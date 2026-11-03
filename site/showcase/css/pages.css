@@ -298,5 +298,19 @@
   text-transform: uppercase;
   margin-bottom: 1.25rem;
 }
+.post-meta { flex-wrap: wrap; row-gap: 0.35rem; }
+.post-meta > * { white-space: nowrap; }
 .post-meta__author { color: var(--accent); }
 
+
+/* Showcase: inline links and the pull quote inside the bio and timeline. */
+.bio-text p a, .timeline__body a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.bio-text blockquote {
+  margin: 1.75rem 0;
+  padding-left: 1.25rem;
+  border-left: 2px solid var(--accent);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  line-height: 1.5;
+  color: var(--text);
+}
