@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RSS feed for the blog. Hand-maintained, so it drifts unless you are
+  deliberate: adding a post means editing this file, blog.html
+  and the featured cards on index.html.
+
+  <item> order is NEWEST FIRST. Dates are RFC-822 and must match the dates
+  shown on the post itself and on its card in blog.html. Copy one <item>
+  block per post.
+-->
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Orla Brennick Blog</title>
+    <link>https://blackphoenixslo.github.io/leakscan-site/showcase/blog.html</link>
+    <atom:link href="https://blackphoenixslo.github.io/leakscan-site/showcase/feed.xml" rel="self" type="application/rss+xml"/>
+    <description>Notes from Orla Brennick's studio in Galway, Ireland: wheel-throwing, glazes and reduction firing, drying pots in the Atlantic damp, and how the work actually gets made.</description>
+    <language>en-ie</language>
+    <lastBuildDate>Wed, 21 Oct 2026 09:00:00 +0000</lastBuildDate>
+    <image>
+      <url>https://blackphoenixslo.github.io/leakscan-site/showcase/imgs/og.webp</url>
+      <title>Orla Brennick Blog</title>
+      <link>https://blackphoenixslo.github.io/leakscan-site/showcase/blog.html</link>
+    </image>
+
+    <item>
+      <title>Why Every Mug Starts as 420 Grams of Clay</title>
+      <link>https://blackphoenixslo.github.io/leakscan-site/showcase/blog/post-1.html</link>
+      <guid isPermaLink="true">https://blackphoenixslo.github.io/leakscan-site/showcase/blog/post-1.html</guid>
+      <pubDate>Wed, 21 Oct 2026 09:00:00 +0000</pubDate>
+      <category>The Work</category>
+      <description>Every mug I make begins on the scale, not the wheel: what weighing clay to the gram settles before the wheel turns, where the 420 grams go, and when I ignore the number.</description>
+    </item>
+
+    <item>
+      <title>What Reduction Firing Actually Does to a Glaze</title>
+      <link>https://blackphoenixslo.github.io/leakscan-site/showcase/blog/post-2.html</link>
+      <guid isPermaLink="true">https://blackphoenixslo.github.io/leakscan-site/showcase/blog/post-2.html</guid>
+      <pubDate>Wed, 30 Sep 2026 09:00:00 +0000</pubDate>
+      <category>Kiln Notes</category>
+      <description>On firing days I starve a gas kiln of oxygen on purpose. What that does to iron and copper, why my celadon only exists because of it, and why no two firings match.</description>
+    </item>
+
+    <item>
+      <title>Drying Pots in a City That Is Never Dry</title>
+      <link>https://blackphoenixslo.github.io/leakscan-site/showcase/blog/post-3.html</link>
+      <guid isPermaLink="true">https://blackphoenixslo.github.io/leakscan-site/showcase/blog/post-3.html</guid>
+      <pubDate>Wed, 09 Sep 2026 09:00:00 +0000</pubDate>
+      <category>Galway</category>
+      <description>Why a board of bowls can take a week to firm up in a Galway March, why slow drying is mostly kind to pots, and the plastic collars, damp cupboard and radiator that keep my handles on.</description>
+    </item>
+
+  </channel>
+</rss>
