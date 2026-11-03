@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /showcase/
+
+Sitemap: https://blackphoenixslo.github.io/leakscan-site/sitemap.xml
