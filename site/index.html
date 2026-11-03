@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeakScan · Leaked content removed by a real person, not a bot</title>
+<meta name="description" content="I'm Jaka. I find your leaked content, check every link myself and file every takedown in your name. Free Google scan and one page removed free before you pay anything.">
+<link rel="canonical" href="https://blackphoenixslo.github.io/leakscan-site/">
+<meta name="theme-color" content="#fbf8f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15120f" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LeakScan">
+<meta property="og:title" content="Leaked content, taken down by a real person">
+<meta property="og:description" content="Software finds the links. Jaka checks every one by hand and files every takedown. Free Google scan first, no forms, no card.">
+<meta property="og:url" content="https://blackphoenixslo.github.io/leakscan-site/">
+<meta property="og:image" content="https://blackphoenixslo.github.io/leakscan-site/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="LeakScan: leaked content, taken down by a real person.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Leaked content, taken down by a real person">
+<meta name="twitter:description" content="Software finds the links. Jaka checks every one by hand and files every takedown. Free Google scan first, no forms, no card.">
+<meta name="twitter:image" content="https://blackphoenixslo.github.io/leakscan-site/assets/og.png">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="css/styles.css">
+<script>document.documentElement.classList.add('js')</script>
+<script src="js/main.js" defer></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "ProfessionalService",
+      "@id": "https://blackphoenixslo.github.io/leakscan-site/#business",
+      "name": "LeakScan",
+      "description": "Personal leaked-content removal for online creators. Every result is checked by a person before any notice is filed.",
+      "url": "https://blackphoenixslo.github.io/leakscan-site/",
+      "logo": "https://blackphoenixslo.github.io/leakscan-site/assets/logo.svg",
+      "image": "https://blackphoenixslo.github.io/leakscan-site/assets/og.png",
+      "email": "me@jackbase.dev",
+      "telephone": "+38640703992",
+      "legalName": "Ognjeni Feniks, Jaka Basej, s.p.",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Kvedrova cesta 5A",
+        "postalCode": "1000",
+        "addressLocality": "Ljubljana",
+        "addressCountry": "SI"
+      },
+      "founder": { "@type": "Person", "name": "Jaka Basej" },
+      "areaServed": "Worldwide",
+      "priceRange": "€250–€500",
+      "sameAs": ["https://t.me/jakabasej"],
+      "contactPoint": [
+        {
+          "@type": "ContactPoint",
+          "contactType": "customer service",
+          "email": "me@jackbase.dev",
+          "telephone": "+38640703992",
+          "url": "https://t.me/jakabasej",
+          "availableLanguage": ["English", "Slovenian"]
+        }
+      ],
+      "makesOffer": [
+        {
+          "@type": "Offer",
+          "name": "Monthly removal",
+          "price": "250",
+          "priceCurrency": "EUR",
+          "priceSpecification": { "@type": "UnitPriceSpecification", "price": "250", "priceCurrency": "EUR", "unitCode": "MON" }
+        },
+        {
+          "@type": "Offer",
+          "name": "One-time clean",
+          "price": "500",
+          "priceCurrency": "EUR"
+        }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://blackphoenixslo.github.io/leakscan-site/#website",
+      "name": "LeakScan",
+      "url": "https://blackphoenixslo.github.io/leakscan-site/",
+      "inLanguage": "en",
+      "publisher": { "@id": "https://blackphoenixslo.github.io/leakscan-site/#business" }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is this legal?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. If you created the content, you hold the copyright to it. A DMCA notice, and its equivalents in the EU and elsewhere, is the legal process for asking sites, hosts and Google to remove copies posted without your permission. You sign a one-page authorization so I can file those notices on your behalf."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Will my own accounts be affected?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "That's the exact risk I'm here to avoid. Nothing is filed until I've confirmed by hand that a link is really your content on a site you didn't authorize. Your own profiles, pages you licensed and people who just look like you are never filed against."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What do you need from me?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For the free scan: your creator name and your handles. That's it. Before I file anything I need the signed one-page Copyright Enforcement Authorization, and now and then a link to your original post so I can show it's yours. I never need your passwords or logins."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How fast does it work?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It depends on the site. Some act on a notice quickly; others ignore it, and then I go to their host, their registrar and Google. With the one-time clean, everything I find is filed in the first week. Google can keep showing a dead page for a while, which is why I also file \"remove outdated content\" requests."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What if it comes back?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Re-uploads happen. On the monthly plan I re-scan every week and file new copies as I find them. On the one-time clean, re-uploads are covered for 40 days, and on day 40 you decide whether to continue."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What will you never do?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "File anything without your signed authorization. File against a link I haven't checked myself. Ask for your passwords. Promise you 100% removal: some sites ignore every notice, and I'd rather tell you that up front."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I cancel? Does anything auto-renew?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The monthly plan can be cancelled anytime. The one-time clean never auto-renews: after 40 days nothing happens unless you say so. And because the scan and the first removal are free, you only pay once you've seen the work."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my information safe?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site has no cookies and no tracking."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need to register or create an account?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. There's no account, no form, no app and no card. You message me on Telegram, WhatsApp or email, and everything happens in that chat."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><symbol id="i-shield-check" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+<symbol id="i-video" viewBox="0 0 24 24"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+<symbol id="i-monitor-smartphone" viewBox="0 0 24 24"><path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"/><path d="M10 19v-3.96 3.15"/><path d="M7 19h5"/><rect width="6" height="10" x="16" y="12" rx="2"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-file-pen-line" viewBox="0 0 24 24"><path d="m18 5-2.414-2.414A2 2 0 0 0 14.172 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/><path d="M21.378 12.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><path d="M8 18h1"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+<symbol id="i-newspaper" viewBox="0 0 24 24"><path d="M15 18h-5"/><path d="M18 14h-8"/><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="10" y="6" rx="1"/></symbol>
+<symbol id="i-trending-up" viewBox="0 0 24 24"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-heart-handshake" viewBox="0 0 24 24"><path d="M19.414 14.414C21 12.828 22 11.5 22 9.5a5.5 5.5 0 0 0-9.591-3.676.6.6 0 0 1-.818.001A5.5 5.5 0 0 0 2 9.5c0 2.3 1.5 4 3 5.5l5.535 5.362a2 2 0 0 0 2.879.052 2.12 2.12 0 0 0-.004-3 2.124 2.124 0 1 0 3-3 2.124 2.124 0 0 0 3.004 0 2 2 0 0 0 0-2.828l-1.881-1.882a2.41 2.41 0 0 0-3.409 0l-1.71 1.71a2 2 0 0 1-2.828 0 2 2 0 0 1 0-2.828l2.823-2.762"/></symbol>
+<symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-scan-search" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol>
+<symbol id="i-badge-check" viewBox="0 0 24 24"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+<symbol id="i-external-link" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+<symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></symbol></svg>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="container header-row">
+    <a class="brand" href="./" aria-label="LeakScan home">
+      <img src="assets/logo.svg" alt="" width="32" height="32">
+      <span>LeakScan</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menu">
+      <svg class="icon icon-open" aria-hidden="true"><use href="#i-menu"/></svg>
+      <svg class="icon icon-close" aria-hidden="true"><use href="#i-x"/></svg>
+    </button>
+    <nav id="nav" class="nav" aria-label="Main">
+      <ul>
+        <li><a href="#free">Free scan</a></li>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#website">Your website</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <a class="btn btn-primary btn-sm" href="https://t.me/jakabasej">
+        <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Message me
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" id="top" aria-labelledby="hero-title">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow">Leak removal for OnlyFans, Fansly and Patreon creators</p>
+      <h1 id="hero-title">Leaked content, taken down by a real person. <span class="accent">Me.</span></h1>
+      <p class="lead">Hi, I'm Jaka. Software finds the links. I open every single one, make sure it's really yours, and file every takedown myself. Nothing goes out in your name until a human has checked it.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary btn-lg" href="https://t.me/jakabasej">
+          <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Message me on Telegram
+        </a>
+        <div class="cta-alt">
+          <a class="btn btn-ghost" href="https://wa.me/38640703992?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan.%20My%20creator%20name%20/%20handles%3A%20">
+            <svg class="icon" aria-hidden="true"><use href="#i-message-circle"/></svg>WhatsApp
+          </a>
+          <a class="btn btn-ghost" href="mailto:me@jackbase.dev?subject=Free%20Google%20scan&amp;body=Hi%20Jaka%2C%0A%0AI%27d%20like%20the%20free%20Google%20scan.%0AMy%20creator%20name%3A%20%0AMy%20handles%20%28Instagram%20/%20TikTok%20/%20X%20/%20OnlyFans%20/%20Fansly%20/%20Patreon%29%3A%20%0A%0AThanks%21">
+            <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>Email
+          </a>
+        </div>
+      </div>
+      <ul class="assurances">
+        <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Free Google scan first</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>One page removed free</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>No forms, no account, no card</li>
+      </ul>
+    </div>
+
+    <figure class="report-card" role="img" aria-label="Illustration of a weekly report: each leak link is listed as dead, cached or live, and every row is checked by Jaka.">
+      <div class="report-head" aria-hidden="true">
+        <div>
+          <p class="report-kicker">Weekly report</p>
+          <p class="report-title">@yourhandle</p>
+        </div>
+        <span class="chip chip-soft"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>Re-scanned</span>
+      </div>
+      <ul class="report-rows" aria-hidden="true">
+        <li><span class="thumb t1"></span><span class="row-url">leak-mirror.example/yourhandle</span><span class="chip chip-dead">Dead</span></li>
+        <li><span class="thumb t2"></span><span class="row-url">free-galleries.example/p/2231</span><span class="chip chip-cached">Cached</span></li>
+        <li><span class="thumb t3"></span><span class="row-url">pirate-tube.example/v/yourname</span><span class="chip chip-live">Live</span></li>
+        <li><span class="thumb t4"></span><span class="row-url">forum-dump.example/thread/88</span><span class="chip chip-dead">Dead</span></li>
+      </ul>
+      <div class="report-foot" aria-hidden="true">
+        <img src="assets/avatar-jaka.svg" alt="" width="36" height="36">
+        <p><strong>Every row checked by Jaka</strong><span>Notices filed for the live ones. De-index requests for the cached.</span></p>
+      </div>
+    </figure>
+  </div>
+  <div class="container">
+    <p class="proof"><svg class="icon" aria-hidden="true"><use href="#i-badge-check"/></svg><span>16,000+ takedown links filed for creators; on fapello.com, 570 of the 633 links I filed no longer resolve.</span></p>
+  </div>
+</section>
+
+<section class="section" id="free" aria-labelledby="free-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Free, before you pay anything</p>
+      <h2 id="free-title">See what I find. See me remove one. Then decide.</h2>
+      <p>No sales call, no trial that quietly renews. You get two real things for free, so you know exactly what you'd be paying for.</p>
+    </div>
+    <div class="free-grid">
+      <article class="card free-card reveal">
+        <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg></span>
+        <h3>A free Google scan</h3>
+        <p>Send me your creator name or Instagram handle. I search <strong>Google Search, Google Images and Google Videos</strong> for it, on a phone and on a desktop, and send you the screenshots. You see exactly what a fan, a friend or a brand sees when they google you.</p>
+        <ul class="mini-list">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>Search</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-image"/></svg>Images</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-video"/></svg>Videos</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-monitor-smartphone"/></svg>Phone + desktop</li>
+        </ul>
+      </article>
+      <article class="card free-card reveal">
+        <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-gift"/></svg></span>
+        <h3>One page removed, free</h3>
+        <p>I pick one leak page, usually the simplest site, and get it taken down. You see the work and the result with your own eyes before any money changes hands.</p>
+        <p class="note"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>No form. No registration. No credit card. Just a message.</p>
+      </article>
+    </div>
+
+    <figure class="browser browser-scan reveal">
+      <div class="browser-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">google.com/search?q=yourname</span></div>
+      <div class="g-desktop" role="img" aria-label="Illustration of a Google Images screenshot for a creator's name, with blurred image results.">
+        <div class="g-top" aria-hidden="true">
+          <span class="g-logo">G<b>o</b><i>o</i>g<b>l</b><i>e</i></span>
+          <span class="g-search">yourname<svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></span>
+        </div>
+        <div class="g-tabs" aria-hidden="true"><span>All</span><span class="on">Images</span><span>Videos</span><span>News</span></div>
+        <div class="g-grid" aria-hidden="true">
+          <span class="thumb t1"></span><span class="thumb t2"></span><span class="thumb t3"></span><span class="thumb t4"></span><span class="thumb t5"></span><span class="thumb t6"></span>
+          <span class="thumb t3"></span><span class="thumb t5"></span><span class="thumb t1"></span><span class="thumb t6"></span><span class="thumb t2"></span><span class="thumb t4"></span>
+        </div>
+      </div>
+      <figcaption>Illustration. Your real scan arrives as screenshots in our chat, phone and desktop.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section section-alt" id="why" aria-labelledby="why-title">
+  <div class="container why-grid">
+    <div class="why-intro reveal">
+      <p class="eyebrow">Why a person, and not a bot</p>
+      <h2 id="why-title">One wrong notice can get <em>your</em> accounts flagged.</h2>
+      <p>Automated takedown tools file at volume. That sounds great until a notice hits your own profile, a page you licensed, or someone who just looks like you. Then it's your accounts that get flagged or banned, not the leak site.</p>
+      <p>So I work the other way round: nothing is filed until I've confirmed the image or link is really yours.</p>
+      <div class="person">
+        <img src="assets/avatar-jaka.svg" alt="Jaka, who runs LeakScan" width="64" height="64" loading="lazy">
+        <p><strong>Jaka</strong><span>Runs LeakScan. Reads every message, checks every link, files every notice.</span></p>
+      </div>
+    </div>
+    <ul class="why-points">
+      <li class="card reveal">
+        <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></span>
+        <div><h3>Software finds. I decide.</h3><p>Scanners collect candidates. I open each result, compare it with your content, and only then file. Lookalikes and your own pages are left alone.</p></div>
+      </li>
+      <li class="card reveal">
+        <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-shield-check"/></svg></span>
+        <div><h3>Your accounts come first.</h3><p>Protecting your income matters more than a big number on a report. A clean, correct notice beats ten careless ones.</p></div>
+      </li>
+      <li class="card reveal">
+        <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-heart-handshake"/></svg></span>
+        <div><h3>You talk to me, start to finish.</h3><p>No ticket queue, no support team. The person answering your message is the person filing your notices.</p></div>
+      </li>
+    </ul>
+    <blockquote class="record reveal">
+      <p>16,000+ takedown links filed for creators; on fapello.com, 570 of the 633 links I filed no longer resolve.</p>
+      <footer>My own track record. Nobody can honestly promise every page comes down, and I won't. I'll tell you straight what's likely to go and what isn't.</footer>
+    </blockquote>
+  </div>
+</section>
+
+<section class="section" id="how" aria-labelledby="how-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">How it works</p>
+      <h2 id="how-title">Seven steps, and the first three are free.</h2>
+    </div>
+    <ol class="steps">
+      <li class="step reveal"><span class="step-n" aria-hidden="true">1</span><div><h3>Message me</h3><p>Your creator name and your handles: OnlyFans, Fansly, Patreon, Instagram, TikTok, X. That's all I need to start.</p></div></li>
+      <li class="step reveal"><span class="step-n" aria-hidden="true">2</span><div><h3>Free Google scan</h3><p>Screenshots of Google Search, Images and Videos for your name, on phone and desktop.</p><span class="tag">Free</span></div></li>
+      <li class="step reveal"><span class="step-n" aria-hidden="true">3</span><div><h3>One page removed free</h3><p>My pick, usually the simplest site, so you see it work before paying.</p><span class="tag">Free</span></div></li>
+      <li class="step reveal"><span class="step-n" aria-hidden="true">4</span><div><h3>Pick a plan, sign one page</h3><p>Monthly or one-time. You sign a one-page Copyright Enforcement Authorization (free), so I can file in your name.</p></div></li>
+      <li class="step reveal"><span class="step-n" aria-hidden="true">5</span><div><h3>I file everything</h3><p>DMCA notices to the site, then its host and registrar, plus Google de-indexing and "remove outdated content" requests.</p></div></li>
+      <li class="step reveal"><span class="step-n" aria-hidden="true">6</span><div><h3>Your official pages go up</h3><p>Your own website and blog posts go live and push leak results down your Google results.</p></div></li>
+      <li class="step reveal"><span class="step-n" aria-hidden="true">7</span><div><h3>Weekly report and re-scans</h3><p>Every week: what's live, what's cached, what's dead, and anything new I found and filed.</p></div></li>
+    </ol>
+  </div>
+</section>
+
+<section class="section section-alt" id="website" aria-labelledby="website-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Your official website + blog</p>
+      <h2 id="website-title">Removing leaks is half the job. Owning your Google results is the other half.</h2>
+      <p>Even after a page dies, Google can keep showing it for a while, and new copies pop up. So both plans include an official website for you, plus blog posts I publish after removals. Google gets real pages about the real you to rank, and those end up on top when someone searches your name. Not the leak sites.</p>
+    </div>
+    <div class="ba">
+      <figure class="ba-item reveal">
+        <figcaption><span class="chip chip-live">Before</span>Leak sites own your name</figcaption>
+        <div class="phone" role="img" aria-label="Illustration: before. A phone showing Google results for a creator's name, where the top results are leak sites with blurred thumbnails.">
+          <div class="phone-screen" aria-hidden="true">
+            <div class="m-search">yourname<svg class="icon"><use href="#i-search"/></svg></div>
+            <div class="m-tabs"><span class="on">All</span><span>Images</span><span>Videos</span></div>
+            <div class="m-result bad"><span class="fav"></span><div><span class="m-site">leak-mirror.example</span><span class="m-title">yourname leaked: full gallery</span><span class="m-thumbs"><span class="thumb t1"></span><span class="thumb t2"></span><span class="thumb t3"></span></span></div></div>
+            <div class="m-result bad"><span class="fav"></span><div><span class="m-site">free-galleries.example</span><span class="m-title">yourname: all photos and videos</span><span class="m-lines"><i></i><i></i></span></div></div>
+            <div class="m-result bad"><span class="fav"></span><div><span class="m-site">pirate-tube.example</span><span class="m-title">yourname videos (new)</span><span class="m-lines"><i></i><i></i></span></div></div>
+            <div class="m-result bad"><span class="fav"></span><div><span class="m-site">forum-dump.example</span><span class="m-title">yourname leak thread</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result"><span class="fav ig"></span><div><span class="m-site">Instagram</span><span class="m-title">yourname (@yourname)</span><span class="m-lines"><i></i></span></div></div>
+          </div>
+        </div>
+      </figure>
+      <div class="ba-arrow" aria-hidden="true"><svg class="icon"><use href="#i-arrow-right"/></svg></div>
+      <figure class="ba-item reveal">
+        <figcaption><span class="chip chip-dead">After</span>Your pages hold the top</figcaption>
+        <div class="phone" role="img" aria-label="Illustration: after. The same Google search now shows the creator's official website and blog posts on top, followed by their social profiles; the leak result is marked removed.">
+          <div class="phone-screen" aria-hidden="true">
+            <div class="m-search">yourname<svg class="icon"><use href="#i-search"/></svg></div>
+            <div class="m-tabs"><span class="on">All</span><span>Images</span><span>Videos</span></div>
+            <div class="m-result good"><span class="fav own"></span><div><span class="m-site">yourname.com</span><span class="m-title">Yourname: Official site</span><span class="m-links"><i>Links</i><i>About</i><i>Blog</i></span></div></div>
+            <div class="m-result good"><span class="fav own"></span><div><span class="m-site">yourname.com › blog</span><span class="m-title">Behind the scenes of my new studio</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result"><span class="fav ig"></span><div><span class="m-site">Instagram</span><span class="m-title">yourname (@yourname)</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result"><span class="fav tt"></span><div><span class="m-site">TikTok</span><span class="m-title">@yourname</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result gone"><span class="fav"></span><div><span class="m-site">leak-mirror.example</span><span class="m-title">Removed</span></div></div>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <ul class="ticks ticks-3 reveal">
+      <li><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg><span><strong>An official website</strong> with your name, your links and your style.</span></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-newspaper"/></svg><span><strong>Blog posts after removals</strong>, so Google keeps finding fresh, real pages about you.</span></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-trending-up"/></svg><span><strong>Your pages climb, leaks sink.</strong> Removal and suppression working together.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="showcase" aria-labelledby="showcase-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Showcase</p>
+      <h2 id="showcase-title">This is the kind of site you get.</h2>
+      <p>A live demo built for a fictional creator. Scroll around inside it. Yours is built around your name, your links and your look.</p>
+    </div>
+    <figure class="browser browser-demo reveal">
+      <div class="browser-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">yourname.com</span></div>
+      <iframe src="showcase/" title="Demo of an official creator website" loading="lazy" width="1200" height="720"></iframe>
+    </figure>
+    <p class="center reveal"><a class="btn btn-primary" href="showcase/">Open the demo site<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a></p>
+  </div>
+</section>
+
+<section class="section section-alt" id="pricing" aria-labelledby="pricing-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">What's included</p>
+      <h2 id="pricing-title">Two plans. Both free until you've seen it work.</h2>
+      <p>Your free scan and one free removal come first either way. Both plans include your official website and blog posts.</p>
+    </div>
+    <div class="plans">
+      <article class="card plan reveal" aria-labelledby="plan-monthly">
+        <p class="plan-kind">Ongoing protection</p>
+        <h3 id="plan-monthly">Monthly removal</h3>
+        <p class="price"><span class="amount">€250</span><span class="per">/ month</span></p>
+        <ul class="ticks">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Weekly re-scans</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>DMCA notices to sites and hosts</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Google de-indexing and "remove outdated content" filings</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Removal tracking on every link</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Weekly report: live / cached / dead</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span><strong>Your official website + blog posts</strong></span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Cancel anytime</span></li>
+        </ul>
+        <a class="btn btn-primary btn-block" href="https://t.me/jakabasej"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Start with a free scan</a>
+      </article>
+      <article class="card plan reveal" aria-labelledby="plan-once">
+        <p class="plan-kind">One big clean-up</p>
+        <h3 id="plan-once">One-time clean</h3>
+        <p class="price"><span class="amount">€500</span><span class="per">one-time</span></p>
+        <ul class="ticks">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Everything found is filed in week 1</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Re-uploads filed for 40 days</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Site, host, registrar and Google filings</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span><strong>Your official website + blog posts</strong></span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>On day 40 you decide whether to continue</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>No auto-renewal</span></li>
+        </ul>
+        <a class="btn btn-outline btn-block" href="https://t.me/jakabasej"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Start with a free scan</a>
+      </article>
+    </div>
+    <p class="fineprint reveal"><svg class="icon" aria-hidden="true"><use href="#i-file-pen-line"/></svg><span>Every removal starts with a signed one-page Copyright Enforcement Authorization. It's free, and it lets me file in your name. Prices in EUR.</span></p>
+  </div>
+</section>
+
+<section class="section" id="faq" aria-labelledby="faq-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">FAQ</p>
+      <h2 id="faq-title">Straight answers.</h2>
+    </div>
+    <div class="faq">
+      <details class="reveal" open>
+        <summary>Is this legal?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>Yes. If you created the content, you hold the copyright to it. A DMCA notice, and its equivalents in the EU and elsewhere, is the legal process for asking sites, hosts and Google to remove copies posted without your permission. You sign a one-page authorization so I can file those notices on your behalf.</p>
+      </details>
+      <details class="reveal">
+        <summary>Will my own accounts be affected?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>That's the exact risk I'm here to avoid. Nothing is filed until I've confirmed by hand that a link is really your content on a site you didn't authorize. Your own profiles, pages you licensed and people who just look like you are never filed against.</p>
+      </details>
+      <details class="reveal">
+        <summary>What do you need from me?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>For the free scan: your creator name and your handles. That's it. Before I file anything I need the signed one-page Copyright Enforcement Authorization, and now and then a link to your original post so I can show it's yours. I never need your passwords or logins.</p>
+      </details>
+      <details class="reveal">
+        <summary>How fast does it work?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>It depends on the site. Some act on a notice quickly; others ignore it, and then I go to their host, their registrar and Google. With the one-time clean, everything I find is filed in the first week. Google can keep showing a dead page for a while, which is why I also file "remove outdated content" requests.</p>
+      </details>
+      <details class="reveal">
+        <summary>What if it comes back?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>Re-uploads happen. On the monthly plan I re-scan every week and file new copies as I find them. On the one-time clean, re-uploads are covered for 40 days, and on day 40 you decide whether to continue.</p>
+      </details>
+      <details class="reveal">
+        <summary>What will you never do?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>File anything without your signed authorization. File against a link I haven't checked myself. Ask for your passwords. Promise you 100% removal: some sites ignore every notice, and I'd rather tell you that up front.</p>
+      </details>
+      <details class="reveal">
+        <summary>Can I cancel? Does anything auto-renew?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>The monthly plan can be cancelled anytime. The one-time clean never auto-renews: after 40 days nothing happens unless you say so. And because the scan and the first removal are free, you only pay once you've seen the work.</p>
+      </details>
+      <details class="reveal">
+        <summary>Is my information safe?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site has no cookies and no tracking.</p>
+      </details>
+      <details class="reveal">
+        <summary>Do I need to register or create an account?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
+        <p>No. There's no account, no form, no app and no card. You message me on Telegram, WhatsApp or email, and everything happens in that chat.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="section contact" id="contact" aria-labelledby="contact-title">
+  <div class="container">
+  <div class="contact-card reveal">
+    <img class="contact-avatar" src="assets/avatar-jaka.svg" alt="Jaka" width="88" height="88" loading="lazy">
+    <h2 id="contact-title">Send me your name. I'll show you what Google shows.</h2>
+    <p>Message me on whichever app you already use. You'll be talking to me, not a bot and not a team.</p>
+    <div class="channels">
+      <a class="channel channel-primary" href="https://t.me/jakabasej">
+        <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>
+        <span><strong>Telegram</strong><span>@jakabasej</span></span>
+      </a>
+      <a class="channel" href="https://wa.me/38640703992?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan.%20My%20creator%20name%20/%20handles%3A%20">
+        <svg class="icon" aria-hidden="true"><use href="#i-message-circle"/></svg>
+        <span><strong>WhatsApp</strong><span>+386 40 703 992</span></span>
+      </a>
+      <a class="channel" href="mailto:me@jackbase.dev?subject=Free%20Google%20scan&amp;body=Hi%20Jaka%2C%0A%0AI%27d%20like%20the%20free%20Google%20scan.%0AMy%20creator%20name%3A%20%0AMy%20handles%20%28Instagram%20/%20TikTok%20/%20X%20/%20OnlyFans%20/%20Fansly%20/%20Patreon%29%3A%20%0A%0AThanks%21">
+        <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>
+        <span><strong>Email</strong><span>me@jackbase.dev</span></span>
+      </a>
+    </div>
+    <p class="hint">Not sure what to write? <q>Hi Jaka, I'd like the free Google scan. My name / handles: …</q></p>
+  </div>
+  </div>
+</section>
+
+</main>
+
+<a class="mobile-cta" href="https://t.me/jakabasej" aria-hidden="true" tabindex="-1">
+  <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Free scan: message me
+</a>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div>
+      <a class="brand" href="./">
+        <img src="assets/logo.svg" alt="" width="28" height="28">
+        <span>LeakScan</span>
+      </a>
+      <p>Leaked content removal for creators, done by a person.<br>Run by Ognjeni Feniks, Jaka Basej, s.p., Ljubljana, Slovenia.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+        <li><a href="./#free">Free scan</a></li>
+        <li><a href="./#pricing">Pricing</a></li>
+        <li><a href="./#faq">FAQ</a></li>
+        <li><a href="imprint.html">Imprint</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+      </ul>
+    </nav>
+    <div>
+      <ul class="footer-contact">
+        <li><a href="https://t.me/jakabasej">Telegram @jakabasej</a></li>
+        <li><a href="https://wa.me/38640703992">WhatsApp +386 40 703 992</a></li>
+        <li><a href="mailto:me@jackbase.dev">me@jackbase.dev</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="container footer-base">
+    <p>© 2026 Ognjeni Feniks, Jaka Basej, s.p. · No cookies, no tracking.</p>
+  </div>
+</footer>
+
+</body>
+</html>
