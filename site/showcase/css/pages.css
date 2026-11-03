@@ -234,9 +234,11 @@
    ============================================================ */
 .post-hero {
   position: relative;
-  height: clamp(350px, 45vw, 550px);
+  /* min-height, not height: a long title on a phone must grow the hero
+     instead of climbing under the fixed nav. */
+  min-height: clamp(350px, 45vw, 550px);
   overflow: hidden;
-  padding-top: var(--nav-h);
+  padding-top: calc(var(--nav-h) + 2rem);
   display: flex;
   align-items: flex-end;
 }
