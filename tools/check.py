@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""Gate for site/. Silent + exit 0 when green; prints each problem + exit 1 otherwise.
+
+Checks every HTML file under site/ (except site/showcase/**):
+- local href/src/srcset/poster targets exist (the `showcase/` link is skipped; it ships from another branch)
+- absolute URLs under SITE_URL resolve to local files too; no leading-slash internal links
+- no third-party resource loads (scripts, styles, images, frames, icons)
+- #fragment links point at an existing id
+- <html lang>, viewport meta, <title>, meta description, og:title/description/image, twitter:card
+- exactly one <h1>, no duplicate ids, every <img> has alt + width + height
+- every JSON-LD block parses; FAQPage Q&A text equals the visible <details> FAQ
+- indexable page (no robots noindex) has canonical == SITE_URL + path (and og:url, if present, equal)
+- sitemap.xml lists exactly the indexable pages; robots.txt Sitemap line points at it
+- no `{{` in any shipped text file
+- every file under site/assets, site/css, site/js is referenced by some page
+"""
+import json, pathlib, re, sys
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlsplit, unquote
+
+SITE_URL = "https://blackphoenixslo.github.io/leakscan-site/"
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SITE = ROOT / "site"
+SKIP_LINKS = {"showcase/"}
+MUST_BE_REFERENCED = ("assets", "css", "js")
+TEXT_EXT = {".html", ".css", ".js", ".xml", ".txt", ".svg", ".json", ".webmanifest"}
+RESOURCE_TAGS = {"script", "img", "iframe", "source", "video", "audio", "embed", "object", "track"}
+VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+
+problems = []
+
+
+def bad(msg):
+    problems.append(msg)
+
+
+def shipped(p):
+    rel = p.relative_to(SITE).as_posix()
+    return not (rel == "showcase" or rel.startswith("showcase/"))
+
+
+def page_url(rel):
+    """site-relative path of a page -> its public URL."""
+    if rel == "index.html":
+        return SITE_URL
+    if rel.endswith("/index.html"):
+        return SITE_URL + rel[: -len("index.html")]
+    return SITE_URL + rel
+
+
+class Page(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.lang = None
+        self.refs = []          # (tag, attr, value)
+        self.ids = []
+        self.h1 = 0
+        self.metas = {}
+        self.links = []         # (rel, href)
+        self.imgs = []
+        self.jsonld = []
+        self.title = False
+        self._in_ld = None
+        self._faq = []          # [question, answer]
+        self._stack = []
+        self._cap = None
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag not in VOID:
+            self._stack.append(tag)
+        if tag == "html":
+            self.lang = a.get("lang")
+        if "id" in a:
+            self.ids.append(a["id"])
+        if tag == "h1":
+            self.h1 += 1
+        if tag == "title":
+            self.title = True
+        if tag == "meta":
+            key = a.get("name") or a.get("property")
+            if key:
+                self.metas.setdefault(key, a.get("content", ""))
+        if tag == "link":
+            self.links.append(((a.get("rel") or "").lower(), a.get("href")))
+        if tag == "img":
+            self.imgs.append(a)
+        if tag == "script" and a.get("type") == "application/ld+json":
+            self._in_ld = []
+        if tag == "details":
+            self._faq.append(["", ""])
+        if tag == "summary" and self._faq:
+            self._cap = 0
+        if tag == "p" and self._faq and "details" in self._stack and self._cap is None:
+            self._cap = 1
+        for k in ("href", "src", "poster", "xlink:href"):
+            if a.get(k) is not None:
+                self.refs.append((tag, k, a[k], (a.get("rel") or "").lower()))
+        if a.get("srcset"):
+            for part in a["srcset"].split(","):
+                if part.strip():
+                    self.refs.append((tag, "srcset", part.split()[0], ""))
+        if tag == "meta" and (a.get("content") or "").startswith(SITE_URL):
+            self.refs.append((tag, "content", a["content"], ""))
+
+    def handle_endtag(self, tag):
+        if self._stack and tag in self._stack:
+            while self._stack and self._stack.pop() != tag:
+                pass
+        if tag == "script" and self._in_ld is not None:
+            self.jsonld.append("".join(self._in_ld))
+            self._in_ld = None
+        if tag in ("summary", "p"):
+            self._cap = None
+
+    def handle_data(self, data):
+        if self._in_ld is not None:
+            self._in_ld.append(data)
+        if self._cap is not None and self._faq:
+            self._faq[-1][self._cap] += data
+
+    @property
+    def faq(self):
+        return [(" ".join(q.split()), " ".join(a.split())) for q, a in self._faq]
+
+
+def local_target(page_rel, value):
+    """Return (site-relative file path or None, fragment) for a local/own-site URL; None if external."""
+    if value.startswith(SITE_URL):
+        rest = value[len(SITE_URL):]
+        base = SITE_URL
+        joined = SITE_URL + rest
+    else:
+        sp = urlsplit(value)
+        if sp.scheme or value.startswith("//"):
+            return None
+        base = page_url(page_rel)
+        joined = urljoin(base, value)
+    if not joined.startswith(SITE_URL):
+        return ("../outside", "")
+    sp = urlsplit(joined)
+    path = unquote(sp.path)[len(urlsplit(SITE_URL).path):]
+    if path == "" or path.endswith("/"):
+        path += "index.html"
+    return (path, sp.fragment)
+
+
+def main():
+    pages = sorted(p for p in SITE.rglob("*.html") if shipped(p))
+    parsed = {}
+    for p in pages:
+        rel = p.relative_to(SITE).as_posix()
+        pg = Page()
+        pg.feed(p.read_text(encoding="utf-8"))
+        parsed[rel] = pg
+
+    referenced = set()
+    for rel, pg in parsed.items():
+        if not pg.lang:
+            bad(f"{rel}: <html> has no lang attribute")
+        if "viewport" not in pg.metas:
+            bad(f"{rel}: no viewport meta")
+        if not pg.title:
+            bad(f"{rel}: no <title>")
+        for m in ("description", "og:title", "og:description", "og:image", "twitter:card"):
+            if not pg.metas.get(m):
+                bad(f"{rel}: missing meta {m}")
+        if pg.h1 != 1:
+            bad(f"{rel}: {pg.h1} <h1> elements (want exactly 1)")
+        seen = set()
+        for i in pg.ids:
+            if i in seen:
+                bad(f"{rel}: duplicate id '{i}'")
+            seen.add(i)
+        for img in pg.imgs:
+            for k in ("alt", "width", "height"):
+                if k not in img:
+                    bad(f"{rel}: <img src={img.get('src')!r}> has no {k}")
+        for block in pg.jsonld:
+            try:
+                data = json.loads(block)
+            except ValueError as e:
+                bad(f"{rel}: JSON-LD does not parse: {e}")
+                continue
+            if isinstance(data, dict) and data.get("@type") == "FAQPage":
+                ld = [(q["name"], q["acceptedAnswer"]["text"]) for q in data.get("mainEntity", [])]
+                if ld != pg.faq:
+                    bad(f"{rel}: FAQPage JSON-LD does not match the visible FAQ")
+
+        for tag, attr, value, linkrel in pg.refs:
+            v = value.strip()
+            if v in SKIP_LINKS or v.startswith(("mailto:", "tel:", "data:")):
+                continue
+            if v.startswith("/") and not v.startswith("//"):
+                bad(f"{rel}: internal link with leading slash: {v}")
+                continue
+            if v.startswith("#"):
+                if v[1:] and v[1:] not in pg.ids:
+                    bad(f"{rel}: #{v[1:]} does not match any id")
+                continue
+            tgt = local_target(rel, v)
+            if tgt is None:
+                loads = tag in RESOURCE_TAGS or (tag == "link" and linkrel not in ("canonical", "alternate"))
+                if loads and attr != "content":
+                    bad(f"{rel}: third-party resource <{tag} {attr}={v}>")
+                continue
+            path, frag = tgt
+            f = SITE / path
+            if path.startswith("../") or not f.is_file():
+                bad(f"{rel}: broken link {attr}={v}")
+                continue
+            referenced.add(path)
+            if frag and path.endswith(".html") and path in parsed and frag not in parsed[path].ids:
+                bad(f"{rel}: {v} points at missing id '{frag}'")
+
+    indexable = {rel for rel, pg in parsed.items() if "noindex" not in pg.metas.get("robots", "")}
+    for rel in sorted(indexable):
+        pg = parsed[rel]
+        canon = [h for r, h in pg.links if "canonical" in r.split()]
+        want = page_url(rel)
+        if canon != [want]:
+            bad(f"{rel}: canonical {canon} != [{want}]")
+        if pg.metas.get("og:url") and pg.metas["og:url"] != want:
+            bad(f"{rel}: og:url {pg.metas['og:url']} != {want}")
+
+    sm = SITE / "sitemap.xml"
+    if not sm.is_file():
+        bad("sitemap.xml missing")
+    else:
+        locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", sm.read_text(encoding="utf-8"))
+        want = sorted(page_url(r) for r in indexable)
+        if sorted(locs) != want or len(locs) != len(set(locs)):
+            bad(f"sitemap.xml lists {sorted(locs)}, want {want}")
+    rb = SITE / "robots.txt"
+    if not rb.is_file() or f"Sitemap: {SITE_URL}sitemap.xml" not in rb.read_text(encoding="utf-8"):
+        bad(f"robots.txt missing or has no 'Sitemap: {SITE_URL}sitemap.xml'")
+
+    for f in sorted(SITE.rglob("*")):
+        if not f.is_file() or not shipped(f):
+            continue
+        rel = f.relative_to(SITE).as_posix()
+        if f.suffix in TEXT_EXT and "{{" in f.read_text(encoding="utf-8", errors="replace"):
+            bad(f"{rel}: contains '{{{{'")
+        if rel.split("/")[0] in MUST_BE_REFERENCED and rel not in referenced:
+            bad(f"{rel}: not referenced by any page")
+
+    for p in problems:
+        print(p)
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
