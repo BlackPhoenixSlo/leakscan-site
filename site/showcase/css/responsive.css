@@ -15,13 +15,15 @@
 @media (max-width: 767px) {
   /* On mobile the hero falls back to the vertical portrait, so the subject fills the
      frame and sits directly under the copy. Weight the scrim harder for legibility. */
-  .hero__bg { filter: brightness(0.5); }
+  /* Showcase: the portrait is hands and a bowl, not a face; keep the bowl in frame
+     and the scrim on the lower half only. */
+  .hero__bg { filter: brightness(0.66); object-position: 30% 40%; }
   .hero__overlay {
     background: linear-gradient(
       to top,
       color-mix(in srgb, var(--bg) 96%, transparent) 0%,
-      color-mix(in srgb, var(--bg) 75%, transparent) 45%,
-      color-mix(in srgb, var(--bg) 35%, transparent) 100%
+      color-mix(in srgb, var(--bg) 70%, transparent) 40%,
+      color-mix(in srgb, var(--bg) 10%, transparent) 75%
     );
   }
 }
