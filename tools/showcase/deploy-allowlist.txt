@@ -1,0 +1,6 @@
+# Files under site/showcase/ that legitimately ship without any page linking
+# to them. check_deploy.py fails on anything under site/showcase/ that is
+# neither referenced by a page nor listed here, so every entry is a decision.
+#
+# One glob per line, relative to site/showcase/. `*` does not cross a slash;
+# `dir/` is a whole directory, `**` any depth. Keep this file empty if you can.

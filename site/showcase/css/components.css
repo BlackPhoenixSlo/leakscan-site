@@ -1,0 +1,709 @@
+/* components — reusable pieces: nav, hero, buttons, cards, footer,
+   lightbox, prose, notice, timeline, chips. */
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: var(--nav-h);
+  display: flex;
+  align-items: center;
+  padding: 0 clamp(1.5rem, 5vw, 3rem);
+  transition: background var(--t), backdrop-filter var(--t);
+}
+
+.nav.scrolled {
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+}
+
+.nav__logo {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text);
+  transition: color var(--t);
+}
+.nav__logo:hover { color: var(--accent); }
+
+.nav__links {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+.nav__links a {
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color var(--t);
+}
+.nav__links a:hover,
+.nav__links a.active { color: var(--text); }
+
+.nav__cta {
+  background: var(--accent) !important;
+  color: var(--bg) !important;
+  padding: 0.55rem 1.4rem !important;
+  border-radius: var(--radius) !important;
+  font-weight: 500 !important;
+  transition: background var(--t) !important;
+}
+.nav__cta:hover { background: var(--accent-light) !important; }
+
+/* Mobile menu toggle.
+   background/border must be reset explicitly — a bare <button> otherwise renders
+   with the UA's default ButtonFace fill, which showed up as a solid white box. */
+.nav__toggle {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+  padding: 4px;
+  background: none;
+  border: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.nav__toggle span {
+  display: block;
+  width: 24px;
+  height: 1.5px;
+  background: var(--text);
+  transition: var(--t);
+}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  min-height: 600px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* object-position keeps the face in frame on wide viewports, where a 3:4
+   portrait is cropped hard vertically. Tuned to the portrait's head position. */
+.hero__bg {
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+  object-position: center 22%;
+  width: 100%;
+  height: 100%;
+  filter: brightness(0.72);
+}
+
+.hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--bg) 85%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 30%, transparent) 45%,
+    color-mix(in srgb, var(--bg) 10%, transparent) 100%
+  );
+}
+
+.hero__content {
+  position: relative;
+  z-index: 2;
+  padding: 0 clamp(1.5rem, 5vw, 3rem) clamp(3.5rem, 8vw, 6rem);
+  max-width: var(--max-w);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.hero__eyebrow {
+  margin-bottom: 1rem;
+}
+
+.hero__title {
+  color: var(--white);
+  max-width: 700px;
+  margin-bottom: 1.2rem;
+}
+
+.hero__subtitle {
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  max-width: 420px;
+  margin-bottom: 2.2rem;
+  font-weight: 300;
+}
+
+.hero__actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 2rem;
+  border-radius: var(--radius);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  transition: all var(--t);
+  white-space: nowrap;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--bg);
+}
+.btn--primary:hover {
+  background: var(--accent-light);
+  transform: translateY(-1px);
+}
+
+.btn--outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--text) 30%, transparent);
+}
+.btn--outline:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   GALLERY GRID
+   ============================================================ */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.gallery-grid--4col {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.gallery-grid--3col {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.gallery-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  aspect-ratio: 2/3;
+  cursor: pointer;
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transition: transform 0.5s ease;
+}
+.gallery-item:hover img { transform: scale(1.05); }
+
+.gallery-item__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, color-mix(in srgb, var(--bg) 60%, transparent) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity var(--t);
+}
+.gallery-item:hover .gallery-item__overlay { opacity: 1; }
+
+/* Tall feature item */
+.gallery-item--tall { aspect-ratio: 3/5; }
+
+/* ============================================================
+   SECTION HEADER
+   ============================================================ */
+.section-header {
+  margin-bottom: clamp(2.5rem, 5vw, 4rem);
+}
+.section-header--center { text-align: center; }
+.section-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  max-width: 520px;
+  margin-top: 0.75rem;
+}
+.section-header--center p { margin: 0.75rem auto 0; }
+
+/* ============================================================
+   SOCIAL PROOF STRIP
+   ============================================================ */
+.social-strip {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 3rem 0;
+}
+
+.social-strip__grid {
+  display: flex;
+  justify-content: center;
+  gap: clamp(2rem, 6vw, 5rem);
+  flex-wrap: wrap;
+}
+
+.social-card {
+  text-align: center;
+  min-width: 120px;
+}
+.social-card__count {
+  font-family: var(--font-display);
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+  line-height: 1;
+}
+.social-card__platform {
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+/* ============================================================
+   BLOG CARDS
+   ============================================================ */
+.blog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.blog-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--t), transform var(--t);
+}
+.blog-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+}
+
+.blog-card__img {
+  aspect-ratio: 16/9;
+  overflow: hidden;
+}
+.blog-card__img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.blog-card:hover .blog-card__img img { transform: scale(1.05); }
+
+.blog-card__body {
+  padding: 1.5rem;
+}
+.blog-card__meta {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+.blog-card__title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  line-height: 1.3;
+  margin-bottom: 0.75rem;
+  color: var(--text);
+}
+.blog-card__excerpt {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.blog-card__link {
+  display: inline-block;
+  margin-top: 1.2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  transition: color var(--t);
+}
+.blog-card__link:hover { color: var(--accent-light); }
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.footer {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 4rem 0 2.5rem;
+}
+
+.footer__inner {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 3rem;
+  margin-bottom: 3rem;
+}
+
+.footer__brand-name {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+.footer__brand-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 260px;
+}
+
+.footer__col-title {
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.2rem;
+}
+.footer__links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.footer__links a {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  transition: color var(--t);
+}
+.footer__links a:hover { color: var(--text); }
+
+.footer__bottom {
+  border-top: 1px solid var(--border);
+  padding-top: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Social icons in footer */
+.social-icons {
+  display: flex;
+  gap: 1rem;
+}
+.social-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  transition: all var(--t);
+}
+.social-icon:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ============================================================
+   LIGHTBOX
+   ============================================================ */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.lightbox.open {
+  opacity: 1;
+  pointer-events: all;
+}
+.lightbox__img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: var(--radius);
+}
+.lightbox__close {
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
+  font-size: 2rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  line-height: 1;
+  transition: color var(--t);
+}
+.lightbox__close:hover { color: var(--text); }
+
+/* ============================================================
+   PROSE LISTS (used in post bodies & statement)
+   ============================================================ */
+.post-list {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0 0 1.5rem;
+  color: var(--text-muted);
+}
+.post-list li {
+  margin-bottom: 0.6rem;
+  line-height: 1.8;
+}
+.post-list li::marker { color: var(--accent); }
+.post-body a,
+.post-list a {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: border-color var(--t);
+}
+.post-body a:hover,
+.post-list a:hover { border-bottom-color: var(--accent); }
+
+.post-body blockquote {
+  margin: 2rem 0;
+  padding: 0.25rem 0 0.25rem 1.5rem;
+  border-left: 2px solid var(--accent);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+/* ============================================================
+   NOTICE / CALLOUT
+   ============================================================ */
+.notice {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+}
+.notice p { margin-bottom: 0.5rem; font-size: 0.9rem; }
+.notice p:last-child { margin-bottom: 0; }
+.notice__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.6rem;
+}
+
+/* ============================================================
+   CAREER TIMELINE
+   ============================================================ */
+.timeline {
+  position: relative;
+  padding-left: 2rem;
+  max-width: 780px;
+}
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6rem;
+  bottom: 0.6rem;
+  width: 1px;
+  background: var(--border);
+}
+.timeline__item {
+  position: relative;
+  padding-bottom: 2.75rem;
+}
+.timeline__item:last-child { padding-bottom: 0; }
+.timeline__item::before {
+  content: "";
+  position: absolute;
+  left: calc(-2rem - 4px);
+  top: 0.55rem;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+}
+.timeline__date {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.4rem;
+}
+.timeline__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+.timeline__body {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.75;
+}
+
+/* Chips / tags */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+.chip {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 0.35rem 0.85rem;
+}
+
+
+/* ============================================================
+   DEMO RIBBON (showcase only)
+   Fixed to the bottom of the viewport so it never sits on the fixed nav.
+   Dismissed by main.js for the rest of the session.
+   ============================================================ */
+.demo-ribbon {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 120;            /* over the nav (100), under the lightbox (999) */
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  padding: 0.5rem 0.5rem 0.5rem 1.1rem;
+  background: color-mix(in srgb, var(--surface-2) 94%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 999px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--bg) 70%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.demo-ribbon.is-hidden { display: none; }
+.demo-ribbon__text { margin: 0; }
+.demo-ribbon__text strong { color: var(--text); font-weight: 700; }
+.demo-ribbon__back {
+  flex: none;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background var(--t);
+}
+.demo-ribbon__back:hover { background: var(--accent-light); }
+.demo-ribbon__close {
+  flex: none;
+  padding: 0.2rem 0.45rem;
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.demo-ribbon__close:hover { color: var(--text); }
+/* Keep the footer's last line clear of the ribbon while it is showing. */
+body:has(.demo-ribbon:not(.is-hidden)) .footer { padding-bottom: 6rem; }
+
+/* "demo" marker on account rows: they point at this page, not a platform. */
+.demo-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  vertical-align: middle;
+}
+/* Hide the ribbon while the mobile menu is open; it would cover the links. */
+body:has(.nav__links.open) .demo-ribbon { display: none; }
+
+/* Visible note above the demo account rows on links.html. */
+.links-demo-note {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  text-align: left;
+}
+.link-btn[aria-disabled="true"] { cursor: default; }

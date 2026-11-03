@@ -1,0 +1,160 @@
+/* base — palette, reset, typography, layout utilities.
+   Load first: everything below depends on the :root block here. */
+
+/* ============================================================
+   TEMPLATE CONFIG — swap these vars for any model
+   ============================================================ */
+:root {
+  /* Colors — set the palette for this client here. Everything else in the
+     stylesheet derives from these with color-mix(), so there is no second
+     place to edit. Pick something tied to the client, not to the last one. */
+  --bg:          #15110e;   /* kiln-dark brown-black */
+  --surface:     #1c1713;
+  --surface-2:   #241e19;
+  --border:      #3b3129;
+  --text:        #f2ebe2;   /* porcelain */
+  --text-muted:  #a8998a;
+  --accent:      #c9784a;   /* iron-red / terracotta glaze */
+  --accent-light:#df9568;
+  /* Text drawn ON the accent. Flip to #fff if the accent is dark. */
+  --accent-contrast: #1a0f08;
+  --white:       #ffffff;
+
+  /* Typography */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body:    'Karla', system-ui, sans-serif;
+
+  /* Layout */
+  --max-w: 1200px;
+  --nav-h: 72px;
+  --radius: 4px;
+  --radius-lg: 8px;
+
+  /* Transitions */
+  --t: 0.3s ease;
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+  scrollbar-gutter: stable;
+}
+
+/* Fade-in: initial state in CSS to prevent flash/CLS */
+[data-fade] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  will-change: opacity, transform;
+}
+[data-fade].in-view {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-fade], [data-fade].in-view {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  html { scroll-behavior: auto; }
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul { list-style: none; }
+
+/* ============================================================
+   TYPOGRAPHY
+   ============================================================ */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+}
+
+h1 {
+  font-size: clamp(2.6rem, 5.5vw, 4.8rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+}
+h2 { font-size: clamp(1.8rem, 3.4vw, 2.7rem); }
+h3 { font-size: clamp(1.3rem, 2.2vw, 1.75rem); }
+h4 { font-size: 1.05rem; }
+
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ============================================================
+   LAYOUT UTILITIES
+   ============================================================ */
+.container {
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 clamp(1.5rem, 5vw, 3rem);
+}
+
+.section {
+  padding: clamp(5rem, 10vw, 9rem) 0;
+}
+
+.divider {
+  width: 40px;
+  height: 1px;
+  background: var(--accent);
+  margin: 1.5rem 0;
+}
+
+.divider--center { margin: 1.5rem auto; }
+
+
+/* Skip-to-content (keyboard accessibility) */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  padding: 8px 14px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 10000;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 8px;
+  outline: 2px solid var(--white);
+}
