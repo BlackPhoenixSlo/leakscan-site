@@ -7,6 +7,8 @@ Checks every HTML file under site/ (except site/showcase/**):
 - no third-party resource loads (scripts, styles, images, frames, icons)
 - #fragment links point at an existing id
 - <html lang>, viewport meta, <title>, meta description, og:title/description/image, twitter:card
+- <title> <= 65 chars, meta description <= 160 chars (longer gets cut in Google results)
+- every CTA (<a> with class btn/channel/mobile-cta) to Telegram/WhatsApp prefills a message (text=), mailto has body=
 - exactly one <h1>, no duplicate ids, every <img> has alt + width + height
 - every JSON-LD block parses; FAQPage Q&A text equals the visible <details> FAQ
 - indexable page (no robots noindex) has canonical == SITE_URL + path (and og:url, if present, equal)
@@ -25,6 +27,8 @@ SITE = ROOT / "site"
 MUST_BE_REFERENCED = ("assets", "css", "js")
 TEXT_EXT = {".html", ".css", ".js", ".xml", ".txt", ".svg", ".json", ".webmanifest"}
 RESOURCE_TAGS = {"script", "img", "iframe", "source", "video", "audio", "embed", "object", "track"}
+CTA_CLASSES = {"btn", "channel", "mobile-cta"}
+CHAT = ("https://t.me/", "https://wa.me/")
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
 problems = []
@@ -60,6 +64,8 @@ class Page(HTMLParser):
         self.imgs = []
         self.jsonld = []
         self.title = False
+        self.title_text = ""
+        self.ctas = []          # (class, href)
         self._in_ld = None
         self._faq = []          # [question, answer]
         self._stack = []
@@ -85,6 +91,8 @@ class Page(HTMLParser):
             self.links.append(((a.get("rel") or "").lower(), a.get("href")))
         if tag == "img":
             self.imgs.append(a)
+        if tag == "a" and set((a.get("class") or "").split()) & CTA_CLASSES:
+            self.ctas.append((a.get("class"), a.get("href") or ""))
         if tag == "script" and a.get("type") == "application/ld+json":
             self._in_ld = []
         if tag == "details":
@@ -114,6 +122,8 @@ class Page(HTMLParser):
             self._cap = None
 
     def handle_data(self, data):
+        if self._stack and self._stack[-1] == "title":
+            self.title_text += data
         if self._in_ld is not None:
             self._in_ld.append(data)
         if self._cap is not None and self._faq:
@@ -165,6 +175,14 @@ def main():
         for m in ("description", "og:title", "og:description", "og:image", "twitter:card"):
             if not pg.metas.get(m):
                 bad(f"{rel}: missing meta {m}")
+        if len(pg.title_text.strip()) > 65:
+            bad(f"{rel}: <title> is {len(pg.title_text.strip())} chars (max 65)")
+        if len(pg.metas.get("description", "")) > 160:
+            bad(f"{rel}: meta description is {len(pg.metas['description'])} chars (max 160)")
+        for cls, href in pg.ctas:
+            q = urlsplit(href).query
+            if href.startswith(CHAT) and "text=" not in q or href.startswith("mailto:") and "body=" not in q:
+                bad(f"{rel}: CTA <a class={cls!r}> {href} has no prefilled message")
         if pg.h1 != 1:
             bad(f"{rel}: {pg.h1} <h1> elements (want exactly 1)")
         seen = set()
