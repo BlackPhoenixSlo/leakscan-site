@@ -7,8 +7,18 @@ iframes it as `showcase/`. The demo loads Google Fonts (so the homepage does too
 discloses that and `tools/check.py` keeps the two in sync. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 
-- Free scan: the hero form (`#scan`, plain GET, no JS) sends `p=<platform>&h=<handle>&go=1` to
-  https://jackbase.me/scan (Jaka's scan app, which auto-starts the scan). Contact links stay as the fallback.
+- Free scan: the hero form (`#scan`, plain GET) sends `p=<platform>&h=<handle>` to `scan/` (`site/scan/index.html` +
+  `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
+  (`https://scan.srv1395798.hstgr.cloud`, set once at the top of `js/scan.js`, overridden by `<body data-api>`), reads the
+  SSE stream (progress → result → done), then renders the report: summary, a Google look-alike (All / Images / Videos,
+  Phone / Computer, thumbnails via `/api/thumb`, blurred until Reveal), per-site table, all links (copy / .txt) and the
+  prefilled message CTAs. The URL becomes `scan/?r=<slug>`, which reopens the report via `GET /api/scan-result/<slug>`.
+  Without JS it links to https://jackbase.me/scan.
+- Scan stub: `python3 tools/scan_stub.py [--port 8930]` serves `site/` plus the API routes from the synthetic fixture
+  `tools/fixtures/scan-sample.json` (magic handles `stub-fail`, `stub-429`, `stub-busy`, `stub-empty`; `--omit-results`
+  for break-it runs). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
+  E2E: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR` (starts its own stub; phone + desktop;
+  form → progress → report, tab counts, device toggle, Reveal, CTAs, `?r=` reopen, error paths; never calls prod).
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
 - Gate: `python3 tools/check.py` (silent + exit 0 when green; prints each problem + exit 1). Runs in CI on every push/PR.
   Covers links/assets resolve, no unreferenced files in `assets/ css/ js/`, canonicals, sitemap, JSON-LD (+ FAQ sync),

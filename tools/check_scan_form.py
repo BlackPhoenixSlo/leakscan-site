@@ -5,13 +5,13 @@
     (fallback: cd ~/leakhunt && uv run python ~/leakscan-site/tools/check_scan_form.py BASE_URL OUT_DIR)
 
 Phone (390x844) + desktop (1440x900), each with JS on and off: type `@Some.Name`, pick Instagram, submit.
-Asserts the navigation goes to https://jackbase.me/scan? with p=instagram.com, h=@Some.Name, go=1, and that the
-controls are >= 44px tall, stacked on phone and in one row on desktop. Requests to jackbase.me are answered locally
-(never reach the app); every other non-local request is aborted. Saves hero-before / settled screenshots to OUT_DIR.
+Asserts the navigation goes to the on-site scan page BASE_URL/scan/? with p=instagram.com, h=@Some.Name (no go=),
+and that the controls are >= 44px tall, stacked on phone and in one row on desktop. Every non-local request is aborted
+(so the scan page's API call never leaves the machine). Saves hero-before / settled screenshots to OUT_DIR.
 Prints one line per check; exit 1 if any fails.
 """
 import pathlib, sys
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit
 from playwright.sync_api import sync_playwright
 
 base, out = sys.argv[1], pathlib.Path(sys.argv[2])
@@ -31,17 +31,13 @@ with sync_playwright() as pw:
         for js in (True, False):
             tag = f"{vp_name}-{'js' if js else 'nojs'}"
             ctx = browser.new_context(viewport=vp, java_script_enabled=js, color_scheme="light")
-            hits = []
+            blocked = []
 
-            def route(r, _req, hits=hits):
-                u = r.request.url
-                if urlsplit(u).hostname == "jackbase.me":
-                    hits.append(u)
-                    r.fulfill(status=200, content_type="text/html",
-                              body=f"<!doctype html><title>intercepted</title><p>Intercepted (not sent): {u}</p>")
-                elif urlsplit(u).hostname in ("127.0.0.1", "localhost"):
+            def route(r, _req, blocked=blocked):
+                if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost"):
                     r.continue_()
                 else:
+                    blocked.append(r.request.url)
                     r.abort()
 
             ctx.route("**/*", route)
@@ -64,14 +60,14 @@ with sync_playwright() as pw:
             sel.select_option("instagram.com")
             if js:
                 page.screenshot(path=str(out / f"form-{vp_name}-filled.png"))
-            with page.expect_navigation(url="https://jackbase.me/**"):
+            target = urljoin(base, "scan/")
+            with page.expect_navigation(url=target + "?*"):
                 btn.click()
             url = page.url
             q = parse_qs(urlsplit(url).query)
-            check(f"{tag} url", url.startswith("https://jackbase.me/scan?")
-                  and q.get("p") == ["instagram.com"] and q.get("h") == ["@Some.Name"] and q.get("go") == ["1"]
-                  and "h=%40Some.Name" in url, url)
-            check(f"{tag} one jackbase request, intercepted", len(hits) == 1, str(hits))
+            check(f"{tag} url", url.startswith(target + "?") and q.get("p") == ["instagram.com"]
+                  and q.get("h") == ["@Some.Name"] and "go" not in q and "h=%40Some.Name" in url, url)
+            check(f"{tag} nothing left the machine", all("jackbase.me" not in u for u in blocked), str(blocked))
             page.screenshot(path=str(out / f"form-{tag}-settled.png"))
             ctx.close()
     browser.close()
