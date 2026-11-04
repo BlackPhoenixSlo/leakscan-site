@@ -1,12 +1,9 @@
 // Free scan page: runs the scan on Jaka's scan server and renders the report. Plain ES2017, no tracking, no third
-// parties. The API host is set in ONE place below: same origin, except on *.github.io (the VPS API host);
-// <body data-api="..."> overrides it (tools/scan_stub.py does that).
+// parties. Transport, API host and message links live in js/scan-engine.js (shared with the landing hero).
 (function () {
   'use strict';
-  var API = (document.body.dataset.api || (location.hostname.slice(-9) === 'github.io' ? 'https://scan.srv1395798.hstgr.cloud' : '')).replace(/\/+$/, ''); // '' = same origin (VPS)
-  var REPORT_BASE = 'https://blackphoenixslo.github.io/leakscan-site/scan/?r=';
-  var PLATFORMS = { 'onlyfans.com': 'OnlyFans', 'instagram.com': 'Instagram', 'fansly.com': 'Fansly', 'tiktok.com': 'TikTok', 'patreon.com': 'Patreon' };
-  var HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/;
+  var E = window.LeakScanEngine;
+  var REPORT_BASE = E.REPORT_BASE, PLATFORMS = E.PLATFORMS, cleanHandle = E.cleanHandle, thumb = E.thumb, setMessages = E.setMessages;
   var MAX_THUMBS = 30;
   var FAV_COLORS = ['#ea4335', '#4285f4', '#34a853', '#fbbc05', '#ab47bc', '#00acc1', '#ff7043']; // cse_mosaic _TAB_PALETTE
   var G_COLORS = ['#4285f4', '#ea4335', '#fbbc05', '#4285f4', '#34a853', '#ea4335'];
@@ -22,25 +19,13 @@
   var num = function (n) { return Number(n || 0).toLocaleString('en-US'); };
 
   // ---------- input ----------
-  function cleanHandle(raw) {
-    var h = String(raw || '').trim();
-    if (h.indexOf('/') >= 0) {
-      var parts = h.split(/[?#]/)[0].split('/').filter(Boolean);
-      h = parts.length ? parts[parts.length - 1] : '';
-    }
-    h = h.replace(/^@+/, '');
-    return HANDLE_RE.test(h) ? h : null;
-  }
   function safeUrl(u) { return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null; }
   function host(u) {
     try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; }
   }
-  function thumb(u) {
-    return typeof u === 'string' && /^https:\/\//.test(u) ? API + '/api/thumb?u=' + encodeURIComponent(u) : null;
-  }
 
   // ---------- state ----------
-  var state = { handle: '', platform: 'onlyfans.com', data: null, tab: 'all', device: 'phone', revealed: false,
+  var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone', revealed: false,
     more: { all: 10, images: 12 }, retry: null };
   state.device = window.matchMedia('(min-width: 720px)').matches ? 'computer' : 'phone';
 
@@ -54,16 +39,7 @@
   }
 
   // ---------- message links ----------
-  function setMessages(scope, text, subject, body) {
-    var q = encodeURIComponent(text);
-    scope.querySelectorAll('[data-msg]').forEach(function (a) {
-      var k = a.getAttribute('data-msg');
-      if (k === 'tg') a.href = 'https://t.me/jakabasej?text=' + q;
-      else if (k === 'wa') a.href = 'https://wa.me/38640703992?text=' + q;
-      else a.href = 'mailto:me@jackbase.dev?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    });
-  }
-  function who() { return '@' + state.handle + ' (' + (PLATFORMS[state.platform] || state.platform) + ')'; }
+  function who() { return E.who(state.handle, state.platform); }
 
   // ---------- form ----------
   function showForm(message) {
@@ -71,7 +47,6 @@
     setTitle('Free leak scan', 'Free leak scan', 'See what Google shows for your handle: pages, images and videos, and every leak link the scan finds.');
     var f = $('scan-form');
     f.hidden = false;
-    if (state.platform) f.elements.p.value = state.platform;
     if (message) { $('form-error').textContent = message; show('form-error', true); f.elements.h.focus(); }
   }
   $('scan-form').addEventListener('submit', function (e) {
@@ -79,8 +54,14 @@
     if (!cleanHandle(f.elements.h.value)) {
       e.preventDefault();
       showForm('That doesn’t look like a handle. Use letters, numbers, dots, dashes or underscores, like yourhandle.');
+    } else if (E.cleanSocial(f.elements.ig.value) === false) {
+      e.preventDefault();
+      showForm(SOCIAL_BAD);
+      f.elements.ig.focus();
     }
   });
+
+  var SOCIAL_BAD = 'That Instagram or X username doesn’t look right. Paste the profile link or type the name, like yourname.';
 
   // ---------- errors ----------
   var ERRORS = {
@@ -107,63 +88,6 @@
     if (kind === 'not_found') { $('scan-form').hidden = false; }
   }
   $('retry').addEventListener('click', function () { if (state.retry) state.retry(); });
-  function apiError(status, code, fallback) {
-    var err = new Error(code || fallback);
-    err.kind = code === 'rate_limited' || code === 'busy' || code === 'not_found' || code === 'bad_handle' ? code : 'failed';
-    if (err.kind === 'failed') err.detail = 'The scan server answered with an error (HTTP ' + status + ')';
-    return err;
-  }
-
-  // ---------- SSE over a POST body ----------
-  async function streamScan(payload, onEvent) {
-    var ctrl = window.AbortController ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 240000);
-    try {
-      var res = await fetch(API + '/api/public-scan', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify(payload), signal: ctrl ? ctrl.signal : undefined
-      });
-      if (!res.ok) {
-        var j = {};
-        try { j = await res.json(); } catch (e) { /* not JSON */ }
-        throw apiError(res.status, j && j.error, 'failed');
-      }
-      var stop = false;
-      var dispatch = function (block) {
-        var ev = 'message', data = [];
-        block.split('\n').forEach(function (line) {
-          if (!line || line.charAt(0) === ':') return;
-          var i = line.indexOf(':');
-          var field = i < 0 ? line : line.slice(0, i);
-          var val = i < 0 ? '' : line.slice(i + 1).replace(/^ /, '');
-          if (field === 'event') ev = val;
-          else if (field === 'data') data.push(val);
-        });
-        if (onEvent(ev, data.join('\n')) === false) stop = true;
-      };
-      var feed = function (text, final) {
-        buf = (buf + text).replace(/\r\n/g, '\n');
-        var i;
-        while (!stop && (i = buf.indexOf('\n\n')) >= 0) { dispatch(buf.slice(0, i)); buf = buf.slice(i + 2); }
-        if (final && !stop && buf.trim()) dispatch(buf);
-      };
-      var buf = '';
-      if (!res.body || !res.body.getReader) { feed(await res.text(), true); return; }
-      var reader = res.body.getReader(), dec = new TextDecoder();
-      for (;;) {
-        var chunk = await reader.read();
-        if (chunk.done) { feed(dec.decode(), true); break; }
-        feed(dec.decode(chunk.value, { stream: true }), false);
-        if (stop) { reader.cancel().catch(function () {}); break; }
-      }
-    } catch (e) {
-      if (!e.kind) { e.kind = 'network'; }
-      throw e;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
   // ---------- scan + reopen ----------
   function startScan() {
     hideAll();
@@ -175,20 +99,12 @@
     $('progress-stage').textContent = 'Starting the scan…';
     setBar(3);
     show('progress', true);
-    var result = null, failed = null;
-    streamScan({ platform: state.platform, handle: state.handle, level: 'low' }, function (ev, data) {
-      if (ev === 'progress') addProgress(data);
-      else if (ev === 'result') { try { result = JSON.parse(data); } catch (e) { failed = 'The scan result could not be read'; } }
-      else if (ev === 'failed') failed = data || 'The scan stopped';
-      else if (ev === 'done') return false;
-    }).then(function () {
-      if (failed) showError('failed', failed.replace(/[.\s]+$/, ''));
-      else if (result) { setBar(100); report(result, true); }
-      else showError('network');
-    }, function (e) {
-      if (e.kind === 'bad_handle') showForm('The scan server didn’t accept that handle. Check it and try again.');
-      else showError(e.kind, e.detail);
-    });
+    E.runScan({ platform: state.platform, handle: state.handle, social: state.social, onProgress: addProgress,
+      onResult: function (result) { setBar(100); report(result, true); },
+      onError: function (e) {
+        if (e.kind === 'bad_handle') showForm('The scan server didn’t accept that handle. Check it and try again.');
+        else showError(e.kind, e.detail);
+      } });
   }
   function setBar(p) {
     var b = $('progress-bar');
@@ -196,13 +112,9 @@
     b.firstElementChild.style.width = p + '%';
   }
   function addProgress(text) {
-    var m = /(\d+)\s*\/\s*(\d+)/.exec(text);
-    if (m && +m[2] > 0) {
-      setBar(Math.min(96, 5 + 90 * (+m[1] / +m[2])));
-      $('progress-stage').textContent = 'Searching Google, step ' + m[1] + ' of ' + m[2] + '…';
-    } else {
-      $('progress-stage').textContent = text;
-    }
+    var p = E.progressInfo(text);
+    if (p.pct != null) setBar(p.pct);
+    $('progress-stage').textContent = p.stage;
     var log = $('progress-log');
     var li = document.createElement('li');
     li.textContent = text;
@@ -213,10 +125,7 @@
     hideAll();
     state.retry = function () { reopen(slug); };
     setTitle('Free scan report', 'Loading the report…', '');
-    fetch(API + '/api/scan-result/' + encodeURIComponent(slug)).then(function (res) {
-      if (res.ok) return res.json();
-      return res.json().catch(function () { return {}; }).then(function (j) { throw apiError(res.status, j && j.error, 'failed'); });
-    }).then(function (r) { report(r, false); }, function (e) { showError(e.kind || 'network', e.detail); });
+    E.fetchResult(slug).then(function (r) { report(r, false); }, function (e) { showError(e.kind || 'network', e.detail); });
   }
 
   // ---------- report ----------
@@ -254,20 +163,13 @@
     show('empty', empty);
     ['google', 'sites', 'links'].forEach(function (id) { show(id, !empty); });
 
-    var link = REPORT_BASE + encodeURIComponent(d.slug);
-    var t = 'Hi Jaka, I ran the free scan for ' + who() + '. My report: ' + link;
-    setMessages($('send'), t, 'Free scan report: @' + d.handle,
-      'Hi Jaka,\n\nI ran the free scan.\nMy report link: ' + link + '\nMy handle: ' + who() + '\n\nThanks!');
+    E.sendReport($('send'), d.slug, d.handle, state.platform);
     $('deep-link').href = 'https://jackbase.me/scan?p=' + encodeURIComponent(state.platform) + '&h=' + encodeURIComponent(d.handle) + '&l=deep&go=1';
     $('g-note').textContent = 'Rendered from Google’s index for @' + d.handle + '. Not a live screenshot.';
     var r = encodeURIComponent(d.slug);
     $('after-link').href = '../?r=' + r + '#website';
     $('demo-link').href = '../showcase/?r=' + r;
-    if (/^[A-Za-z0-9_-]{4,64}$/.test(d.slug)) {
-      // read by js/personalize.js on the homepage + demo site; stays in this browser only
-      var pn = raw.profile && typeof raw.profile.display_name === 'string' && raw.profile.display_name.length <= 60 ? raw.profile.display_name : null;
-      try { localStorage.setItem('leakscan.last', JSON.stringify({ slug: d.slug, handle: d.handle, platform: state.platform, name: pn, ts: Date.now() })); } catch (e) { /* storage blocked */ }
-    }
+    E.remember(raw, d.slug, d.handle, state.platform);
     mediaStatus(raw.profile && typeof raw.profile === 'object' ? d.slug : null);
     show('report', true);
     if (!empty) { renderGoogle(); renderSites(); renderLinks(); }
@@ -525,14 +427,17 @@
   // ---------- boot ----------
   $('scan-title').setAttribute('tabindex', '-1');
   var qs = new URLSearchParams(location.search);
-  var slug = qs.get('r'), p = qs.get('p'), rawH = qs.get('h');
+  var slug = qs.get('r'), p = qs.get('p'), rawH = qs.get('h'), rawS = qs.get('ig') || qs.get('x') || '';
   state.platform = PLATFORMS[p] ? p : 'onlyfans.com';
   if (slug && /^[A-Za-z0-9_-]{4,64}$/.test(slug)) { reopen(slug); return; }
   if (slug) { showError('not_found'); return; }
   if (rawH == null) { showForm(); return; }
   var h = cleanHandle(rawH);
   $('scan-form').elements.h.value = rawH;
+  $('scan-form').elements.ig.value = rawS;
   if (!h) { showForm('That doesn’t look like a handle. Use letters, numbers, dots, dashes or underscores, like yourhandle.'); return; }
+  state.social = E.cleanSocial(rawS, qs.get('ig') ? 'instagram' : 'x');
+  if (state.social === false) { showForm(SOCIAL_BAD); return; }
   state.handle = h;
   startScan();
 })();

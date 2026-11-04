@@ -5,9 +5,11 @@
     → open http://127.0.0.1:8930/  (or http://127.0.0.1:8930/scan/?r=demoR3port01, /?r=demoR3port01, /showcase/?r=demoR3port01)
 
 Serves site/ and the API routes of the contract the scan page talks to:
-- POST /api/public-scan  {platform, handle, level} → SSE over the response body: several `progress`, one `result`
-  (tools/fixtures/scan-sample.json with handle/platform/slug swapped in), `done`. Magic handles drive the error paths:
-  stub-fail → `failed` + `done`; stub-429 → 429 rate_limited; stub-busy → 429 busy; stub-empty → status empty.
+- POST /api/public-scan  {platform, handle, level, instagram?, x?} → SSE over the response body: several `progress`, one
+  `result` (tools/fixtures/scan-sample.json with handle/platform/slug swapped in, plus `socials: {instagram?, x?}` echoed
+  when sent; a bad instagram / x value → 400 bad_handle), `done`. Magic handles drive the error paths:
+  stub-fail → `failed` + `done`; stub-429 → 429 rate_limited; stub-busy → 429 busy; stub-empty → status empty;
+  stub-mixed → 3 hits (live true / false / missing) + the results.
 - GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise. Preloaded: demoR3port01 (the
   fixture, with its synthetic `profile`), demoNoProf01 (same, `profile` null: scan-only personalization) and evilR3port01
   (fixture overlaid with tools/fixtures/scan-evil.json: script tags, javascript: urls, oversized strings).
@@ -55,6 +57,11 @@ def make_result(handle, platform, empty=False):
     r = json.loads(json.dumps(FIXTURE))
     r.update(handle=handle, platform=platform,
              slug="".join(random.choice(string.ascii_letters + string.digits) for _ in range(12)))
+    if handle == "stub-mixed":   # badge coverage: hits live true / false / missing, then the Google results
+        r["hits"] = r["hits"][:3]
+        r["hits"][1]["live"] = False
+        r["hits"][2].pop("live")
+        r["hit_count"] = 3
     if empty:
         r.update(status="empty", hit_count=0, domain_count=0, google_total=0, images=[], hits=[], results=[])
     if OPTS.omit_results:
@@ -251,6 +258,9 @@ class Handler(SimpleHTTPRequestHandler):
         handle, platform = str(req.get("handle", "")), req.get("platform")
         if not HANDLE_RE.match(handle) or platform not in PLATFORMS or req.get("level") != "low":
             return self.send_json(400, {"error": "bad_handle"})
+        socials = {k: str(req[k]) for k in ("instagram", "x") if k in req}
+        if any(not HANDLE_RE.match(v) for v in socials.values()):
+            return self.send_json(400, {"error": "bad_handle"})
         if handle == "stub-429":
             return self.send_json(429, {"error": "rate_limited"})
         if handle == "stub-busy":
@@ -273,6 +283,8 @@ class Handler(SimpleHTTPRequestHandler):
                 ev("failed", "Google search quota reached, try again later")
                 return ev("done", "end")
         r = make_result(handle, platform, empty=handle == "stub-empty")
+        if socials:
+            r["socials"] = socials
         STORE[r["slug"]] = r
         ev("result", json.dumps(r))
         ev("done", "end")

@@ -140,9 +140,17 @@ strong { font-weight: 650; }
 .eyebrow { font: 650 .8rem/1.4 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin-bottom: .9em; }
 .accent { color: var(--accent); font-style: italic; }
 .lead { font-size: clamp(1.1rem, 2.4vw, 1.28rem); color: var(--muted); max-width: 36em; }
-/* Free-scan form: plain GET to scan/ (the on-site scan page). Stacked on phones, one row from 560px. */
-.scan-form { display: grid; gap: 10px; margin: 28px 0 10px; max-width: 600px; }
-@media (min-width: 560px) { .scan-form { grid-template-columns: auto 1fr auto; } }
+/* Free-scan form: OnlyFans + optional Instagram / X. With JS it scans in place (js/inline-scan.js); without, a plain GET
+   to scan/. Stacked on phones, one row from 560px. */
+.scan-form { display: grid; gap: 10px; margin: 28px 0 10px; max-width: 680px; }
+@media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto; } .scan-form .btn-lg { padding-inline: 1.2em; } }
+.scan-prefix { display: flex; align-items: center; gap: 0; padding: 0 0 0 1.1em; cursor: text; }
+.scan-prefix:focus-within { border-color: var(--accent); }
+.scan-pre { color: var(--muted); font-size: .9rem; white-space: nowrap; user-select: none; }
+.scan-prefix input { flex: 1; min-width: 0; height: 52px; padding: 0 1em 0 .1em; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; }
+.scan-prefix input::placeholder { color: var(--muted); opacity: .8; }
+.scan-form button[disabled] { opacity: .75; cursor: progress; }
+.inline-msg { margin: 0 0 12px; color: var(--bad); font-weight: 550; font-size: .95rem; }
 .scan-field {
   min-height: 56px; width: 100%; min-width: 0; padding: 0 1.2em; border-radius: 999px;
   border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
@@ -417,3 +425,29 @@ strong { font-weight: 650; }
   .js .reveal { opacity: 1; transform: none; transition: none; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Inline scan: the hero card becomes the live report, the #free illustration shows real counts (js/inline-scan.js) */
+.report-card { scroll-margin-top: calc(var(--header-h) + 12px); }
+.report-card.is-live > :not(.live), .scan-report.is-live > .report-rows:not(.live-rows),
+.scan-report.is-live [data-p="scan-count"] { display: none; }
+.live-title:focus { outline: 0; }
+.live-socials { margin: 2px 0 0; color: var(--muted); font-size: .88rem; }
+.live-status { margin: 12px 0 0; color: var(--muted); font-size: .92rem; }
+.live-status:empty { display: none; }
+.live-bar { height: 6px; margin: 10px 0 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.live-bar i { display: block; height: 100%; width: 3%; background: var(--accent); border-radius: inherit; transition: width .4s ease; }
+.report-card .live-rows li { grid-template-columns: minmax(0, 1fr) auto; animation: live-in .35s ease both; }
+.live-link { display: grid; min-width: 0; color: var(--ink); text-decoration: none; }
+.live-link:hover .live-dom { text-decoration: underline; }
+.live-dom { font: 600 .9rem/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-ttl { font-size: .84rem; line-height: 1.35; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-more { margin: 0 0 12px; font-size: .88rem; color: var(--muted); }
+.live-empty, .live-error p { margin: 14px 0; }
+.live-empty strong { display: block; }
+.live-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px; margin-top: 4px; background: var(--surface-2); border-radius: 14px; }
+.live-actions .live-send-h, .live-actions .live-media { margin: 4px 0 0; flex-basis: 100%; font-weight: 600; font-size: .92rem; }
+.live-actions .live-media { font-weight: 500; color: var(--muted); }
+.live-send { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.live .btn { min-height: 44px; }
+@keyframes live-in { from { opacity: 0; transform: translateY(4px); } }
+.live [hidden], .inline-msg[hidden] { display: none !important; }

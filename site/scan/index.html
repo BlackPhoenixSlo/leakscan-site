@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="../css/scan.css">
 <script>document.documentElement.classList.add('js')</script>
 <script src="../js/personalize.js" defer></script>
+<script src="../js/scan-engine.js" defer></script>
 <script src="../js/scan.js" defer></script>
 </head>
 <body>
@@ -63,15 +64,9 @@
     </noscript>
 
     <form id="scan-form" class="scan-form" method="get" action="./" hidden>
-      <select class="scan-field scan-platform" name="p" aria-label="Platform">
-        <option value="onlyfans.com">OnlyFans</option>
-        <option value="instagram.com">Instagram</option>
-        <option value="fansly.com">Fansly</option>
-        <option value="tiktok.com">TikTok</option>
-        <option value="patreon.com">Patreon</option>
-      </select>
-      <input class="scan-field scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="yourhandle" aria-label="Your handle" aria-describedby="form-error">
-      <button class="btn btn-primary btn-lg" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Scan for free</button>
+        <label class="scan-field scan-prefix"><span class="scan-pre" aria-hidden="true">onlyfans.com/</span><input class="scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="username" aria-label="OnlyFans username" aria-describedby="form-error"></label>
+        <label class="scan-field scan-prefix"><span class="scan-pre" aria-hidden="true">@</span><input class="scan-social" name="ig" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Instagram or X (optional)" aria-label="Instagram or X username (optional)" aria-describedby="form-error"></label>
+        <button class="btn btn-primary btn-lg" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Scan now</button>
     </form>
     <p class="form-error" id="form-error" role="alert" hidden></p>
 
