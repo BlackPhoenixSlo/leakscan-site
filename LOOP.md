@@ -5,3 +5,4 @@ verify live, append a row here. Stop at run 50.
 
 | run | date (UTC) | PR | what changed | evidence folder |
 |---|---|---|---|---|
+| 1 | 2026-11-04 | #4 | hide showcase demo ribbon when framed (Back link nested landing in iframe); shots.py unique names; check.py checks showcase/ link; README/CREDITS fixes | 20261104T004756Z-798c458 |

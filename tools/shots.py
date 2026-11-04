@@ -3,10 +3,12 @@
 
 Usage: python3 tools/shots.py OUT_DIR URL [URL ...]
 Writes OUT_DIR/<name>-<phone|desktop>-<light|dark>-<top|full>.png, where <name> is the
-URL's last path segment without .html ("index" for a directory URL).
+URL path relative to the URLs' common directory, "/" -> "-", without .html, "index" for a
+directory URL: `/` + `/showcase/` + `/showcase/blog/post-1.html` give `index`,
+`showcase-index`, `showcase-blog-post-1`.
 Scrolls each page top to bottom first so scroll-triggered fade-ins and lazy iframes load.
 """
-import pathlib, sys
+import pathlib, posixpath, sys
 from urllib.parse import urlsplit
 from playwright.sync_api import sync_playwright
 
@@ -16,9 +18,13 @@ VIEWPORTS = {
 }
 
 
-def name_of(url):
-    seg = urlsplit(url).path.rstrip("/").split("/")[-1] if not urlsplit(url).path.endswith("/") else ""
-    return (seg[:-5] if seg.endswith(".html") else seg) or "index"
+def names_of(urls):
+    """URL -> file-name stem, unique within one invocation (see module docstring)."""
+    paths = [urlsplit(u).path or "/" for u in urls]
+    paths = [p + "index.html" if p.endswith("/") else p for p in paths]
+    root = posixpath.commonpath([posixpath.dirname(p) for p in paths])
+    stems = [posixpath.relpath(p, root).removesuffix(".html").replace("/", "-") for p in paths]
+    return dict(zip(urls, stems))
 
 
 def settle(page):
@@ -42,6 +48,7 @@ def main(argv):
     out.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
         browser = p.chromium.launch()
+        names = names_of(argv[1:])
         for url in argv[1:]:
             for vp, opts in VIEWPORTS.items():
                 for scheme in ("light", "dark"):
@@ -49,7 +56,7 @@ def main(argv):
                     page = ctx.new_page()
                     page.goto(url, wait_until="load")
                     settle(page)
-                    base = out / f"{name_of(url)}-{vp}-{scheme}"
+                    base = out / f"{names[url]}-{vp}-{scheme}"
                     page.screenshot(path=f"{base}-top.png")
                     page.screenshot(path=f"{base}-full.png", full_page=True)
                     ctx.close()

@@ -1,16 +1,18 @@
 # leakscan-site
 
 Google Ads landing site for LeakScan: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
-third-party requests, no cookies. `site/` is what ships. `site/showcase/` (demo of the official site each client gets)
-comes from the `showcase` branch; the landing page only links/iframes it as `showcase/`.
+third-party requests, no cookies. `site/` is what ships. `site/showcase/` is the demo of the official site each client
+gets (fictional creator, built from the tessa template); the landing page links and iframes it as `showcase/`. Its own
+gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
 - Gate: `python3 tools/check.py` (silent + exit 0 when green; prints each problem + exit 1). Runs in CI on every push/PR.
   Covers links/assets resolve, no unreferenced files in `assets/ css/ js/`, canonicals, sitemap, JSON-LD (+ FAQ sync),
   one h1, unique ids, img alt/size, lang, viewport, meta/OG/Twitter, no third-party resources. Full list: docstring.
 - Shots: `python3 tools/shots.py OUT_DIR URL...` → phone (390x844 @2x) + desktop (1440x900), light + dark, top + full.
-  Needs Playwright with Chromium. Works with the system `python3` here; fallback:
-  `cd ~/leakhunt && uv run python ~/leakscan-site-landing/tools/shots.py OUT_DIR URL...`.
+  File names are the URL path relative to the URLs' common directory (`/` -> `index`, `/showcase/` ->
+  `showcase-index`), so one run never overwrites itself. Needs Playwright with Chromium; system `python3` works here,
+  fallback: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/shots.py OUT_DIR URL...`.
   Evidence goes outside the repo: `~/.leakscan-site/evidence/<branch>/<UTC>-<sha7>/`.
 - Raster assets: `python3 tools/make_icons.py` renders `site/assets/og.png` (from `tools/og.html`),
   `apple-touch-icon.png` and `favicon-32.png` (from `site/assets/favicon.svg`).
