@@ -10,6 +10,8 @@ Checks every HTML file under site/ (except site/showcase/**):
 - <title> <= 65 chars, meta description <= 160 chars (longer gets cut in Google results)
 - every CTA (<a> with class btn/channel/mobile-cta) to Telegram/WhatsApp prefills a message (text=), mailto has body=
 - exactly one <h1>, no duplicate ids, every <img> has alt + width + height
+- every <iframe> has a title and tabindex="-1" (keeps the embedded demo's ~35 links out of the landing page's Tab
+  order; the link next to it is the keyboard route)
 - every JSON-LD block parses; FAQPage Q&A text equals the visible <details> FAQ
 - indexable page (no robots noindex) has canonical == SITE_URL + path (and og:url, if present, equal)
 - sitemap.xml lists exactly the indexable pages; robots.txt Sitemap line points at it
@@ -65,6 +67,7 @@ class Page(HTMLParser):
         self.metas = {}
         self.links = []         # (rel, href)
         self.imgs = []
+        self.iframes = []
         self.jsonld = []
         self.title = False
         self.title_text = ""
@@ -94,6 +97,8 @@ class Page(HTMLParser):
             self.links.append(((a.get("rel") or "").lower(), a.get("href")))
         if tag == "img":
             self.imgs.append(a)
+        if tag == "iframe":
+            self.iframes.append(a)
         if tag == "a" and set((a.get("class") or "").split()) & CTA_CLASSES:
             self.ctas.append((a.get("class"), a.get("href") or ""))
         if tag == "script" and a.get("type") == "application/ld+json":
@@ -197,6 +202,11 @@ def main():
             for k in ("alt", "width", "height"):
                 if k not in img:
                     bad(f"{rel}: <img src={img.get('src')!r}> has no {k}")
+        for fr in pg.iframes:
+            if not (fr.get("title") or "").strip():
+                bad(f"{rel}: <iframe src={fr.get('src')!r}> has no title")
+            if fr.get("tabindex") != "-1":
+                bad(f"{rel}: <iframe src={fr.get('src')!r}> needs tabindex=\"-1\" (else Tab walks every link inside it)")
         for block in pg.jsonld:
             try:
                 data = json.loads(block)

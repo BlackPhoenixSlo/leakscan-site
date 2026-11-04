@@ -463,12 +463,15 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
+  visibility: hidden;      /* closed: out of Tab order and the accessibility tree, not just transparent */
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
 }
 .lightbox.open {
   opacity: 1;
+  visibility: visible;
   pointer-events: all;
+  transition: opacity 0.3s ease;
 }
 .lightbox__img {
   max-width: 92vw;
