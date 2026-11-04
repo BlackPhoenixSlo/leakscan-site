@@ -264,10 +264,10 @@
         <span class="chip chip-soft"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>Re-scanned</span>
       </div>
       <ul class="report-rows" aria-hidden="true">
-        <li data-p="report-row-1"><span class="thumb t1"></span><span class="row-url">leak-mirror.example/yourhandle</span><span class="chip chip-dead">Dead</span></li>
-        <li data-p="report-row-2"><span class="thumb t2"></span><span class="row-url">free-galleries.example/p/2231</span><span class="chip chip-cached">Cached</span></li>
-        <li data-p="report-row-3"><span class="thumb t3"></span><span class="row-url">pirate-tube.example/v/yourname</span><span class="chip chip-live">Live</span></li>
-        <li data-p="report-row-4"><span class="thumb t4"></span><span class="row-url">forum-dump.example/thread/88</span><span class="chip chip-dead">Dead</span></li>
+        <li data-p="report-row-1"><span class="lav" style="background:#4285f4">L</span><span class="row-url">leak-mirror.example/yourhandle</span><span class="chip chip-dead">Dead</span></li>
+        <li data-p="report-row-2"><span class="lav" style="background:#ab47bc">F</span><span class="row-url">free-galleries.example/p/2231</span><span class="chip chip-cached">Cached</span></li>
+        <li data-p="report-row-3"><span class="lav" style="background:#00acc1">P</span><span class="row-url">pirate-tube.example/v/yourname</span><span class="chip chip-live">Live</span></li>
+        <li data-p="report-row-4"><span class="lav" style="background:#fbbc05">F</span><span class="row-url">forum-dump.example/thread/88</span><span class="chip chip-dead">Dead</span></li>
       </ul>
       <div class="report-foot" aria-hidden="true">
         <img src="assets/avatar-jaka.svg" alt="" width="36" height="36">
@@ -280,52 +280,42 @@
   </div>
 </section>
 
-<section class="section" id="free" aria-labelledby="free-title">
+<section class="section free-sec" id="free" aria-labelledby="free-title">
   <div class="container">
-    <div class="section-head reveal">
-      <p class="eyebrow">Free, before you pay anything</p>
-      <h2 id="free-title">See what the scan finds. See me remove one. Then decide.</h2>
-      <p>No sales call, no trial that quietly renews. You get two real things for free, so you know exactly what you'd be paying for.</p>
-    </div>
-    <div class="free-grid">
-      <article class="card free-card reveal">
-        <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg></span>
-        <h3>A free leak scan, right here</h3>
-        <p>Type your handle into the box at the top of this page. The scan checks <strong>hundreds of known leak sites</strong> for copies of your content and gives you a report link with every link it found.</p>
-        <ul class="mini-list">
-          <li><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg>Hundreds of leak sites</li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>Every link it finds</li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg>Your own report link</li>
+    <div class="free-band reveal">
+      <div class="free-copy">
+        <p class="eyebrow">Free, before you pay anything</p>
+        <h2 id="free-title">See what the scan finds. See me remove one. Then decide.</h2>
+        <ul class="free-lines">
+          <li><span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg></span><span><strong>A free leak scan, right here.</strong> Hundreds of leak sites checked, every link in one report.</span></li>
+          <li><span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-gift"/></svg></span><span><strong>One page removed, free.</strong> Send me the report link, I take one page down before you pay.</span></li>
         </ul>
-      </article>
-      <article class="card free-card reveal">
-        <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-gift"/></svg></span>
-        <h3>One page removed, free</h3>
-        <p>Send me the report link. I pick one leak page from it, usually the simplest site, and get it taken down. You see the work and the result with your own eyes before any money changes hands.</p>
-        <p class="note"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>No account. No credit card. Just the report link in a message.</p>
-      </article>
-    </div>
-
-    <figure class="browser browser-scan reveal">
-      <div class="browser-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">blackphoenixslo.github.io/leakscan-site/scan/</span></div>
-      <div class="scan-report" role="img" aria-label="Illustration of a free scan report for a creator's handle: a list of the leak-site links the scan found.">
-        <div class="report-head" aria-hidden="true">
-          <div>
-            <p class="report-kicker">Free scan report</p>
-            <p class="report-title" data-p="scan-handle">@yourhandle</p>
-          </div>
-          <span class="chip chip-live" data-p="scan-count">5 links found</span>
-        </div>
-        <ul class="report-rows" aria-hidden="true">
-          <li data-p="scan-row-1"><span class="thumb t1"></span><span class="row-url">leak-mirror.example/yourhandle</span><span class="chip chip-soft">Leak site</span></li>
-          <li data-p="scan-row-2"><span class="thumb t2"></span><span class="row-url">free-galleries.example/p/2231</span><span class="chip chip-soft">Leak site</span></li>
-          <li data-p="scan-row-3"><span class="thumb t3"></span><span class="row-url">pirate-tube.example/v/yourhandle</span><span class="chip chip-soft">Leak site</span></li>
-          <li data-p="scan-row-4"><span class="thumb t4"></span><span class="row-url">forum-dump.example/thread/88</span><span class="chip chip-soft">Forum</span></li>
-          <li data-p="scan-row-5"><span class="thumb t5"></span><span class="row-url">image-board.example/u/yourhandle</span><span class="chip chip-soft">Forum</span></li>
-        </ul>
+        <p class="free-actions">
+          <a class="btn btn-primary" href="#scan"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Scan free</a>
+          <a class="btn btn-ghost" href="#contact" data-free-send><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Send me the report</a>
+        </p>
+        <p class="free-note"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>No account. No credit card. Just the report link in a message.</p>
       </div>
-      <figcaption>Illustration. Your real report lists every link the scan found. Send me its link and I remove one page free.</figcaption>
-    </figure>
+      <figure class="gmini" role="img" aria-label="Illustration: Google Images results for a creator's handle, every leak thumbnail blurred.">
+        <div class="gmini-top">
+          <span class="gmini-logo" aria-hidden="true"><span style="color:#4285f4">G</span><span style="color:#ea4335">o</span><span style="color:#fbbc05">o</span><span style="color:#4285f4">g</span><span style="color:#34a853">l</span><span style="color:#ea4335">e</span></span>
+          <span class="gmini-q" aria-hidden="true"><svg class="icon"><use href="#i-search"/></svg><span data-p="scan-handle">@yourhandle</span></span>
+        </div>
+        <div class="gmini-tabs" aria-hidden="true"><span>All</span><span class="on">Images</span><span>Videos</span></div>
+        <div class="gmini-grid" aria-hidden="true">
+          <span class="gi-card"><span class="gi-box thumb t1"></span><span class="gi-cap"><span class="gi-fav" style="background:#4285f4">L</span>leak-mirror.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t2"></span><span class="gi-cap"><span class="gi-fav" style="background:#ab47bc">F</span>free-galleries.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t3"></span><span class="gi-cap"><span class="gi-fav" style="background:#00acc1">P</span>pirate-tube.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t4"></span><span class="gi-cap"><span class="gi-fav" style="background:#fbbc05">F</span>forum-dump.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t5"></span><span class="gi-cap"><span class="gi-fav" style="background:#ea4335">P</span>pics-hub.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t6"></span><span class="gi-cap"><span class="gi-fav" style="background:#34a853">P</span>photo-rip.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t1"></span><span class="gi-cap"><span class="gi-fav" style="background:#ff7043">C</span>clip-vault.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t2"></span><span class="gi-cap"><span class="gi-fav" style="background:#00acc1">I</span>image-board.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t3"></span><span class="gi-cap"><span class="gi-fav" style="background:#fbbc05">L</span>leak-hub.example</span></span>
+          <span class="gi-card"><span class="gi-box thumb t4"></span><span class="gi-cap"><span class="gi-fav" style="background:#ff7043">T</span>tube-mirror.example</span></span>
+        </div>
+      </figure>
+    </div>
   </div>
 </section>
 
