@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke-test one LeakScan origin. Usage: deploy/smoke.sh [BASE_URL] [https-host ...]
+# Smoke-test one Abolita origin. Usage: deploy/smoke.sh [BASE_URL] [https-host ...]
 #   BASE_URL default http://127.0.0.1:8081 (the VPS host port). Each https-host gets /healthz + / checked.
 # Read-only GETs/HEADs only (no scans). Exit 1 if any check fails.
 set -u
@@ -23,7 +23,7 @@ check() {
   rm -f "$body"
 }
 check healthz        "$B/healthz"                         200 '"ok": true'
-check landing        "$B/"                                200 'LeakScan'
+check landing        "$B/"                                200 'Abolita'
 check landing-is-site "$B/"                               200 '!id="app-config"'
 check scan-page      "$B/scan/"                           200 'Free leak scan'
 check legacy-ui      "$B/app/"                            200 'Find Your Leaks'
@@ -38,7 +38,7 @@ check dotfile        "$B/.env"                            "404|400"
 for h in "$@"; do
   [ -n "$h" ] || continue
   check "https $h healthz" "https://$h/healthz" 200 '"ok": true' --retry 3 --retry-delay 5 --retry-all-errors
-  check "https $h /"       "https://$h/"        200 'LeakScan'   --retry 3 --retry-delay 5 --retry-all-errors
+  check "https $h /"       "https://$h/"        200 'Abolita'   --retry 3 --retry-delay 5 --retry-all-errors
 done
 [ "$fail" = 0 ] && echo "SMOKE GREEN" || echo "SMOKE RED"
 exit "$fail"
