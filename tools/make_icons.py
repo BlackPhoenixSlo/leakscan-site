@@ -3,6 +3,9 @@
   tools/og.html          -> site/assets/og.png (1200x630)
   site/assets/favicon.svg -> site/assets/apple-touch-icon.png (180) + favicon-32.png
 Usage: python3 tools/make_icons.py
+Then shrink og.png (~165 KB raw; check.py caps rasters at 100 KB), from the repo root:
+  uv run --no-project --with imagequant --with pillow python -c "import imagequant as q, PIL.Image as I; p='site/assets/og.png'; q.quantize_pil_image(I.open(p).convert('RGBA'), dithering_level=1.0, max_colors=256, min_quality=0, max_quality=100).save(p)"
+  zopflipng -y --iterations=15 site/assets/og.png site/assets/og.png    # -> ~61 KB, max pixel error 20/255
 """
 import pathlib
 from playwright.sync_api import sync_playwright

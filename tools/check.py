@@ -15,6 +15,7 @@ Checks every HTML file under site/ (except site/showcase/**):
 - sitemap.xml lists exactly the indexable pages; robots.txt Sitemap line points at it
 - no `{{` in any shipped text file
 - every file under site/assets, site/css, site/js is referenced by some page
+- every raster (.png/.jpg/.webp) under site/ (except showcase/) is <= RASTER_BUDGET bytes
 """
 import json, pathlib, re, sys
 from html.parser import HTMLParser
@@ -29,6 +30,8 @@ TEXT_EXT = {".html", ".css", ".js", ".xml", ".txt", ".svg", ".json", ".webmanife
 RESOURCE_TAGS = {"script", "img", "iframe", "source", "video", "audio", "embed", "object", "track"}
 CTA_CLASSES = {"btn", "channel", "mobile-cta"}
 CHAT = ("https://t.me/", "https://wa.me/")
+RASTER_BUDGET = 100_000   # og.png re-rendered by make_icons.py is ~165 KB until shrunk (see its docstring)
+RASTER_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
 problems = []
@@ -261,6 +264,8 @@ def main():
             bad(f"{rel}: contains '{{{{'")
         if rel.split("/")[0] in MUST_BE_REFERENCED and rel not in referenced:
             bad(f"{rel}: not referenced by any page")
+        if f.suffix.lower() in RASTER_EXT and f.stat().st_size > RASTER_BUDGET:
+            bad(f"{rel}: {f.stat().st_size} bytes > {RASTER_BUDGET} (shrink it, see tools/make_icons.py)")
 
     for p in problems:
         print(p)
