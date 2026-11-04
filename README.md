@@ -1,6 +1,6 @@
 # leakscan-site
 
-Google Ads landing site for LeakScan: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
+Google Ads landing site for Abolita: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
 cookies, no third-party requests on the landing pages. `site/` is what ships. `site/showcase/` is the demo of
 the official site each client gets (fictional creator, built from the tessa template); the landing page links and
 iframes it as `showcase/`. The demo loads Google Fonts (so the homepage does too, via the iframe); `privacy.html`

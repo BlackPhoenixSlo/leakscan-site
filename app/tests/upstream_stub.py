@@ -232,7 +232,7 @@ class _H(BaseHTTPRequestHandler):
     def _stream_chat(self, body):
         """DeepSeek stream:true wire shape: role chunk, keepalive, content deltas, [DONE].
         Reply text depends only on which system prompt arrived (landing vs scan app)."""
-        landing = "LeakScan landing page" in body["messages"][0]["content"]
+        landing = "Abolita landing page" in body["messages"][0]["content"]
         parts = (["Both plans come after the free scan: ", "€250/month or €500 one-time.", "\n",
                   "See [Pricing](#pricing) or ask on [Telegram](https://t.me/jakabasej)."]
                  if landing else ["Your scan ", "is grounded in kb.json."])

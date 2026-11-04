@@ -658,7 +658,7 @@ def askai(browser, vp_name, vp):
     # 2. open / close / focus
     L.click()
     page.wait_for_timeout(300)
-    d = page.get_by_role("dialog", name="Ask about LeakScan")
+    d = page.get_by_role("dialog", name="Ask about Abolita")
     check(f"{v} opens role=dialog named, aria-modal, input focused", is_open() and d.count() == 1 and d.is_visible()
           and dlg.get_attribute("aria-modal") == "true" and page.evaluate("document.activeElement.id") == "askai-input")
     box = dlg.bounding_box()

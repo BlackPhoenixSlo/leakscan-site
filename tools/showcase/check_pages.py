@@ -13,7 +13,7 @@ Showcase adaptation: no sitemap.xml and no netlify.toml ship with the
 showcase, so those two legs are gone. Two showcase-only rules replace them:
 every page is <meta name="robots" content="noindex, nofollow"> (the demo must
 not rank), and every page carries the demo ribbon linking back to the
-LeakScan landing page one level above site/showcase/. Every page also has
+Abolita landing page one level above site/showcase/. Every page also has
 exactly one <h1> and no skipped heading levels (h2 -> h4). A page using
 [data-fade] sets html.js in an inline <head> script, and the CSS hides
 [data-fade] only under .js, so the content shows with JS off or main.js down.
@@ -241,7 +241,7 @@ def check_blog(parsed):
 
 
 def check_showcase(parsed, paths):
-    """Showcase-only rules: noindex, one h1 + no level skips, ribbon back to LeakScan.
+    """Showcase-only rules: noindex, one h1 + no level skips, ribbon back to Abolita.
 
     The ribbon's back link must resolve to the landing page's own index.html
     (the directory above site/showcase/), from either depth — `../` on root
@@ -273,7 +273,7 @@ def check_showcase(parsed, paths):
                 t = paths[rel].parent / p
                 back.append((t / "index.html" if p.endswith("/") else t).resolve())
         if landing not in back:
-            errors.append(f"{rel}: demo ribbon does not link back to the LeakScan "
+            errors.append(f"{rel}: demo ribbon does not link back to the Abolita "
                           f"landing ({', '.join(page.ribbon)})")
     return errors
 

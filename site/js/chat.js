@@ -13,10 +13,10 @@
   var HOSTS = ['t.me', 'wa.me', 'blackphoenixslo.github.io', 'abolita.com', 'www.abolita.com', 'jackbase.me',
     'scan.srv1395798.hstgr.cloud'];
   var CONTACTS = [
-    ['Telegram', 'https://t.me/jakabasej?text=' + encodeURIComponent('Hi Jaka, I have a question about LeakScan: ')],
-    ['WhatsApp', 'https://wa.me/38640703992?text=' + encodeURIComponent('Hi Jaka, I have a question about LeakScan: ')],
-    ['Email', 'mailto:me@jackbase.dev?subject=' + encodeURIComponent('Question about LeakScan') + '&body=' +
-      encodeURIComponent('Hi Jaka,\n\nI have a question about LeakScan: ')]
+    ['Telegram', 'https://t.me/jakabasej?text=' + encodeURIComponent('Hi Jaka, I have a question about Abolita: ')],
+    ['WhatsApp', 'https://wa.me/38640703992?text=' + encodeURIComponent('Hi Jaka, I have a question about Abolita: ')],
+    ['Email', 'mailto:me@jackbase.dev?subject=' + encodeURIComponent('Question about Abolita') + '&body=' +
+      encodeURIComponent('Hi Jaka,\n\nI have a question about Abolita: ')]
   ];
   var MAX_SEND = 8;           // messages sent to the API per request
   var STORE = 'leakscan.askai';
@@ -214,7 +214,7 @@
   }
   function greet() {
     var b = bubble('assistant');
-    render('Hi! I answer quick questions about LeakScan from this page. Pick one or type your own.', b.firstChild);
+    render('Hi! I answer quick questions about Abolita from this page. Pick one or type your own.', b.firstChild);
     var chips = el('div', 'askai-chips');
     KB.slice(0, 6).forEach(function (k) { chips.appendChild(chip(k)); });
     b.appendChild(chips);

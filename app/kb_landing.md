@@ -1,13 +1,13 @@
-<!-- kb_landing.md: knowledge base for the "Ask AI before you DM me" popup on the LeakScan
+<!-- kb_landing.md: knowledge base for the "Ask AI before you DM me" popup on the Abolita
      landing site (https://blackphoenixslo.github.io/leakscan-site/). It MIRRORS that page
      (index.html + privacy.html, as live on 2026-11-04) and MUST be updated whenever the page
      changes (prices, plans, FAQ, contacts, section ids). No facts beyond the page. Served via
      POST /api/chat {"kb":"landing"}; deploy it next to public_app.py on the VPS. -->
 
-# LeakScan landing page: facts
+# Abolita landing page: facts
 
 ## Who
-- LeakScan is leak removal for OnlyFans, Fansly and Patreon creators: "Leaked content, taken down by a real person. Me."
+- Abolita is leak removal for OnlyFans, Fansly and Patreon creators: "Leaked content, taken down by a real person. Me."
 - Run by Jaka (Jaka Basej). "Software finds the links. I open every single one, make sure it's really yours, and file every takedown myself. Nothing goes out in your name until a human has checked it."
 - "Software finds. I decide." Scanners collect candidates; Jaka opens each result, compares it with your content, and only then files. Lookalikes and your own pages are left alone.
 - "Your accounts come first." One wrong notice can get your accounts flagged; automated takedown tools file at volume and can hit your own profile, a page you licensed, or someone who just looks like you. Nothing is filed until Jaka has confirmed the image or link is really yours.
