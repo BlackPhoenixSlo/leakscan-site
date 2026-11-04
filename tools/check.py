@@ -2,7 +2,7 @@
 """Gate for site/. Silent + exit 0 when green; prints each problem + exit 1 otherwise.
 
 Checks every HTML file under site/ (except site/showcase/**):
-- local href/src/srcset/poster targets exist (the `showcase/` link is skipped; it ships from another branch)
+- local href/src/srcset/poster targets exist (pages under site/showcase/ have their own gates in tools/showcase/)
 - absolute URLs under SITE_URL resolve to local files too; no leading-slash internal links
 - no third-party resource loads (scripts, styles, images, frames, icons)
 - #fragment links point at an existing id
@@ -22,7 +22,6 @@ SITE_URL = "https://blackphoenixslo.github.io/leakscan-site/"
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
-SKIP_LINKS = {"showcase/"}
 MUST_BE_REFERENCED = ("assets", "css", "js")
 TEXT_EXT = {".html", ".css", ".js", ".xml", ".txt", ".svg", ".json", ".webmanifest"}
 RESOURCE_TAGS = {"script", "img", "iframe", "source", "video", "audio", "embed", "object", "track"}
@@ -190,7 +189,7 @@ def main():
 
         for tag, attr, value, linkrel in pg.refs:
             v = value.strip()
-            if v in SKIP_LINKS or v.startswith(("mailto:", "tel:", "data:")):
+            if v.startswith(("mailto:", "tel:", "data:")):
                 continue
             if v.startswith("/") and not v.startswith("//"):
                 bad(f"{rel}: internal link with leading slash: {v}")
