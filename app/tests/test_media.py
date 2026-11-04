@@ -4,8 +4,9 @@ Declared bypasses (all synthetic data):
   - official-CDN image fetches -> stub.FakeCDN at media_gather.urlopen (wire boundary)
   - Instagram embed page -> stub.FakeEmbed at media_gather.page_open (wire boundary), serving
     synthetic fixtures (tests/fixtures/ig_embed_*.html; default: login shell)
-  - Browserbase/Instagram -> media_gather.grab_ig_grid monkeypatched (function boundary),
-    returns synthetic Pillow images
+  - Browserbase -> media_gather._bb_create/_bb_release/_cdp_page faked (REST + CDP wire), the
+    IG grid step media_gather.grid_from_page monkeypatched (function boundary), returns
+    synthetic Pillow images. MEDIA_GOOGLE pinned to "cse" here (browser mode: test_media_browser.py)
   - profile page fetches -> profile_extract.urlopen raises (profile falls back / LLM stub)."""
 import http.client
 import io
@@ -26,6 +27,8 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
 from PIL import Image  # noqa: E402
+
+import contextlib  # noqa: E402
 
 import chat_proxy  # noqa: E402
 import cse_scanner  # noqa: E402
@@ -49,32 +52,38 @@ def _no_fetch(req, timeout=None):
 
 
 class _Env(unittest.TestCase):
-    """Temp DB/DATA_DIR, CSE stub, fake CDN, gated fake grab_ig_grid."""
+    """Temp DB/DATA_DIR, CSE stub, fake CDN, gated fake grid_from_page, fake Browserbase session."""
 
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.saved = (db.DB_PATH, cse_scanner.CSE_ENDPOINT, chat_proxy.DEEPSEEK_URL, public_app.SCAN_LIMITER,
-                     public_app.RESULT_LIMITER, pe.urlopen, mg.urlopen, mg.grab_ig_grid, mg.PUBLIC_ORIGIN,
-                     mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE, mg.page_open, dict(os.environ))
+                     public_app.RESULT_LIMITER, pe.urlopen, mg.urlopen, mg.grid_from_page, mg.PUBLIC_ORIGIN,
+                     mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE, mg.page_open, mg.MEDIA_GOOGLE, mg._bb_create,
+                     mg._bb_release, mg._cdp_page, mg.BB_CREATE_GAP, dict(os.environ))
         db.DB_PATH = os.path.join(cls.tmp.name, "t.db")
         db.init_db()
         cls.up = stub.Stub().start()
         cse_scanner.CSE_ENDPOINT = cls.up.base + "/customsearch/v1"
         chat_proxy.DEEPSEEK_URL = cls.up.base + "/chat/completions"
         os.environ.update(GOOGLE_API_KEY="fake", GOOGLE_CSE_ID="fake", GOOGLE_CSE_ID_WEB="fakeweb",
-                          DEEPSEEK_API_KEY="fake")
+                          DEEPSEEK_API_KEY="fake", BROWSERBASE_API_KEY="fake", BROWSERBASE_PROJECT_ID="fake")
         os.environ.pop("DATA_DIR", None)
         public_app.SCAN_LIMITER = ratelimit.Limiter(rate_per_min=1000, burst=1000, max_concurrent=100)
         public_app.RESULT_LIMITER = ratelimit.Limiter(rate_per_min=10000, burst=1000, max_concurrent=1000)
         pe.urlopen = _no_fetch
         mg.PUBLIC_ORIGIN = PUB
+        mg.MEDIA_GOOGLE, mg.BB_CREATE_GAP = "cse", 0
+        mg._bb_create = lambda key, proj, timeout, deadline: {"id": "s1", "connectUrl": "wss://fake"}
+        mg._bb_release = lambda key, proj, sid: True
+        mg._cdp_page = contextlib.contextmanager(lambda url, deadline: (yield object()))
 
     @classmethod
     def tearDownClass(cls):
         (db.DB_PATH, cse_scanner.CSE_ENDPOINT, chat_proxy.DEEPSEEK_URL, public_app.SCAN_LIMITER,
-         public_app.RESULT_LIMITER, pe.urlopen, mg.urlopen, mg.grab_ig_grid, mg.PUBLIC_ORIGIN,
-         mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE, mg.page_open, env) = cls.saved
+         public_app.RESULT_LIMITER, pe.urlopen, mg.urlopen, mg.grid_from_page, mg.PUBLIC_ORIGIN,
+         mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE, mg.page_open, mg.MEDIA_GOOGLE, mg._bb_create,
+         mg._bb_release, mg._cdp_page, mg.BB_CREATE_GAP, env) = cls.saved
         os.environ.clear()
         os.environ.update(env)
         cls.up.shutdown()
@@ -91,11 +100,11 @@ class _Env(unittest.TestCase):
         self.gate.set()
         self.ig_calls = []
 
-        def fake_grab(handle, budget):
-            self.ig_calls.append((handle, budget))
+        def fake_grab(page, handle, deadline):
+            self.ig_calls.append((handle, deadline))
             self.gate.wait(20)
             return stub.ig_grid(6)
-        mg.grab_ig_grid = fake_grab
+        mg.grid_from_page = fake_grab
         for d in ("media", "media-cache"):
             shutil.rmtree(os.path.join(self.tmp.name, d), ignore_errors=True)
 
@@ -246,7 +255,7 @@ class TestGather(_Env):
 
     def test_embed_tiles_all_downloads_failed_not_cached(self):
         self.embed.pages[H] = stub.embed_page()                                  # tiles, CDN has none
-        mg.grab_ig_grid = lambda h, b: []
+        mg.grid_from_page = lambda p, h, d: []
         self.assertEqual(mg.gather("slugDLF001", "instagram.com", H, None, [], budget=60), "ready")  # google
         self.assertFalse(os.path.exists(mg._cache_path(mg.cache_key("instagram.com", H))))
         mg.gather("slugDLF002", "instagram.com", H, None, [], budget=60)
@@ -301,7 +310,7 @@ class TestGather(_Env):
             self.assertNotIn(u, self.cdn.seen)          # never even fetched
 
     def test_max_images(self):
-        mg.grab_ig_grid = lambda h, b: stub.ig_grid(20)
+        mg.grid_from_page = lambda p, h, d: stub.ig_grid(20)
         mg.gather("slugMAX001", "instagram.com", H, None, [], budget=60)
         self.assertEqual(len(mg._read_index("slugMAX001")["images"]), mg.MEDIA_MAX)
 
@@ -324,13 +333,13 @@ class TestGather(_Env):
         self.assertEqual(self.ig_calls, [])
         self.assertFalse(os.path.exists(mg._cache_path(mg.cache_key("onlyfans.com", H))))  # not cached
 
-        def boom(h, b):
+        def boom(p, h, d):
             raise RuntimeError("bb down")
-        mg.grab_ig_grid = boom
+        mg.grid_from_page = boom
         self.assertEqual(mg.gather("slugPART01", "onlyfans.com", H, stub.VALID, SCAN_ITEMS, budget=60), "ready")
         self.assertEqual({i["source"] for i in mg._read_index("slugPART01")["images"]}, {"google"})
         mg.urlopen = stub.FakeCDN({})                                   # nothing fetchable
-        mg.grab_ig_grid = lambda h, b: []
+        mg.grid_from_page = lambda p, h, d: []
         self.assertEqual(mg.gather("slugNONE01", "web.com", "nobody", None, [], budget=60), "none")
         self.assertEqual(mg._read_index("slugNONE01")["status"], "none")
 
@@ -400,7 +409,7 @@ class TestHTTP(_Env):
         self.gate.set()
         m = self.wait_status(slug, "ready")
         self.assertEqual([i["source"] for i in m["images"]], ["instagram"] * 6 + ["google"] * 3)
-        self.assertEqual(set(m), {"slug", "status", "images", "updated_at"})
+        self.assertEqual(set(m), {"slug", "status", "images", "updated_at", "profile_updated_at"})
         for im in m["images"]:
             self.assertEqual(set(im), {"src", "w", "h", "source"})
             self.assertRegex(im["src"], rf"^{PUB}/api/media/{slug}/\d+\.jpg$")
@@ -459,10 +468,12 @@ class TestNoPlaywright(unittest.TestCase):
 import os, sys, threading, json, urllib.request, tempfile
 sys.modules['playwright'] = None; sys.modules['playwright.sync_api'] = None
 os.environ.update(BROWSERBASE_API_KEY='x', BROWSERBASE_PROJECT_ID='y')
-import db, public_app, media_gather as mg
+import time, db, public_app, media_gather as mg
 from http.server import ThreadingHTTPServer
 db.DB_PATH = os.path.join(tempfile.mkdtemp(), 't.db'); db.init_db()
-assert mg.grab_ig_grid('mira.example', 60) == []
+st = mg.browser_steps(mg._Gallery('slugNOPW01'), handle='mira.example', ig='mira.example', profile=None,
+                      leak=(set(), set()), deadline=time.monotonic() + 60, want_google=True, want_grid=True)
+assert st['session'] is False and st['google'] == st['instagram'] == 0, st
 s = ThreadingHTTPServer(('127.0.0.1', 0), public_app.Handler)
 threading.Thread(target=s.serve_forever, daemon=True).start()
 print(urllib.request.urlopen(f'http://127.0.0.1:{s.server_address[1]}/healthz').status)

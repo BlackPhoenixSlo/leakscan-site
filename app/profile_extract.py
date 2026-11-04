@@ -1,11 +1,14 @@
 """
 Per-scan public profile for the quick scan (stdlib only).
 
-collect_sources() gathers raw public evidence for a handle (Instagram crawler-UA
-og tags + best-effort web_profile_info, generic og tags for tiktok/patreon/
-fansly, the scan's own Google items), extract_profile() turns it into one small
-SFW profile JSON via a single DeepSeek JSON-mode call, validated against a fixed
-schema; fallback_profile() builds the same shape without any LLM.
+collect_sources() gathers raw public evidence for a handle (user-declared socials
+first: the declared Instagram handle's crawler-UA og tags + best-effort
+web_profile_info, generic og tags for tiktok/patreon/fansly, the scan's own Google
+items), extract_profile() turns it into one small SFW profile JSON via a single
+DeepSeek JSON-mode call, validated against a fixed schema; fallback_profile()
+builds the same shape without any LLM. refine_profile() re-runs the same prompt
+once with Google web snippets (gathered later by media_gather) as extra evidence.
+Declared socials ({"instagram": h, "x": h}) are confirmed accounts: always listed first.
 
 Outbound fetches: fixed https hosts only, short timeouts, byte caps, no
 redirects. No user-controlled URL is ever fetched: page URLs are built from the
@@ -212,10 +215,27 @@ def _short_platform(platform):
     return (platform or "").lower().split(".")[0]
 
 
-def collect_sources(platform, handle, cse_items, fetch=urlopen):
-    """Raw public evidence for one handle. Fetches run in parallel; each fails soft."""
+def clean_socials(socials):
+    """{"instagram"?: h, "x"?: h} with HANDLE_RE-valid values only."""
+    out = {}
+    for k in ("instagram", "x"):
+        v = (socials or {}).get(k) if isinstance(socials, dict) else None
+        if valid_handle(v):
+            out[k] = v
+    return out
+
+
+def collect_sources(platform, handle, cse_items, fetch=urlopen, socials=None):
+    """Raw public evidence for one handle. Fetches run in parallel; each fails soft.
+    A declared Instagram handle replaces the scanned handle for the Instagram fetches."""
+    declared = clean_socials(socials)
     src = {"handle": handle, "platform": _short_platform(platform),
            "instagram": None, "og": None, "google": []}
+    if declared:
+        src["declared"] = declared
+    ig_h = declared.get("instagram") or handle
+    if ig_h != handle:
+        src["ig_handle"] = ig_h
     for it in (cse_items or [])[:200]:
         link = it.get("link") if isinstance(it, dict) else None
         if not link:
@@ -231,8 +251,8 @@ def collect_sources(platform, handle, cse_items, fetch=urlopen):
     if src["platform"] in OG_PAGES and src["platform"] not in og_targets:
         og_targets.append(src["platform"])
     with _cf.ThreadPoolExecutor(max_workers=2 + len(og_targets)) as ex:
-        f_html = ex.submit(_ig_html, fetch, handle)
-        f_api = ex.submit(_ig_api, fetch, handle)
+        f_html = ex.submit(_ig_html, fetch, ig_h)
+        f_api = ex.submit(_ig_api, fetch, ig_h)
         f_og = {p: ex.submit(_og_page, fetch, p, handle) for p in og_targets}
         html_res, api_res = f_html.result(), f_api.result()
         og = {p: f.result() for p, f in f_og.items()}
@@ -287,7 +307,9 @@ def fetch_avatar(sources, fetch=urlopen, timeout=FETCH_TIMEOUT):
 
 # --------------------------------------------------------------- prompting
 SYSTEM_PROMPT = """You write a short public profile of an online creator for a demo website.
-You receive SOURCES: raw public data (Instagram page data, other profile page tags, Google results).
+You receive SOURCES: raw public data (Instagram page data, other profile page tags, Google results,
+and sometimes web_results: Google web snippets about the creator, and declared_accounts: social
+accounts the creator confirmed as their own).
 
 HARD RULES:
 - Use ONLY facts present in the SOURCES. If a field is not supported by the sources, use null.
@@ -313,6 +335,10 @@ def build_prompt(sources):
         "other_profile_pages": sources.get("og"),
         "google_results": sources.get("google") or [],
     }
+    if sources.get("declared"):
+        payload["declared_accounts"] = sources["declared"]
+    if sources.get("web"):
+        payload["web_results"] = sources["web"]
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "SOURCES:\n" + json.dumps(payload, ensure_ascii=False)},
@@ -366,27 +392,38 @@ def _account_of(url):
     return plat, h
 
 
+def _results(sources):
+    """Google items from the scan + web snippets (refine), as {title, link, snippet}."""
+    return (sources.get("google") or []) + [
+        {"title": w.get("title"), "link": w.get("url"), "snippet": w.get("snippet")}
+        for w in sources.get("web") or [] if isinstance(w, dict)]
+
+
 def _evidence_accounts(sources):
     """{(platform, handle_lower): (canonical_url, handle)} for accounts backed by the sources."""
     found = {}
     h, plat = sources.get("handle"), sources.get("platform")
+    ig_h = sources.get("ig_handle") or h
 
     def add(p, handle):
         if p in ACCOUNT_DOMAINS and valid_handle(handle):
             found.setdefault((p, handle.lower()), (_canonical_url(p, handle), handle))
+    for p, dh in (sources.get("declared") or {}).items():
+        add(p, dh)                                    # creator-declared: confirmed, first
     if plat in ACCOUNT_DOMAINS and valid_handle(h):
         add(plat, h)                                  # the scanned account itself
-    if sources.get("instagram") and valid_handle(h):
-        add("instagram", h)
+    if sources.get("instagram") and valid_handle(ig_h):
+        add("instagram", ig_h)
         for u in sources["instagram"].get("bio_links") or []:
             a = _account_of(u)
             if a:
                 add(*a)
     for p in (sources.get("og") or {}):
         add(p, h)
-    for g in sources.get("google") or []:
+    names = {x.lower() for x in [h, ig_h] + list((sources.get("declared") or {}).values()) if x}
+    for g in _results(sources):
         a = _account_of(g.get("link"))
-        if a and h and a[1].lower() == h.lower():
+        if a and a[1].lower() in names:
             add(*a)
     return found
 
@@ -419,8 +456,8 @@ def _source_followers(sources):
     ig = sources.get("instagram") or {}
     if isinstance(ig.get("followers"), int):
         return ig["followers"]
-    h = (sources.get("handle") or "").lower()
-    for g in sources.get("google") or []:
+    h = (sources.get("ig_handle") or sources.get("handle") or "").lower()
+    for g in _results(sources):
         a = _account_of(g.get("link"))
         if a and a[0] == "instagram" and a[1].lower() == h:
             n = parse_followers(g.get("snippet"))
@@ -433,7 +470,7 @@ def _source_urls(sources, accounts):
     out = [a["url"] for a in accounts]
     have = {(a["platform"], a["handle"].lower()) for a in accounts}
     h = (sources.get("handle") or "").lower()
-    for g in sources.get("google") or []:
+    for g in _results(sources):
         a = _account_of(g.get("link"))
         if a and a[1].lower() == h and (a[0], h) not in have:
             have.add((a[0], h))
@@ -471,6 +508,8 @@ def validate_profile(raw, sources, generated_by="deepseek", avatar=False):
         if (plat, hl) not in seen:
             seen.add((plat, hl))
             accounts.append({"platform": plat, "handle": h, "url": url})
+    declared = {(p, dh.lower()) for p, dh in (sources.get("declared") or {}).items()}
+    accounts.sort(key=lambda a: (a["platform"], a["handle"].lower()) not in declared)   # stable
     site = raw.get("site_domain")
     site = site.strip().lower() if isinstance(site, str) else None
     if not site or not _SITE_RE.match(site):
@@ -494,14 +533,15 @@ def validate_profile(raw, sources, generated_by="deepseek", avatar=False):
 
 def source_name(sources):
     """Display name stated by the sources: IG full_name, else '<Name> (@handle)' in a title."""
-    handle = sources.get("handle") or ""
+    handles = [sources.get("handle") or ""] + ([sources["ig_handle"]] if sources.get("ig_handle") else [])
     name = (sources.get("instagram") or {}).get("full_name")
     titles = [v.get("title") for v in (sources.get("og") or {}).values()] + \
-             [g.get("title") for g in sources.get("google") or []]
+             [g.get("title") for g in _results(sources)]
     for t in titles:
-        if name:
-            break
-        name = name_from_title(t, handle)
+        for h in handles:
+            if name:
+                break
+            name = name_from_title(t, h)
     return name
 
 
@@ -527,12 +567,12 @@ def extract_profile(sources, llm=deepseek_json, timeout=LLM_TIMEOUT, avatar=Fals
         return fallback_profile(sources, avatar=avatar)
 
 
-def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROFILE_BUDGET):
+def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROFILE_BUDGET, socials=None):
     """collect -> avatar -> extract inside a total time budget.
     Returns (profile, avatar_bytes_and_ext_or_None, sources)."""
     fetch, llm = fetch or urlopen, llm or deepseek_json   # resolved per call (patchable)
     t0 = time.monotonic()
-    sources = collect_sources(platform, handle, cse_items, fetch=fetch)
+    sources = collect_sources(platform, handle, cse_items, fetch=fetch, socials=socials)
     remaining = lambda: budget - (time.monotonic() - t0)
     av = fetch_avatar(sources, fetch=fetch, timeout=min(FETCH_TIMEOUT, max(1, remaining() - 3))) \
         if remaining() > 4 else None
@@ -540,3 +580,41 @@ def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROF
     if llm_timeout < 2:
         return fallback_profile(sources, avatar=bool(av)), av, sources
     return extract_profile(sources, llm=llm, timeout=llm_timeout, avatar=bool(av)), av, sources
+
+
+_KEEP_KEYS = tuple(CAPS) + ("followers", "site_domain")
+
+
+def refine_profile(old, sources, web, *, platform="", handle="", socials=None, llm=None, timeout=LLM_TIMEOUT):
+    """ONE extra LLM call with Google web snippets as extra evidence -> refined profile, or
+    None (LLM unavailable/failed: keep the original). Same shape + "refined": true. A good
+    field of `old` is never replaced by an empty one; old accounts/sources are kept; avatar kept."""
+    llm = llm or deepseek_json
+    src = dict(sources or {"handle": handle, "platform": _short_platform(platform),
+                           "instagram": None, "og": None, "google": []})
+    declared = clean_socials(socials)
+    if declared and not src.get("declared"):
+        src["declared"] = declared
+    src["web"] = [w for w in web or [] if isinstance(w, dict)]
+    old = old if isinstance(old, dict) else {}
+    try:
+        raw = llm(build_prompt(src), timeout=timeout)
+        new = validate_profile(raw, src, generated_by="deepseek", avatar=bool(old.get("avatar")))
+    except Exception:
+        return None
+    for k in _KEEP_KEYS:
+        if new.get(k) in (None, "", []) and old.get(k) not in (None, "", []):
+            new[k] = old[k]
+    seen = {(a["platform"], a["handle"].lower()) for a in new["accounts"]}
+    for a in old.get("accounts") or []:
+        if isinstance(a, dict) and (a.get("platform"), (a.get("handle") or "").lower()) not in seen:
+            seen.add((a.get("platform"), (a.get("handle") or "").lower()))
+            new["accounts"].append(a)
+    dec = {(p, h.lower()) for p, h in (src.get("declared") or {}).items()}
+    new["accounts"] = sorted(new["accounts"], key=lambda a: (a["platform"], a["handle"].lower()) not in dec)
+    new["accounts"] = new["accounts"][:MAX_ACCOUNTS]
+    new["sources"] = list(dict.fromkeys((old.get("sources") or []) + new["sources"]))[:10]
+    if new["display_name"] == handle and old.get("display_name"):
+        new["display_name"] = old["display_name"]
+    new["refined"] = True
+    return new

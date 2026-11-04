@@ -226,8 +226,9 @@ def _profile_cse_items(handle, items):
         return []
 
 
-def _quick_profile(handle, platform, items):
-    """-> (profile|None, avatar(bytes, ext)|None). Never raises, never exceeds ~budget+2s."""
+def _quick_profile(handle, platform, items, socials=None):
+    """-> (profile|None, avatar(bytes, ext)|None, sources|None). Never raises, never exceeds
+    ~budget+2s. sources go on to media_gather (profile refine with web snippets)."""
     box = {}
 
     def run():
@@ -235,9 +236,9 @@ def _quick_profile(handle, platform, items):
             t0 = time.monotonic()
             more = _profile_cse_items(handle, items)
             budget = profile_extract.PROFILE_BUDGET - (time.monotonic() - t0)
-            prof, av, _ = profile_extract.build_profile(platform, handle, more + list(items or []),
-                                                        budget=budget)
-            box["r"] = (prof, av)
+            prof, av, src = profile_extract.build_profile(platform, handle, more + list(items or []),
+                                                          budget=budget, socials=socials)
+            box["r"] = (prof, av, src)
         except Exception as e:
             _event(f"profile failed: {type(e).__name__}")
     t = threading.Thread(target=run, daemon=True)
@@ -246,8 +247,40 @@ def _quick_profile(handle, platform, items):
     if "r" not in box:
         if t.is_alive():
             _event("profile timed out")
-        return None, None
+        return None, None, None
     return box["r"]
+
+
+SOCIAL_KEYS = ("instagram", "x")
+_SOCIAL_URL_RE = re.compile(r"^(?:https?://)?(?:www\.|m\.)?(?:instagram\.com|x\.com|twitter\.com)/+@?([^/?#\s]+)",
+                            re.I)
+MAX_QUICK_ALIASES = 3
+
+
+def clean_socials(body):
+    """User-declared socials from the scan body -> {"instagram"?: h, "x"?: h}. Accepts @h and
+    instagram.com/<h>, x.com/<h>, twitter.com/<h> URL forms; invalid values dropped silently."""
+    out = {}
+    for k in SOCIAL_KEYS:
+        v = body.get(k) if isinstance(body, dict) else None
+        if not isinstance(v, str):
+            continue
+        v = v.strip()[:200]
+        m = _SOCIAL_URL_RE.match(v)
+        v = (m.group(1) if m else v).lstrip("@").rstrip("/")
+        if profile_extract.valid_handle(v):
+            out[k] = v
+    return out
+
+
+def quick_aliases(handle_aliases, socials):
+    """Scan handle + declared social handles that differ (case-insensitive), cap 3."""
+    out, seen = [], set()
+    for a in list(handle_aliases[:1]) + [socials[k] for k in SOCIAL_KEYS if k in socials]:
+        if a.lower() not in seen:
+            seen.add(a.lower())
+            out.append(a)
+    return out[:MAX_QUICK_ALIASES]
 
 
 # Quick-scan `results` (Google-style links/images/videos tabs).
@@ -1724,6 +1757,7 @@ class Handler(BaseHTTPRequestHandler):
             ex = _scan_extra_all(slug) or {}
             pub["results"] = ex.get("results") or []
             pub["profile"] = ex.get("profile")
+            pub["socials"] = ex.get("socials") or {}
             pub["media"] = {"status": media_gather.public_view(slug)["status"]}
         return self._json(pub, 200, extra=noindex)
 
@@ -1881,27 +1915,33 @@ class Handler(BaseHTTPRequestHandler):
                                "handle": handle, "platform": platform}, 200)
 
         # Low (CSE) scans are a couple of API calls -> keep the fast SSE path.
+        # Declared socials widen the leak search (extra aliases) and feed the profile.
+        socials = clean_socials(body)
         wc.sse_start(self)
         try:
             if not aliases:
                 return wc.sse_fail(self, "Enter a valid handle (letters, digits, . _ - only).")
-            self._scan_cse(aliases[0], platform, ip)
+            self._scan_cse(aliases[0], platform, ip, aliases=quick_aliases(aliases, socials),
+                           socials=socials)
         finally:
             SCAN_LIMITER.release(ip)
 
-    def _scan_cse(self, handle, platform, ip):
+    def _scan_cse(self, handle, platform, ip, aliases=None, socials=None):
         """Level 1: Google Custom Search — fast, no scraping, anyone. Runs a 6–8
         call exclude-reset widening (CSE_QUICK_CALLS) across a few phrasings so the
         quick scan surfaces many more distinct leak hosts than the old 2-pass, with
         a shallow depth fallback when too few sites turn up."""
-        _event(f"scan start level=low platform={platform}")
+        aliases, socials = aliases or [handle], socials or {}
+        _event(f"scan start level=low platform={platform} aliases={len(aliases)}")
         if not cse_scanner.cse_available():
             return wc.sse_fail(self, "Quick search isn't configured right now. Try the deep scan.")
         prog = lambda m: wc.sse(self, "progress", m)
         try:
-            queries = [handle] + [f"{p} {handle}" for p in CSE_PREFIXES]
+            # each alias's bare query first, then the prefixed seeds; +1 call per extra alias
+            seeds = [(a, a) for a in aliases] + [(f"{p} {a}", a) for a in aliases for p in CSE_PREFIXES]
             results, raw_total = cse_scanner.cse_search_wide(
-                queries, max_calls=CSE_QUICK_CALLS, on_progress=prog)
+                [q for q, _ in seeds], max_calls=CSE_QUICK_CALLS + len(aliases) - 1, on_progress=prog,
+                tags=[a for _, a in seeds])
             rows = cse_scanner.summarize_cse(results)
             if len(rows) < MIN_SITES_FOR_FALLBACK and FALLBACK_EXTRA_PAGES > 0:
                 try:
@@ -1925,24 +1965,26 @@ class Handler(BaseHTTPRequestHandler):
                 google_total = min(google_total, GOOGLE_INDEX_MAX)
         status = "empty" if not rows else "complete"
         shaped = shape_results(results)
-        profile, avatar = None, None
+        profile, avatar, sources = None, None, None
         if PROFILE_ENABLED:
             prog("Reading your public profile…")
-            profile, avatar = _quick_profile(handle, platform, results)
+            profile, avatar, sources = _quick_profile(handle, platform, results, socials)
         slug = db.insert_scan(rows, handle=handle, level="low", platform=platform,
                               status=status, client_ip_hash=_ip_hash(ip),
                               extra={"images": images, "google_total": google_total,
-                                     "results": shaped, "profile": profile})
+                                     "results": shaped, "profile": profile, "socials": socials})
         if avatar and not _save_avatar(slug, avatar) and profile:
             profile["avatar"] = False
-        media = {"status": media_gather.start(slug, platform, handle, profile, results)}
+        media = {"status": media_gather.start(slug, platform, handle, profile, results,
+                                              sources=sources, socials=socials)}
         _event(f"scan done level=low hits={len(rows)} images={len(images)} calls={CSE_QUICK_CALLS} "
+               f"aliases={len(aliases)} socials={len(socials)} "
                f"profile={(profile or {}).get('generated_by')} avatar={bool(avatar)} media={media['status']}")
         wc.sse(self, "result", json.dumps({
             "slug": slug, "handle": handle, "platform": platform, "level": "low",
             "status": status, "hit_count": len(rows), "domain_count": len(rows),
             "google_total": google_total, "images": images, "hits": rows,
-            "results": shaped, "profile": profile, "media": media,
+            "results": shaped, "profile": profile, "media": media, "socials": socials,
         }, ensure_ascii=False))
         wc.sse(self, "done", "end")
 
