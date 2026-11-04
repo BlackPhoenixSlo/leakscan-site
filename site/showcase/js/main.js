@@ -66,21 +66,28 @@ const lightboxImg = document.querySelector('.lightbox__img');
 const lightboxClose = document.querySelector('.lightbox__close');
 
 if (lightbox) {
+  let opener = null;   // the gallery button that opened it; focus goes back there on close
+
   document.querySelectorAll('[data-lightbox]').forEach(item => {
     item.addEventListener('click', () => {
       const src = item.querySelector('img')?.src || item.dataset.lightbox;
       const alt = item.querySelector('img')?.alt || '';
+      opener = item.querySelector('button') || document.activeElement;
       lightboxImg.src = src;
       lightboxImg.alt = alt;
       lightbox.classList.add('open');
       document.body.style.overflow = 'hidden';
+      lightboxClose?.focus();
     });
   });
 
   const closeLightbox = () => {
+    if (!lightbox.classList.contains('open')) return;
     lightbox.classList.remove('open');
     document.body.style.overflow = '';
     lightboxImg.src = '';
+    opener?.focus();
+    opener = null;
   };
 
   lightboxClose?.addEventListener('click', closeLightbox);
@@ -88,7 +95,10 @@ if (lightbox) {
     if (e.target === lightbox) closeLightbox();
   });
   document.addEventListener('keydown', e => {
+    if (!lightbox.classList.contains('open')) return;
     if (e.key === 'Escape') closeLightbox();
+    // aria-modal: the close button is the only control inside, so Tab stays on it
+    if (e.key === 'Tab') { e.preventDefault(); lightboxClose?.focus(); }
   });
 }
 
