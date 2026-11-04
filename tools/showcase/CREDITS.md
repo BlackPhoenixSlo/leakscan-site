@@ -5,27 +5,30 @@ All photos in `site/showcase/imgs/` (except the favicons) are from
 (free to use, attribution not required; credited here anyway). The files are
 cropped, resized WebP derivatives made by `tools/showcase/make_images.py`.
 
-The demo creator, Orla Brennick, is fictional. None of these photos shows her,
-and none shows an identifiable face: hands, pots, studios and places only.
+The demo creator, Orla Brennick, is fictional. Since 2026-11 the homepage and the
+blog / about headers use one Pexels series by Monstera Production (one model, a potter
+in her studio), so the demo reads as a real creator's site: the people photos stand in
+for "her". The model is not Orla and is not affiliated with LeakScan.
+Files are capped at 1600 px wide and 180 KB (`make_images.py` MAX_W / BUDGET).
 
 | File | Photo | Photographer |
 |---|---|---|
-| `hero-wide.webp` (mirrored) | [Close-up shot of a person making a pot](https://www.pexels.com/photo/close-up-shot-of-a-person-making-a-pot-14676612/) | Anastasia Lashkevich |
-| `portrait.webp` | [Woman making a clay bowl on a potter's lathe](https://www.pexels.com/photo/woman-making-a-clay-bowl-on-a-potters-lathe-9304550/) | Mikhail Nilov |
-| `behind-the-scenes.webp` | [Shaping of an unfinished clay pot](https://www.pexels.com/photo/shaping-of-an-unfinished-clay-pot-9304551/) | Mikhail Nilov |
-| `headshot.webp` | [Woman making a clay pot](https://www.pexels.com/photo/woman-making-a-clay-pot-16303094/) | Rüveyda |
-| `studio-portrait.webp` | [Pottery on shelves](https://www.pexels.com/photo/pottery-on-shelves-6611418/) | Yan Krukau |
-| `blog-why-this-site.webp` | [Ceramic cups and plates](https://www.pexels.com/photo/ceramic-cups-and-plates-6611421/) | Yan Krukau |
-| `blog-impersonators.webp` | [Clay mugs drying on a radiator](https://www.pexels.com/photo/clay-mugs-drying-on-a-radiator-6611472/) | Yan Krukau |
-| `og.webp` | [Close-up of ceramic containers](https://www.pexels.com/photo/close-up-of-ceramic-containers-8063882/) | Roman Odintsov |
+| `hero-wide.webp` | [Young woman throwing ball of clay in pottery](https://www.pexels.com/photo/5302896/) | Monstera Production |
+| `portrait.webp` | [Potter shaping a clay slab (series)](https://www.pexels.com/photo/5302893/) | Monstera Production |
+| `behind-the-scenes.webp` | [Potter carving a clay plate (series)](https://www.pexels.com/photo/5302910/) | Monstera Production |
+| `headshot.webp` | [Potter holding clay, portrait (series)](https://www.pexels.com/photo/5302902/) | Monstera Production |
+| `studio-portrait.webp` | [Potter holding clay, portrait (series)](https://www.pexels.com/photo/5302902/) | Monstera Production |
+| `blog-why-this-site.webp` | [Potter at the long table in a bright studio (series)](https://www.pexels.com/photo/5302892/) | Monstera Production |
+| `blog-impersonators.webp` | [Potter at the table, terracotta wall (series)](https://www.pexels.com/photo/5302899/) | Monstera Production |
+| `og.webp` | [Young woman throwing ball of clay in pottery](https://www.pexels.com/photo/5302896/) | Monstera Production |
 | `verify-hero.webp` | [Display of clay mugs](https://www.pexels.com/photo/display-of-clay-mugs-8063803/) | Roman Odintsov |
-| `blog-where-to-find-me.webp` | [Close-up of vases](https://www.pexels.com/photo/close-up-of-vases-8063852/) | Roman Odintsov |
-| `editorial-01.webp` | [Rustic ceramic cups on wooden table](https://www.pexels.com/photo/rustic-ceramic-cups-on-wooden-table-28509629/) | Kevyn Costa |
-| `editorial-02.webp` | [Handcrafted ceramic vases on display](https://www.pexels.com/photo/handcrafted-ceramic-vases-on-display-29286721/) | Novirina |
+| `blog-where-to-find-me.webp` | [Potter at the window table (series)](https://www.pexels.com/photo/5302900/) | Monstera Production |
+| `editorial-01.webp` | [Potter trimming a clay plate (series)](https://www.pexels.com/photo/5302909/) | Monstera Production |
+| `editorial-02.webp` | [Potter kneading clay by the window (series)](https://www.pexels.com/photo/5302907/) | Monstera Production |
 | `editorial-03.webp` | [Ceramic mugs on a wooden tray](https://www.pexels.com/photo/ceramic-mugs-on-a-wooden-tray-6312194/) | Katrin Bolovtsova |
 | `editorial-04.webp` | [Minimalist ceramic vases on wooden tray](https://www.pexels.com/photo/minimalist-ceramic-vases-on-wooden-tray-33126633/) | Vinícius Borralho |
-| `outdoors.webp` | [Serene Irish lake in overcast weather](https://www.pexels.com/photo/serene-irish-lake-in-overcast-weather-38153503/) | Oleksandr Kobuta |
+| `outdoors.webp` | [Potter wedging a block of clay (series)](https://www.pexels.com/photo/5302895/) | Monstera Production |
 | `timeline-hero.webp` | [Dramatic coastal landscape in Ireland](https://www.pexels.com/photo/dramatic-coastal-landscape-in-ireland-38806951/) | Oleksandr Kobuta |
-| `about-hero.webp` | [Bright pottery studio with handmade crafts](https://www.pexels.com/photo/bright-pottery-studio-with-handmade-crafts-31047256/) | Christian Alemu |
+| `about-hero.webp` | [Hands cutting a clay slab (series)](https://www.pexels.com/photo/5302908/) | Monstera Production |
 
 `favicon.svg` / `favicon.png` are drawn for the showcase, not photographs.

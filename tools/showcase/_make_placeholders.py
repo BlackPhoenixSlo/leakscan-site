@@ -48,11 +48,11 @@ BLOG_DIRECTION = (
 SPECS = {
     # --- Hero / identity -------------------------------------------------
     "portrait.webp": (2400, 3200, "HERO PORTRAIT",
-        "Vertical 3:4. Hands at the wheel, no face. Subject high in frame with headroom — "
+        "Vertical 3:4. Her at work, face in frame. Subject high in frame with headroom — "
         "the nav sits over the top. Natural light. This is the mobile hero."),
     "hero-wide.webp": (2560, 1440, "HERO — WIDE",
         "16:9 desktop hero. COMPOSE WITH THE SUBJECT ON THE RIGHT THIRD and open space "
-        "on the left — the headline sits in that negative space. Hands and work, no face."),
+        "on the left — the headline sits in that negative space. Her at work."),
     "headshot.webp": (480, 480, "AVATAR — SQUARE",
         "1:1. Crops to a circle on the links page (shown at most 110px wide, so 480 "
         "covers 3x screens). Top-down wheel shot, centred."),

@@ -7,7 +7,8 @@ Each image is cropped to the aspect ratio _make_placeholders.SPECS gives for
 its filename, at SPECS size (never upscaled), then saved as WebP at the
 highest quality that fits its weight budget, stepping the size down if even
 q=60 does not fit. Give file names to rebuild only those. Downloads stay in the cache dir, outside the repo.
-No photo shows an identifiable face: the demo creator is fictional.
+The demo creator is fictional; the photos are one Pexels series of one model (a potter in her studio), so the
+site reads as one real person. Output is capped at MAX_W px wide and BUDGET bytes (page weight).
 """
 import argparse
 import io
@@ -21,29 +22,30 @@ import _sitelib as site
 from _make_placeholders import SPECS
 
 OUT = site.PUBLIC / "imgs"
-HERO_BUDGET = 400_000          # the two homepage heroes
-BUDGET = 200_000               # everything else
+HERO_BUDGET = 180_000          # the two homepage heroes
+BUDGET = 180_000               # everything else
+MAX_W = 1600                   # declared width/height stay the SPECS design size (aspect); files are smaller
 
 # filename: (pexels id, focal point x,y as 0..1 of the original[, "flip"])
 # "flip" mirrors the photo, used to put the subject on the right third.
 IMAGES = {
-    "hero-wide.webp":          (14676612, (0.50, 0.50), "flip"),
-    "portrait.webp":           (9304550,  (0.50, 0.50)),
-    "studio-portrait.webp":    (6611418,  (0.50, 0.50)),
-    "headshot.webp":           (16303094, (0.50, 0.50)),
-    "og.webp":                 (8063882,  (0.50, 0.55)),
-    "editorial-01.webp":       (28509629, (0.50, 0.50)),
-    "editorial-02.webp":       (29286721, (0.50, 0.50)),
+    "hero-wide.webp":          (5302896, (0.62, 0.42)),
+    "portrait.webp":           (5302893, (0.50, 0.42)),
+    "studio-portrait.webp":    (5302902, (0.50, 0.40)),
+    "headshot.webp":           (5302902, (0.50, 0.30)),
+    "og.webp":                 (5302896, (0.62, 0.40)),
+    "editorial-01.webp":       (5302909, (0.50, 0.50)),
+    "editorial-02.webp":       (5302907, (0.76, 0.50)),
     "editorial-03.webp":       (6312194,  (0.50, 0.50)),
     "editorial-04.webp":       (33126633, (0.50, 0.50)),
-    "outdoors.webp":           (38153503, (0.50, 0.50)),
-    "behind-the-scenes.webp":  (9304551,  (0.50, 0.50)),
-    "about-hero.webp":         (31047256, (0.50, 0.50)),
+    "outdoors.webp":           (5302895, (0.50, 0.50)),
+    "behind-the-scenes.webp":  (5302910, (0.50, 0.50)),
+    "about-hero.webp":         (5302908, (0.50, 0.50)),
     "timeline-hero.webp":      (38806951, (0.50, 0.50)),
     "verify-hero.webp":        (8063803,  (0.50, 0.50)),
-    "blog-why-this-site.webp": (6611421,  (0.50, 0.50)),
-    "blog-where-to-find-me.webp": (8063852, (0.50, 0.50)),
-    "blog-impersonators.webp": (6611472,  (0.50, 0.50)),
+    "blog-why-this-site.webp": (5302892, (0.62, 0.45)),
+    "blog-where-to-find-me.webp": (5302900, (0.55, 0.45)),
+    "blog-impersonators.webp": (5302899, (0.62, 0.45)),
 }
 HEROES = {"hero-wide.webp", "portrait.webp"}
 
@@ -102,8 +104,9 @@ def main():
         if "flip" in opts:
             src = src.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
         im = crop(src, (w, h), focal)
-        if im.width > w:
-            im = im.resize((w, h), Image.LANCZOS)
+        tw = min(w, MAX_W)
+        if im.width > tw:
+            im = im.resize((tw, round(tw * h / w)), Image.LANCZOS)
         data, size, q = encode(im, HERO_BUDGET if name in HEROES else BUDGET)
         (OUT / name).write_bytes(data)
         print(f"{name:28} {size[0]}x{size[1]}  q{q}  {len(data) // 1024} KB  (pexels {pid})")
