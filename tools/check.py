@@ -18,6 +18,8 @@ Checks every HTML file under site/ (except site/showcase/**):
 - no `{{` in any shipped text file
 - every file under site/assets, site/css, site/js is referenced by some page
 - every raster (.png/.jpg/.webp) under site/ (except showcase/) is <= RASTER_BUDGET bytes
+- every third-party host site/showcase/** loads is in DISCLOSED and privacy.html names it (the homepage iframes the
+  demo, so its loads are the landing site's too); privacy.html names no host the demo no longer loads
 """
 import json, pathlib, re, sys
 from html.parser import HTMLParser
@@ -34,6 +36,7 @@ CTA_CLASSES = {"btn", "channel", "mobile-cta"}
 CHAT = ("https://t.me/", "https://wa.me/")
 RASTER_BUDGET = 100_000   # og.png re-rendered by make_icons.py is ~165 KB until shrunk (see its docstring)
 RASTER_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+DISCLOSED = {"fonts.googleapis.com": "Google Fonts", "fonts.gstatic.com": "Google Fonts"}  # host -> privacy.html wording
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
 problems = []
@@ -276,6 +279,26 @@ def main():
             bad(f"{rel}: not referenced by any page")
         if f.suffix.lower() in RASTER_EXT and f.stat().st_size > RASTER_BUDGET:
             bad(f"{rel}: {f.stat().st_size} bytes > {RASTER_BUDGET} (shrink it, see tools/make_icons.py)")
+
+    demo_hosts = set()
+    for p in sorted((SITE / "showcase").rglob("*.html")):
+        pg = Page()
+        pg.feed(p.read_text(encoding="utf-8"))
+        for tag, attr, value, linkrel in pg.refs:
+            u = urlsplit(value.strip())
+            loads = tag in RESOURCE_TAGS or (tag == "link" and linkrel not in ("canonical", "alternate"))
+            if loads and attr != "content" and u.scheme in ("http", "https", "") and u.netloc \
+                    and not value.strip().startswith(SITE_URL):
+                demo_hosts.add(u.netloc)
+    privacy = (SITE / "privacy.html").read_text(encoding="utf-8")
+    for host in sorted(demo_hosts):
+        if host not in DISCLOSED:
+            bad(f"showcase loads third-party host {host}: disclose it in privacy.html and add it to DISCLOSED")
+        elif DISCLOSED[host] not in privacy:
+            bad(f"showcase loads {host} but privacy.html does not mention {DISCLOSED[host]!r}")
+    for host, words in DISCLOSED.items():
+        if host not in demo_hosts and words in privacy and not any(DISCLOSED[h] == words for h in demo_hosts):
+            bad(f"privacy.html mentions {words!r} but nothing under showcase/ loads {host} any more")
 
     for p in problems:
         print(p)
