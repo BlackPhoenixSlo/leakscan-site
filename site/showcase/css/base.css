@@ -45,19 +45,20 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Fade-in: initial state in CSS to prevent flash/CLS */
-[data-fade] {
+/* Fade-in: initial state in CSS to prevent flash/CLS. Gated on html.js (set
+   inline in <head>) so content stays visible when JS is off or main.js fails. */
+.js [data-fade] {
   opacity: 0;
   transform: translateY(24px);
   transition: opacity 0.6s ease, transform 0.6s ease;
   will-change: opacity, transform;
 }
-[data-fade].in-view {
+.js [data-fade].in-view {
   opacity: 1;
   transform: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-fade], [data-fade].in-view {
+  .js [data-fade], .js [data-fade].in-view {
     opacity: 1;
     transform: none;
     transition: none;

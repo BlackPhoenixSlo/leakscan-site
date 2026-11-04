@@ -14,7 +14,9 @@ showcase, so those two legs are gone. Two showcase-only rules replace them:
 every page is <meta name="robots" content="noindex, nofollow"> (the demo must
 not rank), and every page carries the demo ribbon linking back to the
 LeakScan landing page one level above site/showcase/. Every page also has
-exactly one <h1> and no skipped heading levels (h2 -> h4).
+exactly one <h1> and no skipped heading levels (h2 -> h4). A page using
+[data-fade] sets html.js in an inline <head> script, and the CSS hides
+[data-fade] only under .js, so the content shows with JS off or main.js down.
 
 Silent and exit 0 when every statement of the page set agrees.
 
@@ -63,6 +65,9 @@ class Page(HTMLParser):
         self.robots: list[str] = []
         self.ribbon: list[str] = []
         self.headings: list[int] = []
+        self.fades = False
+        self.js_flag = False
+        self._inline_script = False
         self._depth = {"nav": 0, "footer": 0}
         self._ribbon_tag: str | None = None
         self._ribbon_depth = 0
@@ -72,6 +77,8 @@ class Page(HTMLParser):
             self._depth[tag] += 1
             self.has_footer |= tag == "footer"
         a = dict(attrs)
+        self.fades |= "data-fade" in a
+        self._inline_script = tag == "script" and "src" not in a
 
         if len(tag) == 2 and tag[0] == "h" and tag[1] in "123456":
             self.headings.append(int(tag[1]))
@@ -108,7 +115,13 @@ class Page(HTMLParser):
         if tag in self._depth and self._depth[tag]:
             self._depth[tag] -= 1
 
+    def handle_data(self, data):
+        if self._inline_script and "classList.add('js')" in data:
+            self.js_flag = True
+
     def handle_endtag(self, tag):
+        if tag == "script":
+            self._inline_script = False
         if tag in self._depth and self._depth[tag]:
             self._depth[tag] -= 1
         if self._ribbon_tag == tag:
@@ -247,6 +260,9 @@ def check_showcase(parsed, paths):
                 errors.append(f"{rel}: heading skips h{prev} -> h{cur}" if prev
                               else f"{rel}: first heading is h{cur}, not h1")
                 break
+        if page.fades and not page.js_flag:
+            errors.append(f"{rel}: uses [data-fade] but no inline "
+                          f"document.documentElement.classList.add('js') script")
         if not page.ribbon:
             errors.append(f"{rel}: no demo ribbon (class=\"{RIBBON_CLASS}\") with a link")
             continue
@@ -259,6 +275,21 @@ def check_showcase(parsed, paths):
         if landing not in back:
             errors.append(f"{rel}: demo ribbon does not link back to the LeakScan "
                           f"landing ({', '.join(page.ribbon)})")
+    return errors
+
+
+def check_fade_css():
+    """Every CSS rule hiding [data-fade] must be scoped under .js (see docstring)."""
+    import re
+    errors = []
+    for css in sorted((site.PUBLIC / "css").glob("*.css")):
+        text = re.sub(r"/\*.*?\*/", "", css.read_text(encoding="utf-8"), flags=re.S)
+        for sel in re.findall(r"([^{}]+)\{", text):
+            for part in sel.split(","):
+                part = part.strip()
+                if "[data-fade]" in part and not part.startswith(".js "):
+                    errors.append(f"css/{css.name}: '{part}' not scoped under .js "
+                                  f"(content invisible without JS)")
     return errors
 
 
@@ -283,6 +314,7 @@ def main() -> int:
     errors += check_blog(parsed)
     errors += check_image_dims(parsed)
     errors += check_showcase(parsed, paths)
+    errors += check_fade_css()
 
     for e in errors:
         print(f"FAIL  {e}")
