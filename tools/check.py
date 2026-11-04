@@ -20,6 +20,8 @@ Checks every HTML file under site/ (except site/showcase/**):
 - every raster (.png/.jpg/.webp) under site/ (except showcase/) is <= RASTER_BUDGET bytes
 - every third-party host site/showcase/** loads is in DISCLOSED and privacy.html names it (the homepage iframes the
   demo, so its loads are the landing site's too); privacy.html names no host the demo no longer loads
+- every outside host named in site/js/*.js (scan API, deep-scan link, chat links) is named in privacy.html, so moving
+  the scan server can't leave the policy pointing at the old one
 """
 import json, pathlib, re, sys
 from html.parser import HTMLParser
@@ -299,6 +301,12 @@ def main():
     for host, words in DISCLOSED.items():
         if host not in demo_hosts and words in privacy and not any(DISCLOSED[h] == words for h in demo_hosts):
             bad(f"privacy.html mentions {words!r} but nothing under showcase/ loads {host} any more")
+
+    site_host = urlsplit(SITE_URL).netloc
+    for js in sorted((SITE / "js").glob("*.js")):
+        for host in sorted(set(re.findall(r"https?://([A-Za-z0-9.-]+)", js.read_text(encoding="utf-8"))) - {site_host}):
+            if host not in privacy:
+                bad(f"js/{js.name} talks to {host} but privacy.html does not name it")
 
     for p in problems:
         print(p)
