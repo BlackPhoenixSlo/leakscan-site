@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Leak scan report</title>
+<link rel="stylesheet" href="/static/styles.css">
+<!--APP_CONFIG-->
+</head>
+<body data-mode="share">
+<header class="topbar">
+  <a class="brand" href="/app/"><span class="logo">◑</span> LeakScan</a>
+  <button class="ghost-btn" id="global-unblur" type="button" style="display:none">🔞 Unblur</button>
+</header>
+
+<main>
+  <!-- LOADING -->
+  <section id="panel-loading" class="panel active">
+    <div class="scanning">
+      <div class="orbit" aria-hidden="true"></div>
+      <h2>Loading report…</h2>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="panel-results" class="panel report">
+    <div id="results-head" class="results-head report-hero"></div>
+    <div id="report-chips" class="report-chips"></div>
+    <div id="report-stats" class="report-stats"></div>
+    <div id="report-media" class="report-sec" style="display:none">
+      <div class="report-sechead"><h2>Preview of what we found</h2>
+        <span class="pill warn">🔞 blurred · tap to reveal · scroll →</span></div>
+      <div id="results-images" class="img-grid dragrow"></div>
+    </div>
+    <div id="report-topchat" class="topask" style="display:none">
+      <div id="topchat-log" class="chat-log topask-log"></div>
+      <form id="topchat-form" class="ask-pill" autocomplete="off">
+        <input id="topchat-input" type="text" placeholder="Ask anything about your report — leaks, takedowns, cost…"
+               maxlength="1000" autocomplete="off">
+        <button class="ask-go" id="topchat-send" type="submit" aria-label="Ask">&#10148;</button>
+      </form>
+    </div>
+    <div class="share-row">
+      <button class="cta-btn" id="share-btn" type="button">Copy link to report</button>
+      <a class="cta-btn share-dm" id="share-dm" target="_blank" rel="noopener noreferrer" style="display:none">💬 DM me</a>
+      <button class="poster-save" id="poster-save" type="button" style="display:none">⬇ Download image</button>
+      <span class="muted" id="share-hint"></span>
+    </div>
+    <div id="report-gshot" class="report-sec" style="display:none"></div>
+    <div id="report-googlealso" class="report-sec" style="display:none"></div>
+    <div id="report-bars" class="report-bars"></div>
+    <div id="report-links" class="report-links" style="display:none">
+      <div class="report-sechead"><h2>All detected leak links <span id="report-links-count" class="mut"></span></h2></div>
+      <p class="report-lead">Every detected URL, grouped by site — biggest first, ready for takedown.</p>
+      <div class="report-linktools">
+        <button class="ghost-btn" id="links-copy" type="button">⧉ Copy all</button>
+        <button class="ghost-btn" id="links-download" type="button">▤ Download .txt</button>
+        <input id="links-email" class="links-email" type="email" placeholder="email to send links…"
+               autocomplete="off" spellcheck="false">
+        <button class="ghost-btn" id="links-mail" type="button">✉ Mail links</button>
+        <span class="muted" id="links-msg"></span>
+      </div>
+      <div id="results-list" class="results-list"></div>
+    </div>
+    <div id="report-audit" class="report-audit" style="display:none">
+      <div class="report-sechead"><h2>Review the full list yourself</h2></div>
+      <p class="report-lead">Two files: every leak we <strong>accepted</strong> as yours, and every candidate we <strong>removed</strong>. Open the removed list to confirm nothing real was dropped.</p>
+      <div class="audit-btns">
+        <a class="cta-btn audit-dl" id="dl-accepted" download>⬇ Accepted leaks</a>
+        <a class="ghost-btn audit-dl" id="dl-removed" download>⬇ Removed leaks</a>
+      </div>
+    </div>
+    <p id="report-disclaimer" class="report-disclaimer" style="display:none">* These are the most obvious leaks found in this first-pass automated scan. Once we begin, we manually check further and find lots more — across more sites too.</p>
+    <div id="report-covers" class="report-covers" style="display:none"></div>
+
+    <div id="chat" class="chat-card">
+      <div class="chat-head">Ask about this report</div>
+      <div id="chat-log" class="chat-log"></div>
+      <div id="chat-qrow" class="qrow"></div>
+      <form id="chat-form" class="chat-form" autocomplete="off">
+        <input id="chat-input" type="text" placeholder="e.g. how do I get these removed?"
+               maxlength="1000" autocomplete="off">
+        <button class="cta-btn" id="chat-send" type="submit">Send</button>
+      </form>
+    </div>
+
+    <div id="help" class="help-block">
+      <h3>Want these removed?</h3>
+      <p class="muted">We file the takedowns for you. Reach out directly and we'll take it from here.</p>
+      <div id="dm-cta" class="dm-cta"></div>
+      <a class="ghost-btn" href="/app/">Scan your own handle</a>
+    </div>
+
+    <pre id="live-console" class="live-console" style="display:none" aria-live="polite"></pre>
+
+    <div id="report-foot" class="report-foot"></div>
+  </section>
+
+  <!-- ERROR -->
+  <section id="panel-error" class="panel">
+    <div class="errbox">
+      <h2>Report not found</h2>
+      <p id="error-msg" class="muted">This report may have expired or the link is incorrect.</p>
+      <a class="cta-btn" href="/app/">Run a new scan</a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot"><span>LeakScan · your content, your rights</span></footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

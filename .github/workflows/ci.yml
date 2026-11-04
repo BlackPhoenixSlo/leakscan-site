@@ -1,0 +1,15 @@
+name: ci
+on:
+  pull_request:
+  push:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pytest Pillow
+      - run: python3 tools/check.py
+      - run: python3 -m pytest -q app/tests
