@@ -53,8 +53,9 @@ SPECS = {
     "hero-wide.webp": (2560, 1440, "HERO — WIDE",
         "16:9 desktop hero. COMPOSE WITH THE SUBJECT ON THE RIGHT THIRD and open space "
         "on the left — the headline sits in that negative space. Hands and work, no face."),
-    "headshot.webp": (1200, 1200, "AVATAR — SQUARE",
-        "1:1. Crops to a circle on the links page. Top-down wheel shot, centred."),
+    "headshot.webp": (480, 480, "AVATAR — SQUARE",
+        "1:1. Crops to a circle on the links page (shown at most 110px wide, so 480 "
+        "covers 3x screens). Top-down wheel shot, centred."),
     "og.webp": (1200, 630, "SOCIAL SHARE CARD",
         "1200x630 exactly. This is what renders in every link preview on X, Discord, "
         "iMessage. Subject off-centre, leave room — platforms crop the edges."),

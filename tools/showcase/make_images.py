@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Build site/showcase/imgs/*.webp from Pexels originals (credits: CREDITS.md).
 
-    python3 tools/showcase/make_images.py [--cache /tmp/showcase-px/src]
+    python3 tools/showcase/make_images.py [--cache /tmp/showcase-px/src] [NAME.webp ...]
 
 Each image is cropped to the aspect ratio _make_placeholders.SPECS gives for
 its filename, at SPECS size (never upscaled), then saved as WebP at the
 highest quality that fits its weight budget, stepping the size down if even
-q=60 does not fit. Downloads stay in the cache dir, outside the repo.
+q=60 does not fit. Give file names to rebuild only those. Downloads stay in the cache dir, outside the repo.
 No photo shows an identifiable face: the demo creator is fictional.
 """
 import argparse
@@ -88,9 +88,15 @@ def encode(im, budget):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", default="/tmp/showcase-px/src")
+    ap.add_argument("only", nargs="*", help="rebuild only these files")
     a = ap.parse_args()
+    unknown = set(a.only) - set(IMAGES)
+    if unknown:
+        sys.exit(f"unknown image(s): {', '.join(sorted(unknown))}")
     os.makedirs(a.cache, exist_ok=True)
     for name, (pid, focal, *opts) in IMAGES.items():
+        if a.only and name not in a.only:
+            continue
         w, h = SPECS[name][:2]
         src = Image.open(fetch(pid, a.cache, 2600 if w > 2400 else 2400)).convert("RGB")
         if "flip" in opts:
