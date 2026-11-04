@@ -7,6 +7,7 @@
 .scan-top h1 { font-size: clamp(2rem, 6vw, 3.2rem); overflow-wrap: anywhere; }
 .scan-top h1:focus { outline: none; }
 .scan-top .lead:empty { display: none; }
+.scan-aliases { margin: 6px 0 0; color: var(--muted); font-size: 1rem; overflow-wrap: anywhere; }
 .scan-card { margin: 24px 0 0; padding: clamp(18px, 3vw, 28px); border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); max-width: 760px; }
 .form-error { margin: 0 0 12px; color: var(--bad); font-weight: 550; }
 

@@ -75,5 +75,32 @@
   ],
   "site_domain": "evil.example/<script>",
   "avatar": "true"
+ },
+ "aliases": {
+  "declared": [
+   "evil.user"
+  ],
+  "discovered": [
+   "<script>alert(1)</script>",
+   "javascript:alert(1)",
+   "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  ],
+  "socials": [
+   {
+    "platform": "x",
+    "handle": "<img src=x onerror=alert(1)>",
+    "url": "javascript:alert(1)"
+   },
+   {
+    "platform": "fansly",
+    "handle": "evil.ok",
+    "url": "https://evil.example/fansly"
+   },
+   {
+    "platform": "<b>",
+    "handle": "evil.ok",
+    "url": "https://fansly.com/evil.ok"
+   }
+  ]
  }
 }

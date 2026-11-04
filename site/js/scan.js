@@ -35,7 +35,7 @@
     $('scan-lead').textContent = lead;
   }
   function hideAll() {
-    ['scan-form', 'form-error', 'progress', 'error', 'summary', 'empty', 'report'].forEach(function (id) { show(id, false); });
+    ['scan-form', 'form-error', 'progress', 'error', 'summary', 'empty', 'report', 'scan-aliases'].forEach(function (id) { show(id, false); });
   }
 
   // ---------- message links ----------
@@ -140,6 +140,8 @@
       images: Array.isArray(r.images) ? r.images : [], hits: hits, results: results
     };
     d.status = r.status || (d.hit_count || results.length ? 'complete' : 'empty');
+    var al = r.aliases && typeof r.aliases === 'object' && Array.isArray(r.aliases.discovered) ? r.aliases.discovered : [];
+    d.discovered = al.slice(0, 4).filter(function (a) { return typeof a === 'string' && E.HANDLE_RE.test(a) && a !== d.handle; });
     return d;
   }
   function report(raw, fresh) {
@@ -154,6 +156,8 @@
       empty ? 'Scan of what Google shows for your ' + name + ' handle.'
         : 'Copies found on ' + d.domain_count + ' ' + plural(d.domain_count, 'site', 'sites') + '. Here is what Google shows for your ' + name + ' handle.');
     document.title = '@' + d.handle + ' · Free scan report · Abolita';
+    $('scan-aliases').textContent = d.discovered.length ? 'Also found as ' + d.discovered.map(function (a) { return '@' + a; }).join(', ') : '';
+    show('scan-aliases', d.discovered.length > 0);
     $('summary').querySelector('[data-stat=domains]').textContent = num(d.domain_count);
     $('summary').querySelector('[data-label=domains]').textContent = plural(d.domain_count, 'site with copies found', 'sites with copies found');
     $('summary').querySelector('[data-stat=pages]').textContent = num(d.hit_count);

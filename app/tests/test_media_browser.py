@@ -140,6 +140,32 @@ class FakePage:
         pass
 
 
+class TimedSorry(FakePage):
+    """Google answers /sorry until Browserbase's solver finishes `secs` (wall clock) after the first
+    Google navigation; then results. `served` = what each Google navigation actually got."""
+
+    def __init__(self, secs, **kw):
+        super().__init__(**kw)
+        self.secs, self.solve_at, self.served = secs, None, []
+
+    def goto(self, url, wait_until=None, timeout=None):
+        if "google.com" in url:
+            if self.solve_at is None:
+                self.solve_at = time.monotonic() + self.secs
+            if time.monotonic() < self.solve_at:
+                self.gotos.append(url)
+                self.served.append(("sorry", url))
+                self.url, self.html, self.pending = "https://www.google.com/sorry/index?continue=x", "sorry", url
+                return
+            self.served.append(("ok", url))
+        super().goto(url, wait_until, timeout)
+
+    def wait_for_timeout(self, ms):
+        time.sleep(0.05)
+        if "/sorry/" in self.url and time.monotonic() >= self.solve_at:
+            self.goto(self.pending)
+
+
 class _Env(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -271,8 +297,9 @@ class TestBrowserGather(_Env):
         self.assertEqual(st, "ready")
         self.assertEqual((len(self.creates), self.releases, len(self.pages)), (1, ["s1"], 1))
         page = self.pages[0]
-        kinds = ["isch" if "tbm=isch" in u else "web" if "google.com" in u else "ig" for u in page.gotos]
-        self.assertEqual(kinds, ["web", "web", "isch", "isch", "ig"])              # b (feeds refine), a, c: one session
+        kinds = ["home" if u == mg.GOOGLE_HOME else "isch" if "tbm=isch" in u else "web" if "google.com" in u
+                 else "ig" for u in page.gotos]
+        self.assertEqual(kinds, ["home", "web", "web", "isch", "isch", "ig"])      # warmup, b (feeds refine), a, c
         self.assertTrue(all("safe=active" in u for u in page.gotos if "google" in u))
         idx = mg._read_index(slug)
         srcs = [i["source"] for i in idx["images"]]
@@ -326,7 +353,7 @@ class TestBrowserGather(_Env):
         # official-site tiles' thumbs (D1, D2, D4, D5; D7 is 246x139 < MIN_SIDE), capped at THUMB_BELOW
         self.assertEqual(srcs.count("google"), mg.THUMB_BELOW)
         self.assertEqual(srcs.count("instagram"), 6)
-        self.assertEqual(len(self.pages[0].gotos), 2)            # 1 images + 1 web query (no name), no grid
+        self.assertEqual(len(self.pages[0].gotos), 3)            # warmup + 1 images + 1 web query (no name), no grid
 
     def test_consent_cookie_then_click_fallback(self):
         mg.gather(self.new_scan(), "instagram.com", H, None, SCAN_ITEMS, budget=60)
@@ -372,6 +399,51 @@ class TestBrowserGather(_Env):
         slug = self.new_scan()
         mg.gather(slug, "instagram.com", H, None, SCAN_ITEMS, budget=60)
         self.assertIn("google", [i["source"] for i in mg._read_index(slug)["images"]])
+
+    def _timed(self, secs, web_box, captcha_wait):
+        logs, saved = [], (mg.log, mg.GOOGLE_WEB_BOX, mg.CAPTCHA_WAIT)
+        mg.log, mg.GOOGLE_WEB_BOX, mg.CAPTCHA_WAIT = logs.append, web_box, captcha_wait
+        self.page_factory = lambda: TimedSorry(secs)
+        try:
+            orig = {"display_name": "Mira Example", "accounts": [], "confidence": 0.6}
+            slug = self.new_scan(orig)
+            mg.gather(slug, "instagram.com", H, orig, SCAN_ITEMS, budget=60, sources=self.sources())
+        finally:
+            mg.log, mg.GOOGLE_WEB_BOX, mg.CAPTCHA_WAIT = saved
+        page = self.pages[0]
+        kind = lambda u: "home" if u == mg.GOOGLE_HOME else "isch" if "tbm=isch" in u else "web"
+        return slug, [(st, kind(u)) for st, u in page.served], logs
+
+    def test_web_text_waits_for_captcha_via_warmup(self):
+        # captcha solved 4 s after the first Google hit; the web box alone gives up after ~3 s
+        slug, served, logs = self._timed(secs=4.0, web_box=5, captcha_wait=5)
+        self.assertEqual(served[0], ("sorry", "home"))                      # warmup takes the captcha
+        self.assertEqual([k for st, k in served if st == "ok"][:2], ["home", "web"])
+        self.assertNotIn(("sorry", "web"), served)                          # web text never hits it
+        self.assertTrue([l for l in logs if l.startswith("media google captcha solved=True")])
+        self.assertFalse([l for l in logs if "web retry" in l])
+        self.assertTrue(mg.load_snippets(slug))
+        self.assertEqual(len(self.llm_calls()), 1)                         # refine ran
+        self.assertTrue(mg.public_view(slug)["profile_updated_at"])
+
+    def test_web_text_retried_once_after_images(self):
+        # captcha outlasts the warmup and the web box, Images (35 s box) sees it solved -> one retry
+        slug, served, logs = self._timed(secs=6.0, web_box=5, captcha_wait=0.5)
+        self.assertIn(("sorry", "web"), served)
+        kinds = [k for st, k in served if st == "ok"]
+        self.assertEqual(kinds[0], "isch")
+        self.assertEqual(kinds[-1], "web")                                 # retried after the Images step
+        self.assertEqual(len([l for l in logs if l == "media google web retry"]), 1)
+        web_logs = [l for l in logs if l.startswith("media google web queries=")]
+        self.assertTrue(web_logs[0].split("raw=")[1].startswith("0 "))
+        self.assertFalse(web_logs[1].split("raw=")[1].startswith("0 "))
+        self.assertTrue(mg.load_snippets(slug))
+        self.assertTrue(mg.public_view(slug)["profile_updated_at"])
+
+    def test_no_retry_when_web_text_had_results(self):
+        slug, served, logs = self._timed(secs=0, web_box=20, captcha_wait=25)
+        self.assertFalse([l for l in logs if "web retry" in l])
+        self.assertEqual([k for _, k in served].count("web"), 2)           # the 2 normal queries only
 
     def test_snippets_capped_and_pruned(self):
         long = "".join(

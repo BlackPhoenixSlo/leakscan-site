@@ -47,12 +47,14 @@
     if (!slug) return null;
     var m = { slug: slug, handle: typeof raw.handle === 'string' && HANDLE_RE.test(raw.handle) ? raw.handle : fb.handle,
       platform: E.PLATFORMS[raw.platform] ? raw.platform : fb.platform, rows: [], sites: [],
-      profile: !!(raw.profile && typeof raw.profile === 'object'), socials: {} };
+      profile: !!(raw.profile && typeof raw.profile === 'object'), socials: {}, discovered: [] };
     if (!m.handle) return null;
     var so = raw.socials && typeof raw.socials === 'object' ? raw.socials : {};
     ['instagram', 'x'].forEach(function (k) {
       if (typeof so[k] === 'string' && HANDLE_RE.test(so[k].replace(/^@/, ''))) m.socials[k] = so[k].replace(/^@/, '');
     });
+    var al = raw.aliases && typeof raw.aliases === 'object' && Array.isArray(raw.aliases.discovered) ? raw.aliases.discovered : [];
+    m.discovered = al.slice(0, 4).filter(function (a) { return typeof a === 'string' && HANDLE_RE.test(a) && a !== m.handle; });
     // backend that doesn't echo socials yet: show what she typed (fresh scan only)
     if (!m.socials.instagram && !m.socials.x && fb.social) m.socials[fb.social.net] = fb.social.handle;
     var seen = {}, by = {};
@@ -118,7 +120,8 @@
     live = make('div', 'live', [
       make('div', 'report-head', [
         make('div', '', [make('p', 'report-kicker live-kicker', ['Free scan · ' + E.PLATFORMS[platform]]),
-          make('p', 'report-title live-title', ['@' + handle], { tabindex: '-1' }), make('p', 'live-socials', [], { hidden: '' })]),
+          make('p', 'report-title live-title', ['@' + handle], { tabindex: '-1' }), make('p', 'live-socials', [], { hidden: '' }),
+          make('p', 'live-aliases', [], { hidden: '' })]),
         make('span', 'chip chip-live live-count', [], { hidden: '' })]),
       make('p', 'live-status', [], { role: 'status' }),
       make('div', 'live-bar', [make('i')], { 'aria-hidden': 'true' }),
@@ -150,6 +153,8 @@
       .map(function (k) { return k[1] + ' @' + m.socials[k[0]]; });
     q('.live-socials').textContent = soc.join(' · ');
     q('.live-socials').hidden = !soc.length;
+    q('.live-aliases').textContent = m.discovered.length ? 'Also found as ' + m.discovered.map(function (a) { return '@' + a; }).join(', ') : '';
+    q('.live-aliases').hidden = !m.discovered.length;
     q('.live-bar').hidden = true;
     var count = q('.live-count');
     count.textContent = plural(n, 'link found', 'links found');

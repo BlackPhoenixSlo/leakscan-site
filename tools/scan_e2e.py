@@ -48,6 +48,9 @@ VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 144
 fails = []
 
 PAGES = [r for r in FX["results"] if r["kind"] != "video"]
+ALSO = "Also found as " + ", ".join("@" + a for a in FX["aliases"]["discovered"])
+# leak-page socials on platforms the profile does not have (the discovered Instagram never replaces hers)
+FOUND = [s["url"] for s in FX["aliases"]["socials"] if s["platform"] not in {a["platform"] for a in FX["profile"]["accounts"]}]
 VIDEOS = [r for r in FX["results"] if r["kind"] == "video"]
 IMAGES = min(30, len(dict.fromkeys(FX["images"] + [r["thumb"] for r in FX["results"] if r["thumb"]])))
 
@@ -103,6 +106,8 @@ def scan_flow(browser, vp_name, vp):
     want = (FX["domain_count"], FX["hit_count"], FX["google_total"])
     check(f"{vp_name} summary numbers match fixture", got == want, f"{got} vs {want}")
     check(f"{vp_name} title shows handle", page.locator("#scan-title").inner_text() == "@demo.creator")
+    check(f"{vp_name} aliases: header says Also found as the discovered handles", page.locator("#scan-aliases").is_visible()
+          and page.locator("#scan-aliases").inner_text() == ALSO, page.locator("#scan-aliases").inner_text())
     shot("2-report-full", full=True)
 
     # 4. device + tabs (both devices, all three tabs)
@@ -192,6 +197,10 @@ def scan_flow(browser, vp_name, vp):
     check(f"{vp_name} ?r= reopens without a new scan", len(posts) == n_posts
           and digits(p2.locator("[data-stat=domains]").inner_text()) == FX["domain_count"])
     p2.screenshot(path=str(out / f"{vp_name}-8-reopen.png"))
+    p2.goto(base + "scan/?r=evilR3port01")
+    p2.wait_for_selector("#report:not([hidden])", timeout=5000)
+    check(f"{vp_name} aliases: malicious discovered handles never shown", p2.locator("#scan-aliases").is_hidden()
+          and "alert(1)" not in p2.locator("#scan-aliases").evaluate("e => e.textContent"))
     p2.close()
 
     # 9. error / empty paths
@@ -208,6 +217,7 @@ def scan_flow(browser, vp_name, vp):
     page.wait_for_selector("#report:not([hidden])", timeout=10000)
     check(f"{vp_name} empty status UI", page.locator("#empty").is_visible() and not page.locator("#google").is_visible()
           and "Nothing indexed for this handle right now" in page.locator("#empty").inner_text())
+    check(f"{vp_name} aliases: none discovered -> header line hidden", page.locator("#scan-aliases").is_hidden())
     shot("9-empty")
     page.goto(base + "scan/?r=doesNotExist")
     page.wait_for_selector("#error:not([hidden])", timeout=5000)
@@ -417,8 +427,8 @@ def personalize_flow(browser, vp_name, vp):
         page.wait_for_timeout(1500)
         btns = page.eval_on_selector_all(".p-links a", "els => els.map(e => [e.href, e.target])")
         av = page.eval_on_selector("img.links-avatar", "e => [e.getAttribute('src'), e.naturalWidth]")
-        check(f"{tag} profile: links page = the profile accounts, avatar from the API",
-              [b[0] for b in btns] == [a["url"] for a in PROFILE["accounts"]] and all(b[1] == "_blank" for b in btns)
+        check(f"{tag} profile: links page = the profile accounts + leak-page socials for new platforms, avatar from the API",
+              [b[0] for b in btns] == [a["url"] for a in PROFILE["accounts"]] + FOUND and all(b[1] == "_blank" for b in btns)
               and av[0] == f"{API}/api/avatar/{FX['slug']}" and av[1] == 48, f"{btns} {av}")
         page.screenshot(path=str(out / f"{vp_name}-p6-demo-links.png"), full_page=True)
     ctx.close()
@@ -471,6 +481,11 @@ def personalize_flow(browser, vp_name, vp):
     check(f"{tag} scan-only: demo stays Orla, no @handle in its name slots", "Orla Brennick" in ft and h not in ft
           and frame.locator(".nav__logo").inner_text().upper() == "ORLA BRENNICK", ft[:120])
     page.locator("#website").screenshot(path=str(out / f"{vp_name}-p7-scan-only.png"))
+    page.goto(base + "?r=demoFoundIG1", wait_until="load")
+    page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=9000)
+    ig = [s["handle"] for s in FX["aliases"]["socials"] if s["platform"] == "instagram"][0]
+    got = (texts(page, '[data-p="ig"] .m-title'), shown(page, '[data-p="tt"]'))
+    check(f"{tag} aliases: scan-only: leak-page Instagram fills the IG rows", got == ([f"{h} (@{ig})"] * 2, 0), got)
     ctx.close()
 
     # F. malicious values never reach the DOM
@@ -935,7 +950,7 @@ def inline_flow(browser, vp_name, vp):
 
     card = lambda page: page.evaluate("""() => {
         const c = document.querySelector('.report-card'), L = c.querySelector('.live'), t = s => { const e = L && L.querySelector(s); return e && !e.hidden ? e.textContent.trim() : null; };
-        return {live: c.classList.contains('is-live'), title: t('.live-title'), socials: t('.live-socials'), count: t('.live-count'),
+        return {live: c.classList.contains('is-live'), title: t('.live-title'), socials: t('.live-socials'), aliases: t('.live-aliases'), count: t('.live-count'),
           status: t('.live-status'), error: L && L.getAttribute('data-error'), empty: t('.live-empty'), more: t('.live-more'),
           rows: [...c.querySelectorAll('.live-rows li')].map(li => { const a = li.querySelector('a'); return {tag: a && a.tagName,
             dom: li.querySelector('.live-dom').textContent, ttl: li.querySelector('.live-ttl').textContent, href: a && a.href,
@@ -987,6 +1002,7 @@ def inline_flow(browser, vp_name, vp):
         "noopener" in r["rel"] and "nofollow" in r["rel"] for r in c["rows"]) and c["role"] is None, [r["rel"] for r in c["rows"]])
     check(f"{tag} hero: count + more", c["count"] == f"{N} links found" and c["more"] == f"+ {N - 5} more in the full report", (c["count"], c["more"]))
     check(f"{tag} hero: socials in the header", c["socials"] == "Instagram @demo.ig", c["socials"])
+    check(f"{tag} hero: aliases: Also found as the discovered handles", c["aliases"] == ALSO, c["aliases"])
     check(f"{tag} hero: Open full report = scan/?r=<slug>", c["open"] == "scan/?r=" + slug, c["open"])
     check(f"{tag} hero: Send me the report = DM links with report URL + handle", msgs_ok(c["msgs"], quote(REPORT_BASE + slug, safe=""), "demo.creator"), c["msgs"])
     focus = page.evaluate("document.activeElement.className")
@@ -1052,6 +1068,7 @@ def inline_flow(browser, vp_name, vp):
           and not any(b in json.dumps(c) for b in ("Dead", "Cached", "Removed")), [r["badge"] for r in c["rows"]])
     check(f"{tag} hero: second result replaces the first", c["title"] == "@stub-mixed" and c["count"] == f"{len(mixed)} links found"
           and c["socials"] is None and net["bodies"] == [{"platform": "onlyfans.com", "handle": "stub-mixed", "level": "low"}], (c["count"], net["bodies"]))
+    check(f"{tag} hero: aliases: no discovered handles -> line hidden", c["aliases"] is None, c["aliases"])
     check(f"{tag} hero: URL follows the new slug", parse_qs(urlsplit(page.url).query).get("r", [""])[0] not in ("", slug), page.url)
 
     # 5. zero hits + X from a pasted URL

@@ -128,6 +128,28 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   new scan resets everything, "Reset page" too. Own elements only, never personalize's `data-p` slots.
 - Proof: `tools/scan_e2e.py OUT --only inline`; `tools/check_scan_form.py BASE OUT` (layout, no-JS GET).
 
+## Alias enrichment (quick scan)
+
+- After the first CSE pass, `app/alias_enrich.py` reads up to 4 found leak pages (top domains, one page each, no
+  videos / socials; <= 6 s each and in total, 1 MB cap, redirects only within the same site, no private IPs) and pulls
+  the creator's other handles: links to onlyfans / fansly / instagram / x|twitter / tiktok `@` / patreon, `@handle`
+  in title / h1 / meta description, and the title / h1 person name (`Mira Example` -> `miraexample`, `mira_example`,
+  `mira.example`). Kept only when it plausibly is her: normalised containment / edit distance <= 2 to a known handle,
+  or the only account of its platform on a page whose title / h1 names her. Site names, generic words
+  (`leaked`, `free`, `porn`…), numbers-only and < 4 chars are dropped.
+- `public_app` then CSE-scans <= 2 new aliases (<= 8 calls each; <= 4 aliases per scan incl. declared), merges hits by
+  URL (`alias` = handle it was found under), whole step <= 12 s (`ALIAS_BUDGET`), skipped with 0 hits or after
+  `ALIAS_SKIP_AFTER` s; off with `ALIAS_ENRICH=0`. Log: `alias_enrich pages= cand= kept= new= items= secs= reasons=`.
+  Worst case quick scan: 8 (+1 per declared alias) + 1 fallback page + 16 = 25 CSE calls (+1 with `PROFILE_CSE_EXTRA`).
+- API (additive): result + `/api/scan-result/<slug>` carry `aliases: {declared, discovered, socials:[{platform,
+  handle, url, source_domain}]}`; leak-page socials are appended to `profile.accounts` with `source: "leak_page"`
+  (declared first; a declared or scanned platform never gets a discovered handle), so the media step's Instagram uses a
+  discovered one only when none was declared; names / aliases go into the profile LLM evidence as `other_names`.
+- UI: hero card + `scan/` header "Also found as @a, @b"; personalize fills platforms nothing else knows from
+  `aliases.socials`. Tests: `app/tests/test_alias_enrich.py` (synthetic pages `app/tests/fixtures/alias_leak_*.html`).
+- Media fix (same PR): the Browserbase session opens google.com once (consent + captcha settle, <= 25 s) before the
+  web-text query, and retries a raw=0 web-text query once after the Images step.
+
 ## Replace before launch
 
 - **Jaka's photo**: `site/assets/avatar-jaka.svg` is an initials placeholder (used 3x in `site/index.html`). Add a square
