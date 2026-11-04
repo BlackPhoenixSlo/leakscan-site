@@ -30,6 +30,11 @@
       });
     }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
     items.forEach(function (el) { io.observe(el); });
+    // Tab scrolls a control just into view, often inside the -8% band, so it would stay invisible while focused.
+    document.addEventListener('focusin', function (e) {
+      var el = e.target.closest && e.target.closest('.reveal:not(.is-in)');
+      if (el) { el.classList.add('is-in'); io.unobserve(el); }
+    });
 
     var cta = document.querySelector('.mobile-cta');
     var hero = document.querySelector('.hero');
