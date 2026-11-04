@@ -26,9 +26,11 @@
 <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/chat.css">
 <script>document.documentElement.classList.add('js')</script>
 <script src="js/main.js" defer></script>
 <script src="js/personalize.js" defer></script>
+<script src="js/chat.js" defer></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -490,6 +492,7 @@
     <div class="section-head reveal">
       <p class="eyebrow">FAQ</p>
       <h2 id="faq-title">Straight answers.</h2>
+      <p>Not covered here? <a href="#contact" data-askai-open>Ask the AI</a> before you message me.</p>
     </div>
     <div class="faq">
       <details class="reveal" open>
@@ -594,5 +597,21 @@
   </div>
 </footer>
 
+<button class="askai-launcher" type="button" hidden aria-haspopup="dialog" aria-controls="askai" aria-expanded="false" aria-label="Ask AI before you DM me"><svg class="icon" aria-hidden="true"><use href="#i-message-circle"/></svg><span class="askai-launcher-text">Ask AI before you DM me</span></button>
+<dialog id="askai" class="askai" aria-labelledby="askai-title" aria-modal="true">
+  <div class="askai-panel">
+    <div class="askai-head">
+      <h2 id="askai-title">Ask about LeakScan</h2>
+      <button class="askai-close" type="button" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <p class="askai-note">Answers come from this page. For your case, message Jaka: <a href="https://t.me/jakabasej" target="_blank" rel="noopener">Telegram</a> · <a href="https://wa.me/38640703992" target="_blank" rel="noopener">WhatsApp</a> · <a href="mailto:me@jackbase.dev">Email</a></p>
+    <div class="askai-log" role="log" aria-live="polite" aria-label="Conversation"></div>
+    <form class="askai-form">
+      <label class="askai-sr" for="askai-input">Your question</label>
+      <textarea id="askai-input" rows="1" maxlength="500" placeholder="Ask a question…" enterkeyhint="send"></textarea>
+      <button class="askai-send" type="submit" aria-label="Send"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg></button>
+    </form>
+  </div>
+</dialog>
 </body>
 </html>

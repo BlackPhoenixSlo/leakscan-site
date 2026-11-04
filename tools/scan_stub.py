@@ -17,6 +17,10 @@ Serves site/ and the API routes of the contract the scan page talks to:
   also lists off-origin / javascript: srcs (must be dropped). --media none → {status:"none", images:[]}; --media 404 → 404.
   POST /__stub/media?slug=<slug>[&mode=normal|relative|none|404] resets that slug's poll counter (and mode) for a test.
 - GET /api/thumb?u=<https url> → a generated SVG placeholder (size/colour derived from u), never fetches u.
+- POST /api/chat  {kb: "landing", messages: [{role, content}], slug?} → SSE: `token` events (data = JSON-encoded text
+  chunk) streaming CHAT_ANSWER (markdown with an anchor, allowed + forbidden links, bold, bullets), then `done`. A last
+  user message containing stub-fail → some tokens then `failed`; stub-429 → 429 rate_limited. Each request body is
+  kept in order and GET /api/_chat-log returns them (test hook, not part of the contract).
 - CORS on every API response (echoes Origin), OPTIONS preflight answered.
 
 Bypass (declared): every served .html gets `data-api="<stub origin>"` added to its <body> tag, the override the scan
@@ -37,6 +41,14 @@ PLATFORMS = {"onlyfans.com", "instagram.com", "fansly.com", "tiktok.com", "patre
 STORE = {}
 OPTS = argparse.Namespace(omit_results=False, omit_profile=False, delay=0.15, media="normal")
 MEDIA_POLLS, MEDIA_MODE = {}, {}
+CHAT_LOG = []
+CHAT_ANSWER = (
+    "Short answer: it's **€250/month** or **€500 one-time**, and the scan plus one removal come first, free. "
+    "Details: [Pricing](#pricing).\n\n"
+    "- Message Jaka on [Telegram](https://t.me/jakabasej)\n"
+    "- Monthly plan: **weekly re-scans**\n"
+    "- Don't click [x](javascript:alert(1)) or [this deal](https://evil.example/phish) or https://evil.example/raw\n\n"
+    "Questions about your case? See #contact.")
 
 
 def make_result(handle, platform, empty=False):
@@ -168,6 +180,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if u.path == "/api/_chat-log":
+            return self.send_json(200, CHAT_LOG)
         if u.path.startswith("/api/"):
             return self.send_json(404, {"error": "not_found"})
         path = pathlib.Path(self.translate_path(u.path))
@@ -186,6 +200,39 @@ class Handler(SimpleHTTPRequestHandler):
             return self.wfile.write(body)
         return super().do_GET()
 
+    def sse_start(self):
+        self.send_response(200)
+        self.cors()
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+
+    def ev(self, name, data):
+        self.wfile.write(f"event: {name}\ndata: {data}\n\n".encode())
+        self.wfile.flush()
+
+    def chat(self):
+        try:
+            req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        except ValueError:
+            return self.send_json(400, {"error": "bad_json"})
+        msgs = req.get("messages")
+        if req.get("kb") != "landing" or not isinstance(msgs, list) or not msgs or not all(
+                isinstance(m, dict) and m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)
+                for m in msgs) or msgs[-1]["role"] != "user":
+            return self.send_json(400, {"error": "bad_request"})
+        CHAT_LOG.append(req)
+        last = msgs[-1]["content"]
+        if "stub-429" in last:
+            return self.send_json(429, {"error": "rate_limited"})
+        self.sse_start()
+        for i in range(0, len(CHAT_ANSWER), 9):
+            time.sleep(0.02)
+            self.ev("token", json.dumps(CHAT_ANSWER[i:i + 9]))
+            if "stub-fail" in last and i >= 27:
+                return self.ev("failed", "model provider error")
+        self.ev("done", "end")
+
     def do_POST(self):
         if urlsplit(self.path).path == "/__stub/media":
             q = parse_qs(urlsplit(self.path).query)
@@ -193,6 +240,8 @@ class Handler(SimpleHTTPRequestHandler):
             MEDIA_POLLS.pop(slug, None)
             MEDIA_MODE[slug] = q.get("mode", [OPTS.media])[0]
             return self.send_json(200, {"ok": True})
+        if urlsplit(self.path).path == "/api/chat":
+            return self.chat()
         if urlsplit(self.path).path != "/api/public-scan":
             return self.send_json(404, {"error": "not_found"})
         try:

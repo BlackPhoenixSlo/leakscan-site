@@ -37,9 +37,17 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   (malicious values); `/api/profile`, `/api/avatar`, `/api/media` routes). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
   E2E: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR` (starts its own stub; phone + desktop;
   form → progress → report, tab counts, device toggle, Reveal, CTAs, `?r=` reopen, error paths; never calls prod).
-  `--only scan|personalize`; `personalize` covers the flow above (no-slug text identical to main, phones, demo pages,
+  `--only scan|personalize`; `personalize` covers the flow above (no-slug text identical to the page without personalize.js, phones, demo pages,
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.
+- Ask-AI popup: `js/chat.js` + `css/chat.css`, markup at the end of `index.html` (launcher + `<dialog id="askai">`; also
+  opened by any `[data-askai-open]` link). Chips and typed questions that fuzzy-match an FAQ question (or "what does it
+  cost") are answered instantly from the page's own FAQ / pricing text, no network. Everything else streams from
+  `POST <API>/api/chat` (`{kb:"landing", messages (last 8), slug?}` → SSE `token`/`done`/`failed`; API origin =
+  `<body data-api>`, else the scan server on github.io, else same origin; from file:// or on any error → contacts). Answers are built as DOM nodes;
+  links are live only for existing `#ids` and `https://` t.me, wa.me, blackphoenixslo.github.io, abolita.com, jackbase.me,
+  the scan server, plus `mailto:me@jackbase.dev`. Chat lives in sessionStorage only. Stub: `/api/chat` with magic words
+  `stub-fail` / `stub-429`. E2E: `scan_e2e.py OUT_DIR --only askai` (`--break-allowlist` for the break-it run).
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
 - Gate: `python3 tools/check.py` (silent + exit 0 when green; prints each problem + exit 1). Runs in CI on every push/PR.
   `.github/workflows/ci.yml` also runs `python3 -m pytest -q app/tests`.
