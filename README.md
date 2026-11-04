@@ -42,6 +42,7 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   need `profile`; `--omit-profile` turns only those red.
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
 - Gate: `python3 tools/check.py` (silent + exit 0 when green; prints each problem + exit 1). Runs in CI on every push/PR.
+  `.github/workflows/ci.yml` also runs `python3 -m pytest -q app/tests`.
   Covers links/assets resolve, no unreferenced files in `assets/ css/ js/`, canonicals, sitemap, JSON-LD (+ FAQ sync),
   one h1, unique ids, img alt/size, lang, viewport, meta/OG/Twitter, no third-party resources. Full list: docstring.
 - Shots: `python3 tools/shots.py OUT_DIR URL...` → phone (390x844 @2x) + desktop (1440x900), light + dark, top + full.
@@ -51,9 +52,55 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   Evidence goes outside the repo: `~/.leakscan-site/evidence/<branch>/<UTC>-<sha7>/`.
 - Raster assets: `python3 tools/make_icons.py` renders `site/assets/og.png` (from `tools/og.html`),
   `apple-touch-icon.png` and `favicon-32.png` (from `site/assets/favicon.svg`).
-- Deploy: push to `main` → `.github/workflows/pages.yml` runs the gate and deploys `site/` to GitHub Pages
-  (https://blackphoenixslo.github.io/leakscan-site/). `netlify.toml` publishes `site/` if connected to Netlify.
+- Deploy: VPS = `deploy/push.sh` (see "One project, one origin" below). Push to `main` →
+  `.github/workflows/pages.yml` runs the gate and deploys `site/` to GitHub Pages
+  (https://blackphoenixslo.github.io/leakscan-site/), the fallback during the DNS transition. `netlify.toml` publishes `site/` if connected to Netlify.
 - Improvement loop: `LOOP.md`.
+
+## One project, one origin (VPS)
+
+One container serves everything from the same origin (test host https://abolita.srv1395798.hstgr.cloud, later
+https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the same container):
+
+| Path | Served by |
+| --- | --- |
+| `/api/*`, `/static/*`, `/s/<slug>`, `/healthz` | scan backend `app/public_app.py` (unchanged behaviour) |
+| `/app/` | legacy scan UI (`app/public_static/`, was `/`) |
+| `/?p=&h=&go=&l=` | 302 → `/app/?<same query>` (old jackbase.me/scan deep links) |
+| everything else (`/`, `/scan/`, `/showcase/…`, `/privacy.html`) | landing site `site/` via `app/site_static.py` |
+
+- `app/` = the backend, flat like prod (`HERE`-relative paths): `public_app.py` + its import closure + every script
+  it spawns for deep scans + data files (`kb.json`, `bruqi_detection_map.json`, `aliases.txt`, `fake_aggregators.txt`,
+  `public_static/`). `public_app.py`, `cse_scanner.py`, `profile_extract.py`, `media_gather.py` and `app/tests/` come
+  from `bruquiextension` (re-sync: `git -C ~/bruquiextension show origin/main:public_app.py > app/public_app.py`, then
+  re-apply the block between `>>> one-project patch` / `<<< one-project patch` and the two `# one-project hook`
+  lines; `media_gather.py` carries one `# one-project` line: `PUBLIC_ORIGIN` defaults to empty = relative media src).
+  The rest is the prod tree snapshot.
+- `app/site_static.py`: stdlib static server for `site/` (`SITE_DIR`, default `<repo>/site`; realpath-confined, no
+  dotfiles, dir → `index.html`, missing → `404.html`, html `no-cache`, assets `max-age=86400`, GET/HEAD). If
+  `SITE_DIR` is missing it logs once and `/` falls back to the legacy UI.
+- Local run: `SITE_DIR=site PUBLIC_PORT=18084 python3 app/public_app.py` → http://127.0.0.1:18084/ (no API keys =
+  scans fail upstream; the tests fake Google CSE / DeepSeek / Browserbase at the wire).
+- Tests: `python3 -m pytest -q app/tests` (needs `pytest Pillow`) and `python3 tools/check.py`; both run in
+  `.github/workflows/ci.yml` on every push/PR.
+- Image: `deploy/Dockerfile` (python:3.13-slim + Pillow, curl_cffi, playwright package without browsers; `app/` →
+  `/app`, `site/` → `/site`). Compose: `deploy/docker-compose.yml` (project `leakscan`, container `leakscan-app`,
+  volume `leakscan-data:/data` kept as-is, env `/root/leakscan/.env`, Traefik routers `leakscan` (API host),
+  `leakscan-site` (`SITE_HOST`) and `leakscan-site-www` (`SITE_HOST_WWW`, 301 → apex); one router per host so a host
+  without DNS only fails its own certificate). Every env var: `deploy/.env.example`.
+- Deploy: `deploy/push.sh root@72.62.92.114` (backup → rsync `app/ site/` + deploy files → `docker compose up -d
+  --build` with `LEAKSCAN_PORT=8081` → health wait → `deploy/smoke.sh` on the VPS and over https). Idempotent.
+  After the first push the old root-level `/root/leakscan/*.py`, `public_static/`, `Dockerfile` and
+  `docker-compose.yml` are dead (the image builds from `app/` + `site/`) and can be deleted.
+- GitHub Pages (`pages.yml`) keeps deploying `site/` as the fallback during the DNS transition.
+
+### DNS cut-over to abolita.com
+
+1. At the registrar: `A @ → 72.62.92.114`; `CNAME www → abolita.com` (or `A www → 72.62.92.114`).
+2. In `/root/leakscan/.env`: `SITE_HOST=abolita.com` and `SITE_HOST_WWW=www.abolita.com`; keep
+   `CORS_ORIGINS=https://blackphoenixslo.github.io` while the Pages copy is still in use.
+3. Re-run `deploy/push.sh root@72.62.92.114`; Traefik fetches the certificates (`mytlschallenge`).
+4. Then follow "Move to a custom domain" below for canonicals/sitemap (steps 2-4; step 1 is this section).
 
 ## Replace before launch
 

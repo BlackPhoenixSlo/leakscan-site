@@ -1,0 +1,12 @@
+# fake_aggregators.txt — registrable domains that carry the handle but serve OTHER
+# people / studio content. clean_crawl.py --block-file drops every URL hosted on these
+# from the cleaned crawl, so they never reach the gallery, the DMCA export, or the report.
+#
+# BAR TO ADD A DOMAIN: it must be VISION-confirmed not-the-creator (a hard block is
+# irreversible recall loss — the cardinal sin is dropping her real leaks). One host per
+# line; subdomains collapse to the registrable domain automatically.
+#
+# ahvideoscdn.net — SISTERSWITCH studio porn SEO-named 'mckinley-richardson-*.jpg' etc.;
+#   vision-vetted 2026-07-03 across mckinley/julia/sophie/xxandieelle (36/30/29/29 media),
+#   user-confirmed the sole false-keep. Passed name + host-category + crawl-media gates.
+ahvideoscdn.net

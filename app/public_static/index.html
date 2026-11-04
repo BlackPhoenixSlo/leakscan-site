@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Find Your Leaks — free scan</title>
+<link rel="stylesheet" href="/static/styles.css">
+<!--APP_CONFIG-->
+</head>
+<body data-mode="home">
+<header class="topbar">
+  <a class="brand" href="/app/"><span class="logo">◑</span> LeakScan</a>
+  <div class="topnav">
+    <button class="ghost-btn" id="global-unblur" type="button" style="display:none">🔞 Unblur</button>
+    <button class="ghost-btn" id="nav-help" type="button">Get help</button>
+  </div>
+</header>
+
+<main>
+  <!-- LANDING -->
+  <section id="panel-landing" class="panel active">
+    <div class="hero">
+      <div class="badge">Free · Private · No signup</div>
+      <h1>Find where your content was <span class="hl">leaked</span></h1>
+      <p class="sub">Enter your handle and we'll scan <strong id="domain-count">known</strong> leak sites for stolen copies of your content — then help you get them removed.</p>
+
+      <div class="level-toggle" role="tablist" aria-label="Scan depth">
+        <button type="button" class="lvl active" data-level="low">Quick scan</button>
+        <button type="button" class="lvl" data-level="deep">Deep scan</button>
+      </div>
+      <p class="lvl-note" id="lvl-note">Instant Google search across known leak sites.</p>
+
+      <form id="scan-form" class="scan-form" autocomplete="off" novalidate>
+        <div class="field platform">
+          <select id="platform" aria-label="Platform">
+            <option value="onlyfans.com">OnlyFans</option>
+            <option value="fansly.com">Fansly</option>
+            <option value="instagram.com">Instagram</option>
+            <option value="tiktok.com">TikTok</option>
+            <option value="patreon.com">Patreon</option>
+          </select>
+        </div>
+        <div class="field handle">
+          <span class="at">@</span>
+          <input id="handle" type="text" placeholder="yourhandle" maxlength="60"
+                 spellcheck="false" autocapitalize="none" required>
+        </div>
+        <button type="submit" class="cta-btn" id="scan-btn">Scan for leaks</button>
+        <div class="field aliases" id="aliases-field" style="display:none">
+          <label class="aliases-label" for="aliases">Your real / stage name &amp; spellings
+            <span class="aliases-hint">— leaks are often posted under your name, not your @handle. Adding it finds far more.</span>
+          </label>
+          <input id="aliases" type="text" autocomplete="off" maxlength="200"
+                 placeholder="e.g. Sophie Rain, sophie rain, sophie.rain (comma-separated)">
+        </div>
+      </form>
+      <p class="fineprint">We only check for <em>your</em> content. No login, nothing posted, nothing shared.</p>
+    </div>
+
+    <div class="how">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li><span class="n">1</span><span>We search known leak sites for your handle and its common misspellings.</span></li>
+        <li><span class="n">2</span><span>You get a shareable report of exactly where copies were found.</span></li>
+        <li><span class="n">3</span><span>Message Jaka with your report link — the first page is removed free, so you see it work.</span></li>
+      </ol>
+    </div>
+
+    <div id="ask" class="ask-wrap">
+      <div id="ask-answer" class="chat-log"></div>
+      <form id="ask-form" class="ask-pill" autocomplete="off">
+        <input id="ask-input" type="text" autocomplete="off" maxlength="1000"
+               placeholder="Ask anything — leaks, DMCA, or how this works…">
+        <button class="ask-go" id="ask-send" type="submit" aria-label="Ask">&#10148;</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section id="panel-progress" class="panel">
+    <div class="scanning">
+      <div class="orbit" aria-hidden="true"></div>
+      <h2>Scanning the web…</h2>
+      <p class="muted">Checking known leak sites for <strong id="progress-handle"></strong>. Keep this page open — a deep scan runs in stages and can take several minutes.</p>
+      <div id="progress-stage" class="stage-line" style="display:none"></div>
+      <div id="found-live" class="found-live"></div>
+      <details id="slugs-box" class="slugs-box" style="display:none">
+        <summary><span id="slugs-count">0</span> handle variations we're checking</summary>
+        <div id="slugs-list" class="slugs-list"></div>
+      </details>
+      <pre id="progress-log" class="log" aria-live="polite"></pre>
+      <button class="ghost-btn" id="cancel-btn" type="button">Cancel</button>
+
+      <div id="pchat" class="chat-card">
+        <div class="chat-head">Ask while you wait</div>
+        <div id="pchat-log" class="chat-log"></div>
+        <form id="pchat-form" class="chat-form" autocomplete="off">
+          <input id="pchat-input" type="text" placeholder="e.g. what happens after the scan?"
+                 maxlength="1000" autocomplete="off">
+          <button class="cta-btn" id="pchat-send" type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="panel-results" class="panel report">
+    <div id="results-head" class="results-head report-hero"></div>
+    <div id="report-chips" class="report-chips"></div>
+    <div id="report-stats" class="report-stats"></div>
+    <div id="report-media" class="report-sec" style="display:none">
+      <div class="report-sechead"><h2>Preview of what we found</h2>
+        <span class="pill warn">🔞 blurred · tap to reveal · scroll →</span></div>
+      <div id="results-images" class="img-grid dragrow"></div>
+    </div>
+    <div id="report-topchat" class="topask" style="display:none">
+      <div id="topchat-log" class="chat-log topask-log"></div>
+      <form id="topchat-form" class="ask-pill" autocomplete="off">
+        <input id="topchat-input" type="text" placeholder="Ask anything about your report — leaks, takedowns, cost…"
+               maxlength="1000" autocomplete="off">
+        <button class="ask-go" id="topchat-send" type="submit" aria-label="Ask">&#10148;</button>
+      </form>
+    </div>
+    <div class="share-row">
+      <button class="cta-btn" id="share-btn" type="button">Copy link to report</button>
+      <a class="cta-btn share-dm" id="share-dm" target="_blank" rel="noopener noreferrer" style="display:none">💬 DM me</a>
+      <button class="poster-save" id="poster-save" type="button" style="display:none">⬇ Download image</button>
+      <span class="muted" id="share-hint"></span>
+    </div>
+    <div id="deep-cta-top" class="deep-cta-top" style="display:none">
+      <button class="cta-btn" id="deep-cta-top-btn" type="button">🔬 Run a Deep scan — check every known leak site for your leaked URLs</button>
+    </div>
+    <div id="report-gshot" class="report-sec" style="display:none"></div>
+    <div id="report-googlealso" class="report-sec" style="display:none"></div>
+    <div id="report-bars" class="report-bars"></div>
+    <div id="report-links" class="report-links" style="display:none">
+      <div class="report-sechead"><h2>All detected leak links <span id="report-links-count" class="mut"></span></h2></div>
+      <p class="report-lead">Every detected URL, grouped by site — biggest first, ready for takedown.</p>
+      <div class="report-linktools">
+        <button class="ghost-btn" id="links-copy" type="button">⧉ Copy all</button>
+        <button class="ghost-btn" id="links-download" type="button">▤ Download .txt</button>
+        <input id="links-email" class="links-email" type="email" placeholder="email to send links…"
+               autocomplete="off" spellcheck="false">
+        <button class="ghost-btn" id="links-mail" type="button">✉ Mail links</button>
+        <span class="muted" id="links-msg"></span>
+      </div>
+      <div id="results-list" class="results-list"></div>
+    </div>
+    <div id="report-audit" class="report-audit" style="display:none">
+      <div class="report-sechead"><h2>Review the full list yourself</h2></div>
+      <p class="report-lead">Two files: every leak we <strong>accepted</strong> as yours, and every candidate we <strong>removed</strong>. Open the removed list to confirm nothing real was dropped.</p>
+      <div class="audit-btns">
+        <a class="cta-btn audit-dl" id="dl-accepted" download>⬇ Accepted leaks</a>
+        <a class="ghost-btn audit-dl" id="dl-removed" download>⬇ Removed leaks</a>
+      </div>
+    </div>
+    <p id="report-disclaimer" class="report-disclaimer" style="display:none">* These are the most obvious leaks found in this first-pass automated scan. Once we begin, we manually check further and find lots more — across more sites too.</p>
+    <div id="report-covers" class="report-covers" style="display:none"></div>
+    <div id="deep-cta" class="deep-cta" style="display:none">
+      <button class="cta-btn" id="deep-cta-btn" type="button">Run a Deep scan — check every known leak site for your leaked URLs</button>
+    </div>
+
+    <div id="deep-more" class="deep-more" style="display:none">
+      <h3>Dig deeper</h3>
+      <p class="muted">Run a wider pass — many more name variations, plus any extra aliases you add — to catch the long tail. Slower, but the most thorough.</p>
+      <div class="field aliases">
+        <label class="aliases-label" for="deep-more-aliases">Add your real / stage name &amp; other spellings
+          <span class="aliases-hint">— the more name variants, the more leaks we catch.</span>
+        </label>
+        <input id="deep-more-aliases" type="text" autocomplete="off" maxlength="200"
+               placeholder="e.g. Sophie Rain, sophie rain, sophie.rain…">
+      </div>
+      <button class="cta-btn" id="deep-more-btn" type="button">Run additional deep pass</button>
+    </div>
+
+    <div id="verify-card" class="verify-card" style="display:none">
+      <div class="verify-head">🔒 Are you <strong id="verify-handle">you</strong>? Verify ownership</div>
+      <p class="muted">Prove this account is yours by adding a one-time code to your Instagram or
+        OnlyFans bio. This unlocks takedown filing on your behalf.</p>
+      <div id="verify-step1">
+        <button class="cta-btn" id="verify-get" type="button">Get my code</button>
+      </div>
+      <div id="verify-step2" style="display:none">
+        <div class="verify-code">Add to your bio: <code id="verify-code"></code>
+          <button class="ghost-btn" id="verify-copy" type="button">Copy</button></div>
+        <p class="muted" id="verify-instr"></p>
+        <button class="cta-btn" id="verify-run" type="button">I added it — Verify</button>
+        <span class="muted" id="verify-status"></span>
+      </div>
+    </div>
+
+    <div id="chat" class="chat-card">
+      <div class="chat-head">Ask about your results</div>
+      <div id="chat-log" class="chat-log"></div>
+      <div id="chat-qrow" class="qrow"></div>
+      <form id="chat-form" class="chat-form" autocomplete="off">
+        <input id="chat-input" type="text" placeholder="e.g. how do I get these removed?"
+               maxlength="1000" autocomplete="off">
+        <button class="cta-btn" id="chat-send" type="submit">Send</button>
+      </form>
+    </div>
+
+    <div id="help" class="help-block">
+      <h3>Want these removed?</h3>
+      <p class="muted">We file the takedowns for you. Reach out directly and we'll take it from here.</p>
+      <p class="muted">Send me the report link. I remove one page free so you see it work, then you decide.</p>
+      <div id="dm-cta" class="dm-cta"></div>
+      <button class="ghost-btn" id="rescan-btn" type="button">Scan another handle</button>
+    </div>
+
+    <pre id="live-console" class="live-console" style="display:none" aria-live="polite"></pre>
+
+    <div id="report-foot" class="report-foot"></div>
+  </section>
+
+  <!-- ERROR -->
+  <section id="panel-error" class="panel">
+    <div class="errbox">
+      <h2>Something went wrong</h2>
+      <p id="error-msg" class="muted"></p>
+      <button class="cta-btn" id="retry-btn" type="button">Back to start</button>
+    </div>
+  </section>
+</main>
+
+<footer class="foot"><span>LeakScan · your content, your rights</span></footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

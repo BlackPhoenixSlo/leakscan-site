@@ -1,0 +1,62 @@
+# LeakScan, one project: landing site + scan API on one origin. VPS: /root/leakscan, run by deploy/push.sh:
+#   LEAKSCAN_PORT=8081 docker compose --env-file .env -p leakscan -f deploy/docker-compose.yml up -d --build
+# Same compose project / service / container / image / volume as the old root-level stack, so the
+# 28 MB leakscan-data volume (/data/public.db, avatars, media) carries over unchanged.
+# Traefik: one router per host so a host whose DNS is not live yet only fails its own certificate.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: leakscan-app
+    container_name: leakscan-app
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      PUBLIC_HOST: "0.0.0.0"
+      PUBLIC_PORT: "8080"
+      BIG_SCAN_CSE_IMAGES_ONLY: "0"
+      INCOGNITON_DISABLE: "1"
+      BIO_VERIFY_ENABLED: "0"
+      TRUST_XFF: "1"
+      PUBLIC_DB: "/data/public.db"
+      SITE_DIR: "/site"
+    ports:
+      - "${LEAKSCAN_PORT:-8080}:8080"
+    volumes:
+      - leakscan-data:/data
+    networks:
+      - default
+      - n8n_default
+    labels:
+      autoheal: "true"
+      traefik.enable: "true"
+      traefik.docker.network: "n8n_default"
+      traefik.http.services.leakscan.loadbalancer.server.port: "8080"
+      # API host (unchanged)
+      traefik.http.routers.leakscan.rule: "Host(`${LEAKSCAN_HOST:-scan.srv1395798.hstgr.cloud}`)"
+      traefik.http.routers.leakscan.entrypoints: "websecure"
+      traefik.http.routers.leakscan.tls.certresolver: "mytlschallenge"
+      traefik.http.routers.leakscan.service: "leakscan"
+      # Landing site apex (test host until abolita.com DNS is live)
+      traefik.http.routers.leakscan-site.rule: "Host(`${SITE_HOST:-abolita.srv1395798.hstgr.cloud}`)"
+      traefik.http.routers.leakscan-site.entrypoints: "websecure"
+      traefik.http.routers.leakscan-site.tls.certresolver: "mytlschallenge"
+      traefik.http.routers.leakscan-site.service: "leakscan"
+      # www -> apex (301)
+      traefik.http.routers.leakscan-site-www.rule: "Host(`${SITE_HOST_WWW:-www.abolita.srv1395798.hstgr.cloud}`)"
+      traefik.http.routers.leakscan-site-www.entrypoints: "websecure"
+      traefik.http.routers.leakscan-site-www.tls.certresolver: "mytlschallenge"
+      traefik.http.routers.leakscan-site-www.service: "leakscan"
+      traefik.http.routers.leakscan-site-www.middlewares: "leakscan-site-www-redirect"
+      traefik.http.middlewares.leakscan-site-www-redirect.redirectregex.regex: "^https?://[^/]+/(.*)"
+      traefik.http.middlewares.leakscan-site-www-redirect.redirectregex.replacement: "https://${SITE_HOST:-abolita.srv1395798.hstgr.cloud}/$${1}"
+      traefik.http.middlewares.leakscan-site-www-redirect.redirectregex.permanent: "true"
+
+volumes:
+  leakscan-data:
+
+networks:
+  n8n_default:
+    external: true
