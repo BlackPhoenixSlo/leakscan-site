@@ -140,7 +140,7 @@ strong { font-weight: 650; }
 .eyebrow { font: 650 .8rem/1.4 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin-bottom: .9em; }
 .accent { color: var(--accent); font-style: italic; }
 .lead { font-size: clamp(1.1rem, 2.4vw, 1.28rem); color: var(--muted); max-width: 36em; }
-/* Free-scan form: plain GET to the scan tool, works without JS. Stacked on phones, one row from 560px. */
+/* Free-scan form: plain GET to scan/ (the on-site scan page). Stacked on phones, one row from 560px. */
 .scan-form { display: grid; gap: 10px; margin: 28px 0 10px; max-width: 600px; }
 @media (min-width: 560px) { .scan-form { grid-template-columns: auto 1fr auto; } }
 .scan-field {

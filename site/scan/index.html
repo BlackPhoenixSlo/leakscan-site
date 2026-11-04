@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free leak scan · LeakScan</title>
+<meta name="description" content="Free leak scan: see what Google shows for your handle, pages, images and videos, and every leak link it found. No account, no card.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#fbf8f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15120f" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LeakScan">
+<meta property="og:title" content="Free leak scan · LeakScan">
+<meta property="og:description" content="See what Google shows for your handle and every leak link the scan found. Free, no account, no card.">
+<meta property="og:image" content="https://blackphoenixslo.github.io/leakscan-site/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Free leak scan · LeakScan">
+<meta name="twitter:description" content="See what Google shows for your handle and every leak link the scan found. Free, no account, no card.">
+<meta name="twitter:image" content="https://blackphoenixslo.github.io/leakscan-site/assets/og.png">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../css/styles.css">
+<link rel="stylesheet" href="../css/scan.css">
+<script>document.documentElement.classList.add('js')</script>
+<script src="../js/scan.js" defer></script>
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+<symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+<symbol id="i-scan-search" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
+<symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+<symbol id="i-external-link" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+<symbol id="i-smartphone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></symbol></svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="container header-row">
+    <a class="brand" href="../" aria-label="LeakScan home">
+      <img src="../assets/logo.svg" alt="" width="32" height="32">
+      <span>LeakScan</span>
+    </a>
+    <a class="btn btn-primary btn-sm" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Message me</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="scan-top" aria-labelledby="scan-title">
+  <div class="container">
+    <p class="eyebrow" id="scan-kicker">Free leak scan</p>
+    <h1 id="scan-title">Free leak scan</h1>
+    <p class="lead" id="scan-lead">See what Google shows for your handle: pages, images and videos, and every leak link the scan finds.</p>
+
+    <noscript>
+      <p class="scan-card">The scan runs in your browser, so this page needs JavaScript. You can run the same free scan on my scan app instead: <a href="https://jackbase.me/scan">jackbase.me/scan</a>.</p>
+    </noscript>
+
+    <form id="scan-form" class="scan-form" method="get" action="./" hidden>
+      <select class="scan-field scan-platform" name="p" aria-label="Platform">
+        <option value="onlyfans.com">OnlyFans</option>
+        <option value="instagram.com">Instagram</option>
+        <option value="fansly.com">Fansly</option>
+        <option value="tiktok.com">TikTok</option>
+        <option value="patreon.com">Patreon</option>
+      </select>
+      <input class="scan-field scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="yourhandle" aria-label="Your handle" aria-describedby="form-error">
+      <button class="btn btn-primary btn-lg" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Scan for free</button>
+    </form>
+    <p class="form-error" id="form-error" role="alert" hidden></p>
+
+    <div class="scan-card progress-card" id="progress" hidden>
+      <div class="progress-head">
+        <span class="spinner" aria-hidden="true"></span>
+        <p id="progress-stage">Starting the scan…</p>
+      </div>
+      <div class="bar" role="progressbar" aria-label="Scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar"><i></i></div>
+      <ol class="progress-log" id="progress-log" aria-live="polite"></ol>
+      <p class="progress-note">Usually under a minute. Keep this tab open. Your handle goes only to my own scan server.</p>
+    </div>
+
+    <div class="scan-card error-card" id="error" role="alert" hidden>
+      <h2 id="error-title">Something went wrong</h2>
+      <p id="error-text"></p>
+      <p class="error-actions"><button class="btn btn-primary" type="button" id="retry"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>Try again</button></p>
+      <p class="msg-row"><span>Message me directly:</span>
+        <a class="btn btn-ghost btn-sm" data-msg="tg" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Telegram</a>
+        <a class="btn btn-ghost btn-sm" data-msg="wa" href="https://wa.me/38640703992?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-message-circle"/></svg>WhatsApp</a>
+        <a class="btn btn-ghost btn-sm" data-msg="mail" href="mailto:me@jackbase.dev?subject=Free%20Google%20scan&amp;body=Hi%20Jaka%2C%0A%0AI%27d%20like%20the%20free%20Google%20scan.%0AMy%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>Email</a>
+      </p>
+    </div>
+
+    <ul class="stats" id="summary" hidden>
+      <li><strong data-stat="domains">0</strong><span data-label="domains">sites with copies found</span></li>
+      <li><strong data-stat="pages">0</strong><span data-label="pages">indexed pages</span></li>
+      <li><strong data-stat="google">~0</strong><span>results in Google's index</span></li>
+    </ul>
+    <p class="scan-card empty-card" id="empty" hidden><strong>Nothing indexed for this handle right now.</strong> That's good news, but leaks often sit on sites Google hasn't picked up yet, or under another name. Message me below and I'll check by hand.</p>
+  </div>
+</section>
+
+<div id="report" hidden>
+  <section class="scan-section" id="google" aria-labelledby="google-title">
+    <div class="container container-wide">
+      <div class="section-head">
+        <h2 id="google-title">What Google shows</h2>
+        <p>What someone sees when they search your name with “leaks”. Images and videos are blurred until you reveal them.</p>
+      </div>
+      <div class="g-controls">
+        <fieldset class="seg" id="device">
+          <legend class="sr-only">Show as</legend>
+          <label><input type="radio" name="device" value="phone"><span><svg class="icon" aria-hidden="true"><use href="#i-smartphone"/></svg>Phone</span></label>
+          <label><input type="radio" name="device" value="computer"><span><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg>Computer</span></label>
+        </fieldset>
+        <button class="btn btn-ghost btn-sm" type="button" id="reveal" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span>Reveal images</span></button>
+      </div>
+      <div id="g-stage" class="g-stage"></div>
+      <p class="g-note" id="g-note">Rendered from Google's index. Not a live screenshot.</p>
+    </div>
+  </section>
+
+  <section class="scan-section" id="send" aria-labelledby="send-title">
+    <div class="container">
+      <div class="contact-card">
+        <img class="contact-avatar" src="../assets/avatar-jaka.svg" alt="Jaka" width="88" height="88">
+        <h2 id="send-title">Send me this report. I remove one page free so you see it work.</h2>
+        <p>Send it on whichever app you already use. You'll be talking to me, not a bot and not a team.</p>
+        <div class="channels">
+          <a class="channel channel-primary" data-msg="tg" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%20ran%20the%20free%20scan.%20My%20report%20link%20and%20handle%3A%20">
+            <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>
+            <span><strong>Telegram</strong><span>@jakabasej</span></span>
+          </a>
+          <a class="channel" data-msg="wa" href="https://wa.me/38640703992?text=Hi%20Jaka%2C%20I%20ran%20the%20free%20scan.%20My%20report%20link%20and%20handle%3A%20">
+            <svg class="icon" aria-hidden="true"><use href="#i-message-circle"/></svg>
+            <span><strong>WhatsApp</strong><span>+386 40 703 992</span></span>
+          </a>
+          <a class="channel" data-msg="mail" href="mailto:me@jackbase.dev?subject=Free%20scan%20report&amp;body=Hi%20Jaka%2C%0A%0AI%20ran%20the%20free%20scan.%0AMy%20report%20link%3A%20%0AMy%20handle%3A%20%0A%0AThanks%21">
+            <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>
+            <span><strong>Email</strong><span>me@jackbase.dev</span></span>
+          </a>
+        </div>
+        <p class="price-line">Then €250/month or €500 one-time, only if you continue.</p>
+        <p class="deep"><a id="deep-link" href="https://jackbase.me/scan">Run a deep scan (takes minutes)<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="scan-section" id="sites" aria-labelledby="sites-title">
+    <div class="container">
+      <h2 id="sites-title">Where the copies are</h2>
+      <div class="sites-wrap">
+        <table class="sites">
+          <thead><tr><th scope="col">Site</th><th scope="col">Links</th><th scope="col">Top link</th></tr></thead>
+          <tbody id="sites-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="scan-section" id="links" aria-labelledby="links-title">
+    <div class="container">
+      <div class="links-head">
+        <h2 id="links-title">All detected links</h2>
+        <p class="links-actions">
+          <button class="btn btn-ghost btn-sm" type="button" id="copy-all"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy all</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="download"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download .txt</button>
+          <span class="copy-status" id="copy-status" role="status"></span>
+        </p>
+      </div>
+      <div id="links-list" class="links-list"></div>
+    </div>
+  </section>
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div>
+      <a class="brand" href="../">
+        <img src="../assets/logo.svg" alt="" width="28" height="28">
+        <span>LeakScan</span>
+      </a>
+      <p>Leaked content removal for creators, done by a person.<br>Run by Ognjeni Feniks, Jaka Basej, s.p., Ljubljana, Slovenia.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+        <li><a href="../#free">Free scan</a></li>
+        <li><a href="../#pricing">Pricing</a></li>
+        <li><a href="../#faq">FAQ</a></li>
+        <li><a href="../imprint.html">Imprint</a></li>
+        <li><a href="../privacy.html">Privacy</a></li>
+      </ul>
+    </nav>
+    <div>
+      <ul class="footer-contact">
+        <li><a href="https://t.me/jakabasej">Telegram @jakabasej</a></li>
+        <li><a href="https://wa.me/38640703992">WhatsApp +386 40 703 992</a></li>
+        <li><a href="mailto:me@jackbase.dev">me@jackbase.dev</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="container footer-base">
+    <p>© 2026 Ognjeni Feniks, Jaka Basej, s.p. · No cookies, no tracking.</p>
+  </div>
+</footer>
+
+</body>
+</html>
