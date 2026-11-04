@@ -45,6 +45,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import web_common as wc
 import db
 import ratelimit
+import alias_enrich
 import chat_proxy
 import cse_scanner
 import leak_evidence
@@ -226,7 +227,7 @@ def _profile_cse_items(handle, items):
         return []
 
 
-def _quick_profile(handle, platform, items, socials=None):
+def _quick_profile(handle, platform, items, socials=None, hints=None):
     """-> (profile|None, avatar(bytes, ext)|None, sources|None). Never raises, never exceeds
     ~budget+2s. sources go on to media_gather (profile refine with web snippets)."""
     box = {}
@@ -237,7 +238,7 @@ def _quick_profile(handle, platform, items, socials=None):
             more = _profile_cse_items(handle, items)
             budget = profile_extract.PROFILE_BUDGET - (time.monotonic() - t0)
             prof, av, src = profile_extract.build_profile(platform, handle, more + list(items or []),
-                                                          budget=budget, socials=socials)
+                                                          budget=budget, socials=socials, hints=hints)
             box["r"] = (prof, av, src)
         except Exception as e:
             _event(f"profile failed: {type(e).__name__}")
@@ -281,6 +282,65 @@ def quick_aliases(handle_aliases, socials):
             seen.add(a.lower())
             out.append(a)
     return out[:MAX_QUICK_ALIASES]
+
+
+# Alias enrichment: read a few found leak pages for the creator's other handles, re-scan <= 2 of them.
+ALIAS_ENRICH = os.environ.get("ALIAS_ENRICH", "1").lower() in ("1", "true", "yes")
+ALIAS_NEW_MAX = 2             # new aliases CSE-scanned per scan (each <= CSE_QUICK_CALLS calls)
+ALIAS_TOTAL_MAX = 4           # declared + discovered aliases per scan
+ALIAS_BUDGET = float(os.environ.get("ALIAS_BUDGET", "12"))          # s: page reads + extra CSE, hard cap
+ALIAS_SKIP_AFTER = float(os.environ.get("ALIAS_SKIP_AFTER", "45"))  # s into the scan: past this, skip the step
+
+
+def _alias_cse(alias, deadline):
+    """One discovered alias -> CSE items tagged alias=<alias> (<= CSE_QUICK_CALLS calls). Never raises."""
+    seeds = [alias] + [f"{p} {alias}" for p in CSE_PREFIXES]
+    try:
+        items, _ = cse_scanner.cse_search_wide(seeds, max_calls=CSE_QUICK_CALLS, tags=[alias] * len(seeds),
+                                               deadline=deadline)
+        return items
+    except Exception:
+        return []
+
+
+def enrich_aliases(declared, rows, results, prog, started):
+    """First-pass rows/results -> (extra CSE items, discovered aliases scanned, leak-page socials, names).
+    Bounded: skipped with 0 hits or when the scan already ran ALIAS_SKIP_AFTER s; <= ALIAS_BUDGET s."""
+    none = ([], [], [], [])
+    if not ALIAS_ENRICH or not rows:
+        return none
+    if time.monotonic() - started > ALIAS_SKIP_AFTER:
+        _event("alias_enrich skipped: budget")
+        return none
+    t0 = time.monotonic()
+    deadline = t0 + ALIAS_BUDGET
+    prog("Checking other names…")
+    d = alias_enrich.discover(rows, results, declared, budget=min(alias_enrich.FETCH_TOTAL, ALIAS_BUDGET))
+    low = {a.lower() for a in declared}
+    room = max(0, min(ALIAS_NEW_MAX, ALIAS_TOTAL_MAX - len(declared)))
+    new = [a for a in d["aliases"] if a.lower() not in low][:room]
+    extra = []
+    if new and deadline - time.monotonic() > 2:
+        prog("Also searching Google for " + ", ".join("@" + a for a in new) + "…")
+        with _cf.ThreadPoolExecutor(max_workers=len(new)) as ex:
+            for items in ex.map(lambda a: _alias_cse(a, deadline), new):
+                extra += items
+    else:
+        new = []
+    _event(f"alias_enrich pages={d['pages']} cand={d['cand']} kept={d['kept']} new={len(new)} "
+           f"items={len(extra)} secs={time.monotonic() - t0:.1f} reasons={alias_enrich.reasons_str(d['reasons'])}")
+    return extra, new, d["socials"], d["names"]
+
+
+def merge_items(results, extra):
+    """CSE items unioned by link; first sighting (and its alias tag) wins."""
+    seen = {it.get("link") for it in results}
+    out = list(results)
+    for it in extra:
+        if it.get("link") and it["link"] not in seen:
+            seen.add(it["link"])
+            out.append(it)
+    return out
 
 
 # Quick-scan `results` (Google-style links/images/videos tabs).
@@ -1758,6 +1818,7 @@ class Handler(BaseHTTPRequestHandler):
             pub["results"] = ex.get("results") or []
             pub["profile"] = ex.get("profile")
             pub["socials"] = ex.get("socials") or {}
+            pub["aliases"] = ex.get("aliases") or {"declared": [], "discovered": [], "socials": []}
             pub["media"] = {"status": media_gather.public_view(slug)["status"]}
         return self._json(pub, 200, extra=noindex)
 
@@ -1932,6 +1993,7 @@ class Handler(BaseHTTPRequestHandler):
         quick scan surfaces many more distinct leak hosts than the old 2-pass, with
         a shallow depth fallback when too few sites turn up."""
         aliases, socials = aliases or [handle], socials or {}
+        started = time.monotonic()
         _event(f"scan start level=low platform={platform} aliases={len(aliases)}")
         if not cse_scanner.cse_available():
             return wc.sse_fail(self, "Quick search isn't configured right now. Try the deep scan.")
@@ -1952,6 +2014,13 @@ class Handler(BaseHTTPRequestHandler):
                     pass
         except Exception:
             return wc.sse_fail(self, "Quick search is temporarily unavailable. Please try again.")
+        extra, found, found_socials, names = enrich_aliases(aliases, rows, results, prog, started)
+        if extra:
+            results = merge_items(results, extra)
+            rows = cse_scanner.summarize_cse(results)
+        alias_info = {"declared": list(aliases), "discovered": found,
+                      "socials": [s for s in found_socials if s["handle"].lower() not in
+                                  {v.lower() for v in socials.values()}]}
         images = cse_scanner.good_images(results, handle, CSE_IMAGES)
         # Replace Google's inflated raw totalResults with a grounded estimate.
         if USE_TOTAL_RESULTS_QUERY:
@@ -1968,23 +2037,27 @@ class Handler(BaseHTTPRequestHandler):
         profile, avatar, sources = None, None, None
         if PROFILE_ENABLED:
             prog("Reading your public profile…")
-            profile, avatar, sources = _quick_profile(handle, platform, results, socials)
+            profile, avatar, sources = _quick_profile(handle, platform, results, socials,
+                                                      hints={"names": names, "aliases": found})
+            profile = profile_extract.merge_found_accounts(profile, alias_info["socials"], socials)
         slug = db.insert_scan(rows, handle=handle, level="low", platform=platform,
                               status=status, client_ip_hash=_ip_hash(ip),
                               extra={"images": images, "google_total": google_total,
-                                     "results": shaped, "profile": profile, "socials": socials})
+                                     "results": shaped, "profile": profile, "socials": socials,
+                                     "aliases": alias_info})
         if avatar and not _save_avatar(slug, avatar) and profile:
             profile["avatar"] = False
         media = {"status": media_gather.start(slug, platform, handle, profile, results,
                                               sources=sources, socials=socials)}
         _event(f"scan done level=low hits={len(rows)} images={len(images)} calls={CSE_QUICK_CALLS} "
-               f"aliases={len(aliases)} socials={len(socials)} "
+               f"aliases={len(aliases)}+{len(found)} socials={len(socials)}+{len(alias_info['socials'])} "
                f"profile={(profile or {}).get('generated_by')} avatar={bool(avatar)} media={media['status']}")
         wc.sse(self, "result", json.dumps({
             "slug": slug, "handle": handle, "platform": platform, "level": "low",
             "status": status, "hit_count": len(rows), "domain_count": len(rows),
             "google_total": google_total, "images": images, "hits": rows,
             "results": shaped, "profile": profile, "media": media, "socials": socials,
+            "aliases": alias_info,
         }, ensure_ascii=False))
         wc.sse(self, "done", "end")
 

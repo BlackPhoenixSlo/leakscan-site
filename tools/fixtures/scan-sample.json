@@ -834,5 +834,34 @@
   ],
   "confidence": 0.9,
   "generated_by": "fixture"
+ },
+ "aliases": {
+  "declared": [
+   "demo.creator"
+  ],
+  "discovered": [
+   "demo.creator.vip",
+   "demostudio"
+  ],
+  "socials": [
+   {
+    "platform": "fansly",
+    "handle": "demo.creator.vip",
+    "url": "https://fansly.com/demo.creator.vip",
+    "source_domain": "leakvault.example"
+   },
+   {
+    "platform": "x",
+    "handle": "demostudio",
+    "url": "https://x.com/demostudio",
+    "source_domain": "leakvault.example"
+   },
+   {
+    "platform": "instagram",
+    "handle": "demo.other.ig",
+    "url": "https://instagram.com/demo.other.ig",
+    "source_domain": "leakvault.example"
+   }
+  ]
  }
 }

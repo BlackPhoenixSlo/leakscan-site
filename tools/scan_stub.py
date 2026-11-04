@@ -11,8 +11,11 @@ Serves site/ and the API routes of the contract the scan page talks to:
   stub-fail → `failed` + `done`; stub-429 → 429 rate_limited; stub-busy → 429 busy; stub-empty → status empty;
   stub-mixed → 3 hits (live true / false / missing) + the results.
 - GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise. Preloaded: demoR3port01 (the
-  fixture, with its synthetic `profile`), demoNoProf01 (same, `profile` null: scan-only personalization) and evilR3port01
+  fixture, with its synthetic `profile`), demoNoProf01 (same, `profile` null: scan-only personalization, no leak-page
+  Instagram), demoFoundIG1 (`profile` null, leak-page Instagram fills the IG rows) and evilR3port01
   (fixture overlaid with tools/fixtures/scan-evil.json: script tags, javascript: urls, oversized strings).
+  `aliases` {declared, discovered, socials} (alias enrichment) comes from the fixture: discovered handles + the
+  socials read off leak pages; stub-mixed / stub-empty carry none.
 - GET /api/profile/<slug> → {slug, profile}; GET /api/avatar/<slug> → a generated PNG when profile.avatar is true, else 404.
 - GET /api/media/<slug> (demo photos, arrive after the scan) → polls 1-2: {status:"pending", images:[2]}, then
   {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (generated PNG bytes). evilR3port01
@@ -57,13 +60,16 @@ def make_result(handle, platform, empty=False):
     r = json.loads(json.dumps(FIXTURE))
     r.update(handle=handle, platform=platform,
              slug="".join(random.choice(string.ascii_letters + string.digits) for _ in range(12)))
+    r["aliases"]["declared"] = [handle]
     if handle == "stub-mixed":   # badge coverage: hits live true / false / missing, then the Google results
+        r["aliases"] = {"declared": [handle], "discovered": [], "socials": []}   # no "Also found as"
         r["hits"] = r["hits"][:3]
         r["hits"][1]["live"] = False
         r["hits"][2].pop("live")
         r["hit_count"] = 3
     if empty:
-        r.update(status="empty", hit_count=0, domain_count=0, google_total=0, images=[], hits=[], results=[])
+        r.update(status="empty", hit_count=0, domain_count=0, google_total=0, images=[], hits=[], results=[],
+                 aliases={"declared": [handle], "discovered": [], "socials": []})
     if OPTS.omit_results:
         r.pop("results", None)
     if OPTS.omit_profile:
@@ -285,6 +291,7 @@ class Handler(SimpleHTTPRequestHandler):
         r = make_result(handle, platform, empty=handle == "stub-empty")
         if socials:
             r["socials"] = socials
+            r["aliases"]["declared"] += list(socials.values())
         STORE[r["slug"]] = r
         ev("result", json.dumps(r))
         ev("done", "end")
@@ -298,7 +305,9 @@ def main():
     ap.add_argument("--media", choices=("normal", "relative", "none", "404"), default="normal")
     ap.add_argument("--delay", type=float, default=0.15)
     ap.parse_args(namespace=OPTS)
-    for slug, overlay in (("demoR3port01", {}), ("demoNoProf01", {"profile": None}), (EVIL["slug"], EVIL)):
+    no_ig = {**FIXTURE["aliases"], "socials": [x for x in FIXTURE["aliases"]["socials"] if x["platform"] != "instagram"]}
+    for slug, overlay in (("demoR3port01", {}), ("demoNoProf01", {"profile": None, "aliases": no_ig}),
+                          ("demoFoundIG1", {"profile": None}), (EVIL["slug"], EVIL)):
         seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
         if OPTS.omit_results:
             seed.pop("results", None)

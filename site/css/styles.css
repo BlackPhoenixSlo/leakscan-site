@@ -431,7 +431,7 @@ strong { font-weight: 650; }
 .report-card.is-live > :not(.live), .scan-report.is-live > .report-rows:not(.live-rows),
 .scan-report.is-live [data-p="scan-count"] { display: none; }
 .live-title:focus { outline: 0; }
-.live-socials { margin: 2px 0 0; color: var(--muted); font-size: .88rem; }
+.live-socials, .live-aliases { margin: 2px 0 0; color: var(--muted); font-size: .88rem; }
 .live-status { margin: 12px 0 0; color: var(--muted); font-size: .92rem; }
 .live-status:empty { display: none; }
 .live-bar { height: 6px; margin: 10px 0 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }

@@ -146,7 +146,7 @@
   }
 
   window.LeakScanEngine = {
-    API: API, REPORT_BASE: REPORT_BASE, PLATFORMS: PLATFORMS, SLUG_RE: SLUG_RE, cleanHandle: cleanHandle, cleanSocial: cleanSocial, thumb: thumb,
+    API: API, REPORT_BASE: REPORT_BASE, PLATFORMS: PLATFORMS, SLUG_RE: SLUG_RE, HANDLE_RE: HANDLE_RE, cleanHandle: cleanHandle, cleanSocial: cleanSocial, thumb: thumb,
     who: who, setMessages: setMessages, sendReport: sendReport, remember: remember, runScan: runScan,
     fetchResult: fetchResult, progressInfo: progressInfo
   };

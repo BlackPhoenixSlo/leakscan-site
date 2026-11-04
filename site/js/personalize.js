@@ -98,8 +98,16 @@
     var so = r.socials && typeof r.socials === 'object' ? r.socials : {}, socials = {};
     if (handle(so.instagram)) socials.instagram = handle(so.instagram);
     if (handle(so.x)) socials.x = handle(so.x);
+    // found: her other accounts read off leak pages (alias enrichment); only fill platforms nothing else knows
+    var al = r.aliases && typeof r.aliases === 'object' ? r.aliases : {}, found = [], fseen = {};
+    (Array.isArray(al.socials) ? al.socials : []).slice(0, 12).forEach(function (a) {
+      var k = a && platKey(a.platform), fh = a && handle(a.handle);
+      if (!k || !fh || fseen[k]) return;
+      fseen[k] = 1;
+      found.push({ key: k, handle: fh, url: accountUrl(a.url, k) });
+    });
     return { slug: slug, handle: h, platform: platKey(r.platform), leaks: order.slice(0, 4), images: images.slice(0, 3),
-      profile: cleanProfile(r.profile), socials: socials };
+      profile: cleanProfile(r.profile), socials: socials, found: found };
   }
 
   // ---------- slug + data ----------
@@ -185,6 +193,7 @@
     var p = m.profile || {}, acc = {};
     (p.accounts || []).forEach(function (a) { acc[a.key] = a; });
     if (m.platform && !acc[m.platform]) acc[m.platform] = { key: m.platform, handle: m.handle, url: null };
+    (m.found || []).forEach(function (a) { if (!acc[a.key]) acc[a.key] = a; });
     var so = m.socials || {};
     ['instagram', 'x'].forEach(function (k) { // keep the profile's link only when it is the same account
       if (so[k]) acc[k] = { key: k, handle: so[k], url: acc[k] && acc[k].handle.toLowerCase() === so[k].toLowerCase() ? acc[k].url : null };

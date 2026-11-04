@@ -225,14 +225,25 @@ def clean_socials(socials):
     return out
 
 
-def collect_sources(platform, handle, cse_items, fetch=urlopen, socials=None):
+def clean_hints(hints):
+    """{"names": [display-name candidates], "aliases": [other handles]} from leak pages, capped."""
+    h = hints if isinstance(hints, dict) else {}
+    names = [n for n in h.get("names") or [] if _text(n, CAPS["display_name"])][:4]
+    aliases = [a for a in h.get("aliases") or [] if valid_handle(a)][:4]
+    return {k: v for k, v in (("names", names), ("aliases", aliases)) if v}
+
+
+def collect_sources(platform, handle, cse_items, fetch=urlopen, socials=None, hints=None):
     """Raw public evidence for one handle. Fetches run in parallel; each fails soft.
-    A declared Instagram handle replaces the scanned handle for the Instagram fetches."""
+    A declared Instagram handle replaces the scanned handle for the Instagram fetches.
+    `hints` (alias enrichment): other names/handles read off leak pages -> prompt evidence only."""
     declared = clean_socials(socials)
     src = {"handle": handle, "platform": _short_platform(platform),
            "instagram": None, "og": None, "google": []}
     if declared:
         src["declared"] = declared
+    if clean_hints(hints):
+        src["other_names"] = clean_hints(hints)
     ig_h = declared.get("instagram") or handle
     if ig_h != handle:
         src["ig_handle"] = ig_h
@@ -308,8 +319,9 @@ def fetch_avatar(sources, fetch=urlopen, timeout=FETCH_TIMEOUT):
 # --------------------------------------------------------------- prompting
 SYSTEM_PROMPT = """You write a short public profile of an online creator for a demo website.
 You receive SOURCES: raw public data (Instagram page data, other profile page tags, Google results,
-and sometimes web_results: Google web snippets about the creator, and declared_accounts: social
-accounts the creator confirmed as their own).
+and sometimes web_results: Google web snippets about the creator, declared_accounts: social
+accounts the creator confirmed as their own, and other_names: display names / other handles of the
+same creator read off pages that name her -- weaker evidence, use a name only when it fits the rest).
 
 HARD RULES:
 - Use ONLY facts present in the SOURCES. If a field is not supported by the sources, use null.
@@ -339,6 +351,8 @@ def build_prompt(sources):
         payload["declared_accounts"] = sources["declared"]
     if sources.get("web"):
         payload["web_results"] = sources["web"]
+    if sources.get("other_names"):
+        payload["other_names"] = sources["other_names"]
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "SOURCES:\n" + json.dumps(payload, ensure_ascii=False)},
@@ -567,12 +581,13 @@ def extract_profile(sources, llm=deepseek_json, timeout=LLM_TIMEOUT, avatar=Fals
         return fallback_profile(sources, avatar=avatar)
 
 
-def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROFILE_BUDGET, socials=None):
+def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROFILE_BUDGET, socials=None,
+                  hints=None):
     """collect -> avatar -> extract inside a total time budget.
     Returns (profile, avatar_bytes_and_ext_or_None, sources)."""
     fetch, llm = fetch or urlopen, llm or deepseek_json   # resolved per call (patchable)
     t0 = time.monotonic()
-    sources = collect_sources(platform, handle, cse_items, fetch=fetch, socials=socials)
+    sources = collect_sources(platform, handle, cse_items, fetch=fetch, socials=socials, hints=hints)
     remaining = lambda: budget - (time.monotonic() - t0)
     av = fetch_avatar(sources, fetch=fetch, timeout=min(FETCH_TIMEOUT, max(1, remaining() - 3))) \
         if remaining() > 4 else None
@@ -583,6 +598,24 @@ def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROF
 
 
 _KEEP_KEYS = tuple(CAPS) + ("followers", "site_domain")
+
+
+def merge_found_accounts(profile, found, declared=None, cap=12):
+    """Append leak-page socials to profile.accounts flagged source:"leak_page". Declared accounts stay
+    first and win: a platform the creator declared never gets a discovered handle. -> profile."""
+    if not isinstance(profile, dict):
+        return profile
+    accs = [a for a in profile.get("accounts") or [] if isinstance(a, dict)]
+    have = {(a.get("platform"), (a.get("handle") or "").lower()) for a in accs}
+    dec = clean_socials(declared)
+    for s in found or []:
+        plat, h = s.get("platform"), s.get("handle")
+        if plat not in ACCOUNT_DOMAINS or not valid_handle(h) or plat in dec or (plat, h.lower()) in have:
+            continue
+        have.add((plat, h.lower()))
+        accs.append({"platform": plat, "handle": h, "url": _canonical_url(plat, h), "source": "leak_page"})
+    profile["accounts"] = accs[:cap]
+    return profile
 
 
 def refine_profile(old, sources, web, *, platform="", handle="", socials=None, llm=None, timeout=LLM_TIMEOUT):
