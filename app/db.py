@@ -166,6 +166,35 @@ def finish_scan(slug, hits, *, status=None, extra=None, path=None):
     return cur.rowcount > 0
 
 
+def update_extra(slug, patch, path=None):
+    """Merge `patch` into a scan's extra_json (top-level keys replaced). Read-modify-write in
+    one IMMEDIATE transaction. No schema change. Returns True if the row exists."""
+    if not slug or not SLUG_RE.match(slug) or not isinstance(patch, dict):
+        return False
+    conn = sqlite3.connect(path or DB_PATH, timeout=10, isolation_level=None)
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT extra_json FROM scans WHERE slug = ?", (slug,)).fetchone()
+        if row is None:
+            conn.execute("ROLLBACK")
+            return False
+        try:
+            extra = json.loads(row[0] or "{}") or {}
+        except ValueError:
+            extra = {}
+        extra.update(patch)
+        conn.execute("UPDATE scans SET extra_json = ? WHERE slug = ?",
+                     (json.dumps(extra, ensure_ascii=False, separators=(",", ":")), slug))
+        conn.execute("COMMIT")
+        return True
+    except Exception:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
+
+
 def reap_running(path=None):
     """Mark any 'running' rows as failed. A running row that survives a process
     restart is orphaned (its in-memory worker is gone), so we flip it at startup
@@ -200,9 +229,7 @@ def get_scan(slug, path=None):
     # whatever the worker stored so a share/reload renders the full report.
     for key in ("img_meta", "gallery", "cse_sites", "top_leaks", "n_leaks",
                 "n_media", "n_hosting", "n_sites", "quote", "links_by_domain",
-                # audit downloads: accepted (confirmed) + removed (dropped candidate) URL lists
-                # and their counts — the full lists are big, served only by the download route.
-                "n_accepted", "n_removed", "accepted_urls", "removed_urls"):
+                "excluded"):
         if key in extra:
             d[key] = extra[key]
     return d

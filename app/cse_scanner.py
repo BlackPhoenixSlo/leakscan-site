@@ -170,12 +170,13 @@ def cse_search_deep(query, max_calls=15, api_key=None, cx=None, timeout=20,
 
 
 def cse_search_wide(queries, max_calls=15, api_key=None, cx=None, timeout=20,
-                    q_budget=1900, on_progress=None):
+                    q_budget=1900, on_progress=None, tags=None):
     """Multi-seed exclude-reset widening. Same idea as cse_search_deep but CYCLES
     through several seed queries (e.g. the base query + `<h> nude` + `<h> porn`) so
     different phrasings surface different leak sites — while sharing ONE exclusion
     set across all seeds, so every later call `-site:`-excludes every domain any
-    seed has seen. Stops after a full cycle of seeds adds nothing new. Returns
+    seed has seen. Stops after a full cycle of seeds adds nothing new. `tags` (parallel to
+    queries) stamps each new item's `alias` with its seed's tag. Returns
     (items, google_total_from_first_call)."""
     key = api_key or os.environ.get("GOOGLE_API_KEY", "")
     cid = cx or os.environ.get("GOOGLE_CSE_ID", "")
@@ -206,6 +207,8 @@ def cse_search_wide(queries, max_calls=15, api_key=None, cx=None, timeout=20,
             if it["link"] in seen_links:
                 continue
             seen_links.add(it["link"])
+            if tags:
+                it["alias"] = tags[call % len(queries)]
             items.append(it)
             added += 1
             rd = _regdom(it.get("host") or "")
@@ -233,7 +236,7 @@ def summarize_cse(results):
         e = by_host.get(h)
         if e is None:
             e = {"domain": h, "url": r.get("link"), "occurrences": 0,
-                 "method": "google", "alias": None, "live": True,
+                 "method": "google", "alias": r.get("alias"), "live": True,
                  "title": (r.get("title") or "")[:120]}
             by_host[h] = e
         e["occurrences"] += 1

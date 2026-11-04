@@ -4,7 +4,9 @@ and the local real-path run. Callers point
 cse_scanner.CSE_ENDPOINT / chat_proxy.DEEPSEEK_URL at it (declared bypass).
 All data is synthetic.
 
-  python3 tests/upstream_stub.py PORT [valid|dirty|timeout|echo]
+  python3 tests/upstream_stub.py PORT [valid|dirty|timeout|echo|sparse]
+(echo: name/bio from the prompt's IG data; with web_results, tagline/about from the first one;
+ sparse: a valid-shape profile with every text field null -> refine must keep old fields)
 """
 import hashlib
 import io
@@ -155,6 +157,9 @@ VALID = {
                  {"platform": "tiktok", "handle": "mira.example", "url": "https://www.tiktok.com/@mira.example"}],
     "site_domain": "miraexample.com", "confidence": 0.86,
 }
+SPARSE = {"display_name": None, "first_name": None, "tagline": None, "profession": None, "location": None,
+          "bio": None, "about_short": None, "followers": None, "accounts": [], "site_domain": None,
+          "confidence": 0.4}
 DIRTY = {
     "display_name": "M" * 200, "first_name": ["not", "a", "string"],
     "tagline": "Exclusive leaked content and nudes",          # unsafe -> null
@@ -183,6 +188,7 @@ class Stub(ThreadingHTTPServer):
     def __init__(self, port=0, mode="valid"):
         super().__init__(("127.0.0.1", port), _H)
         self.mode, self.calls = mode, []
+        self.alias_items = {}      # CSE: query token -> extra items (declared-social alias seeds)
         self.lock = threading.Lock()
 
     @property
@@ -217,6 +223,10 @@ class _H(BaseHTTPRequestHandler):
             return self._send({"searchInformation": {"totalResults": "9"}, "items": IMAGE_ITEMS})
         with self.server.lock:
             self.server.calls.append(("cse", g("q")))
+        words = [w for w in g("q").split() if not w.startswith("-site:")]
+        for w in words:
+            if w in self.server.alias_items:
+                return self._send({"searchInformation": {"totalResults": "5"}, "items": self.server.alias_items[w]})
         self._send({"searchInformation": {"totalResults": "1234"}, "items": CSE_ITEMS})
 
     def _stream_chat(self, body):
@@ -258,6 +268,12 @@ class _H(BaseHTTPRequestHandler):
                    "accounts": [{"platform": "instagram", "handle": h,
                                  "url": f"https://www.instagram.com/{h}/"}] if ig else [],
                    "site_domain": None, "confidence": 0.7 if ig else 0.2}
+            web = src.get("web_results") or []
+            if web:
+                out.update(tagline=web[0]["title"][:90], about_short=web[0]["snippet"][:400] or out["about_short"],
+                           confidence=0.8)
+        elif mode == "sparse":
+            out = SPARSE
         else:
             out = VALID if mode == "valid" else DIRTY
         self._send({"choices": [{"message": {"role": "assistant", "content": json.dumps(out)}}],

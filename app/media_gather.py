@@ -1,22 +1,32 @@
 """Quick-scan SFW media: a few NON-nude photos of the creator for the landing's mock
 "official website", gathered in a background thread after a quick scan's DB insert.
 
-Sources (official only, every byte from an official CDN host, nothing from the scan's
-leak results), in this order:
+Sources (official only, nothing from the scan's leak results), in this order:
   (a) Instagram profile embed page (instagram.com/<handle>/embed/, anonymous, no browser):
       latest posts' image URLs from its server-rendered contextJSON;
-  (b) Google image search, SafeSearch on (safe=active), restricted to the creator's
-      official-account sites — up to GOOGLE_QUERIES CSE calls, ONLY with GOOGLE_CSE_ID_WEB
-      (a whole-web engine; the leak-only GOOGLE_CSE_ID never returns official photos);
-  (c) fallback: the public Instagram post grid via ONE Browserbase session (only when (a)
-      added < BB_FALLBACK_BELOW images and a gather slot is free).
+  (b) ONE Browserbase session per scan (only when (a) left room, keys set, a gather slot is
+      free and >= 20 s budget left), each sub-step time-boxed and failing alone:
+        1. Google Images (MEDIA_GOOGLE=browser, default): tbm=isch&safe=active for
+           google_queries() (<= 2, official-account sites); tiles on official sites are
+           clicked to read the full-size URL (must be an official CDN, same google_ok policy
+           as CSE); last resort: Google's own SafeSearch thumbnail of an official-site tile;
+        2. Google web text: top <= 10 organic {title,url,snippet} for "<handle>" (+ display
+           name), leak/hit domains dropped, <= 4000 chars -> media/<slug>/web_snippets.json,
+           then ONE extra DeepSeek call refines the scan's profile (profile_extract.refine_profile);
+        3. Instagram grid fallback (only when (a) added < BB_FALLBACK_BELOW images).
+      EU consent: SOCS/CONSENT cookies pre-set, "Accept all" clicked as fallback. Google's
+      /sorry captcha is left to Browserbase's solveCaptchas (~8 s measured).
+  MEDIA_GOOGLE=cse: the old CSE image search (GOOGLE_CSE_ID_WEB, a whole-web engine) instead
+  of 1-2; MEDIA_GOOGLE=off: no Google at all (session only for 3).
 SFW limitation: there is NO NSFW classifier. Safety relies on Instagram/TikTok/YouTube/X
 content policy + Google SafeSearch + official-source-only.
 
-Layout: <DATA_DIR>/media/<slug>/{index.json, 0.jpg, 1.jpg..}; per-handle cache
+Layout: <DATA_DIR>/media/<slug>/{index.json, web_snippets.json, 0.jpg, 1.jpg..}; per-handle cache
 <DATA_DIR>/media-cache/<platform>-<handle>.json (7 days) points at an earlier slug's files.
 `playwright` and Pillow are imported lazily: the app runs without them (gather -> fewer/no images).
 """
+import base64
+import contextlib
 import hashlib
 import html
 import io
@@ -29,7 +39,8 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from urllib.parse import urlparse
+from datetime import datetime, timezone
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import cse_scanner
 import db
@@ -44,6 +55,11 @@ MEDIA_ENABLED = _flag("MEDIA_ENABLED", "1")
 MEDIA_BROWSERBASE = _flag("MEDIA_BROWSERBASE", "1")
 MEDIA_BUDGET = float(os.environ.get("MEDIA_BUDGET", "90"))
 MEDIA_MAX = max(1, min(int(os.environ.get("MEDIA_MAX", "12")), 12))
+# Google step: "browser" = Google Images + web text in the Browserbase session (default),
+# "cse" = CSE image search with GOOGLE_CSE_ID_WEB (opt-in), "off" = no Google.
+MEDIA_GOOGLE = os.environ.get("MEDIA_GOOGLE", "browser").strip().lower()
+if MEDIA_GOOGLE not in ("browser", "cse", "off"):
+    MEDIA_GOOGLE = "browser"
 # Residential proxies ON by default: without them Instagram serves the login wall to
 # Browserbase's datacenter IPs (0 images after ~19s, a billed session wasted); with them 12
 # grid images in ~11s (measured 2026-11-04). Proxy bandwidth is billed extra, but the
@@ -61,7 +77,23 @@ FETCH_TIMEOUT = 8
 IG_GRID_WAIT_MS = 15000
 IG_EMBED_TIMEOUT = 10
 IG_EMBED_CAP = 2 * 1024 * 1024
-BB_FALLBACK_BELOW = 4         # Browserbase only when the embed step added fewer images
+BB_FALLBACK_BELOW = 4         # IG grid in the session only when the embed step added fewer images
+BB_CREATE_GAP = 2.5           # s between session creates, process-wide (25 creates/min org limit)
+GOOGLE_IMG_BOX = 35           # s for the Images sub-step (first query includes the captcha solve)
+GOOGLE_WEB_BOX = 20           # s for the web-text sub-step
+CAPTCHA_WAIT = 25             # s to let Browserbase solve a /sorry captcha (measured ~8 s)
+CLICKS_PER_QUERY = 6          # tiles clicked per Images query to read the full-size URL
+CLICK_WAIT_MS = 1500
+THUMB_BELOW = 3               # Google thumbnails only when < this many full-size images came
+WEB_MAX, WEB_TEXT_CAP = 10, 4000
+REFINE_RESERVE = 12           # s of the budget kept for the profile-refine DeepSeek call
+SNIPPETS_FILE = "web_snippets.json"
+# Pre-set EU consent ("Accept all") so Google serves results, not the consent interstitial.
+CONSENT_COOKIES = [
+    {"name": "SOCS", "value": "CAISHAgBEhJnd3NfMjAyMzA4MTAtMF9SQzIaAmVuIAEaBgiAo_CmBg",
+     "domain": ".google.com", "path": "/"},
+    {"name": "CONSENT", "value": "YES+cb.20230810-00-p0.en+FX+410", "domain": ".google.com", "path": "/"},
+]
 HANDLE_RE = re.compile(r"^[A-Za-z0-9._-]{1,60}$")
 SLUG_RE = db.SLUG_RE
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -89,6 +121,8 @@ log = lambda msg: (sys.stderr.write(msg + "\n"), sys.stderr.flush())   # public_
 _LOCK = threading.Lock()
 _RUNNING = set()
 _SEM = threading.BoundedSemaphore(MAX_GATHERS)
+_BB_GATE = threading.Lock()   # serializes session creates (BB_CREATE_GAP apart)
+_BB_LAST = [0.0]
 
 
 # ── paths / index ────────────────────────────────────────────────────────────
@@ -107,10 +141,11 @@ def _atomic_write(path, data):
     os.replace(tmp, path)
 
 
-def _write_index(slug, status, images):
+def _write_index(slug, status, images, profile_updated_at=None):
     d = media_dir(slug)
     os.makedirs(d, exist_ok=True)
-    obj = {"slug": slug, "status": status, "images": images, "updated_at": int(time.time())}
+    obj = {"slug": slug, "status": status, "images": images, "updated_at": int(time.time()),
+           "profile_updated_at": profile_updated_at}
     _atomic_write(os.path.join(d, "index.json"), json.dumps(obj).encode())
 
 
@@ -123,10 +158,13 @@ def _read_index(slug):
 
 
 def public_view(slug):
-    """-> {slug, status, images:[{src,w,h,source}], updated_at}. Slug must be SLUG_RE-valid."""
+    """-> {slug, status, images:[{src,w,h,source}], updated_at, profile_updated_at}.
+    profile_updated_at (ISO) is set once the profile was refined from web text: refetch it.
+    Slug must be SLUG_RE-valid."""
     idx = _read_index(slug) if MEDIA_ENABLED else None
     if not idx:
-        return {"slug": slug, "status": "none", "images": [], "updated_at": None}
+        return {"slug": slug, "status": "none", "images": [], "updated_at": None,
+                "profile_updated_at": None}
     imgs, status = idx.get("images") or [], idx.get("status")
     with _LOCK:
         running = slug in _RUNNING
@@ -136,6 +174,7 @@ def public_view(slug):
         status = "ready" if imgs else "none"
     order = sorted(imgs, key=lambda i: i.get("source") != "instagram")    # IG grid first
     return {"slug": slug, "status": status, "updated_at": idx.get("updated_at"),
+            "profile_updated_at": idx.get("profile_updated_at"),
             "images": [{"src": f"{PUBLIC_ORIGIN}/api/media/{slug}/{i['n']}.jpg", "w": i["w"],
                         "h": i["h"], "source": i["source"]} for i in order]}
 
@@ -250,6 +289,7 @@ class _Gallery:
     def __init__(self, slug):
         self.slug, self.images, self.shas = slug, [], set()
         self.dir = media_dir(slug)
+        self.profile_updated_at = self.cache_slug = None
 
     @property
     def full(self):
@@ -274,7 +314,7 @@ class _Gallery:
         os.makedirs(self.dir, exist_ok=True)
         _atomic_write(os.path.join(self.dir, f"{n}.jpg"), jpeg)
         self.images.append({"n": n, "w": w, "h": h, "source": source, "sha1": sha})
-        _write_index(self.slug, "pending", self.images)
+        _write_index(self.slug, "pending", self.images, self.profile_updated_at)
         return True
 
     def from_cache(self, key):
@@ -295,10 +335,11 @@ class _Gallery:
             except OSError:
                 shutil.copyfile(s, d)
             self.images.append(i)
+        self.cache_slug = c["slug"]
         return True
 
     def finish(self):
-        _write_index(self.slug, "ready" if self.images else "none", self.images)
+        _write_index(self.slug, "ready" if self.images else "none", self.images, self.profile_updated_at)
 
 
 # ── per-handle cache ────────────────────────────────────────────────────────
@@ -363,7 +404,11 @@ def google_images(handle, profile, leak, timeout=FETCH_TIMEOUT):
     return out
 
 
-def ig_handle(platform, handle, profile):
+def ig_handle(platform, handle, profile, socials=None):
+    """User-declared Instagram handle first, then profile.accounts, then the scanned IG handle."""
+    dec = (socials or {}).get("instagram")
+    if isinstance(dec, str) and HANDLE_RE.match(dec):
+        return dec
     for a in (profile or {}).get("accounts") or []:
         if isinstance(a, dict) and a.get("platform") == "instagram" and HANDLE_RE.match(a.get("handle") or ""):
             return a["handle"]
@@ -462,7 +507,7 @@ def ig_embed_grid(handle, timeout=IG_EMBED_TIMEOUT):
     return urls
 
 
-# ── Instagram grid via Browserbase (fallback) ───────────────────────────────
+# ── Browserbase session (one per scan) ───────────────────────────────────────
 _GRID_JS = """async (sel) => {
   const t0 = Date.now();
   const imgs = () => Array.from(document.querySelectorAll(sel));
@@ -475,41 +520,49 @@ _GRID_JS = """async (sel) => {
 }"""
 
 
-def grid_from_cdp(connect_url, handle, deadline):
-    """Connect to a CDP browser, open the public IG profile, return grid image bytes."""
+def _ms(deadline, cap):
+    return max(1000, min(cap, int((deadline - time.monotonic()) * 1000)))
+
+
+@contextlib.contextmanager
+def _cdp_page(connect_url, deadline):
+    """Connect to the session's CDP browser -> its first page (tests patch this: browser wire)."""
     from playwright.sync_api import sync_playwright
-    ms = lambda cap: max(1000, min(cap, int((deadline - time.monotonic()) * 1000)))
     with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(connect_url, timeout=ms(15000))
+        browser = p.chromium.connect_over_cdp(connect_url, timeout=_ms(deadline, 15000))
         try:
             ctx = browser.contexts[0] if browser.contexts else browser.new_context()
-            page = ctx.pages[0] if ctx.pages else ctx.new_page()
-            resp = {}
-            page.on("response", lambda r: resp.setdefault(r.url, r)
-                    if r.request.resource_type == "image" else None)
-            page.goto(f"https://www.instagram.com/{handle}/", wait_until="domcontentloaded",
-                      timeout=ms(30000))
-            try:
-                page.wait_for_selector(GRID_SEL, timeout=ms(IG_GRID_WAIT_MS))
-            except Exception:
-                log("media ig grid not found")
-                return []
-            got = page.evaluate(_GRID_JS, GRID_SEL)
-            out = []
-            for src in pick_grid(got.get("items"), got.get("og")):
-                data = None
-                if src in resp:
-                    try:
-                        data = resp[src].body()
-                    except Exception:
-                        data = None
-                out.append(data or fetch_image(src))
-            return [d for d in out if d]
+            yield ctx.pages[0] if ctx.pages else ctx.new_page()
         finally:
             try:
                 browser.close()
             except Exception:
                 pass
+
+
+def grid_from_page(page, handle, deadline):
+    """Open the public IG profile in the session's page -> grid image bytes."""
+    resp = {}
+    page.on("response", lambda r: resp.setdefault(r.url, r)
+            if r.request.resource_type == "image" else None)
+    page.goto(f"https://www.instagram.com/{handle}/", wait_until="domcontentloaded",
+              timeout=_ms(deadline, 30000))
+    try:
+        page.wait_for_selector(GRID_SEL, timeout=_ms(deadline, IG_GRID_WAIT_MS))
+    except Exception:
+        log("media ig grid not found")
+        return []
+    got = page.evaluate(_GRID_JS, GRID_SEL)
+    out = []
+    for src in pick_grid(got.get("items"), got.get("og")):
+        data = None
+        if src in resp:
+            try:
+                data = resp[src].body()
+            except Exception:
+                data = None
+        out.append(data or fetch_image(src))
+    return [d for d in out if d]
 
 
 def _bb(method, path, key, body, timeout=15):
@@ -556,40 +609,445 @@ def _bb_release(key, proj, sid):
     return False
 
 
-def grab_ig_grid(handle, budget):
-    """ONE Browserbase session -> public IG profile grid -> list of image bytes. [] on any failure."""
-    key, proj = os.environ.get("BROWSERBASE_API_KEY", ""), os.environ.get("BROWSERBASE_PROJECT_ID", "")
-    if not key or not proj or not HANDLE_RE.match(handle or ""):
-        return []
+def _bb_create_gated(key, proj, timeout, deadline):
+    """Process-wide: one create at a time, >= BB_CREATE_GAP s apart (no 429 bursts)."""
+    with _BB_GATE:
+        wait = _BB_LAST[0] + BB_CREATE_GAP - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            return _bb_create(key, proj, timeout, deadline)
+        finally:
+            _BB_LAST[0] = time.monotonic()
+
+
+def bb_keys():
+    return os.environ.get("BROWSERBASE_API_KEY", ""), os.environ.get("BROWSERBASE_PROJECT_ID", "")
+
+
+# ── Google in the browser: consent, captcha, parsers ─────────────────────────
+_CONSENT_RE = re.compile(r"consent\.google\.|Before you continue to Google", re.I)
+_ACCEPT_JS = """() => {
+  const b = Array.from(document.querySelectorAll('button, input[type=submit], div[role=button]'))
+    .find(e => /^(accept all|i agree|alle akzeptieren|tout accepter|accetta tutto|aceptar todo|sprejmi vse)$/i
+      .test((e.innerText || e.value || e.getAttribute('aria-label') || '').trim()));
+  if (b) { b.click(); return true; }
+  return false;
+}"""
+_CLICK_JS = """async (a) => {
+  const ext = (s) => { try { const h = new URL(s).hostname;
+    return /^https:/.test(s) && !/(^|\\.)(gstatic|google|googleusercontent)\\.com$/.test(h); } catch (e) { return false; } };
+  const out = {};
+  for (const id of a.ids) {
+    const t = document.querySelector('[data-lpage][data-docid="' + id + '"]');
+    if (!t) continue;
+    const old = new Set(Array.from(document.querySelectorAll('img[jsname="kn3ccd"]')).map(i => i.currentSrc || i.src));
+    (t.querySelector('[role=button]') || t.querySelector('a') || t).click();
+    const t0 = Date.now();
+    while (Date.now() - t0 < a.wait && !out[id]) {
+      await new Promise(r => setTimeout(r, 150));
+      for (const i of document.querySelectorAll('img[jsname="kn3ccd"]')) {
+        const s = i.currentSrc || i.src;
+        if (ext(s) && !old.has(s)) { out[id] = {src: s, w: i.naturalWidth, h: i.naturalHeight}; break; }
+      }
+    }
+  }
+  return out;
+}"""
+_TAG_RE = re.compile(r"<[^>]+>")
+_ATTR_RE = re.compile(r'([a-zA-Z:_-]+)\s*=\s*"([^"]*)"')
+_TILE_RE = re.compile(r'<div\b[^>]*\bdata-lpage="[^"]*"[^>]*>', re.I)
+_THUMB_RE = re.compile(r'<img\b[^>]*?\bsrc="(data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+|'
+                       r'https://encrypted-tbn\d\.gstatic\.com/images\?[^"]+)"', re.I)
+_H3_RE = re.compile(r"<h3\b[^>]*>(.*?)</h3>", re.I | re.S)
+_CITE_RE = re.compile(r"<cite\b[^>]*>(.*?)</cite>", re.I | re.S)
+_SNIP_RE = re.compile(r'<div\b[^>]*class="[^"]*\bVwiC3b\b[^"]*"[^>]*>(.*?)</div>', re.I | re.S)
+_HREF_RE = re.compile(r'<a\b[^>]*\bhref="([^"]+)"', re.I)
+_SOURCE_RE = re.compile(r'<span\b[^>]*class="[^"]*\bVuuXrf\b[^"]*"[^>]*>(.*?)</span>', re.I | re.S)
+_SOCIAL_URL = {"instagram": "https://www.instagram.com/{}/", "x": "https://x.com/{}",
+               "x (formerly twitter)": "https://x.com/{}", "tiktok": "https://www.tiktok.com/@{}",
+               "youtube": "https://www.youtube.com/@{}", "facebook": "https://www.facebook.com/{}",
+               "threads": "https://www.threads.net/@{}"}
+_TBN_RE = re.compile(r"^https://encrypted-tbn\d\.gstatic\.com/images\?")
+THUMB_CAP = 200 * 1024
+
+
+def _text(frag):
+    t = re.sub(r"\s+", " ", html.unescape(_TAG_RE.sub(" ", frag or ""))).strip()
+    return re.sub(r" ([,.;:!?])", r"\1", t)
+
+
+def parse_google_images(page_html):
+    """Google Images result page -> [{docid, context, host, title, thumb}] in page order.
+    Tiles are <div data-lpage=<context page> data-docid=..>; thumb = the tile's inline base64
+    (or encrypted-tbn) image. Full-size URLs are NOT in the page (read by clicking a tile)."""
+    h, out, seen = page_html or "", [], set()
+    starts = [m for m in _TILE_RE.finditer(h)]
+    for i, m in enumerate(starts):
+        a = {k.lower(): html.unescape(v) for k, v in _ATTR_RE.findall(m.group(0))}
+        ctx, docid = a.get("data-lpage") or "", a.get("data-docid") or ""
+        if not docid or docid in seen or not ctx.startswith(("https://", "http://")):
+            continue
+        seen.add(docid)
+        seg = h[m.end():starts[i + 1].start() if i + 1 < len(starts) else m.end() + 200_000]
+        th = _THUMB_RE.search(seg)
+        alt = re.search(r'<img\b[^>]*\balt="([^"]*)"', seg)
+        out.append({"docid": docid, "context": ctx, "host": (urlparse(ctx).hostname or "").lower(),
+                    "title": html.unescape(alt.group(1)) if alt else "",
+                    "thumb": html.unescape(th.group(1)) if th else None})
+    return out
+
+
+def _result_url(seg_before, seg_after):
+    """Organic result URL: a direct/`/url?q=` href, else rebuilt from the <cite> breadcrumb
+    ('https://www.instagram.com › p › X' -> https://www.instagram.com/p/X) — Google now
+    wraps result links in opaque /goto?url= tokens."""
+    hrefs = _HREF_RE.findall(seg_before[-1500:])
+    for href in reversed(hrefs):
+        href = html.unescape(href)
+        if href.startswith("/url?"):
+            q = parse_qs(urlparse(href).query)
+            href = unquote((q.get("q") or q.get("url") or [""])[0])
+        host = (urlparse(href).hostname or "") if href.startswith("http") else ""
+        if host and not re.search(r"(^|\.)(google|gstatic)\.[a-z.]+$", host):
+            return href
+        break                                   # nearest anchor is the title link
+    for c in _CITE_RE.findall(seg_after[:3000]):
+        parts = [p.strip() for p in re.split(r"\s*[›>]\s*", _text(c.replace("&rsaquo;", "›")))]
+        if parts and re.match(r"^https?://[A-Za-z0-9.-]+$", parts[0]):
+            path = []
+            for p in parts[1:]:                 # stop at a display label ('Wall Art') or an ellipsis
+                if "..." in p or not re.match(r"^[A-Za-z0-9._~%@+=:-]+$", p):
+                    break
+                path.append(p)
+            return parts[0] + "/" + "/".join(path)
+    # social results show no URL, only a source label 'Instagram · natgeo'
+    lab = _SOURCE_RE.search(seg_after[:3000])
+    if lab:
+        site, _, who = _text(lab.group(1)).partition("·")
+        tpl, who = _SOCIAL_URL.get(site.strip().lower()), who.strip().lstrip("@")
+        if tpl:                                 # label names a page, not a handle -> site root
+            return tpl.format(who) if HANDLE_RE.match(who) else tpl.split("{}")[0].rstrip("@")
+    return None
+
+
+def parse_google_web(page_html):
+    """Google web results page -> organic [{title, url, snippet}] (sitelinks/ads skipped:
+    an organic title <h3> is followed by a <cite>)."""
+    h, out = page_html or "", []
+    ms = list(_H3_RE.finditer(h))
+    for i, m in enumerate(ms):
+        nxt = ms[i + 1].start() if i + 1 < len(ms) else len(h)
+        after = h[m.end():nxt]
+        if not _CITE_RE.search(after[:3000]):
+            continue
+        title, url = _text(m.group(1)), _result_url(h[:m.start()], after)
+        if not title or not url:
+            continue
+        sn = _SNIP_RE.search(after)
+        out.append({"title": title[:200], "url": url[:300], "snippet": _text(sn.group(1))[:400] if sn else ""})
+    return out
+
+
+def _official_ctx(item, leak):
+    urls, doms = leak
+    d = registrable_domain(item.get("context") or "")
+    return d in _NOT_LEAK and d not in doms and item.get("context") not in urls
+
+
+# Measured (real Google, Browserbase): /watch, /shorts tiles open a preview with the full-size
+# i.ytimg.com URL in ~1 s; IG /p/ and channel/profile tiles mostly never expose one -> click those last.
+_CLICK_FIRST = re.compile(r"youtube\.com/(?:watch|shorts)|youtu\.be/|/status/|tiktok\.com/@[^/]+/video/")
+
+
+def _click_rank(t):
+    return 0 if _CLICK_FIRST.search(t.get("context") or "") else 1
+
+
+def thumb_bytes(src):
+    """Google's own SafeSearch thumbnail: inline base64 or encrypted-tbn*.gstatic.com only."""
+    try:
+        if src.startswith("data:image/"):
+            data = base64.b64decode(src.split(",", 1)[1])
+            return data if len(data) <= THUMB_CAP else None
+        if not _TBN_RE.match(src):
+            return None
+        req = urllib.request.Request(src, headers={"User-Agent": UA, "Accept": "image/*"})
+        with urlopen(req, timeout=FETCH_TIMEOUT) as r:
+            if (getattr(r, "status", None) or r.getcode()) != 200:
+                return None
+            data = r.read(THUMB_CAP + 1)
+        return data if 0 < len(data) <= THUMB_CAP else None
+    except Exception:
+        return None
+
+
+def _accept_consent(page):
+    """Fallback when the cookies didn't stick: click Google's 'Accept all'. -> clicked?"""
+    try:
+        return bool(page.evaluate(_ACCEPT_JS))
+    except Exception:
+        return False
+
+
+def _set_consent(page):
+    try:
+        page.context.add_cookies(CONSENT_COOKIES)
+        return True
+    except Exception as e:
+        log(f"media google consent cookies failed: {type(e).__name__}")
+        return False
+
+
+def _wait(page, ms):
+    try:
+        page.wait_for_timeout(ms)
+    except Exception:
+        time.sleep(ms / 1000)
+
+
+def google_page(page, url, box_deadline, ready):
+    """Navigate, let Browserbase solve a /sorry captcha, click consent if shown.
+    -> page HTML (or '' when walled). `ready(html)` says whether results are present."""
+    page.goto(url, wait_until="domcontentloaded", timeout=_ms(box_deadline, 30000))
+    if "/sorry/" in (page.url or ""):
+        t0 = time.monotonic()
+        while "/sorry/" in (page.url or "") and time.monotonic() < box_deadline - 2:
+            _wait(page, 1000)
+        solved = "/sorry/" not in (page.url or "")
+        log(f"media google captcha solved={solved} secs={time.monotonic() - t0:.1f}")
+        if not solved:
+            return ""
+    _wait(page, 800)
+    h = page.content()
+    # EU: a redirect to consent.google.com, OR (measured) an in-page dialog over parseable results
+    # that blocks image clicks -> click 'Accept all' whenever one is present
+    if _CONSENT_RE.search(page.url or "") or _CONSENT_RE.search(h):
+        clicked = _accept_consent(page)
+        if clicked or not ready(h):
+            log(f"media google consent interstitial clicked={clicked}")
+        if clicked:
+            _wait(page, 1500)
+            h = page.content()
+    return h if ready(h) else ""
+
+
+def _google_url(q, images):
+    return ("https://www.google.com/search?" + ("tbm=isch&" if images else "")
+            + "safe=active&hl=en&gl=us&q=" + quote_plus(q))
+
+
+def google_images_step(page, g, handle, profile, leak, box_deadline):
+    """Google Images in the session -> images added. Full-size URLs (official CDN, google_ok)
+    first; thumbnails of official-site tiles only as last resort."""
+    t0, added, thumbs, n_tiles, n_full, n_click, n_res = time.monotonic(), 0, [], 0, 0, 0, 0
+    resolved = set()
+    for q in google_queries(handle, profile):
+        if g.full or box_deadline - time.monotonic() < 5:
+            break
+        tiles = parse_google_images(google_page(page, _google_url(q, True), box_deadline,
+                                                lambda h: "data-lpage=" in h))
+        n_tiles += len(tiles)
+        cand = sorted((t for t in tiles if _official_ctx(t, leak)), key=_click_rank)
+        ids = [t["docid"] for t in cand[:CLICKS_PER_QUERY]]
+        n_click += len(ids)
+        wait = min(CLICK_WAIT_MS, max(300, int((box_deadline - time.monotonic()) * 1000 / max(1, len(ids)))))
+        full = page.evaluate(_CLICK_JS, {"ids": ids, "wait": wait}) if ids and box_deadline - time.monotonic() > 3 else {}
+        n_res += len(full or {})
+        for t in cand:
+            f = (full or {}).get(t["docid"]) or {}
+            item = {"full": f.get("src") or "", "host": t["host"], "w": f.get("w"), "h": f.get("h")}
+            if item["full"] and google_ok(item, leak) and not g.full:
+                n_full += 1
+                if g.add(fetch_image(item["full"]), "google"):
+                    added += 1
+                    resolved.add(t["docid"])
+                    continue
+            if t["thumb"] and t["docid"] not in resolved:
+                thumbs.append(t["thumb"])
+    n_thumb = 0
+    if added < THUMB_BELOW:
+        for src in thumbs:
+            if g.full or n_thumb >= THUMB_BELOW:
+                break
+            n_thumb += g.add(thumb_bytes(src), "google")
+    log(f"media google images tiles={n_tiles} clicked={n_click} resolved={n_res} full={n_full} added={added} thumbs={n_thumb} "
+        f"secs={time.monotonic() - t0:.1f}")
+    return added + n_thumb
+
+
+def web_queries(handle, profile, ig=None):
+    qs = [f'"{handle}"']
+    name = ((profile or {}).get("display_name") or "").strip()
+    if name and len(name) <= 60 and name.lower() != handle.lower() and '"' not in name:
+        qs.append(f'"{name}"')
+    elif ig and ig.lower() != handle.lower():
+        qs.append(f'"{ig}"')
+    return qs[:2]
+
+
+def clean_snippets(results, leak):
+    """Drop leak/hit domains, Google's own pages and unsafe wording; dedupe; cap 10 / 4000 chars."""
+    import profile_extract                          # lazy: SFW word filter lives there
+    urls, doms = leak
+    out, seen, total = [], set(), 0
+    for r in results:
+        u, d = r.get("url") or "", registrable_domain(r.get("url") or "")
+        if not d or d in doms or u in urls or (u, r.get("title")) in seen or re.match(r"^(google|gstatic)\.", d):
+            continue
+        if profile_extract._UNSAFE_RE.search(f"{r.get('title')} {r.get('snippet')} {u}"):
+            continue
+        size = len(r["title"]) + len(r["snippet"]) + len(u)
+        if total + size > WEB_TEXT_CAP:
+            room = WEB_TEXT_CAP - total - len(r["title"]) - len(u)
+            if room < 40:
+                break
+            r = {**r, "snippet": r["snippet"][:room]}
+            size = len(r["title"]) + len(r["snippet"]) + len(u)
+        seen.add((u, r["title"]))
+        out.append({"title": r["title"], "url": u, "snippet": r["snippet"]})
+        total += size
+        if len(out) >= WEB_MAX:
+            break
+    return out
+
+
+def google_web_step(page, handle, profile, ig, leak, box_deadline):
+    t0, raw, nq = time.monotonic(), [], 0
+    for q in web_queries(handle, profile, ig):
+        if box_deadline - time.monotonic() < 4:
+            break
+        nq += 1
+        raw += parse_google_web(google_page(page, _google_url(q, False), box_deadline,
+                                            lambda h: bool(_CITE_RE.search(h))))
+    out = clean_snippets(raw, leak)
+    log(f"media google web queries={nq} raw={len(raw)} kept={len(out)} "
+        f"chars={sum(len(r['title']) + len(r['snippet']) + len(r['url']) for r in out)} "
+        f"secs={time.monotonic() - t0:.1f}")
+    return out
+
+
+def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_grid):
+    """ONE Browserbase session for this scan: (b) Google web text, (a) Google Images,
+    (c) IG grid fallback — each time-boxed, each failing alone. Session released in finally.
+    -> {session, google, instagram, snippets, ok}"""
+    st = {"session": False, "google": 0, "instagram": 0, "snippets": [], "ok": True}
+    key, proj = bb_keys()
+    if not key or not proj:
+        return st
     try:
         import playwright.sync_api  # noqa: F401  (lazy: the app runs without playwright)
     except ImportError:
-        log("media: playwright not installed, skipping instagram")
-        return []
-    deadline = time.monotonic() + budget
-    sess = _bb_create(key, proj, int(max(60, min(90, budget))), deadline)
+        log("media: playwright not installed, skipping browser steps")
+        return st
+    t0 = time.monotonic()
+    sess = _bb_create_gated(key, proj, int(max(60, min(120, deadline - t0 + 15))), deadline)
     if not sess:
-        return []
+        st["ok"] = False
+        return st
+    st["session"] = True
+    log(f"media browserbase session created secs={time.monotonic() - t0:.1f}")
     try:
-        return grid_from_cdp(sess["connectUrl"], handle, deadline)
+        with _cdp_page(sess["connectUrl"], deadline) as page:
+            if want_google:
+                _set_consent(page)
+                try:   # web text first: ~3 s, and it is what feeds the profile refine
+                    st["snippets"] = google_web_step(page, handle, profile, ig, leak,
+                                                     min(deadline, time.monotonic() + GOOGLE_WEB_BOX))
+                except Exception as e:
+                    st["ok"] = False
+                    log(f"media google web failed: {type(e).__name__}")
+                try:
+                    st["google"] = google_images_step(page, g, handle, profile, leak,
+                                                      min(deadline, time.monotonic() + GOOGLE_IMG_BOX))
+                except Exception as e:
+                    st["ok"] = False
+                    log(f"media google images failed: {type(e).__name__}")
+            if want_grid and not g.full and deadline - time.monotonic() > 8:
+                t1 = time.monotonic()
+                try:
+                    for data in grid_from_page(page, ig, deadline):
+                        st["instagram"] += g.add(data, "instagram")
+                except Exception as e:
+                    st["ok"] = False
+                    log(f"media instagram step failed: {type(e).__name__}")
+                log(f"media instagram grid added={st['instagram']} secs={time.monotonic() - t1:.1f}")
+    except Exception as e:
+        st["ok"] = False
+        log(f"media browser session failed: {type(e).__name__}")
     finally:
         _bb_release(key, proj, sess["id"])
+        log(f"media browserbase session released secs={time.monotonic() - t0:.1f}")
+    return st
+
+
+# ── web snippets + profile refine ───────────────────────────────────────────
+def snippets_path(slug):
+    return os.path.join(media_dir(slug), SNIPPETS_FILE)
+
+
+def save_snippets(slug, snippets):
+    os.makedirs(media_dir(slug), exist_ok=True)
+    _atomic_write(snippets_path(slug), json.dumps(snippets, ensure_ascii=False).encode())
+
+
+def load_snippets(slug):
+    try:
+        with open(snippets_path(slug), encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def refine(slug, platform, handle, profile, sources, snippets, socials, deadline):
+    """ONE extra DeepSeek call with the web snippets -> scan's stored profile. -> ISO ts | None."""
+    if not snippets:
+        return None
+    timeout = deadline - time.monotonic() - 0.5
+    if timeout < 3:
+        log("media profile refine skipped: budget")
+        return None
+    t0 = time.monotonic()
+    try:
+        import profile_extract
+        new = profile_extract.refine_profile(profile, sources, snippets, platform=platform, handle=handle,
+                                             socials=socials, timeout=min(profile_extract.LLM_TIMEOUT, timeout))
+        if not new:
+            log(f"media profile refine kept original secs={time.monotonic() - t0:.1f}")
+            return None
+        if not db.update_extra(slug, {"profile": new}):
+            return None
+    except Exception as e:
+        log(f"media profile refine failed: {type(e).__name__}")
+        return None
+    log(f"media profile refined snippets={len(snippets)} secs={time.monotonic() - t0:.1f}")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # ── orchestration ───────────────────────────────────────────────────────────
-def gather(slug, platform, handle, profile, cse_items, *, budget=MEDIA_BUDGET, browser=True):
+def gather(slug, platform, handle, profile, cse_items, *, budget=MEDIA_BUDGET, browser=True,
+           sources=None, socials=None):
     """Fill <DATA_DIR>/media/<slug>/. Never raises. -> final status ('ready'|'none')."""
     t0 = time.monotonic()
     deadline = t0 + budget
-    g, key, cacheable, n_google, n_ig = _Gallery(slug), cache_key(platform, handle), False, 0, 0
+    g, key, cacheable, n_google = _Gallery(slug), cache_key(platform, handle), False, 0
     n_tiles = n_embed = 0
+    st = {"session": False, "google": 0, "instagram": 0, "snippets": [], "ok": True}
+    snippets = []
     try:
         if g.from_cache(key):
-            log(f"media done cache=hit n={len(g.images)}")
+            snippets = load_snippets(g.cache_slug)
+            if snippets:
+                save_snippets(slug, snippets)
+                g.profile_updated_at = refine(slug, platform, handle, profile, sources, snippets, socials,
+                                              deadline)
+            log(f"media done cache=hit n={len(g.images)} snippets={len(snippets)}")
             return "ready" if g.images else "none"
         leak = _leak_sets(cse_items)
-        ig, ig_ok = ig_handle(platform, handle, profile), True
+        ig, ig_ok = ig_handle(platform, handle, profile, socials), True
         if ig:
+            t1 = time.monotonic()
             try:
                 tiles = ig_embed_grid(ig, max(1, min(IG_EMBED_TIMEOUT, deadline - time.monotonic())))
                 n_tiles = len(tiles)
@@ -600,24 +1058,34 @@ def gather(slug, platform, handle, profile, cse_items, *, budget=MEDIA_BUDGET, b
             except Exception as e:
                 ig_ok = False
                 log(f"media ig embed failed: {type(e).__name__}")
-        try:
-            for u in google_images(handle, profile, leak):
-                if g.full or time.monotonic() > deadline:
-                    break
-                n_google += g.add(fetch_image(u), "google")
-        except Exception as e:
-            log(f"media google step failed: {type(e).__name__}")
-        bb_wanted = bool(MEDIA_BROWSERBASE and ig and n_embed < BB_FALLBACK_BELOW and not g.full)
-        if browser and bb_wanted and deadline - time.monotonic() > 20:
+            log(f"media ig embed added={n_embed}/{n_tiles} secs={time.monotonic() - t1:.1f}")
+        if MEDIA_GOOGLE == "cse":
             try:
-                for data in grab_ig_grid(ig, deadline - time.monotonic()) or []:
-                    n_ig += g.add(data, "instagram")
+                for u in google_images(handle, profile, leak):
+                    if g.full or time.monotonic() > deadline:
+                        break
+                    n_google += g.add(fetch_image(u), "google")
             except Exception as e:
-                ig_ok = False
-                log(f"media instagram step failed: {type(e).__name__}")
-        # not cached: transient IG failure, embed tiles found but none downloaded, or the
-        # Browserbase fallback was wanted but no slot was free
-        cacheable = ig_ok and not (n_tiles and not n_embed) and (browser or not bb_wanted)
+                log(f"media google step failed: {type(e).__name__}")
+        want_grid = bool(ig and n_embed < BB_FALLBACK_BELOW and not g.full)
+        want_google = MEDIA_GOOGLE == "browser" and not g.full
+        k, p = bb_keys()
+        bb_wanted = bool(MEDIA_BROWSERBASE and k and p and (want_grid or want_google))
+        if browser and bb_wanted and deadline - time.monotonic() > 20:
+            st = browser_steps(g, handle=handle, ig=ig, profile=profile, leak=leak,
+                               deadline=deadline - (REFINE_RESERVE if want_google else 0),
+                               want_google=want_google, want_grid=want_grid)
+            snippets = st["snippets"]
+            if snippets:
+                try:
+                    save_snippets(slug, snippets)
+                except OSError as e:
+                    log(f"media snippets save failed: {type(e).__name__}")
+                g.profile_updated_at = refine(slug, platform, handle, profile, sources, snippets, socials,
+                                              deadline)
+        # not cached: transient IG/browser failure, embed tiles found but none downloaded, or
+        # the browser session was wanted but no slot was free
+        cacheable = (ig_ok and st["ok"] and not (n_tiles and not n_embed) and (browser or not bb_wanted))
     except Exception as e:
         log(f"media gather failed: {type(e).__name__}")
     finally:
@@ -627,15 +1095,16 @@ def gather(slug, platform, handle, profile, cse_items, *, budget=MEDIA_BUDGET, b
             log(f"media index write failed: {type(e).__name__}")
     if cacheable:
         _cache_save(key, slug, g.images)
-    log(f"media done cache=miss embed={n_embed}/{n_tiles} google={n_google} instagram={n_ig} browser={browser} "
-        f"secs={time.monotonic() - t0:.1f}")
+    log(f"media done cache=miss embed={n_embed}/{n_tiles} google={n_google + st['google']} "
+        f"instagram={st['instagram']} snippets={len(snippets)} session={st['session']} browser={browser} "
+        f"mode={MEDIA_GOOGLE} secs={time.monotonic() - t0:.1f}")
     return "ready" if g.images else "none"
 
 
-def _run(slug, platform, handle, profile, cse_items):
+def _run(slug, platform, handle, profile, cse_items, sources, socials):
     full = _SEM.acquire(blocking=False)
     try:
-        gather(slug, platform, handle, profile, cse_items, browser=full)
+        gather(slug, platform, handle, profile, cse_items, browser=full, sources=sources, socials=socials)
     finally:
         if full:
             _SEM.release()
@@ -643,7 +1112,7 @@ def _run(slug, platform, handle, profile, cse_items):
             _RUNNING.discard(slug)
 
 
-def start(slug, platform, handle, profile, cse_items):
+def start(slug, platform, handle, profile, cse_items, sources=None, socials=None):
     """Kick off the background gather for a fresh quick scan -> 'pending' | 'none'. Never raises."""
     if not MEDIA_ENABLED or not SLUG_RE.match(slug or "") or not HANDLE_RE.match(handle or ""):
         return "none"
@@ -651,8 +1120,8 @@ def start(slug, platform, handle, profile, cse_items):
         _write_index(slug, "pending", [])
         with _LOCK:
             _RUNNING.add(slug)
-        threading.Thread(target=_run, args=(slug, platform, handle, profile, list(cse_items or [])),
-                         daemon=True).start()
+        threading.Thread(target=_run, args=(slug, platform, handle, profile, list(cse_items or []),
+                                            sources, socials), daemon=True).start()
         return "pending"
     except Exception as e:
         with _LOCK:
