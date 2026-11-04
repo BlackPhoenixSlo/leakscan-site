@@ -600,14 +600,17 @@ def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROF
 _KEEP_KEYS = tuple(CAPS) + ("followers", "site_domain")
 
 
-def merge_found_accounts(profile, found, declared=None, cap=12):
+def merge_found_accounts(profile, found, declared=None, platform="", cap=12):
     """Append leak-page socials to profile.accounts flagged source:"leak_page". Declared accounts stay
-    first and win: a platform the creator declared never gets a discovered handle. -> profile."""
+    first and win: a platform the creator declared (socials or the scanned platform) never gets a
+    discovered handle. -> profile."""
     if not isinstance(profile, dict):
         return profile
     accs = [a for a in profile.get("accounts") or [] if isinstance(a, dict)]
     have = {(a.get("platform"), (a.get("handle") or "").lower()) for a in accs}
-    dec = clean_socials(declared)
+    dec = set(clean_socials(declared))
+    scanned = _short_platform(platform)
+    dec.add("x" if scanned == "twitter" else scanned)
     for s in found or []:
         plat, h = s.get("platform"), s.get("handle")
         if plat not in ACCOUNT_DOMAINS or not valid_handle(h) or plat in dec or (plat, h.lower()) in have:

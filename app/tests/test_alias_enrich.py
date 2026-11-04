@@ -286,6 +286,7 @@ class TestQuickScanEnrich(unittest.TestCase):
         self.assertEqual(accs[:len(accs) - len(leak)], [a for a in accs if "source" not in a])
         self.assertIn({"platform": "instagram", "handle": "mira.studio", "url": "https://instagram.com/mira.studio",
                        "source": "leak_page"}, leak)
+        self.assertFalse([a for a in leak if a["platform"] == "onlyfans"])   # scanned platform = declared
         # display-name candidates reach the profile LLM evidence
         llm = [c[1] for c in self.up.calls[self.n0:] if c[0] == "llm"]
         payload = json.loads(llm[0]["messages"][1]["content"].split("\n", 1)[1])
@@ -306,6 +307,17 @@ class TestQuickScanEnrich(unittest.TestCase):
         leak = {a["handle"].lower() for a in res["profile"]["accounts"] if a.get("source") == "leak_page"}
         self.assertFalse(leak & OTHERS, leak & OTHERS)
         self.assertFalse({s["handle"].lower() for s in res["aliases"]["socials"]} & OTHERS)
+
+    def test_scanned_instagram_wins_over_discovered(self):
+        self.up.mode = "sparse"     # LLM finds no IG account: the scanned IG handle must still feed media
+        try:
+            res, _ = self.scan({"handle": H, "platform": "instagram.com", "level": "low"})
+        finally:
+            self.up.mode = "valid"
+        self.assertIn("mira.studio", res["aliases"]["discovered"])
+        accs = res["profile"]["accounts"]
+        self.assertFalse([a for a in accs if a["platform"] == "instagram" and a.get("source") == "leak_page"])
+        self.assertEqual(mg.ig_handle("instagram.com", H, res["profile"], res["socials"]), H)
 
     def test_declared_instagram_wins_over_discovered(self):
         res, _ = self.scan({"handle": H, "platform": "onlyfans.com", "level": "low", "instagram": "mira.ig"})

@@ -143,7 +143,7 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   Worst case quick scan: 8 (+1 per declared alias) + 1 fallback page + 16 = 25 CSE calls (+1 with `PROFILE_CSE_EXTRA`).
 - API (additive): result + `/api/scan-result/<slug>` carry `aliases: {declared, discovered, socials:[{platform,
   handle, url, source_domain}]}`; leak-page socials are appended to `profile.accounts` with `source: "leak_page"`
-  (declared first; a declared platform never gets a discovered handle), so the media step's Instagram uses a
+  (declared first; a declared or scanned platform never gets a discovered handle), so the media step's Instagram uses a
   discovered one only when none was declared; names / aliases go into the profile LLM evidence as `other_names`.
 - UI: hero card + `scan/` header "Also found as @a, @b"; personalize fills platforms nothing else knows from
   `aliases.socials`. Tests: `app/tests/test_alias_enrich.py` (synthetic pages `app/tests/fixtures/alias_leak_*.html`).

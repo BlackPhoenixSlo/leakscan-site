@@ -2039,7 +2039,7 @@ class Handler(BaseHTTPRequestHandler):
             prog("Reading your public profile…")
             profile, avatar, sources = _quick_profile(handle, platform, results, socials,
                                                       hints={"names": names, "aliases": found})
-            profile = profile_extract.merge_found_accounts(profile, alias_info["socials"], socials)
+            profile = profile_extract.merge_found_accounts(profile, alias_info["socials"], socials, platform)
         slug = db.insert_scan(rows, handle=handle, level="low", platform=platform,
                               status=status, client_ip_hash=_ip_hash(ip),
                               extra={"images": images, "google_total": google_total,
