@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline]
         [--omit-results] [--omit-profile] [--break-allowlist]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
@@ -42,7 +42,7 @@ out = pathlib.Path(sys.argv[1]).expanduser()
 out.mkdir(parents=True, exist_ok=True)
 omit = "--omit-results" in sys.argv
 omit_profile = "--omit-profile" in sys.argv
-SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai"]
+SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai", "inline"]
 BREAK_ALLOWLIST = "--break-allowlist" in sys.argv
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 fails = []
@@ -80,19 +80,17 @@ def scan_flow(browser, vp_name, vp):
     page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
     shot = lambda name, full=False, page=page, v=vp_name: page.screenshot(path=str(out / f"{v}-{name}.png"), full_page=full)
 
-    # 1. home → form → scan page
-    page.goto(base, wait_until="load")
-    page.locator("#scan .scan-handle").fill("@demo.creator")
-    page.locator("#scan select[name=p]").select_option("fansly.com")
-    with page.expect_navigation(url=re.compile(r"/scan/\?")):
-        page.locator("#scan button").click()
-    q = parse_qs(urlsplit(page.url).query)
-    check(f"{vp_name} lands on scan/?p=&h=", q.get("p") == ["fansly.com"] and q.get("h") == ["@demo.creator"], page.url)
+    # 1. a scan/?p=&h= link (older links + the no-JS hero form land here; the JS hero form scans in place: `inline`)
+    bodies = []
+    page.on("request", lambda q, bodies=bodies: q.method == "POST" and "/api/public-scan" in q.url and bodies.append(json.loads(q.post_data)))
+    page.goto(base + "scan/?p=fansly.com&h=%40demo.creator", wait_until="load")
 
     # 2. progress
     page.wait_for_selector("#progress-log li", timeout=5000)
     check(f"{vp_name} progress visible", page.locator("#progress").is_visible()
           and "demo.creator" in page.locator("#scan-title").inner_text())
+    check(f"{vp_name} scan/?p=&h= posts platform + clean handle, no socials",
+          bodies == [{"platform": "fansly.com", "handle": "demo.creator", "level": "low"}], bodies)
     shot("1-progress")
 
     # 3. report
@@ -259,12 +257,11 @@ def stub_media(slug, mode="normal"):
 
 
 def baseline_index():
-    """This tree's index.html without js/personalize.js (so other features' text doesn't count), data-api injected
-    like the stub does."""
+    """This tree's index.html without personalize.js / inline-scan.js (the page those scripts must leave alone when
+    there is no slug), with the stub's data-api injected like the stub does."""
     html = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
-    tag = '<script src="js/personalize.js" defer></script>\n'
-    assert tag in html, "baseline: personalize.js script tag not found in index.html"
-    return "no personalize.js", re.sub(r"<body\b", f'<body data-api="{API}"', html.replace(tag, ""), count=1)
+    html = re.sub(r'<script src="js/(personalize|inline-scan)\.js" defer></script>\n', "", html)
+    return "no-p-scripts", re.sub(r"<body\b", f'<body data-api="{API}"', html, count=1)
 
 
 def personalize_flow(browser, vp_name, vp):
@@ -311,7 +308,7 @@ def personalize_flow(browser, vp_name, vp):
     p2.goto(base, wait_until="load")
     p2.wait_for_timeout(1200)
     then = p2.evaluate("document.body.innerText")
-    check(f"{tag} no slug: visible text identical to the page with {sha}", now == then, f"{len(now)} vs {len(then)} chars")
+    check(f"{tag} no slug: visible text identical to the page without the scripts", now == then, f"{len(now)} vs {len(then)} chars")
     check(f"{tag} no slug: no API call", not no_api, no_api)
     ctx2.close()
     ctx.close()
@@ -862,6 +859,286 @@ def askai(browser, vp_name, vp):
     ctx.close()
 
 
+# ---------------------------------------------------------------- inline
+# The hero form scans on the landing page itself (js/inline-scan.js + js/scan-engine.js). Checks named "hero: ..."
+# need a fresh scan `result` event; "profile: ..." need `profile`.
+def _rows(fx):
+    """Mirror of inline-scan.js model(): distinct valid links, hits first (Live / Found), then Google results (Indexed)."""
+    rows, seen = [], set()
+    for h in fx["hits"]:
+        if h["url"] not in seen:
+            seen.add(h["url"])
+            rows.append((h["domain"], h.get("title"), h["url"], "Live" if h.get("live") is True else "Found"))
+    for r in fx.get("results", []):
+        if r["link"] not in seen:
+            seen.add(r["link"])
+            rows.append((r["domain"], r.get("title"), r["link"], "Indexed"))
+    return rows
+
+
+def _sites(rows):
+    occ, order = {}, []
+    for d, *_ in rows:
+        if d not in occ:
+            occ[d] = 0
+            order.append(d)
+        occ[d] += 1
+    return [(d, occ[d]) for d in sorted(order, key=lambda d: -occ[d])][:5]
+
+
+def inline_flow(browser, vp_name, vp):
+    tag = f"{vp_name} inline"
+    rows = _rows(FX)
+    N = len(rows)
+    net = {"outside": [], "bodies": [], "errors": [], "console": [], "nav": []}
+
+    def new_ctx(js=True, scheme="light"):
+        ctx = browser.new_context(viewport=vp, device_scale_factor=2 if vp_name == "phone" else 1, java_script_enabled=js,
+                                  is_mobile=vp_name == "phone", has_touch=vp_name == "phone", color_scheme=scheme)
+
+        def route(r, _req):
+            if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost"):
+                r.continue_()
+            else:
+                net["outside"].append(r.request.url)
+                r.abort()
+        ctx.route("**/*", route)
+
+        def on_page(pg):
+            pg.on("pageerror", lambda e: net["errors"].append(str(e)))
+            # the browser logs each provoked 429 / 400 / aborted scan POST as "Failed to load resource": expected here
+            pg.on("console", lambda m: m.type == "error" and urlsplit(m.location.get("url") or "").hostname not in FONT_HOSTS
+                  and not (m.text.startswith("Failed to load resource") and "/api/public-scan" in (m.location.get("url") or ""))
+                  and net["console"].append(m.text + " @ " + (m.location.get("url") or "")))
+            pg.on("request", lambda q: q.method == "POST" and "/api/public-scan" in q.url and net["bodies"].append(json.loads(q.post_data)))
+            pg.on("framenavigated", lambda f: f == pg.main_frame and net["nav"].append(f.url))
+        ctx.on("page", on_page)
+        return ctx
+
+    def shot(page, name, el=None):
+        for scheme in ("light", "dark"):
+            page.emulate_media(color_scheme=scheme)
+            page.wait_for_timeout(80)
+            (page.locator(el) if el else page).screenshot(path=str(out / f"{vp_name}-i{name}-{scheme}.png"))
+        page.emulate_media(color_scheme="light")
+
+    def submit(page, h, social=""):
+        net["bodies"].clear()
+        page.locator("#scan input[name=h]").fill(h)
+        page.locator("#scan input[name=ig]").fill(social)
+        page.locator("#scan button[type=submit]").click()
+
+    def settled(page, timeout=15000):
+        page.wait_for_function("() => { const c = document.querySelector('.report-card'); return c && !c.hasAttribute('aria-busy') && !document.querySelector('#scan button').disabled; }", timeout=timeout)
+        page.wait_for_timeout(250)
+
+    card = lambda page: page.evaluate("""() => {
+        const c = document.querySelector('.report-card'), L = c.querySelector('.live'), t = s => { const e = L && L.querySelector(s); return e && !e.hidden ? e.textContent.trim() : null; };
+        return {live: c.classList.contains('is-live'), title: t('.live-title'), socials: t('.live-socials'), count: t('.live-count'),
+          status: t('.live-status'), error: L && L.getAttribute('data-error'), empty: t('.live-empty'), more: t('.live-more'),
+          rows: [...c.querySelectorAll('.live-rows li')].map(li => { const a = li.querySelector('a'); return {tag: a && a.tagName,
+            dom: li.querySelector('.live-dom').textContent, ttl: li.querySelector('.live-ttl').textContent, href: a && a.href,
+            target: a && a.target, rel: a && a.rel, badge: li.querySelector('.live-badge').textContent}; }),
+          open: L && L.querySelector('.live-open') ? L.querySelector('.live-open').getAttribute('href') : null,
+          msgs: L ? [...L.querySelectorAll('[data-msg]')].map(a => a.href) : [], role: c.getAttribute('role')};
+    }""")
+    ill = lambda page: page.evaluate("""() => {
+        const s = document.querySelector('.scan-report'), pill = s.querySelector('[data-live=scan-count]');
+        return {live: s.classList.contains('is-live'), pill: pill && pill.textContent, label: s.getAttribute('aria-label'),
+          rows: [...s.querySelectorAll('[data-live=scan-rows] li')].map(li => [li.querySelector('.row-url').textContent, li.querySelector('.chip').textContent]),
+          thumbs: [...s.querySelectorAll('[data-live=scan-rows] img.p-img')].map(i => i.src),
+          visible_illus: [...s.querySelectorAll('.report-rows:not(.live-rows) li')].filter(e => e.offsetParent !== null).length,
+          cap: s.closest('figure').querySelector('figcaption').textContent};
+    }""")
+    msgs_ok = lambda m, *need: len(m) == 3 and m[0].startswith("https://t.me/jakabasej?text=") and m[1].startswith(
+        "https://wa.me/38640703992?text=") and m[2].startswith("mailto:me@jackbase.dev?") and all(all(x in u for x in need) for u in m)
+
+    # 1. before + submit → progress, no navigation
+    stub_media(FX["slug"])
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.goto(base, wait_until="load")
+    page.wait_for_timeout(300)
+    form = page.evaluate("() => { const f = document.getElementById('scan'); return [f.getAttribute('action'), f.getAttribute('method'), [...f.elements].map(e => e.name).filter(Boolean)]; }")
+    check(f"{tag} form markup: GET scan/ with h + ig, no platform select", form == ["scan/", "get", ["h", "ig"]], form)
+    shot(page, "1-before", ".hero")
+    net["nav"].clear()
+    submit(page, "@demo.creator", "https://www.instagram.com/demo.ig/")
+    page.wait_for_function("() => /step/.test((document.querySelector('.report-card .live-status') || {}).textContent || '')", timeout=5000)
+    c = card(page)
+    check(f"{tag} progress visible in the hero card", c["live"] and c["title"] == "@demo.creator" and "Searching Google, step" in c["status"]
+          and page.locator(".report-card .live-status").is_visible() and page.locator("#scan button").is_disabled(), c["status"])
+    check(f"{tag} second scan state: no stale rows while scanning", not c["rows"] and not ill(page)["live"])
+    shot(page, "2-progress", ".hero")
+    check(f"{tag} body: onlyfans + handle + instagram from a pasted URL",
+          net["bodies"] == [{"platform": "onlyfans.com", "handle": "demo.creator", "level": "low", "instagram": "demo.ig"}], net["bodies"])
+
+    # 2. settled hero card
+    settled(page)
+    slug = parse_qs(urlsplit(page.url).query).get("r", [""])[0]
+    check(f"{tag} hero: no navigation, URL = index.html?r=<slug>", re.fullmatch(r"[A-Za-z0-9]{12}", slug or "") is not None
+          and page.url == base + "?r=" + slug and all(urlsplit(u).path == "/" for u in net["nav"]), [page.url] + net["nav"])
+    c = card(page)
+    want = [{"tag": "A", "dom": d, "ttl": t, "href": u, "target": "_blank", "badge": b} for d, t, u, b in rows[:5]]
+    got = [{k: r[k] for k in ("tag", "dom", "ttl", "href", "target", "badge")} for r in c["rows"]]
+    check(f"{tag} hero: rows = the fixture's first 5 links (domain, title, href, badge)", got == want, got)
+    check(f"{tag} hero: row links rel noopener + nofollow, card no longer role=img", c["rows"] and all(
+        "noopener" in r["rel"] and "nofollow" in r["rel"] for r in c["rows"]) and c["role"] is None, [r["rel"] for r in c["rows"]])
+    check(f"{tag} hero: count + more", c["count"] == f"{N} links found" and c["more"] == f"+ {N - 5} more in the full report", (c["count"], c["more"]))
+    check(f"{tag} hero: socials in the header", c["socials"] == "Instagram @demo.ig", c["socials"])
+    check(f"{tag} hero: Open full report = scan/?r=<slug>", c["open"] == "scan/?r=" + slug, c["open"])
+    check(f"{tag} hero: Send me the report = DM links with report URL + handle", msgs_ok(c["msgs"], quote(REPORT_BASE + slug, safe=""), "demo.creator"), c["msgs"])
+    focus = page.evaluate("document.activeElement.className")
+    box = page.locator(".report-card").bounding_box()
+    check(f"{tag} hero: card focused + scrolled into view", "live-title" in focus and box["y"] >= 0 and box["y"] < vp["height"] - 100, f"{focus} y={box['y']:.0f}")
+    i = ill(page)
+    sites = _sites(rows)
+    check(f"{tag} hero: illustration pill + rows = real counts", i["live"] and i["pill"] == f"{N} links found" and i["visible_illus"] == 0
+          and i["rows"] == [[d, f"{n} link" + ("s" if n != 1 else "")] for d, n in sites] and f"{N} links" in i["label"], i)
+    check(f"{tag} hero: illustration thumbs via the stub /api/thumb", i["thumbs"] and all(t.startswith(API + "/api/thumb?u=") for t in i["thumbs"]), i["thumbs"])
+    last = json.loads(page.evaluate("localStorage.getItem('leakscan.last')") or "{}")
+    check(f"{tag} hero: localStorage leakscan.last", last.get("slug") == slug and last.get("handle") == "demo.creator", last)
+    # personalize (same checks as #18's ?r= path, via apply())
+    page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=5000)
+    texts = lambda sel: page.eval_on_selector_all(sel, "els => els.filter(e => e.offsetParent !== null).map(e => e.textContent.trim())")
+    name = PROFILE["display_name"]
+    check(f"{tag} hero: personalize line + phones' leak domains", "Scanned @demo.creator" in page.locator("[data-p=scanned]").inner_text()
+          and [page.locator(f'[data-p="leak-{k}"] .m-site').inner_text() for k in range(1, 5)] == TOP)
+    check(f"{tag} profile: phones search for the name, IG row = the typed Instagram", texts("[data-p=search]") == [name, name]
+          and texts('[data-p="ig"] .m-title') == [f"{name} (@demo.ig)"] * 2, texts('[data-p="ig"] .m-title'))
+    check(f"{tag} hero: showcase iframe + button carry the slug", page.locator("iframe[data-p=demo]").get_attribute("src") == "showcase/?r=" + slug
+          and page.locator("a[data-p=demo]").get_attribute("href") == "showcase/?r=" + slug)
+    try:
+        page.wait_for_function("() => (document.querySelector('.live-media') || {}).textContent === 'Photos ready: see your demo site'", timeout=12000)
+    except Exception:
+        pass
+    check(f"{tag} profile: hero media line ends at 'Photos ready'", page.locator(".live-media").is_visible()
+          and page.locator(".live-media a").get_attribute("href") == "#showcase", page.locator(".live-media").inner_text())
+    page.evaluate("window.scrollTo(0, 0)")
+    shot(page, "3-settled", ".hero")
+    shot(page, "3-settled-card", ".report-card")
+    page.locator(".browser-scan").scroll_into_view_if_needed()
+    page.wait_for_timeout(700)
+    shot(page, "4-illustration", ".browser-scan")
+    page.locator("#website").scroll_into_view_if_needed()
+    page.wait_for_timeout(700)
+    shot(page, "5-phones", "#website")
+
+    # 3. reload with ?r= restores the hero card, no new scan
+    n_posts = len(net["bodies"])
+    page.reload(wait_until="load")
+    try:
+        page.wait_for_selector(".report-card .live-rows li", timeout=6000)
+    except Exception:
+        pass
+    c2 = card(page)
+    check(f"{tag} reload ?r= restores hero card (rows, count, socials), no new scan", c2["rows"] == c["rows"] and c2["count"] == c["count"]
+          and c2["socials"] == "Instagram @demo.ig" and ill(page)["pill"] == f"{N} links found" and len(net["bodies"]) == n_posts, c2["count"])
+
+    # 4. second scan resets, badges only from data (stub-mixed: live true / false / missing, then Google results)
+    submit(page, "stub-mixed")
+    page.wait_for_function("() => /step/.test((document.querySelector('.report-card .live-status') || {}).textContent || '')", timeout=5000)
+    mid = card(page)
+    check(f"{tag} second scan resets hero card + illustration", not mid["rows"] and mid["title"] == "@stub-mixed" and mid["count"] is None
+          and not ill(page)["live"] and mid["socials"] is None, mid)
+    settled(page)
+    mixed = _rows({"hits": [dict(h) for h in FX["hits"][:3]], "results": FX["results"]})
+    c = card(page)
+    check(f"{tag} hero: badges only what the data says (Live / Found / Indexed)", [r["badge"] for r in c["rows"]] == ["Live", "Found", "Found", "Indexed", "Indexed"]
+          and not any(b in json.dumps(c) for b in ("Dead", "Cached", "Removed")), [r["badge"] for r in c["rows"]])
+    check(f"{tag} hero: second result replaces the first", c["title"] == "@stub-mixed" and c["count"] == f"{len(mixed)} links found"
+          and c["socials"] is None and net["bodies"] == [{"platform": "onlyfans.com", "handle": "stub-mixed", "level": "low"}], (c["count"], net["bodies"]))
+    check(f"{tag} hero: URL follows the new slug", parse_qs(urlsplit(page.url).query).get("r", [""])[0] not in ("", slug), page.url)
+
+    # 5. zero hits + X from a pasted URL
+    submit(page, "stub-empty", "x.com/demo_x")
+    settled(page)
+    c = card(page)
+    i = ill(page)
+    check(f"{tag} zero hits: honest empty state, send still there", c["empty"] and c["empty"].startswith("No leaks found for @stub-empty right now")
+          and c["count"] == "0 links found" and not c["rows"] and c["open"] and msgs_ok(c["msgs"], "stub-empty") and i["pill"] == "0 links found", c)
+    check(f"{tag} body: x.com URL → x, no instagram", net["bodies"] == [{"platform": "onlyfans.com", "handle": "stub-empty", "level": "low", "x": "demo_x"}]
+          and c["socials"] == "X @demo_x", (net["bodies"], c["socials"]))
+    page.locator(".report-card").screenshot(path=str(out / f"{vp_name}-i6-empty.png"))
+
+    # 6. errors: 429 rate_limited / busy, failed, network, server 400, client-side validation
+    for h, kind, want in (("stub-429", "rate_limited", "busy"), ("stub-busy", "busy", "busy"), ("stub-fail", "failed", "didn’t finish")):
+        submit(page, h)
+        settled(page)
+        c = card(page)
+        txt = page.locator(".report-card .live-error").inner_text() if page.locator(".report-card .live-error").count() else ""
+        check(f"{tag} {kind} error inline, form re-enabled", c["error"] == kind and want in txt and ("minute" in txt) and msgs_ok(c["msgs"], h)
+              and page.locator("#scan button").is_enabled() and page.url.startswith(base + "?r="), txt)
+        page.locator(".report-card").screenshot(path=str(out / f"{vp_name}-i7-error-{kind}.png"))
+    page.route("**/api/public-scan", lambda r, _q: r.abort())   # fake: network down (wire boundary)
+    submit(page, "demo.creator")
+    settled(page)
+    c = card(page)
+    check(f"{tag} network error inline, form re-enabled", c["error"] == "network" and "Couldn’t reach" in page.locator(".live-error").inner_text()
+          and msgs_ok(c["msgs"], "demo.creator") and page.locator("#scan button").is_enabled())
+    page.unroute("**/api/public-scan")
+    page.route("**/api/public-scan", lambda r, _q: r.fulfill(status=400, content_type="application/json", body='{"error":"bad_handle"}'))  # fake: server 400
+    submit(page, "demo.creator")
+    settled(page)
+    check(f"{tag} server 400 → 'doesn’t look right' at the form, card back to illustration", "doesn’t look right" in page.locator(".inline-msg").inner_text()
+          and not card(page)["live"] and page.locator("#scan button").is_enabled())
+    page.unroute("**/api/public-scan")
+    for h, s, field in (("bad handle!", "", "h"), ("demo.creator", "tiktok.com/someone", "ig")):
+        submit(page, h, s)
+        page.wait_for_timeout(200)
+        check(f"{tag} client validation ({field}) → message, no POST", "doesn’t look right" in page.locator(".inline-msg").inner_text()
+              and not net["bodies"] and page.evaluate("document.activeElement.name") == field, net["bodies"])
+    page.locator(".hero").screenshot(path=str(out / f"{vp_name}-i8-validation.png"))
+
+    # 7. a good scan again, then Reset page resets everything
+    submit(page, "demo.creator", "demo.ig")
+    settled(page)
+    check(f"{tag} hero: scan works again after errors", len(card(page)["rows"]) == 5 and not page.locator(".inline-msg").is_visible())
+    page.locator("[data-p=scanned] button").click()
+    page.wait_for_load_state("load")
+    page.wait_for_timeout(1200)
+    check(f"{tag} Reset page resets hero card + illustration", not card(page)["live"] and not ill(page)["live"] and page.url == base
+          and page.evaluate("localStorage.getItem('leakscan.last')") is None and card(page)["role"] == "img")
+    ctx.close()
+
+    # 8. no JS: plain GET to scan/ with h + ig; scan/ reads h / ig / x and posts the socials
+    ctx = new_ctx(js=False)
+    page = ctx.new_page()
+    page.goto(base, wait_until="load")
+    page.locator("#scan input[name=h]").fill("@Some.Name")
+    page.locator("#scan input[name=ig]").fill("x.com/some_x")
+    with page.expect_navigation(url=re.compile(r"/scan/\?")):
+        page.locator("#scan button[type=submit]").click()
+    q = parse_qs(urlsplit(page.url).query)
+    check(f"{tag} no JS: form GETs scan/?h=&ig=", urlsplit(page.url).path == "/scan/" and q == {"h": ["@Some.Name"], "ig": ["x.com/some_x"]}, page.url)
+    ctx.close()
+    ctx = new_ctx()
+    page = ctx.new_page()
+    for qs, want in (("h=%40Some.Name&ig=x.com%2Fsome_x", {"handle": "Some.Name", "x": "some_x"}),
+                     ("h=demo.creator&ig=%40demo.ig", {"handle": "demo.creator", "instagram": "demo.ig"}),
+                     ("h=demo.creator&x=demo_x", {"handle": "demo.creator", "x": "demo_x"})):
+        net["bodies"].clear()
+        page.goto(base + "scan/?" + qs, wait_until="load")
+        page.wait_for_selector("#report:not([hidden])", timeout=15000)
+        check(f"{tag} scan/?{qs} posts the socials", net["bodies"] == [{"platform": "onlyfans.com", "level": "low", **want}], net["bodies"])
+    net["bodies"].clear()
+    page.goto(base + "scan/", wait_until="load")
+    f = page.locator("#scan-form")
+    f.locator("input[name=h]").fill("demo.creator")
+    f.locator("input[name=ig]").fill("https://twitter.com/demo_x")
+    with page.expect_navigation(url=re.compile(r"/scan/\?h=")):
+        f.locator("button[type=submit]").click()
+    page.wait_for_selector("#report:not([hidden])", timeout=15000)
+    check(f"{tag} scan/ page form: same two fields, twitter URL → x", net["bodies"] == [{"platform": "onlyfans.com", "handle": "demo.creator", "level": "low", "x": "demo_x"}], net["bodies"])
+    page.goto(base + "scan/?h=demo.creator&ig=tiktok.com%2Fx", wait_until="load")
+    check(f"{tag} scan/ bad social → form message", page.locator("#form-error").is_visible() and "Instagram or X" in page.locator("#form-error").inner_text())
+    ctx.close()
+
+    hosts = {urlsplit(u).hostname for u in net["outside"]}
+    check(f"{tag} no request left loopback but the demo's aborted Google Fonts", hosts <= FONT_HOSTS, sorted(hosts))
+    check(f"{tag} no JS errors, no console errors", not net["errors"] and not net["console"], net["errors"] + net["console"])
+
+
 with socket.socket() as s:
     s.bind(("127.0.0.1", 0))
     port = s.getsockname()[1]
@@ -882,6 +1159,8 @@ try:
                 personalize_flow(browser, vp_name, vp)
             if "askai" in SCENARIOS:
                 askai(browser, vp_name, vp)
+            if "inline" in SCENARIOS:
+                inline_flow(browser, vp_name, vp)
         browser.close()
 finally:
     stub.terminate()

@@ -29,6 +29,8 @@
 <link rel="stylesheet" href="css/chat.css">
 <script>document.documentElement.classList.add('js')</script>
 <script src="js/main.js" defer></script>
+<script src="js/scan-engine.js" defer></script>
+<script src="js/inline-scan.js" defer></script>
 <script src="js/personalize.js" defer></script>
 <script src="js/chat.js" defer></script>
 <script type="application/ld+json">
@@ -234,15 +236,9 @@
       <h1 id="hero-title">Leaked content, taken down by a real person. <span class="accent">Me.</span></h1>
       <p class="lead">Hi, I'm Jaka. Software finds the links. I open every single one, make sure it's really yours, and file every takedown myself. Nothing goes out in your name until a human has checked it.</p>
       <form id="scan" class="scan-form" method="get" action="scan/">
-        <select class="scan-field scan-platform" name="p" aria-label="Platform">
-          <option value="onlyfans.com">OnlyFans</option>
-          <option value="instagram.com">Instagram</option>
-          <option value="fansly.com">Fansly</option>
-          <option value="tiktok.com">TikTok</option>
-          <option value="patreon.com">Patreon</option>
-        </select>
-        <input class="scan-field scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="yourhandle" aria-label="Your handle">
-        <button class="btn btn-primary btn-lg" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Scan for free</button>
+        <label class="scan-field scan-prefix"><span class="scan-pre" aria-hidden="true">onlyfans.com/</span><input class="scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="username" aria-label="OnlyFans username"></label>
+        <label class="scan-field scan-prefix"><span class="scan-pre" aria-hidden="true">@</span><input class="scan-social" name="ig" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Instagram or X (optional)" aria-label="Instagram or X username (optional)"></label>
+        <button class="btn btn-primary btn-lg" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Scan now</button>
       </form>
       <p class="scanned" data-p="scanned" hidden></p>
       <p class="scan-note">Free. No account. You see every link it finds.</p>
@@ -373,7 +369,7 @@
       <h2 id="how-title">Seven steps, and the first three are free.</h2>
     </div>
     <ol class="steps">
-      <li class="step reveal"><span class="step-n" aria-hidden="true">1</span><div><h3>Type your handle</h3><p>Pick OnlyFans, Instagram, Fansly, TikTok or Patreon and type your handle into the box at the top. That's all the scan needs.</p></div></li>
+      <li class="step reveal"><span class="step-n" aria-hidden="true">1</span><div><h3>Type your username</h3><p>Type your OnlyFans username into the box at the top, plus your Instagram or X if you like. That's all the scan needs.</p></div></li>
       <li class="step reveal"><span class="step-n" aria-hidden="true">2</span><div><h3>Free scan, right here</h3><p>It checks hundreds of known leak sites and gives you a report link with every link it found.</p><span class="tag">Free</span></div></li>
       <li class="step reveal"><span class="step-n" aria-hidden="true">3</span><div><h3>Send me the report link</h3><p>On Telegram, WhatsApp or email. I remove one page free, usually the simplest site, so you see it work before paying.</p><span class="tag">Free</span></div></li>
       <li class="step reveal"><span class="step-n" aria-hidden="true">4</span><div><h3>Pick a plan, sign one page</h3><p>Monthly or one-time. You sign a one-page Copyright Enforcement Authorization (free), so I can file in your name.</p></div></li>

@@ -7,9 +7,10 @@ iframes it as `showcase/`. The demo loads Google Fonts (so the homepage does too
 discloses that and `tools/check.py` keeps the two in sync. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 
-- Free scan: the hero form (`#scan`, plain GET) sends `p=<platform>&h=<handle>` to `scan/` (`site/scan/index.html` +
+- Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
+  `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
-  (same origin, except on `*.github.io` → `https://scan.srv1395798.hstgr.cloud`; set once at the top of `js/scan.js`
+  (same origin, except on `*.github.io` → `https://scan.srv1395798.hstgr.cloud`; set once at the top of `js/scan-engine.js`
   and `js/personalize.js`, overridden by `<body data-api>`), reads the
   SSE stream (progress → result → done), then renders the report: summary, a Google look-alike (All / Images / Videos,
   Phone / Computer, thumbnails via `/api/thumb`, blurred until Reveal), per-site table, all links (copy / .txt) and the
@@ -31,13 +32,14 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   Privacy: the slug lives only in this browser (localStorage, plus the cached result in sessionStorage); "Reset page"
   clears it. Nothing is sent anywhere except the API reads above.
 - Scan stub: `python3 tools/scan_stub.py [--port 8930]` serves `site/` plus the API routes from the synthetic fixture
-  `tools/fixtures/scan-sample.json` (magic handles `stub-fail`, `stub-429`, `stub-busy`, `stub-empty`; `--omit-results`
+  `tools/fixtures/scan-sample.json` (magic handles `stub-fail`, `stub-429`, `stub-busy`, `stub-empty`, `stub-mixed` (live true / false / missing);
+  echoes `instagram` / `x` as `socials`; `--omit-results`
   for break-it runs; `--omit-profile` drops `profile`; `--media normal|relative|none|404`, or per slug
   `POST /__stub/media?slug=&mode=`; preloaded slugs `demoR3port01`, `demoNoProf01` (no profile), `evilR3port01`
   (malicious values); `/api/profile`, `/api/avatar`, `/api/media` routes). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
   E2E: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR` (starts its own stub; phone + desktop;
   form → progress → report, tab counts, device toggle, Reveal, CTAs, `?r=` reopen, error paths; never calls prod).
-  `--only scan|personalize`; `personalize` covers the flow above (no-slug text identical to the page without personalize.js, phones, demo pages,
+  `--only scan|personalize|askai|inline`; `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.
 - Ask-AI popup: `js/chat.js` + `css/chat.css`, markup at the end of `index.html` (launcher + `<dialog id="askai">`; also
@@ -109,6 +111,22 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
    `CORS_ORIGINS=https://blackphoenixslo.github.io` while the Pages copy is still in use.
 3. Re-run `deploy/push.sh root@72.62.92.114`; Traefik fetches the certificates (`mytlschallenge`).
 4. Then follow "Move to a custom domain" below for canonicals/sitemap (steps 2-4; step 1 is this section).
+
+## Inline scan
+
+- Hero form = OnlyFans username (`onlyfans.com/` prefix) + optional Instagram or X (`@` prefix, name `ig`) + "Scan now".
+  The network comes only from a pasted URL (`instagram.com/<h>` → instagram, `x.com|twitter.com/<h>` → x); a bare name
+  is sent as `instagram`. Body: `{platform: "onlyfans.com", handle, level: "low", instagram? | x?}`. Same two fields on
+  `scan/`, which also reads `h=`, `ig=`, `x=` (and old `p=`).
+- `js/scan-engine.js` (`window.LeakScanEngine`): the one SSE / fetch transport, API origin rule, error mapping, message
+  links and `leakscan.last` writer, used by `js/scan.js` and `js/inline-scan.js`.
+- `js/inline-scan.js`: with JS the form never leaves the page. The hero card turns into the live report (progress →
+  first 5 links: domain + title, badge Live = `live: true`, Indexed = Google result, else Found; "N links found";
+  Open full report `scan/?r=`; Send me the report; demo photo status), the "Free scan report" illustration shows the
+  real per-site counts, `LeakScanPersonalize.apply()` does the phones / showcase / demo (`socials` win the IG / X rows),
+  URL becomes `?r=<slug>` (reload restores the card). Errors stay inline (busy / bad handle / failed + DM links); a
+  new scan resets everything, "Reset page" too. Own elements only, never personalize's `data-p` slots.
+- Proof: `tools/scan_e2e.py OUT --only inline`; `tools/check_scan_form.py BASE OUT` (layout, no-JS GET).
 
 ## Replace before launch
 

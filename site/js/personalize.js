@@ -94,8 +94,12 @@
     var images = (Array.isArray(r.images) ? r.images : []).filter(function (u) {
       return typeof u === 'string' && u.length <= 600 && GSTATIC_RE.test(u);
     });
+    // socials: the Instagram / X names she typed next to the scan (echoed by the API); they win over profile guesses
+    var so = r.socials && typeof r.socials === 'object' ? r.socials : {}, socials = {};
+    if (handle(so.instagram)) socials.instagram = handle(so.instagram);
+    if (handle(so.x)) socials.x = handle(so.x);
     return { slug: slug, handle: h, platform: platKey(r.platform), leaks: order.slice(0, 4), images: images.slice(0, 3),
-      profile: cleanProfile(r.profile) };
+      profile: cleanProfile(r.profile), socials: socials };
   }
 
   // ---------- slug + data ----------
@@ -181,6 +185,10 @@
     var p = m.profile || {}, acc = {};
     (p.accounts || []).forEach(function (a) { acc[a.key] = a; });
     if (m.platform && !acc[m.platform]) acc[m.platform] = { key: m.platform, handle: m.handle, url: null };
+    var so = m.socials || {};
+    ['instagram', 'x'].forEach(function (k) { // keep the profile's link only when it is the same account
+      if (so[k]) acc[k] = { key: k, handle: so[k], url: acc[k] && acc[k].handle.toLowerCase() === so[k].toLowerCase() ? acc[k].url : null };
+    });
     var main = (p.accounts && p.accounts[0]) || (m.platform && acc[m.platform]);
     var base = (p.username || m.handle).toLowerCase().replace(/[^a-z0-9-]/g, '') || 'yourname';
     return {
