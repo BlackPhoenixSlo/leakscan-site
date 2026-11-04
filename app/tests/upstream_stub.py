@@ -1,5 +1,6 @@
 """Local HTTP stand-in for paid upstreams (Google CSE + DeepSeek), used by
-tests/test_profile.py, tests/test_media.py and the local real-path run. Callers point
+tests/test_profile.py, tests/test_media.py, tests/test_chat_landing.py (stream:true SSE)
+and the local real-path run. Callers point
 cse_scanner.CSE_ENDPOINT / chat_proxy.DEEPSEEK_URL at it (declared bypass).
 All data is synthetic.
 
@@ -8,6 +9,7 @@ All data is synthetic.
 import hashlib
 import io
 import json
+import os
 import sys
 import threading
 import time
@@ -114,6 +116,33 @@ class FakeCDN:
         return _CdnResp(self.bodies[req.full_url])
 
 
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+EMBED_SHELL = (b'<!DOCTYPE html><html><head><title id="pageTitle">Instagram</title></head><body>'
+               b'<script>requireLazy([],function(){s.handle({"require":[["PolarisEmbedSimple","init",[],'
+               b'[{"isRichEmbed":false,"isProfileEmbed":false,"contextJSON":null}]]]});});</script>'
+               b'</body></html>')                         # login/"Sorry" shell: no posts
+
+
+def embed_page(name="ig_embed_profile.html"):
+    with open(os.path.join(FIXTURES, name), "rb") as fh:
+        return fh.read()
+
+
+class FakeEmbed:
+    """media_gather.page_open stand-in (instagram.com wire): handle -> embed page bytes
+    (default: login shell); records (url, headers)."""
+    def __init__(self, pages=None):
+        self.pages, self.seen = pages or {}, []
+
+    def __call__(self, req, timeout=None):
+        self.seen.append((req.full_url, dict(req.header_items())))
+        handle = req.full_url.split("/")[3]
+        page = self.pages.get(handle, EMBED_SHELL)
+        if isinstance(page, BaseException):
+            raise page
+        return io.BytesIO(page)
+
+
 VALID = {
     "display_name": "Mira Example", "first_name": "Mira",
     "tagline": "Ceramics, travel diaries and studio vlogs",
@@ -184,16 +213,37 @@ class _H(BaseHTTPRequestHandler):
         g = lambda k: q.get(k, [""])[0]
         if g("searchType") == "image":
             with self.server.lock:
-                self.server.calls.append(("cse_image", g("q"), g("safe")))
+                self.server.calls.append(("cse_image", g("q"), g("safe"), g("cx")))
             return self._send({"searchInformation": {"totalResults": "9"}, "items": IMAGE_ITEMS})
         with self.server.lock:
             self.server.calls.append(("cse", g("q")))
         self._send({"searchInformation": {"totalResults": "1234"}, "items": CSE_ITEMS})
 
+    def _stream_chat(self, body):
+        """DeepSeek stream:true wire shape: role chunk, keepalive, content deltas, [DONE].
+        Reply text depends only on which system prompt arrived (landing vs scan app)."""
+        landing = "LeakScan landing page" in body["messages"][0]["content"]
+        parts = (["Both plans come after the free scan: ", "€250/month or €500 one-time.", "\n",
+                  "See [Pricing](#pricing) or ask on [Telegram](https://t.me/jakabasej)."]
+                 if landing else ["Your scan ", "is grounded in kb.json."])
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        lines = ['data: {"choices":[{"delta":{"role":"assistant"}}]}', ": keepalive"]
+        lines += ["data: " + json.dumps({"choices": [{"delta": {"content": t}}]}) for t in parts]
+        lines.append("data: [DONE]")
+        for ln in lines:
+            self.wfile.write((ln + "\n\n").encode())
+            self.wfile.flush()
+        self.close_connection = True
+
     def do_POST(self):  # DeepSeek chat/completions
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         with self.server.lock:
             self.server.calls.append(("llm", body))
+        if body.get("stream"):   # chat proxy (chat_proxy.stream_chat); profile calls are stream:false
+            return self._stream_chat(body)
         mode = self.server.mode
         if mode == "timeout":
             time.sleep(self.server.timeout_sleep)

@@ -19,7 +19,9 @@ Routes (public surface — no admin routes here):
   GET  /api/media/<slug>       quick-scan SFW photos {status: pending|ready|none, images[]}
   GET  /api/media/<slug>/<n>.jpg  one gathered photo (404 if none)
   POST /api/public-scan        live scan (SSE, rate-limited)
-  POST /api/chat               (M5) DeepSeek chat proxy
+  POST /api/chat               (M5) DeepSeek chat proxy; body {"kb":"landing"} -> landing
+                               FAQ mode (kb_landing.md + LANDING_SYSTEM_PROMPT)
+  GET  /api/chat-kb?kb=landing landing KB monitor {kb, ok, bytes, updated} (no content)
 """
 
 import base64
@@ -55,6 +57,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC_ROOT = os.path.join(HERE, "public_static")
 MAP_FILE = os.path.join(HERE, "bruqi_detection_map.json")
 KB_FILE = os.path.join(HERE, "kb.json")
+# Landing-site "Ask AI" popup KB (mirrors the GitHub Pages landing page).
+KB_LANDING_FILE = os.environ.get("KB_LANDING_FILE", os.path.join(HERE, "kb_landing.md"))
 SCANNER = os.path.join(HERE, "leak_scanner.py")
 PIPELINE = os.path.join(HERE, "pipeline_steps.py")
 BIO_VERIFY = os.path.join(HERE, "bio_verify.py")
@@ -1515,6 +1519,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/thumb":
             return self.api_thumb()
+        if path == "/api/chat-kb":
+            return self.api_chat_kb()
         if path.startswith("/static/"):
             wc.serve_static(self, STATIC_ROOT, path[len("/static/"):],
                             extra_headers={"X-Content-Type-Options": "nosniff"})
@@ -1633,15 +1639,22 @@ class Handler(BaseHTTPRequestHandler):
             wc.sse_start(self)
             slug = body.get("slug")
             scan = db.get_scan(slug) if slug else None
-            kb_text = chat_proxy.load_kb(KB_FILE)
+            landing = body.get("kb") == "landing"   # unknown kb values -> default scan-app mode
+            kb_text = chat_proxy.load_kb(KB_LANDING_FILE if landing else KB_FILE)
+            if landing and not kb_text:
+                # No grounding -> no answer (the landing prompt must never improvise facts).
+                return wc.sse_fail(self, "The assistant is unavailable right now. "
+                                         "Please DM me on Telegram, WhatsApp or email.")
             ctx = chat_proxy.scan_summary(scan)
-            sc = body.get("scan_context")
+            sc = None if landing else body.get("scan_context")   # live scan status: scan app only
             if isinstance(sc, str) and sc.strip():
                 # 2000 (was 900): the deep scan's live context now teaches the model the
                 # full stage list + not-finished rule — truncating it re-introduces the
                 # "375/375 checks done => the scan is finished" hallucination.
                 ctx = (ctx + "\n\nLIVE STATUS: " + sc.strip()[:2000]).strip()
-            msgs = chat_proxy.build_messages(kb_text, ctx, body.get("messages") or [])
+            msgs = chat_proxy.build_messages(
+                kb_text, ctx, body.get("messages") or [],
+                chat_proxy.LANDING_SYSTEM_PROMPT if landing else chat_proxy.SYSTEM_PROMPT)
             if not any(m["role"] == "user" for m in msgs):
                 return wc.sse_fail(self, "Ask me anything about your scan or getting leaks removed.")
             _event("chat start")
@@ -1649,6 +1662,20 @@ class Handler(BaseHTTPRequestHandler):
             _event("chat done")
         finally:
             CHAT_LIMITER.release(ip)
+
+    def api_chat_kb(self):
+        """Monitoring: is the landing KB deployed? Size + mtime only, never content."""
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        kb = (qs.get("kb") or [""])[0]
+        if kb != "landing":
+            return self._json({"error": "unknown_kb"}, 404)
+        try:
+            st = os.stat(KB_LANDING_FILE)
+            size, updated = st.st_size, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(st.st_mtime))
+        except OSError:
+            size, updated = 0, None
+        return self._json({"kb": kb, "ok": bool(chat_proxy.load_kb(KB_LANDING_FILE)),
+                           "bytes": size, "updated": updated})
 
     # ------------------------------------------------------------- scan result
     def api_scan_result(self, slug):

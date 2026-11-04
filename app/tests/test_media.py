@@ -2,6 +2,8 @@
 Declared bypasses (all synthetic data):
   - Google CSE -> tests/upstream_stub.py HTTP stub (cse_scanner.CSE_ENDPOINT patched)
   - official-CDN image fetches -> stub.FakeCDN at media_gather.urlopen (wire boundary)
+  - Instagram embed page -> stub.FakeEmbed at media_gather.page_open (wire boundary), serving
+    synthetic fixtures (tests/fixtures/ig_embed_*.html; default: login shell)
   - Browserbase/Instagram -> media_gather.grab_ig_grid monkeypatched (function boundary),
     returns synthetic Pillow images
   - profile page fetches -> profile_extract.urlopen raises (profile falls back / LLM stub)."""
@@ -16,6 +18,7 @@ import tempfile
 import threading
 import time
 import unittest
+import urllib.error
 from http.server import ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -53,13 +56,14 @@ class _Env(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.saved = (db.DB_PATH, cse_scanner.CSE_ENDPOINT, chat_proxy.DEEPSEEK_URL, public_app.SCAN_LIMITER,
                      public_app.RESULT_LIMITER, pe.urlopen, mg.urlopen, mg.grab_ig_grid, mg.PUBLIC_ORIGIN,
-                     mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE, dict(os.environ))
+                     mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE, mg.page_open, dict(os.environ))
         db.DB_PATH = os.path.join(cls.tmp.name, "t.db")
         db.init_db()
         cls.up = stub.Stub().start()
         cse_scanner.CSE_ENDPOINT = cls.up.base + "/customsearch/v1"
         chat_proxy.DEEPSEEK_URL = cls.up.base + "/chat/completions"
-        os.environ.update(GOOGLE_API_KEY="fake", GOOGLE_CSE_ID="fake", DEEPSEEK_API_KEY="fake")
+        os.environ.update(GOOGLE_API_KEY="fake", GOOGLE_CSE_ID="fake", GOOGLE_CSE_ID_WEB="fakeweb",
+                          DEEPSEEK_API_KEY="fake")
         os.environ.pop("DATA_DIR", None)
         public_app.SCAN_LIMITER = ratelimit.Limiter(rate_per_min=1000, burst=1000, max_concurrent=100)
         public_app.RESULT_LIMITER = ratelimit.Limiter(rate_per_min=10000, burst=1000, max_concurrent=1000)
@@ -70,7 +74,7 @@ class _Env(unittest.TestCase):
     def tearDownClass(cls):
         (db.DB_PATH, cse_scanner.CSE_ENDPOINT, chat_proxy.DEEPSEEK_URL, public_app.SCAN_LIMITER,
          public_app.RESULT_LIMITER, pe.urlopen, mg.urlopen, mg.grab_ig_grid, mg.PUBLIC_ORIGIN,
-         mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE, env) = cls.saved
+         mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE, mg.page_open, env) = cls.saved
         os.environ.clear()
         os.environ.update(env)
         cls.up.shutdown()
@@ -81,6 +85,8 @@ class _Env(unittest.TestCase):
         mg.MEDIA_ENABLED, mg.MEDIA_BROWSERBASE = True, True
         self.cdn = stub.FakeCDN()
         mg.urlopen = self.cdn
+        self.embed = stub.FakeEmbed()
+        mg.page_open = self.embed
         self.gate = threading.Event()
         self.gate.set()
         self.ig_calls = []
@@ -161,7 +167,121 @@ class TestPolicy(unittest.TestCase):
         self.assertEqual(len(mg.google_queries(H, {"display_name": "MIRA.EXAMPLE"})), 1)
 
 
+class TestEmbedParse(unittest.TestCase):
+    def test_context_json_tiles_in_order_dedupe_by_path(self):
+        got = mg.parse_embed(stub.embed_page().decode())
+        names = [u.split("?")[0].rsplit("/", 1)[1] for u in got]
+        # covers in post order (tile1 repost + carousel child == cover deduped), then children
+        self.assertEqual(names, ["tile0.jpg", "tile1.jpg", "tile2.jpg", "tile4.jpg", "tile5.jpg", "kid0b.jpg"])
+        self.assertTrue(all(mg.official_url(u) and not mg.is_profile_pic(u) for u in got))
+        self.assertIn("oh=00_1d&", got[1])                 # first occurrence's query kept
+
+    def test_html_tiles_avatar_excluded(self):
+        got = mg.parse_embed(stub.embed_page("ig_embed_tiles.html").decode())
+        self.assertFalse([u for u in got if "mira_pp" in u or "og_avatar" in u], got)
+
+    def test_html_tiles_unescaped_deduped_official_only(self):
+        got = mg.parse_embed(stub.embed_page("ig_embed_tiles.html").decode())
+        self.assertFalse([u for u in got if "&amp;" in u])
+        grid = [u for u in got if "/grid" in u]
+        self.assertEqual([u.split("?")[0].rsplit("/", 1)[1] for u in grid],
+                         ["gridA.jpg", "gridC.jpg", "gridF.jpg", "gridG.jpg"])
+        self.assertTrue(grid[0].endswith("?stp=dst-jpg_e35&_nc_cat=1&oh=00_A"))
+        self.assertEqual(len(mg.parse_embed(stub.embed_page().decode(), cap=2)), 2)
+
+    def test_shells_and_errors_are_not_found(self):
+        for page in (stub.EMBED_SHELL.decode(), "<html>app shell, no data</html>",
+                     '<script>{"contextJSON":"{\\"context\\":7}"}</script>', '"contextJSON":"{bad', ""):
+            self.assertEqual(mg.parse_embed(page), [], page[:40])
+        saved = mg.page_open
+        try:
+            fe = mg.page_open = stub.FakeEmbed({"mira.example": stub.embed_page()})
+            self.assertEqual(len(mg.ig_embed_grid("mira.example")), 6)
+            url, hdrs = fe.seen[0]
+            self.assertEqual(url, "https://www.instagram.com/mira.example/embed/")
+            self.assertEqual((hdrs.get("Sec-fetch-mode"), hdrs.get("User-agent")), ("navigate", mg.UA))
+            self.assertEqual(mg.ig_embed_grid("nobody"), [])                     # login shell
+            self.assertEqual(mg.ig_embed_grid("bad/handle"), [])
+            self.assertEqual(len(fe.seen), 2)                                    # invalid handle: no request
+            mg.page_open = stub.FakeEmbed({"big": stub.embed_page() + b" " * mg.IG_EMBED_CAP})
+            self.assertEqual(mg.ig_embed_grid("big"), [])
+            for code in (302, 404):
+                mg.page_open = stub.FakeEmbed({"h": urllib.error.HTTPError("u", code, "x", {}, None)})
+                self.assertEqual(mg.ig_embed_grid("h"), [])
+            mg.page_open = stub.FakeEmbed({"h": urllib.error.HTTPError("u", 503, "x", {}, None)})
+            with self.assertRaises(urllib.error.HTTPError):                      # transient: caller won't cache
+                mg.ig_embed_grid("h")
+        finally:
+            mg.page_open = saved
+
+
 class TestGather(_Env):
+    def embed_tiles(self, n):
+        """FakeEmbed serves the fixture; FakeCDN gets bytes for its first n tile URLs."""
+        self.embed.pages[H] = stub.embed_page()
+        urls = mg.parse_embed(stub.embed_page().decode())[:n]
+        for i, u in enumerate(urls):
+            self.cdn.bodies[u] = stub.synth(640, 800, 40 + i)
+        return urls
+
+    def test_embed_first_no_browserbase_when_4_plus(self):
+        urls = self.embed_tiles(6)
+        self.assertEqual(mg.gather("slugEMB001", "instagram.com", H, stub.VALID, SCAN_ITEMS, budget=60), "ready")
+        idx = mg._read_index("slugEMB001")
+        self.assertEqual([i["source"] for i in idx["images"]], ["instagram"] * 6 + ["google"] * 3)
+        self.assertEqual(self.ig_calls, [])
+        self.assertEqual([u for u in self.cdn.seen if u in urls], urls)          # fetched in tile order
+        self.assertTrue(os.path.exists(mg._cache_path(mg.cache_key("instagram.com", H))))
+
+    def test_login_shell_or_few_tiles_falls_back_to_browserbase(self):
+        mg.gather("slugSHELL1", "instagram.com", H, None, [], budget=60)         # default page: login shell
+        self.assertEqual(len(self.ig_calls), 1)
+        self.assertEqual([i["source"] for i in mg._read_index("slugSHELL1")["images"]].count("instagram"), 6)
+        shutil.rmtree(os.path.join(self.tmp.name, "media-cache"), ignore_errors=True)
+        self.embed_tiles(3)                                                      # 3 of 6 downloadable
+        mg.gather("slugFEW001", "instagram.com", H, None, [], budget=60)
+        self.assertEqual(len(self.ig_calls), 2)
+        srcs = [i["source"] for i in mg._read_index("slugFEW001")["images"]]
+        self.assertEqual((srcs[:3], len(srcs)), (["instagram"] * 3, mg.MEDIA_MAX))  # 3 embed, google, BB fill
+
+    def test_embed_tiles_all_downloads_failed_not_cached(self):
+        self.embed.pages[H] = stub.embed_page()                                  # tiles, CDN has none
+        mg.grab_ig_grid = lambda h, b: []
+        self.assertEqual(mg.gather("slugDLF001", "instagram.com", H, None, [], budget=60), "ready")  # google
+        self.assertFalse(os.path.exists(mg._cache_path(mg.cache_key("instagram.com", H))))
+        mg.gather("slugDLF002", "instagram.com", H, None, [], budget=60)
+        self.assertEqual(len(self.embed.seen), 2)                                # embed retried, not cached
+
+    def test_google_uses_web_engine_only(self):
+        mg.gather("slugWEB001", "onlyfans.com", H, stub.VALID, SCAN_ITEMS, budget=60)
+        img = [c for c in self.up.calls if c[0] == "cse_image"]
+        self.assertTrue(img)
+        self.assertEqual({c[3] for c in img}, {"fakeweb"})
+        n = len(img)
+        os.environ.pop("GOOGLE_CSE_ID_WEB")
+        try:
+            shutil.rmtree(os.path.join(self.tmp.name, "media-cache"), ignore_errors=True)
+            mg.gather("slugWEB002", "onlyfans.com", H, stub.VALID, SCAN_ITEMS, budget=60)
+            self.assertEqual(len([c for c in self.up.calls if c[0] == "cse_image"]), n)   # no CSE image call
+            self.assertNotIn("google", {i["source"] for i in mg._read_index("slugWEB002")["images"]})
+        finally:
+            os.environ["GOOGLE_CSE_ID_WEB"] = "fakeweb"
+
+    def test_public_origin_empty_is_relative(self):
+        mg.gather("slugREL001", "instagram.com", H, None, [], budget=60)
+        saved = mg.PUBLIC_ORIGIN
+        try:
+            mg.PUBLIC_ORIGIN = ""
+            srcs = [i["src"] for i in mg.public_view("slugREL001")["images"]]
+        finally:
+            mg.PUBLIC_ORIGIN = saved
+        self.assertEqual(sorted(srcs), sorted(f"/api/media/slugREL001/{n}.jpg" for n in range(len(srcs))))
+        self.assertGreaterEqual(len(srcs), 6)
+        code = "import media_gather as mg; print(repr(mg.PUBLIC_ORIGIN))"
+        env = {**os.environ, "PUBLIC_ORIGIN": "", "PYTHONPATH": os.pathsep.join([ROOT, os.path.join(ROOT, "version2site")])}
+        out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(out.stdout.strip(), "''", out.stderr[-500:])
+
     def test_google_then_instagram_dedupe_caps(self):
         st = mg.gather("slugAAAA01", "onlyfans.com", H, stub.VALID, SCAN_ITEMS, budget=60)
         self.assertEqual(st, "ready")

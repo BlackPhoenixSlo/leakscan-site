@@ -2,11 +2,14 @@
 "official website", gathered in a background thread after a quick scan's DB insert.
 
 Sources (official only, every byte from an official CDN host, nothing from the scan's
-leak results):
-  (a) Google image search, SafeSearch on (safe=active), restricted to the creator's
-      official-account sites — up to GOOGLE_QUERIES CSE calls;
-  (b) the public Instagram post grid via ONE Browserbase session (only when an IG
-      handle is known and a gather slot is free).
+leak results), in this order:
+  (a) Instagram profile embed page (instagram.com/<handle>/embed/, anonymous, no browser):
+      latest posts' image URLs from its server-rendered contextJSON;
+  (b) Google image search, SafeSearch on (safe=active), restricted to the creator's
+      official-account sites — up to GOOGLE_QUERIES CSE calls, ONLY with GOOGLE_CSE_ID_WEB
+      (a whole-web engine; the leak-only GOOGLE_CSE_ID never returns official photos);
+  (c) fallback: the public Instagram post grid via ONE Browserbase session (only when (a)
+      added < BB_FALLBACK_BELOW images and a gather slot is free).
 SFW limitation: there is NO NSFW classifier. Safety relies on Instagram/TikTok/YouTube/X
 content policy + Google SafeSearch + official-source-only.
 
@@ -15,6 +18,7 @@ Layout: <DATA_DIR>/media/<slug>/{index.json, 0.jpg, 1.jpg..}; per-handle cache
 `playwright` and Pillow are imported lazily: the app runs without them (gather -> fewer/no images).
 """
 import hashlib
+import html
 import io
 import json
 import os
@@ -40,8 +44,13 @@ MEDIA_ENABLED = _flag("MEDIA_ENABLED", "1")
 MEDIA_BROWSERBASE = _flag("MEDIA_BROWSERBASE", "1")
 MEDIA_BUDGET = float(os.environ.get("MEDIA_BUDGET", "90"))
 MEDIA_MAX = max(1, min(int(os.environ.get("MEDIA_MAX", "12")), 12))
-BB_PROXIES = _flag("BROWSERBASE_PROXIES", "0")
-PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "").rstrip("/")  # one-project: "" = relative /api/media src (same origin)
+# Residential proxies ON by default: without them Instagram serves the login wall to
+# Browserbase's datacenter IPs (0 images after ~19s, a billed session wasted); with them 12
+# grid images in ~11s (measured 2026-11-04). Proxy bandwidth is billed extra, but the
+# session only runs as the fallback when the free embed step comes up short.
+BB_PROXIES = _flag("BROWSERBASE_PROXIES", "1")
+# "" -> relative src ("/api/media/<slug>/<n>.jpg"); unset -> the VPS origin.
+PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "https://scan.srv1395798.hstgr.cloud").rstrip("/")
 BB_API = "https://api.browserbase.com/v1"
 MAX_GATHERS = 2               # concurrent full gathers (Browserbase); when busy -> Google step only
 CACHE_TTL = 7 * 86400
@@ -50,6 +59,9 @@ MIN_SIDE, MAX_SIDE, MAX_BYTES = 200, 1200, 300 * 1024
 FETCH_CAP = 8 * 1024 * 1024
 FETCH_TIMEOUT = 8
 IG_GRID_WAIT_MS = 15000
+IG_EMBED_TIMEOUT = 10
+IG_EMBED_CAP = 2 * 1024 * 1024
+BB_FALLBACK_BELOW = 4         # Browserbase only when the embed step added fewer images
 HANDLE_RE = re.compile(r"^[A-Za-z0-9._-]{1,60}$")
 SLUG_RE = db.SLUG_RE
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -63,6 +75,14 @@ _NOT_LEAK = frozenset(OFFICIAL_SITES + ("twitter.com", "youtu.be"))
 _CDN_RE = re.compile(r"(?:^|\.)(?:cdninstagram\.com|fbcdn\.net|tiktokcdn(?:-[a-z]{2})?\.com|"
                      r"ytimg\.com|twimg\.com|lookaside\.instagram\.com)$")
 GRID_SEL = 'main a[href*="/p/"] img, main a[href*="/reel/"] img'
+# Embed page fetch: with a bare desktop-Chrome UA Instagram returns a ~500 KB JS app shell
+# with NO posts; with the fetch metadata a browser sends when loading the embed iframe it
+# returns the server-rendered page whose contextJSON holds the latest posts (measured).
+_EMBED_HEADERS = {"User-Agent": UA, "Accept": "text/html,application/xhtml+xml",
+                  "Accept-Language": "en-US,en;q=0.9", "Sec-Fetch-Mode": "navigate",
+                  "Sec-Fetch-Dest": "iframe", "Sec-Fetch-Site": "cross-site"}
+# IG profile-picture renditions: "-19" image category in the path, 150px stp, explicit name.
+_PROFILE_PIC_RE = re.compile(r"/t51\.\d+-19/|s150x150|profile_pic", re.I)
 
 log = lambda msg: (sys.stderr.write(msg + "\n"), sys.stderr.flush())   # public_app sets _event
 
@@ -322,9 +342,11 @@ def google_queries(handle, profile):
 
 
 def google_images(handle, profile, leak, timeout=FETCH_TIMEOUT):
-    """-> accepted official-CDN image URLs (deduped). <= GOOGLE_QUERIES CSE calls."""
-    key, cx = os.environ.get("GOOGLE_API_KEY", ""), os.environ.get("GOOGLE_CSE_ID", "")
+    """-> accepted official-CDN image URLs (deduped). <= GOOGLE_QUERIES CSE calls, whole-web
+    engine GOOGLE_CSE_ID_WEB only (never the leak-domain GOOGLE_CSE_ID)."""
+    key, cx = os.environ.get("GOOGLE_API_KEY", ""), os.environ.get("GOOGLE_CSE_ID_WEB", "")
     if not key or not cx:
+        log("media google skipped: GOOGLE_CSE_ID_WEB/GOOGLE_API_KEY unset")
         return []
     out, seen = [], set()
     for q in google_queries(handle, profile):
@@ -341,7 +363,6 @@ def google_images(handle, profile, leak, timeout=FETCH_TIMEOUT):
     return out
 
 
-# ── Instagram grid via Browserbase ──────────────────────────────────────────
 def ig_handle(platform, handle, profile):
     for a in (profile or {}).get("accounts") or []:
         if isinstance(a, dict) and a.get("platform") == "instagram" and HANDLE_RE.match(a.get("handle") or ""):
@@ -353,6 +374,10 @@ def _strip_q(u):
     return (u or "").split("?", 1)[0]
 
 
+def is_profile_pic(url):
+    return bool(_PROFILE_PIC_RE.search(url or ""))
+
+
 def pick_grid(items, og_image=None, cap=MEDIA_MAX):
     """Grid <img> dicts {src,w,h} -> <= cap official-CDN srcs; drops og:image/avatar and <MIN_SIDE."""
     og, out = _strip_q(og_image), []
@@ -360,7 +385,7 @@ def pick_grid(items, og_image=None, cap=MEDIA_MAX):
         src = (it or {}).get("src") or ""
         if not official_url(src) or src in out or (og and _strip_q(src) == og):
             continue
-        if "/t51.2885-19/" in src or "s150x150" in src:          # IG profile-picture renditions
+        if is_profile_pic(src):
             continue
         if (it.get("w") or 0) < MIN_SIDE or (it.get("h") or 0) < MIN_SIDE:
             continue
@@ -368,6 +393,76 @@ def pick_grid(items, og_image=None, cap=MEDIA_MAX):
     return out[:cap]
 
 
+# ── Instagram grid via the public profile embed page (no browser) ──────────
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None                          # login redirect -> HTTPError 3xx -> "not found"
+
+
+page_open = urllib.request.build_opener(_NoRedirect).open   # tests patch this (instagram.com wire)
+_CTX_KEY = '"contextJSON":'
+_IMG_SRC_RE = re.compile(r'<img\b[^>]*?\bsrc="(https://[^"]+)"', re.I)
+_OG_RE = re.compile(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', re.I)
+
+
+def _embed_candidates(page):
+    """-> (image URLs in page order, avatar URL|None). Server-rendered contextJSON: post tiles
+    then their carousel children; else plain <img> tiles (HTML-rendered variant)."""
+    i = page.find(_CTX_KEY)
+    if i < 0:
+        og = _OG_RE.search(page)
+        return _IMG_SRC_RE.findall(page), og.group(1) if og else None
+    try:
+        raw = json.JSONDecoder().raw_decode(page, i + len(_CTX_KEY))[0]
+        ctx = json.loads(raw)["context"] if isinstance(raw, str) else None   # null = login/Sorry shell
+        posts = [m["shortcode_media"] for m in ctx.get("graphql_media") or []] if ctx else []
+        urls = [p.get("display_url") for p in posts]
+        urls += [e["node"].get("display_url") for p in posts
+                 for e in (p.get("edge_sidecar_to_children") or {}).get("edges") or []]
+        return [u for u in urls if isinstance(u, str)], ctx.get("profile_pic_url") if ctx else None
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return [], None
+
+
+def parse_embed(page, cap=MEDIA_MAX):
+    """Embed page HTML -> <= cap official-CDN grid image URLs: avatar dropped, &amp; unescaped,
+    deduped by path (query ignored), page order kept."""
+    cands, avatar = _embed_candidates(page or "")
+    av, out, seen = _strip_q(html.unescape(avatar or "")), [], set()
+    for u in cands:
+        u = html.unescape(u)
+        p = _strip_q(u)
+        if not official_url(u) or p in seen or p == av or is_profile_pic(u):
+            continue
+        seen.add(p)
+        out.append(u)
+    return out[:cap]
+
+
+def ig_embed_grid(handle, timeout=IG_EMBED_TIMEOUT):
+    """GET instagram.com/<handle>/embed/ -> grid image URLs. [] = not found (login/"Sorry" shell,
+    no posts, 3xx/404). Transport errors raise (caller: transient, don't cache)."""
+    if not HANDLE_RE.match(handle or ""):
+        return []
+    req = urllib.request.Request(f"https://www.instagram.com/{handle}/embed/", headers=_EMBED_HEADERS)
+    try:
+        with page_open(req, timeout=timeout) as r:
+            page = r.read(IG_EMBED_CAP + 1)
+    except urllib.error.HTTPError as e:
+        if 300 <= e.code < 400 or e.code == 404:
+            log(f"media ig embed not found: http {e.code}")
+            return []
+        raise
+    if len(page) > IG_EMBED_CAP:
+        log("media ig embed not found: page over cap")
+        return []
+    urls = parse_embed(page.decode("utf-8", "replace"))
+    if not urls:
+        log("media ig embed not found")
+    return urls
+
+
+# ── Instagram grid via Browserbase (fallback) ───────────────────────────────
 _GRID_JS = """async (sel) => {
   const t0 = Date.now();
   const imgs = () => Array.from(document.querySelectorAll(sel));
@@ -487,11 +582,24 @@ def gather(slug, platform, handle, profile, cse_items, *, budget=MEDIA_BUDGET, b
     t0 = time.monotonic()
     deadline = t0 + budget
     g, key, cacheable, n_google, n_ig = _Gallery(slug), cache_key(platform, handle), False, 0, 0
+    n_tiles = n_embed = 0
     try:
         if g.from_cache(key):
             log(f"media done cache=hit n={len(g.images)}")
             return "ready" if g.images else "none"
         leak = _leak_sets(cse_items)
+        ig, ig_ok = ig_handle(platform, handle, profile), True
+        if ig:
+            try:
+                tiles = ig_embed_grid(ig, max(1, min(IG_EMBED_TIMEOUT, deadline - time.monotonic())))
+                n_tiles = len(tiles)
+                for u in tiles:
+                    if g.full or time.monotonic() > deadline:
+                        break
+                    n_embed += g.add(fetch_image(u), "instagram")
+            except Exception as e:
+                ig_ok = False
+                log(f"media ig embed failed: {type(e).__name__}")
         try:
             for u in google_images(handle, profile, leak):
                 if g.full or time.monotonic() > deadline:
@@ -499,15 +607,17 @@ def gather(slug, platform, handle, profile, cse_items, *, budget=MEDIA_BUDGET, b
                 n_google += g.add(fetch_image(u), "google")
         except Exception as e:
             log(f"media google step failed: {type(e).__name__}")
-        ig, ig_ok = ig_handle(platform, handle, profile), True
-        if browser and MEDIA_BROWSERBASE and ig and not g.full and deadline - time.monotonic() > 20:
+        bb_wanted = bool(MEDIA_BROWSERBASE and ig and n_embed < BB_FALLBACK_BELOW and not g.full)
+        if browser and bb_wanted and deadline - time.monotonic() > 20:
             try:
                 for data in grab_ig_grid(ig, deadline - time.monotonic()) or []:
                     n_ig += g.add(data, "instagram")
             except Exception as e:
                 ig_ok = False
                 log(f"media instagram step failed: {type(e).__name__}")
-        cacheable = browser and ig_ok
+        # not cached: transient IG failure, embed tiles found but none downloaded, or the
+        # Browserbase fallback was wanted but no slot was free
+        cacheable = ig_ok and not (n_tiles and not n_embed) and (browser or not bb_wanted)
     except Exception as e:
         log(f"media gather failed: {type(e).__name__}")
     finally:
@@ -517,7 +627,7 @@ def gather(slug, platform, handle, profile, cse_items, *, budget=MEDIA_BUDGET, b
             log(f"media index write failed: {type(e).__name__}")
     if cacheable:
         _cache_save(key, slug, g.images)
-    log(f"media done cache=miss google={n_google} instagram={n_ig} browser={browser} "
+    log(f"media done cache=miss embed={n_embed}/{n_tiles} google={n_google} instagram={n_ig} browser={browser} "
         f"secs={time.monotonic() - t0:.1f}")
     return "ready" if g.images else "none"
 
