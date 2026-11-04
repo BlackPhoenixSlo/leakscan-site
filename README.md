@@ -1,8 +1,10 @@
 # leakscan-site
 
 Google Ads landing site for LeakScan: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
-third-party requests, no cookies. `site/` is what ships. `site/showcase/` is the demo of the official site each client
-gets (fictional creator, built from the tessa template); the landing page links and iframes it as `showcase/`. Its own
+cookies, no third-party requests on the landing pages. `site/` is what ships. `site/showcase/` is the demo of
+the official site each client gets (fictional creator, built from the tessa template); the landing page links and
+iframes it as `showcase/`. The demo loads Google Fonts (so the homepage does too, via the iframe); `privacy.html`
+discloses that and `tools/check.py` keeps the two in sync. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
