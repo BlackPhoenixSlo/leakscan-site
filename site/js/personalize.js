@@ -297,7 +297,10 @@
     row('own', d.site, name + ': Official site');
     row('blog', d.site + ' \u203a blog');
     phones(m, d);
-    if (m.profile) text(q('site-url'), d.site);
+    if (m.profile) {
+      text(q('site-url'), d.site);
+      text(q('demo-intro'), 'A preview built from your scan: your name and links, your photos as they arrive. Scroll around inside it. The real one we make together.');
+    }
     // Hero "Weekly report" card + "Free scan report" illustration: only the handle for now. Their rows / "N links
     // found" pill are marked (report-row-*, scan-row-*, scan-count) but stay the illustration: no invented statuses.
     each($$('[data-p="report-handle"], [data-p="scan-handle"]'), function (el) { text(el, '@' + m.handle); });
@@ -449,6 +452,7 @@
       // fixed box: keep the placeholder's aspect ratio, crop the photo into it
       if (img.getAttribute('width')) img.style.aspectRatio = img.getAttribute('width') + ' / ' + img.getAttribute('height');
       img.style.objectFit = 'cover';
+      img.style.objectPosition = 'center 25%';   // her photo, focal point unknown: faces sit in the upper part of most photos
       img.classList.add('p-fade');
       img.style.opacity = '0';
       img.removeAttribute('srcset');

@@ -11,7 +11,7 @@
   if (!E || !form || !card || !window.fetch) return;
   var DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/, HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/;
   var GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
-  var ROWS = 5, SITES = 6, GRID = 12, STRIP = 24, BAND = 10, MAX_IMAGES = 60;
+  var ROWS = 5, SITES = 6, STRIP = 24, BAND = 10, MAX_IMAGES = 60;
   var btn = form.querySelector('button[type=submit]'), btnText = btn && btn.lastChild, btnLabel = btnText && btnText.nodeValue;
   var token = 0, busy = false, live = null, msg = null, saved = null;
   var P = function () { return window.LeakScanPersonalize; };
@@ -130,12 +130,14 @@
     if (drifter) drifter.stop();
     if (live) { live.remove(); live = null; }
     card.classList.remove('is-live');
+    card.style.minHeight = '';
     card.removeAttribute('aria-busy');
     if (saved) { card.setAttribute('role', saved.role); card.setAttribute('aria-label', saved.label); }
   }
   function heroOpen(handle, platform) {
     heroReset();
     if (!saved) saved = { role: card.getAttribute('role'), label: card.getAttribute('aria-label') };
+    card.style.minHeight = card.offsetHeight + 'px';   // never shorter than the illustration: no collapse while scanning
     card.removeAttribute('role');
     card.removeAttribute('aria-label');
     card.classList.add('is-live');
@@ -147,6 +149,8 @@
         make('span', 'chip chip-live live-count', [], { hidden: '' })]),
       make('p', 'live-status', [], { role: 'status' }),
       make('div', 'live-bar', [make('i')], { 'aria-hidden': 'true' }),
+      // placeholder rows while scanning (CSS hides them once the card is no longer aria-busy)
+      make('div', 'live-skel', [0, 1, 2, 3, 4].map(function () { return make('span', 'live-skel-row', [make('i'), make('b')]); }), { 'aria-hidden': 'true' }),
       make('div', 'live-body')
     ]);
     card.appendChild(live);
@@ -172,19 +176,17 @@
     var box = make('span', 'gi-box', [img, make('span', 'gi-go', [icon(it.link ? 'i-external-link' : 'i-arrow-right')])]);
     img.addEventListener('error', function () { img.remove(); box.classList.add('gi-none'); }, { once: true });
     var label = it.link ? 'Image on ' + it.domain + (it.title ? ': ' + it.title : '') + ' (opens in a new tab)' : 'Image result: see it in the full report';
-    return make('a', 'gi-card', [box, cap ? make('span', 'gi-cap', [E.fav(it.domain || 'google.com', 'gi-fav'), it.domain || 'Google Images']) : null],
+    return make('a', 'gi-card', [box, cap ? make('span', 'gi-cap', [E.fav(it.domain || 'google.com', 'gi-fav'), make('span', 'gi-cap-t', [it.domain || 'Google Images'])]) : null],
       it.link ? ext({ href: it.link, 'aria-label': label, title: it.domain }) : { href: 'scan/?r=' + encodeURIComponent(slug), 'aria-label': label });
   }
   function revealBtn(scope) {
-    var b = make('button', 'live-reveal', [icon('i-eye'), make('span', '', ['Reveal'])], { type: 'button', 'aria-pressed': 'false',
-      'aria-label': 'Reveal images' });
+    var b = make('button', 'live-reveal', [icon('i-eye'), make('span', '', ['Reveal images'])], { type: 'button', 'aria-pressed': 'false' });
     b.addEventListener('click', function () {
       var on = !scope.classList.contains('revealed');
       scope.classList.toggle('revealed', on);
       Array.prototype.forEach.call(scope.querySelectorAll('.live-reveal'), function (x) {
         x.setAttribute('aria-pressed', String(on));
-        x.setAttribute('aria-label', on ? 'Blur images' : 'Reveal images');
-        x.lastChild.textContent = on ? 'Blur' : 'Reveal';
+        x.lastChild.textContent = on ? 'Blur images' : 'Reveal images';
       });
     });
     return b;
@@ -200,10 +202,15 @@
   // before it starts restarts the wait. Only while the strip is on screen, its tab is showing and the page is visible.
   // Never under prefers-reduced-motion. scrollLeft only: nothing else moves, the card never changes size.
   var DRIFT_WAIT = 4000, DRIFT_SPEED = 24, DRIFT_HOLD = 1400, drifter = null;
-  function drift(box, strip, panel) {
+  function drift(box, strip, panel, now) {
     if (drifter) drifter.stop();
     drifter = null;
     if (reduce() || !window.requestAnimationFrame) return;
+    var btn = box.querySelector('.live-strip-pause');
+    var auto = function (on) {
+      box.setAttribute('data-auto', on ? 'on' : 'off');
+      if (btn) { btn.setAttribute('aria-label', on ? 'Pause slideshow' : 'Play slideshow'); btn.title = btn.getAttribute('aria-label'); }
+    };
     var d = { box: box, dead: false, armed: false, hover: false, seen: !window.IntersectionObserver, raf: 0, timer: 0 };
     var pos = 0, dir = 1, hold = 0, t0 = 0, io = null;
     d.stop = function () {
@@ -212,6 +219,7 @@
       if (d.raf) cancelAnimationFrame(d.raf);
       if (io) io.disconnect();
       strip.removeAttribute('data-drift');
+      auto(false);
       if (drifter === d) drifter = null;
     };
     var frame = function (t) {
@@ -247,12 +255,13 @@
       io.observe(strip);
     }
     drifter = d;
-    d.wait();
+    auto(true);   // the Stop / Play button (hidden under reduced motion: no data-auto at all)
+    if (now) d.start(); else d.wait();
   }
   ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (k) {
     document.addEventListener(k, function (e) {
       var d = drifter;
-      if (!d || d.dead) return;
+      if (!d || d.dead || (e.target.closest && e.target.closest('.live-strip-pause'))) return;   // the button decides itself
       if (d.box.contains(e.target)) d.stop(); else if (!d.armed) d.wait();
     }, { capture: true, passive: true });
   });
@@ -304,11 +313,17 @@
           b.addEventListener('click', function () { strip.scrollBy({ left: dir * strip.clientWidth * 0.8, behavior: reduce() ? 'auto' : 'smooth' }); });
           return b;
         };
+        var pauseB = make('button', 'live-strip-pause', [icon('i-pause'), icon('i-play')], { type: 'button' });
+        pauseB.addEventListener('click', function () {   // a deliberate choice: Pause ends it, Play starts it now (no wait)
+          if (drifter && drifter.box === sbox) drifter.stop(); else drift(sbox, strip, links, true);
+        });
         sbox = make('div', 'live-strip-box', [
-          make('div', 'live-strip-head', [make('p', 'live-strip-h', ['What Google Images shows for @' + m.handle]), revealBtn(live)]),
+          make('div', 'live-strip-head', [make('p', 'live-strip-h', ['What Google Images shows for @' + m.handle]),
+            make('span', 'live-strip-tools', [pauseB, revealBtn(live)])]),
           make('div', 'live-strip-wrap', [strip, nav(-1), nav(1)])]);
         links.appendChild(sbox);
         // Images: a grid of the first ones
+        var GRID = window.matchMedia && matchMedia('(max-width: 559px)').matches ? 12 : 16;   // phone 3×4, else 4×4: fills the Links panel's height
         var more = m.images.length - GRID, grid = make('div', 'live-panel', [
           make('div', 'live-imgs-head', [make('p', '', [plural(m.images.length, 'image', 'images') + ' on Google Images']), revealBtn(live)]),
           make('div', 'live-grid', m.images.slice(0, GRID).map(function (it) { return tile(it, m.slug); })),

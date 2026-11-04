@@ -18,11 +18,11 @@ Serves site/ and the API routes of the contract the scan page talks to:
   socials read off leak pages; stub-mixed / stub-empty carry none.
 - GET /api/profile/<slug> → {slug, profile}; GET /api/avatar/<slug> → a generated PNG when profile.avatar is true, else 404.
 - GET /api/media/<slug> (demo photos, arrive after the scan) → polls 1-2: {status:"pending", images:[2]}, then
-  {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (tools/fixtures/media/*.jpg: mirrored
-  crops of the CC0 showcase photos, so a swapped-in photo is visibly not the default one). evilR3port01
+  {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (the portrait
+  showcase people photos in site/showcase/imgs, served as webp; the e2e checks the swap by src). evilR3port01
   also lists off-origin / javascript: srcs (must be dropped). --media none → {status:"none", images:[]}; --media 404 → 404.
   POST /__stub/media?slug=<slug>[&mode=normal|relative|none|404] resets that slug's poll counter (and mode) for a test.
-- GET /api/thumb?u=<https url> → one of tools/fixtures/media/*.jpg (picked by a hash of u, 480x640 JPEG), never fetches u.
+- GET /api/thumb?u=<https url> → one of those photos (picked by a hash of u, webp), never fetches u.
 - POST /api/chat  {kb: "landing", messages: [{role, content}], slug?} → SSE: `token` events (data = JSON-encoded text
   chunk) streaming CHAT_ANSWER (markdown with an anchor, allowed + forbidden links, bold, bullets), then `done`. A last
   user message containing stub-fail → some tokens then `failed`; stub-429 → 429 rate_limited. Each request body is
@@ -78,7 +78,9 @@ def make_result(handle, platform, empty=False):
     return r
 
 
-MEDIA_FILES = sorted((ROOT / "tools" / "fixtures" / "media").glob("*.jpg"))
+# the showcase people photos already in the repo (portrait ones, 1067-1400 px wide): no extra binary fixtures
+MEDIA_FILES = [ROOT / "site" / "showcase" / "imgs" / f"{n}.webp" for n in (   # 0 = the demo hero: a face with room around it
+    "editorial-02", "editorial-01", "behind-the-scenes", "editorial-03", "editorial-04")]
 
 
 def stand_in(key):
@@ -160,7 +162,7 @@ class Handler(SimpleHTTPRequestHandler):
                 body = MEDIA_FILES[int(parts[1].split(".")[0]) % len(MEDIA_FILES)].read_bytes()
                 self.send_response(200)
                 self.cors()
-                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Type", "image/webp")
                 self.send_header("Cache-Control", "max-age=3600")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -185,7 +187,7 @@ class Handler(SimpleHTTPRequestHandler):
             body = stand_in(src)
             self.send_response(200)
             self.cors()
-            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Type", "image/webp")
             self.send_header("Cache-Control", "max-age=3600")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()

@@ -595,11 +595,11 @@ def personalize_flow(browser, vp_name, vp):
     page = ctx.new_page()
     page.goto(base + "showcase/?r=" + FX["slug"], wait_until="load")
     try:
-        page.wait_for_function("() => document.querySelector('img.hero__bg').naturalWidth === 480", timeout=6000)
+        page.wait_for_function("() => document.querySelector('img.hero__bg').naturalWidth === 1067", timeout=6000)
     except Exception:
         pass
     rel = page.eval_on_selector("img.hero__bg", "e => [e.getAttribute('src'), e.naturalWidth]")
-    check(f"{tag} profile: same-origin relative media srcs accepted", rel == [f"/api/media/{FX['slug']}/0.jpg", 480], rel)
+    check(f"{tag} profile: same-origin relative media srcs accepted", rel == [f"/api/media/{FX['slug']}/0.jpg", 1067], rel)
     ctx.close()
     stub_media(FX["slug"])
 
@@ -1140,8 +1140,9 @@ def inline_flow(browser, vp_name, vp):
     }""")
     strip = lambda page: page.evaluate("""() => {
         const s = document.querySelector('.report-card .live-strip'), c = document.querySelector('.report-card').getBoundingClientRect();
+        const pb = document.querySelector('.report-card .live-strip-pause');
         return s && {x: s.scrollLeft, drift: s.getAttribute('data-drift'), card: [c.width, c.height], max: s.scrollWidth - s.clientWidth,
-          shifts: window.__ls.slice()};
+          shifts: window.__ls.slice(), pause: pb ? (pb.offsetParent ? 'shown' : 'none') : null, pauseLabel: pb && pb.getAttribute('aria-label')};
     }""")
     msgs_ok = lambda m, *need: len(m) == 3 and m[0].startswith("https://t.me/jakabasej?text=") and m[1].startswith(
         "https://wa.me/38640703992?text=") and m[2].startswith("mailto:me@jackbase.dev?") and all(all(x in u for x in need) for u in m)
@@ -1155,6 +1156,11 @@ def inline_flow(browser, vp_name, vp):
     form = page.evaluate("() => { const f = document.getElementById('scan'); return [f.getAttribute('action'), f.getAttribute('method'), [...f.elements].map(e => e.name).filter(Boolean)]; }")
     check(f"{tag} form markup: GET scan/ with h + ig, no platform select", form == ["scan/", "get", ["h", "ig"]], form)
     shot(page, "1-before", ".hero")
+    page.locator("#free").scroll_into_view_if_needed()
+    page.wait_for_timeout(700)
+    shot(page, "1-band-before", "#free")
+    page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
+    page.wait_for_timeout(300)
     net["nav"].clear()
     submit(page, "@demo.creator", "https://www.instagram.com/demo.ig/")
     page.wait_for_function("() => /step/.test((document.querySelector('.report-card .live-status') || {}).textContent || '')", timeout=5000)
@@ -1183,6 +1189,10 @@ def inline_flow(browser, vp_name, vp):
     check(f"{tag} hero: Open full report = scan/?r=<slug>", c["open"] == "scan/?r=" + slug, c["open"])
     check(f"{tag} hero: Send me the report = DM links with report URL + handle", msgs_ok(c["msgs"], quote(base + "scan/?r=" + slug, safe=""), "demo.creator"), c["msgs"])
     focus = page.evaluate("document.activeElement.className")
+    try:   # bring() scrolls smoothly; give it time to land
+        page.wait_for_function("() => { const r = document.querySelector('.report-card').getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight - 100; }", timeout=2500)
+    except Exception:
+        pass
     box = page.locator(".report-card").bounding_box()
     check(f"{tag} hero: card focused + scrolled into view", "live-title" in focus and box["y"] >= 0 and box["y"] < vp["height"] - 100, f"{focus} y={box['y']:.0f}")
     IM = _images(FX)
@@ -1219,13 +1229,14 @@ def inline_flow(browser, vp_name, vp):
     check(f"{tag} hero: Sites tab = top 6 sites, each opens its first link in a new tab",
           hero["sites"] == [[by_dom[d], "_blank", "noopener noreferrer nofollow"] for d in [x[0] for x in sorted(_site_counts(rows), key=lambda x: -x[1])][:6]], hero["sites"])
     # tabs switch the body without moving anything; Reveal unblurs
-    cbox = lambda: page.evaluate("() => { const r = document.querySelector('.report-card').getBoundingClientRect(); return [r.x, r.y + scrollY, r.width, r.height]; }")
+    cbox = lambda: page.evaluate("() => { const r = document.querySelector('.report-card').getBoundingClientRect(); return [Math.round(r.x + scrollX), Math.round(r.y + scrollY), r.width, r.height]; }")
     card0 = cbox()
     page.locator("#lt-images").click()
     page.wait_for_timeout(350)
     gi = page.evaluate("() => [document.querySelector('#lp-images').classList.contains('on'), getComputedStyle(document.querySelector('#lp-links')).visibility, document.querySelectorAll('#lp-images .live-grid a.gi-card').length, (document.querySelector('#lp-images .live-more') || {}).textContent]")
     card1 = cbox()
-    check(f"{tag} hero: Images tab shows the 12-image grid in place (card box unchanged)", gi == [True, "hidden", 12, f"+ {NI - 12} more in the full report"]
+    G = 12 if vp_name == "phone" else 16
+    check(f"{tag} hero: Images tab shows the image grid (phone 12, else 16) in place (card box unchanged)", gi == [True, "hidden", G, f"+ {NI - G} more in the full report"]
           and card0 == card1, (gi, card0, card1))
     shot(page, "3b-card-images", ".report-card")
     page.locator("#lp-images .live-reveal").click()
@@ -1254,6 +1265,7 @@ def inline_flow(browser, vp_name, vp):
     a1 = strip(page)
     page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-t2.png"))
     check(f"{tag} drift: idle → the strip scrolls by itself (rAF), ~24 px/s", a0["drift"] == "on" and 20 <= a1["x"] - a0["x"] <= 90, (a0["x"], a1["x"]))
+    check(f"{tag} hero: a visible 'Pause slideshow' button while it may move", a1["pause"] == "shown" and a1["pauseLabel"] == "Pause slideshow", a1["pause"])
     late = [x for x in a1["shifts"] if x[1] > 0 and not x[2] and x[0] > page.evaluate("performance.now()") - 4000]
     check(f"{tag} hero: zero layout shift while the strip drifts / loads (card box + PerformanceObserver)",
           a0["card"] == a1["card"] and [round(v) for v in a1["card"]] == [round(card0[2]), round(card0[3])] and not late, (a0["card"], a1["card"], late))
@@ -1261,8 +1273,19 @@ def inline_flow(browser, vp_name, vp):
     b0 = strip(page)["x"]
     page.wait_for_timeout(2000)
     b1 = strip(page)
-    check(f"{tag} hero: pointerdown on the strip stops the drift for good", b1["x"] == b0 and b1["drift"] is None, (b0, b1["x"], b1["drift"]))
+    check(f"{tag} hero: pointerdown on the strip stops the drift for good (button → Play)", b1["x"] == b0 and b1["drift"] is None and b1["pause"] == "shown"
+          and b1["pauseLabel"] == "Play slideshow", (b0, b1["x"], b1["drift"], b1["pause"], b1["pauseLabel"]))
     page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-after-pointerdown.png"))
+    page.locator(".report-card .live-strip-pause").click()   # Play: a deliberate restart, no 4 s wait
+    c0 = strip(page)["x"]
+    page.wait_for_timeout(1500)
+    c1 = strip(page)
+    page.locator(".report-card .live-strip-pause").click()   # Stop
+    page.wait_for_timeout(300)
+    c2 = strip(page)
+    page.wait_for_timeout(1000)
+    check(f"{tag} drift: Play restarts it at once, Stop ends it", c1["drift"] == "on" and c1["x"] - c0 >= 15 and c1["pauseLabel"] == "Pause slideshow"
+          and c2["drift"] is None and strip(page)["x"] == c2["x"] and c2["pauseLabel"] == "Play slideshow", (c0, c1["x"], c2["x"], c1["drift"], c2["drift"]))
     last = json.loads(page.evaluate("localStorage.getItem('leakscan.last')") or "{}")
     check(f"{tag} hero: localStorage leakscan.last", last.get("slug") == slug and last.get("handle") == "demo.creator", last)
     # personalize (same checks as #18's ?r= path, via apply())
@@ -1386,7 +1409,7 @@ def inline_flow(browser, vp_name, vp):
     page.mouse.move(0, 0)
     page.wait_for_timeout(6500)
     r = strip(page)
-    check(f"{tag} hero: reduced motion → strip still, no drift after 6.5 s idle", r and r["x"] == 0 and r["drift"] is None and r["max"] > 0, r and (r["x"], r["drift"], r["max"]))
+    check(f"{tag} hero: reduced motion → strip still, no drift after 6.5 s idle", r and r["x"] == 0 and r["drift"] is None and r["max"] > 0 and r["pause"] == "none", r and (r["x"], r["drift"], r["max"], r["pause"]))
     page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-reduced-motion.png"))
     ctx.close()
 

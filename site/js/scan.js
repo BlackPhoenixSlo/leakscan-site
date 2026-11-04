@@ -247,9 +247,11 @@
     var n = phone ? Math.min(state.more.images, items.length) : items.length;
     var h = '<div class="g-safe" aria-hidden="true"><span>SafeSearch</span><span class="chip-g on">✓ Off</span><span class="chip-g">Blur</span><span class="chip-g">Filter</span></div>';
     h += '<div class="g-grid">' + items.slice(0, n).map(function (it) {
-      var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>' : '';
+      // an image no result has: same caption shape, credited to Google Images (nothing to open: this is the report)
+      var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>'
+        : '<span class="g-ct">Image result</span><span class="g-cs">' + fav('google.com', 'g-fav-s') + 'Google Images</span>';
       var tile = img(it.src, it.title || 'Image result');
-      return '<figure class="g-tile">' + (it.link ? a(it.link, 'g-tile-a', tile + GO) : tile) + (cap ? '<figcaption>' + cap + '</figcaption>' : '') + '</figure>';
+      return '<figure class="g-tile">' + (it.link ? a(it.link, 'g-tile-a', tile + GO) : tile) + '<figcaption>' + cap + '</figcaption></figure>';
     }).join('') + '</div>';
     return h + more('images', 'Show more images', items.length - n);
   }

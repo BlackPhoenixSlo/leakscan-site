@@ -58,7 +58,8 @@
 .seg input:checked + span { background: var(--accent); color: var(--on-accent); }
 .seg input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
 #reveal[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
-.g-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 14px; color: var(--muted); font-size: .92rem; text-align: center; }
+.g-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 14px; color: var(--muted); font-size: .92rem; }
+@media (max-width: 559px) { .g-hint { justify-content: flex-start; align-items: flex-start; font-size: .88rem; line-height: 1.4; } .g-hint .icon { margin-top: 2px; } }
 .g-hint .icon { width: 16px; height: 16px; flex: none; color: var(--accent); }
 .g-stage { display: flex; justify-content: center; }
 .g-note { margin: 14px auto 0; text-align: center; color: var(--muted); font-size: .9rem; }
@@ -142,7 +143,7 @@ a:hover > .g-go, a:focus-visible > .g-go { opacity: 1; transform: none; }
 .g-pack-row .g-img img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Images tab */
-.g-safe { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; color: var(--g-muted); font-size: 13px; }
+.g-safe { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; color: var(--g-muted); font-size: 13px; opacity: .45; cursor: default; user-select: none; }   /* decorative, like .g-tab-deco */
 .chip-g { padding: 6px 14px; border-radius: 999px; background: rgb(32 33 36); color: var(--g-muted); }
 .chip-g.on { background: rgb(26 115 232); color: #fff; }
 .g-grid { column-count: 8; column-gap: 8px; }

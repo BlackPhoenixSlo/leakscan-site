@@ -127,12 +127,14 @@
 .hero__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--bg) 85%, transparent) 0%,
-    color-mix(in srgb, var(--bg) 30%, transparent) 45%,
-    color-mix(in srgb, var(--bg) 10%, transparent) 100%
-  );
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--bg) 55%, transparent) 0%, transparent 55%),
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--bg) 85%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 30%, transparent) 45%,
+      color-mix(in srgb, var(--bg) 10%, transparent) 100%
+    );
 }
 
 .hero__content {
@@ -156,7 +158,7 @@
 
 .hero__subtitle {
   font-size: clamp(0.95rem, 1.5vw, 1.1rem);
-  color: color-mix(in srgb, var(--text) 72%, transparent);
+  color: color-mix(in srgb, var(--text) 88%, transparent);
   max-width: 420px;
   margin-bottom: 2.2rem;
   font-weight: 300;
