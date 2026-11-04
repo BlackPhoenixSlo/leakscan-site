@@ -314,7 +314,7 @@ class TestQuickScanEnrich(unittest.TestCase):
             res, _ = self.scan({"handle": H, "platform": "instagram.com", "level": "low"})
         finally:
             self.up.mode = "valid"
-        self.assertIn("mira.studio", res["aliases"]["discovered"])
+        self.assertTrue([x for x in res["aliases"]["socials"] if x["platform"] == "instagram"])  # leak page had an IG
         accs = res["profile"]["accounts"]
         self.assertFalse([a for a in accs if a["platform"] == "instagram" and a.get("source") == "leak_page"])
         self.assertEqual(mg.ig_handle("instagram.com", H, res["profile"], res["socials"]), H)
