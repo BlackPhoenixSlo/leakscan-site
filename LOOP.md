@@ -7,3 +7,4 @@ verify live, append a row here. Stop at run 50.
 |---|---|---|---|---|
 | 1 | 2026-11-04 | #4 | hide showcase demo ribbon when framed (Back link nested landing in iframe); shots.py unique names; check.py checks showcase/ link; README/CREDITS fixes | 20261104T004756Z-798c458 |
 | 2 | 2026-11-04 | #5 | Telegram CTAs prefill message (plan-specific on pricing); price in hero; meta desc <=160; softened ranking claims; check.py: title/desc length + CTA prefill | 20261104T024636Z-6d885bd |
+| 3 | 2026-11-04 | #7 | og.png 165->61 KB (quantized, recipe in make_icons.py) + check.py raster budget 100 KB; hero check icon on first line; showcase timeline/links/verify consistency (go-live before posts, patron first-pick, "most" fakes) | 20261104T045045Z-2a21b6f |
