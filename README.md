@@ -14,7 +14,8 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   and `js/personalize.js`, overridden by `<body data-api>`), reads the
   SSE stream (progress → result → done), then renders the report: summary, a Google look-alike (All / Images / Videos,
   Phone / Computer, thumbnails via `/api/thumb`, blurred until Reveal), per-site table, all links (copy / .txt) and the
-  prefilled message CTAs. The URL becomes `scan/?r=<slug>`, which reopens the report via `GET /api/scan-result/<slug>`.
+  prefilled message CTAs. The URL becomes `scan/?r=<slug>`, which reopens the report via `GET /api/scan-result/<slug>`;
+  the report link in the messages is `scan/?r=<slug>` on the host serving the page (resolved from `js/scan-engine.js`'s URL).
   Without JS it links to https://jackbase.me/scan.
 - Personalization (`js/personalize.js`): after a scan the landing page and the demo site (`showcase/`) show her data.
   Slug: `?r=` → `localStorage['leakscan.last']` (written by `scan.js`) → none (page unchanged, no API call). One
@@ -43,7 +44,7 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.
 - Ask-AI popup: `js/chat.js` + `css/chat.css`, markup at the end of `index.html` (launcher + `<dialog id="askai">`; also
-  opened by any `[data-askai-open]` link). Chips and typed questions that fuzzy-match an FAQ question (or "what does it
+  opened by any `[data-askai-open]` link; on phones (<720px) the launcher stays hidden while the hero is on screen). Chips and typed questions that fuzzy-match an FAQ question (or "what does it
   cost") are answered instantly from the page's own FAQ / pricing text, no network. Everything else streams from
   `POST <API>/api/chat` (`{kb:"landing", messages (last 8), slug?}` → SSE `token`/`done`/`failed`; API origin =
   `<body data-api>`, else the scan server on github.io, else same origin; from file:// or on any error → contacts). Answers are built as DOM nodes;

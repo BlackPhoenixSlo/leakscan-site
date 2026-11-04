@@ -24,7 +24,8 @@ window.LeakScanPersonalize.apply() re-personalizes in place and idempotently. Ch
 profile are named "profile: …" (the --omit-profile break run must turn only those red). Non-loopback requests are
 aborted; the only ones allowed to be attempted are the demo's disclosed Google Fonts.
 
-askai (js/chat.js, the "Ask AI before you DM me" popup): launcher visible and clear of the hero CTA / sticky bar,
+askai (js/chat.js, the "Ask AI before you DM me" popup): launcher covers no hero text at load (phone: hidden while
+the hero is on screen), visible and clear of the hero CTA (desktop) / sticky bar (phone),
 open/close/Esc/backdrop/focus return/focus trap, FAQ chips and fuzzy-typed questions answered with zero network
 requests, other questions streamed from the stub's /api/chat (request body: kb, slug, history cap), link rules (anchor
 scrolls, allowlisted hosts only), failed / 429 / no-API (file://) fallbacks, retry, sessionStorage restore, reduced
@@ -37,7 +38,6 @@ from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 FX = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())
-REPORT_BASE = "https://blackphoenixslo.github.io/leakscan-site/scan/?r="
 out = pathlib.Path(sys.argv[1]).expanduser()
 out.mkdir(parents=True, exist_ok=True)
 omit = "--omit-results" in sys.argv
@@ -168,7 +168,7 @@ def scan_flow(browser, vp_name, vp):
     page.locator("#reveal").click()
 
     # 7. CTAs + links
-    link = REPORT_BASE + slug
+    link = base + "scan/?r=" + slug
     hrefs = page.eval_on_selector_all("#send [data-msg]", "els => els.map(e => e.href)")
     check(f"{vp_name} CTA hrefs carry report link + handle", len(hrefs) == 3 and all(
         (quote(link, safe="") in h or quote(link, safe="").replace("%20", "+") in h) and "demo.creator" in h for h in hrefs)
@@ -636,27 +636,45 @@ def askai(browser, vp_name, vp):
     def settle():
         page.wait_for_selector(".askai-log[aria-busy=false]", timeout=10000)
 
-    # 1. launcher
+    def click_L():   # phone: the launcher is hidden while the hero is on screen, so scroll past it first
+        if vp_name == "phone" and page.evaluate("document.querySelector('.hero').getBoundingClientRect().bottom > 0"):
+            page.evaluate("document.getElementById('how').scrollIntoView({behavior: 'instant'})")
+            page.wait_for_selector(".askai-launcher:not(.in-hero)", timeout=3000)
+        L.click()
+
+    # 1. launcher: covers no hero text / control at load (phone: hidden until the hero scrolls away)
     page.goto(base, wait_until="load")
-    page.wait_for_selector(".askai-launcher:not([hidden])", timeout=5000)
-    check(f"{v} launcher visible + labelled", L.is_visible() and L.get_attribute("aria-label") == "Ask AI before you DM me"
-          and "Ask AI before you DM me" in L.inner_text(), L.inner_text())
-    cta = page.locator("#scan button[type=submit]").bounding_box()
-    lb = L.bounding_box()
-    check(f"{v} launcher clear of hero CTA", not overlap(lb, cta), f"launcher={lb} cta={cta}")
-    check(f"{v} launcher inside viewport bottom-right", lb["x"] + lb["width"] <= vp["width"] and lb["y"] + lb["height"] <= vp["height"]
-          and vp["width"] - (lb["x"] + lb["width"]) <= 32 and vp["height"] - (lb["y"] + lb["height"]) <= 32, lb)
-    shot("1-launcher")
+    page.wait_for_selector(".askai-launcher:not([hidden])", state="attached", timeout=5000)
+    page.wait_for_timeout(500)
+    covered = page.evaluate("""() => { const L = document.querySelector('.askai-launcher');
+      if (getComputedStyle(L).visibility === 'hidden') return [];
+      const b = L.getBoundingClientRect(), hit = [], w = document.createTreeWalker(document.querySelector('.hero'), NodeFilter.SHOW_TEXT);
+      for (let n; (n = w.nextNode());) { if (!n.textContent.trim()) continue; const r = document.createRange(); r.selectNodeContents(n);
+        for (const q of r.getClientRects()) if (q.right > b.left && q.left < b.right && q.bottom > b.top && q.top < b.bottom) hit.push(n.textContent.trim()); }
+      return hit; }""")
+    check(f"{v} launcher covers no hero text at load", covered == [], covered)
     if vp_name == "phone":
+        check(f"{v} launcher hidden while hero on screen", not L.is_visible())
         page.evaluate("document.getElementById('how').scrollIntoView()")
         page.wait_for_selector(".mobile-cta.show", timeout=3000)
         page.wait_for_timeout(500)
-        mb, lb2 = page.locator(".mobile-cta").bounding_box(), L.bounding_box()
-        check(f"{v} launcher clear of sticky scan bar", not overlap(lb2, mb), f"launcher={lb2} bar={mb}")
+    check(f"{v} launcher visible + labelled", L.is_visible() and L.get_attribute("aria-label") == "Ask AI before you DM me"
+          and "Ask AI before you DM me" in L.inner_text(), L.inner_text())
+    lb = L.bounding_box()
+    if vp_name == "phone":
+        mb = page.locator(".mobile-cta").bounding_box()
+        check(f"{v} launcher clear of sticky scan bar", not overlap(lb, mb), f"launcher={lb} bar={mb}")
+    else:
+        cta = page.locator("#scan button[type=submit]").bounding_box()
+        check(f"{v} launcher clear of hero CTA", not overlap(lb, cta), f"launcher={lb} cta={cta}")
+    check(f"{v} launcher inside viewport bottom-right", lb["x"] + lb["width"] <= vp["width"] and lb["y"] + lb["height"] <= vp["height"]
+          and vp["width"] - (lb["x"] + lb["width"]) <= 32 and vp["height"] - (lb["y"] + lb["height"]) <= (100 if vp_name == "phone" else 32), lb)   # phone: above the sticky bar
+    shot("1-launcher")
+    if vp_name == "phone":
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
 
     # 2. open / close / focus
-    L.click()
+    click_L()
     page.wait_for_timeout(300)
     d = page.get_by_role("dialog", name="Ask about Abolita")
     check(f"{v} opens role=dialog named, aria-modal, input focused", is_open() and d.count() == 1 and d.is_visible()
@@ -686,11 +704,11 @@ def askai(browser, vp_name, vp):
     page.wait_for_timeout(200)
     check(f"{v} Esc closes, focus back on launcher", not is_open()
           and page.evaluate("document.activeElement.classList.contains('askai-launcher')"))
-    L.click()
+    click_L()
     page.locator(".askai-close").click()
     check(f"{v} close button closes, focus back", not is_open()
           and page.evaluate("document.activeElement.classList.contains('askai-launcher')"))
-    L.click()
+    click_L()
     page.mouse.click(8, 8)
     page.wait_for_timeout(200)
     check(f"{v} backdrop click closes", not is_open())
@@ -706,7 +724,7 @@ def askai(browser, vp_name, vp):
     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
 
     # 3. cached answers: chips + fuzzy typed questions, zero network
-    L.click()
+    click_L()
     n = len(reqs)
     t0 = time.time()
     page.locator(".askai-chip", has_text="What does it cost?").click()
@@ -787,7 +805,7 @@ def askai(browser, vp_name, vp):
 
     # 6. failure paths
     if not is_open():
-        L.click()
+        click_L()
     for word, kind, text in (("stub-fail", "failed", "couldn’t answer"), ("stub-429", "rate_limited", "Too many")):
         ask(f"{word} please")
         page.wait_for_selector(f"[data-source=error][data-kind={kind}]", timeout=5000)
@@ -810,7 +828,7 @@ def askai(browser, vp_name, vp):
 
     # 7. storage: sessionStorage restore, nothing in localStorage/cookies
     page.reload(wait_until="load")
-    L.click()
+    click_L()
     users = page.eval_on_selector_all(".askai-user", "els => els.map(e => e.textContent)")
     check(f"{v} reload restores chat from sessionStorage", q in users and "how much" in users, len(users))
     check(f"{v} no localStorage writes, no cookies", page.evaluate("Object.keys(localStorage)") == ["leakscan.last"]
@@ -820,7 +838,7 @@ def askai(browser, vp_name, vp):
     # 8. no API origin: page opened from disk (no data-api, not http) → nothing to call
     k, kl, ne = len(reqs), len(chat_log()), len(errors)
     page.goto((ROOT / "site" / "index.html").as_uri(), wait_until="load")
-    L.click()
+    click_L()
     page.locator(".askai-chip", has_text="What does it cost?").click()
     ask("Do you work with agencies?")
     page.wait_for_selector("[data-source=error][data-kind=no_api]", timeout=3000)
@@ -835,11 +853,11 @@ def askai(browser, vp_name, vp):
     # 9. reduced motion
     anim = lambda: page.eval_on_selector(".askai-panel", "e => getComputedStyle(e).animationName")
     page.goto(base, wait_until="load")
-    L.click()
+    click_L()
     a1 = anim()
     page.keyboard.press("Escape")
     page.emulate_media(reduced_motion="reduce")
-    L.click()
+    click_L()
     a2 = anim()
     page.keyboard.press("Escape")
     page.emulate_media(reduced_motion="no-preference")
@@ -988,7 +1006,7 @@ def inline_flow(browser, vp_name, vp):
     check(f"{tag} hero: count + more", c["count"] == f"{N} links found" and c["more"] == f"+ {N - 5} more in the full report", (c["count"], c["more"]))
     check(f"{tag} hero: socials in the header", c["socials"] == "Instagram @demo.ig", c["socials"])
     check(f"{tag} hero: Open full report = scan/?r=<slug>", c["open"] == "scan/?r=" + slug, c["open"])
-    check(f"{tag} hero: Send me the report = DM links with report URL + handle", msgs_ok(c["msgs"], quote(REPORT_BASE + slug, safe=""), "demo.creator"), c["msgs"])
+    check(f"{tag} hero: Send me the report = DM links with report URL + handle", msgs_ok(c["msgs"], quote(base + "scan/?r=" + slug, safe=""), "demo.creator"), c["msgs"])
     focus = page.evaluate("document.activeElement.className")
     box = page.locator(".report-card").bounding_box()
     check(f"{tag} hero: card focused + scrolled into view", "live-title" in focus and box["y"] >= 0 and box["y"] < vp["height"] - 100, f"{focus} y={box['y']:.0f}")
