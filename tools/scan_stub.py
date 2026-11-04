@@ -1,33 +1,42 @@
 #!/usr/bin/env python3
 """Local stand-in for Jaka's scan API + a static server for site/. Stdlib only; for tests and previews.
 
-    python3 tools/scan_stub.py [--port 8930] [--omit-results] [--delay 0.15]
-    → open http://127.0.0.1:8930/  (or http://127.0.0.1:8930/scan/?r=demoR3port01)
+    python3 tools/scan_stub.py [--port 8930] [--omit-results] [--omit-profile] [--media normal|none|404] [--delay 0.15]
+    → open http://127.0.0.1:8930/  (or http://127.0.0.1:8930/scan/?r=demoR3port01, /?r=demoR3port01, /showcase/?r=demoR3port01)
 
 Serves site/ and the API routes of the contract the scan page talks to:
 - POST /api/public-scan  {platform, handle, level} → SSE over the response body: several `progress`, one `result`
   (tools/fixtures/scan-sample.json with handle/platform/slug swapped in), `done`. Magic handles drive the error paths:
   stub-fail → `failed` + `done`; stub-429 → 429 rate_limited; stub-busy → 429 busy; stub-empty → status empty.
-- GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise (fixture slug preloaded).
+- GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise. Preloaded: demoR3port01 (the
+  fixture, with its synthetic `profile`), demoNoProf01 (same, `profile` null: scan-only personalization) and evilR3port01
+  (fixture overlaid with tools/fixtures/scan-evil.json: script tags, javascript: urls, oversized strings).
+- GET /api/profile/<slug> → {slug, profile}; GET /api/avatar/<slug> → a generated PNG when profile.avatar is true, else 404.
+- GET /api/media/<slug> (demo photos, arrive after the scan) → polls 1-2: {status:"pending", images:[2]}, then
+  {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (generated PNG bytes). evilR3port01
+  also lists off-origin / javascript: srcs (must be dropped). --media none → {status:"none", images:[]}; --media 404 → 404.
+  POST /__stub/media?slug=<slug>[&mode=normal|relative|none|404] resets that slug's poll counter (and mode) for a test.
 - GET /api/thumb?u=<https url> → a generated SVG placeholder (size/colour derived from u), never fetches u.
 - CORS on every API response (echoes Origin), OPTIONS preflight answered.
 
 Bypass (declared): every served .html gets `data-api="<stub origin>"` added to its <body> tag, the override the scan
 page reads instead of the production API host. The origin is the *other* loopback name (127.0.0.1 <-> localhost),
 so the page → API calls are cross-origin and exercise CORS like production. --omit-results drops `results` from the
-result (break-it run).
+result (break-it run); --omit-profile sets `profile` to null everywhere (break-it run for the personalization checks).
 """
-import argparse, hashlib, json, pathlib, random, re, string, sys, time
+import argparse, hashlib, json, pathlib, random, re, string, struct, sys, time, zlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 FIXTURE = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())
+EVIL = json.loads((ROOT / "tools" / "fixtures" / "scan-evil.json").read_text())
 HANDLE_RE = re.compile(r"^[A-Za-z0-9._-]{1,60}$")
 PLATFORMS = {"onlyfans.com", "instagram.com", "fansly.com", "tiktok.com", "patreon.com"}
 STORE = {}
-OPTS = argparse.Namespace(omit_results=False, delay=0.15)
+OPTS = argparse.Namespace(omit_results=False, omit_profile=False, delay=0.15, media="normal")
+MEDIA_POLLS, MEDIA_MODE = {}, {}
 
 
 def make_result(handle, platform, empty=False):
@@ -38,6 +47,8 @@ def make_result(handle, platform, empty=False):
         r.update(status="empty", hit_count=0, domain_count=0, google_total=0, images=[], hits=[], results=[])
     if OPTS.omit_results:
         r.pop("results", None)
+    if OPTS.omit_profile:
+        r["profile"] = None
     return r
 
 
@@ -51,6 +62,33 @@ def placeholder_svg(u):
             f'<circle cx="{w * (30 + h[3] % 40) // 100}" cy="{ht * 2 // 5}" r="{w // 6}" fill="rgb(255 255 255 / .35)"/>'
             f'<rect x="{w // 4}" y="{ht * 3 // 5}" width="{w // 2}" height="{ht // 4}" rx="20" fill="rgb(255 255 255 / .2)"/>'
             f'</svg>').encode()
+
+
+def avatar_png(seed, w=48, h=48, cell=12):
+    """A two-tone checker PNG, colours derived from seed (stdlib only, never a real photo)."""
+    d = hashlib.sha256(seed.encode()).digest()
+    a, b = bytes(d[0:3]), bytes(d[3:6])
+    rows = b"".join(b"\x00" + b"".join(a if (x // cell + y // cell) % 2 else b for x in range(w)) for y in range(h))
+    chunk = lambda t, data: struct.pack(">I", len(data)) + t + data + struct.pack(">I", zlib.crc32(t + data) & 0xFFFFFFFF)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
+def media_answer(slug, origin):
+    mode = MEDIA_MODE.get(slug, OPTS.media)
+    if mode == "404" or slug not in STORE:
+        return None
+    if mode == "none":
+        return {"slug": slug, "status": "none", "images": []}
+    n = MEDIA_POLLS[slug] = MEDIA_POLLS.get(slug, 0) + 1
+    count, status = (2, "pending") if n <= 2 else (6, "ready")
+    pre = "" if mode == "relative" else origin   # relative = same-origin "/api/media/..." srcs (site served by the API host)
+    imgs = [{"src": f"{pre}/api/media/{slug}/{i}.jpg", "w": 300, "h": 400, "source": "google"} for i in range(count)]
+    if slug == EVIL["slug"]:
+        imgs = [{"src": "javascript:alert(1)"}, {"src": "https://evil.example/api/media/x/1.jpg"},
+                {"src": "//evil.example/api/media/x/1.jpg"},
+                {"src": f"{origin}.evil.example/api/media/{slug}/1.jpg"}, {"src": f"{origin}/api/media/{slug}/../x.jpg"}] + imgs
+    return {"slug": slug, "status": status, "images": imgs}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -86,6 +124,38 @@ class Handler(SimpleHTTPRequestHandler):
         if u.path.startswith("/api/scan-result/"):
             slug = u.path.rsplit("/", 1)[1]
             return self.send_json(200, STORE[slug]) if slug in STORE else self.send_json(404, {"error": "not_found"})
+        if u.path.startswith("/api/profile/"):
+            slug = u.path.rsplit("/", 1)[1]
+            if slug not in STORE:
+                return self.send_json(404, {"error": "not_found"})
+            return self.send_json(200, {"slug": slug, "profile": STORE[slug].get("profile")})
+        if u.path.startswith("/api/media/"):
+            parts = u.path.split("/")[3:]
+            if len(parts) == 1:
+                ans = media_answer(parts[0], f"http://{self.headers.get('Host')}")
+                return self.send_json(200, ans) if ans else self.send_json(404, {"error": "not_found"})
+            if len(parts) == 2 and parts[0] in STORE and re.fullmatch(r"\d{1,2}\.jpg", parts[1]):
+                body = avatar_png(parts[0] + parts[1], 120, 160, 20)
+                self.send_response(200)
+                self.cors()
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Cache-Control", "max-age=3600")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                return self.wfile.write(body)
+            return self.send_json(404, {"error": "not_found"})
+        if u.path.startswith("/api/avatar/"):
+            slug = u.path.rsplit("/", 1)[1]
+            prof = (STORE.get(slug) or {}).get("profile")
+            if not isinstance(prof, dict) or prof.get("avatar") is not True:
+                return self.send_json(404, {"error": "not_found"})
+            body = avatar_png(slug)
+            self.send_response(200)
+            self.cors()
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
         if u.path == "/api/thumb":
             src = parse_qs(u.query).get("u", [""])[0]
             if not src.startswith("https://"):
@@ -117,6 +187,12 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if urlsplit(self.path).path == "/__stub/media":
+            q = parse_qs(urlsplit(self.path).query)
+            slug = q.get("slug", [""])[0]
+            MEDIA_POLLS.pop(slug, None)
+            MEDIA_MODE[slug] = q.get("mode", [OPTS.media])[0]
+            return self.send_json(200, {"ok": True})
         if urlsplit(self.path).path != "/api/public-scan":
             return self.send_json(404, {"error": "not_found"})
         try:
@@ -157,12 +233,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8930)
     ap.add_argument("--omit-results", action="store_true")
+    ap.add_argument("--omit-profile", action="store_true")
+    ap.add_argument("--media", choices=("normal", "relative", "none", "404"), default="normal")
     ap.add_argument("--delay", type=float, default=0.15)
     ap.parse_args(namespace=OPTS)
-    seed = json.loads(json.dumps(FIXTURE))
-    if OPTS.omit_results:
-        seed.pop("results", None)
-    STORE[seed["slug"]] = seed
+    for slug, overlay in (("demoR3port01", {}), ("demoNoProf01", {"profile": None}), (EVIL["slug"], EVIL)):
+        seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
+        if OPTS.omit_results:
+            seed.pop("results", None)
+        if OPTS.omit_profile:
+            seed["profile"] = None
+        STORE[slug] = seed
     srv = ThreadingHTTPServer(("127.0.0.1", OPTS.port), Handler)
     print(f"scan stub on http://127.0.0.1:{srv.server_address[1]}/", flush=True)
     srv.serve_forever()

@@ -734,3 +734,8 @@ body:has(.nav__links.open) .demo-ribbon { display: none; }
   text-align: left;
 }
 .link-btn[aria-disabled="true"] { cursor: default; }
+
+/* Personalized demo (js/personalize.js, only with ?r=<slug> + a scan profile) */
+.p-note { margin-top: 1rem; font-size: 0.95rem; opacity: 0.85; }
+.p-links:not([hidden]) { display: contents; }
+.p-fade { transition: opacity 0.5s ease; }

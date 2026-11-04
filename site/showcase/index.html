@@ -83,12 +83,12 @@
   </script>
   <link rel="alternate" type="application/rss+xml" title="Orla Brennick Blog RSS" href="feed.xml">
 </head>
-<body>
+<body data-p-demo data-p-title="{name} | Official Website">
 
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <aside class="demo-ribbon" aria-label="Demo notice">
-    <p class="demo-ribbon__text"><strong>Demo site:</strong> fictional creator, this is what every LeakScan client gets.</p>
+    <p class="demo-ribbon__text"><strong>Demo site:</strong> <span data-p-tpl="a preview for {name}, built from the free scan.">fictional creator, this is what every LeakScan client gets.</span></p>
     <a class="demo-ribbon__back" href="../">&larr; Back to LeakScan</a>
     <button class="demo-ribbon__close" type="button" aria-label="Dismiss demo notice">&times;</button>
   </aside>
@@ -96,7 +96,7 @@
   <!-- NAVIGATION -->
   <nav class="nav" role="navigation" aria-label="Main navigation">
     <div class="nav__inner">
-      <a href="./" class="nav__logo">Orla Brennick</a>
+      <a href="./" class="nav__logo" data-p-tpl="{name}">Orla Brennick</a>
       <ul class="nav__links">
         <li><a href="./">Home</a></li>
         <li><a href="about.html">About</a></li>
@@ -121,7 +121,7 @@
            crop would zoom into her face. -->
       <source media="(min-width: 768px)" srcset="imgs/hero-wide.webp" width="2560" height="1440">
       <img
-        class="hero__bg"
+        class="hero__bg" data-p-media="0" data-p-keep data-p-alt="Header photo"
         src="imgs/portrait.webp"
         width="2400" height="3200"
         alt="A potter's hands shaping wet clay on the wheel"
@@ -132,10 +132,10 @@
     <div class="hero__overlay" aria-hidden="true"></div>
     <div class="container">
       <div class="hero__content">
-        <p class="eyebrow hero__eyebrow">Studio potter · Galway, Ireland</p>
-        <h1 class="hero__title">Orla Brennick</h1>
-        <p class="hero__subtitle">I throw stoneware by hand in Galway and film it slowly. This is the one place online I fully control.</p>
-        <div class="hero__actions">
+        <p class="eyebrow hero__eyebrow" data-p="eyebrow">Studio potter · Galway, Ireland</p>
+        <h1 class="hero__title" data-p-tpl="{name}">Orla Brennick</h1>
+        <p class="hero__subtitle" data-p-tpl="[{Tagline}. ]This is the one place online I fully control.">I throw stoneware by hand in Galway and film it slowly. This is the one place online I fully control.</p>
+        <div class="hero__actions" data-p-keep>
           <a href="about.html" class="btn btn--primary">The Full Story</a>
           <a href="links.html" class="btn btn--outline">Official Links</a>
         </div>
@@ -147,11 +147,13 @@
   <section class="section" aria-labelledby="intro-heading">
     <div class="container">
       <div class="about-teaser__text" data-fade style="max-width: 820px; margin: 0 auto; text-align: center;">
-        <p class="eyebrow">Welcome</p>
+        <p class="eyebrow" data-p-keep>Welcome</p>
         <div class="divider" style="margin-left:auto; margin-right:auto;"></div>
-        <h2 id="intro-heading">The Official Home of Orla Brennick</h2>
-        <p>This is the official website of <strong>Orla Brennick</strong>, the studio potter behind <strong>Brennick Clay</strong>, known as <strong>@brennickclay</strong> on Instagram, Patreon and YouTube (as <strong>@BrennickClay</strong>) and as <strong>@orla.brennick</strong> on TikTok. She is based in <strong>Galway, Ireland</strong>, where she makes wheel-thrown, reduction-fired stoneware and is known for her slow, unedited wheel-throwing videos.</p>
+        <h2 id="intro-heading" data-p-tpl="The Official Home of {name}">The Official Home of Orla Brennick</h2>
+        <p data-p="welcome">This is the official website of <strong>Orla Brennick</strong>, the studio potter behind <strong>Brennick Clay</strong>, known as <strong>@brennickclay</strong> on Instagram, Patreon and YouTube (as <strong>@BrennickClay</strong>) and as <strong>@orla.brennick</strong> on TikTok. She is based in <strong>Galway, Ireland</strong>, where she makes wheel-thrown, reduction-fired stoneware and is known for her slow, unedited wheel-throwing videos.</p>
         <p>If you found an account using her name and you're not sure whether it's really her, you are in exactly the right place. Read the <a href="about.html">full biography</a>, follow the <a href="timeline.html">timeline</a>, learn <a href="verify.html">how to check an account</a>, or go straight to the <a href="links.html">complete list of her real accounts</a>.</p>
+        <p data-p-show hidden data-p-tpl="{about_short}">About the creator.</p>
+        <p data-p-show hidden>If you found an account using <span data-p-tpl="{first}’s">this</span> name and you're not sure whether it's real, you are in exactly the right place. Read the <a href="about.html">full biography</a>, learn <a href="verify.html">how to check an account</a>, or go straight to the <a href="links.html">complete list of real accounts</a>.</p>
       </div>
     </div>
   </section>
@@ -162,38 +164,39 @@
       <div class="about-teaser" data-fade>
         <div class="about-teaser__img-wrap">
           <img
-            src="imgs/studio-portrait.webp"
+            src="imgs/studio-portrait.webp" data-p-media="1" data-p-keep data-p-alt="Photo"
             width="2400" height="3200"
             alt="Shelves of finished stoneware in the studio"
             loading="lazy"
           >
         </div>
         <div class="about-teaser__text">
-          <p class="eyebrow">About Her</p>
+          <p class="eyebrow" data-p-tpl="About {first}">About Her</p>
           <div class="divider"></div>
-          <h2 id="about-heading">Thirty-six Mugs a Morning, One Gas Kiln</h2>
+          <h2 id="about-heading" data-p-tpl="Meet {first}">Thirty-six Mugs a Morning, One Gas Kiln</h2>
           <p>Orla makes everyday stoneware: mugs, bowls, plates and the occasional big jar, thrown on the wheel in a shared studio on the edge of Galway and fired in a gas kiln to around 1,300°C.</p>
           <p>Her videos are the opposite of a highlight reel. No music, no jump cuts: forty minutes of the same mug thrown twelve times, mistakes included. Her glazes come out of reduction firing, which is why no two kiln loads look quite alike.</p>
+          <p data-p-show hidden data-p-tpl="{bio}">Biography.</p>
           <p>She started with a ten-week evening class in 2019 and has weighed every ball of mug clay to 420 grams since 2021. One still comes out at 426, every time.</p>
           <div class="about-teaser__facts">
-            <div class="fact-item">
+            <div class="fact-item" data-p-unit>
               <div class="fact-item__label">Based</div>
-              <div class="fact-item__value">Galway</div>
+              <div class="fact-item__value" data-p-tpl="{location}">Galway</div>
             </div>
             <div class="fact-item">
               <div class="fact-item__label">Age</div>
               <div class="fact-item__value">31</div>
             </div>
-            <div class="fact-item">
+            <div class="fact-item" data-p-unit>
               <div class="fact-item__label">Known for</div>
-              <div class="fact-item__value">Slow wheel-throwing videos</div>
+              <div class="fact-item__value" data-p-tpl="{Profession}">Slow wheel-throwing videos</div>
             </div>
-            <div class="fact-item">
+            <div class="fact-item" data-p-unit>
               <div class="fact-item__label">Main platform</div>
-              <div class="fact-item__value">Instagram</div>
+              <div class="fact-item__value" data-p-tpl="{main_platform}">Instagram</div>
             </div>
           </div>
-          <a href="about.html" class="btn btn--primary">Read Full Bio</a>
+          <a href="about.html" class="btn btn--primary" data-p-keep>Read Full Bio</a>
         </div>
       </div>
     </div>
@@ -205,15 +208,15 @@
   <div class="social-strip" aria-label="Audience figures">
     <div class="container">
       <div class="social-strip__grid" data-fade>
-        <div class="social-card">
-          <div class="social-card__count">4</div>
+        <div class="social-card" data-p-unit>
+          <div class="social-card__count" data-p-tpl="{accounts_n}">4</div>
           <div class="social-card__platform">Official accounts</div>
         </div>
         <div class="social-card">
           <div class="social-card__count">0</div>
           <div class="social-card__platform">Shops, backups or second accounts</div>
         </div>
-        <div class="social-card">
+        <div class="social-card" data-p-keep>
           <div class="social-card__count">1</div>
           <div class="social-card__platform">Website, and this is it</div>
         </div>
@@ -228,16 +231,17 @@
   <section class="section" aria-labelledby="verify-heading">
     <div class="container">
       <div data-fade style="max-width: 780px; margin: 0 auto;">
-        <p class="eyebrow">Read This First</p>
+        <p class="eyebrow" data-p-keep>Read This First</p>
         <div class="divider"></div>
-        <h2 id="verify-heading">People Are Selling Pots I Never Made</h2>
+        <h2 id="verify-heading" data-p-tpl="Only One Official {name}">People Are Selling Pots I Never Made</h2>
         <p style="color: var(--text-muted); margin-top: 1.25rem; line-height: 1.85;">
           Since February 2026 I have found eleven accounts pretending to be me: seven on Instagram, four on TikTok. Most add "shop", "studio" or "official" to my handle, copy my kiln-opening photos, and take bank transfers for pots that do not exist. Seven are gone. I never sell through DMs, and I have no shop account.
         </p>
         <p style="color: var(--text-muted); line-height: 1.85;">
           This website is the only source I control. If an account isn't listed on my <a href="links.html" style="color: var(--accent);">official links page</a>, it is not me, no matter whose pots are on it.
         </p>
-        <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <p data-p-show hidden style="color: var(--text-muted); line-height: 1.85;">This website is the only source <span data-p-tpl="{first}">the creator</span> controls. If an account isn't listed on the <a href="links.html" style="color: var(--accent);">official links page</a>, it is not <span data-p-tpl="{first}">the creator</span>.</p>
+        <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;" data-p-keep>
           <a href="verify.html" class="btn btn--primary">How to Check an Account</a>
           <a href="statement.html" class="btn btn--outline">Read the Official Statement</a>
         </div>
@@ -246,41 +250,41 @@
   </section>
 
   <!-- GALLERY PREVIEW -->
-  <section class="section" style="background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);" aria-labelledby="gallery-heading">
+  <section class="section" data-p-gallery style="background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);" aria-labelledby="gallery-heading">
     <div class="container">
       <div class="section-header section-header--center" data-fade>
-        <p class="eyebrow">Gallery</p>
+        <p class="eyebrow" data-p-keep>Gallery</p>
         <div class="divider divider--center"></div>
-        <h2 id="gallery-heading">From the Studio</h2>
+        <h2 id="gallery-heading" data-p-keep>From the Studio</h2>
       </div>
       <ul class="gallery-grid gallery-grid--4col" role="list" style="list-style:none;padding:0;margin:0;">
-        <li class="gallery-item" data-lightbox>
+        <li class="gallery-item" data-lightbox data-p-media-only>
           <button type="button" class="gallery-item__btn" aria-label="View larger: Rustic handmade cups on a wooden table">
-            <img src="imgs/editorial-01.webp" width="1400" height="2100" alt="Rustic handmade cups on a wooden table" loading="lazy">
+            <img src="imgs/editorial-01.webp" width="1400" height="2100" data-p-media="2" alt="Rustic handmade cups on a wooden table" loading="lazy">
           </button>
           <div class="gallery-item__overlay" aria-hidden="true"></div>
         </li>
-        <li class="gallery-item gallery-item--tall" data-lightbox>
+        <li class="gallery-item gallery-item--tall" data-lightbox data-p-media-only>
           <button type="button" class="gallery-item__btn" aria-label="View larger: A lake in the west of Ireland under an overcast sky">
-            <img src="imgs/outdoors.webp" width="1400" height="2100" alt="A lake in the west of Ireland under an overcast sky" loading="lazy">
+            <img src="imgs/outdoors.webp" width="1400" height="2100" data-p-media="3" alt="A lake in the west of Ireland under an overcast sky" loading="lazy">
           </button>
           <div class="gallery-item__overlay" aria-hidden="true"></div>
         </li>
-        <li class="gallery-item" data-lightbox>
+        <li class="gallery-item" data-lightbox data-p-media-only>
           <button type="button" class="gallery-item__btn" aria-label="View larger: Handmade stoneware vases on display">
-            <img src="imgs/editorial-02.webp" width="1400" height="2100" alt="Handmade stoneware vases on display" loading="lazy">
+            <img src="imgs/editorial-02.webp" width="1400" height="2100" data-p-media="4" alt="Handmade stoneware vases on display" loading="lazy">
           </button>
           <div class="gallery-item__overlay" aria-hidden="true"></div>
         </li>
-        <li class="gallery-item gallery-item--tall" data-lightbox>
+        <li class="gallery-item gallery-item--tall" data-lightbox data-p-media-only>
           <button type="button" class="gallery-item__btn" aria-label="View larger: Hands shaping an unfinished clay pot on the wheel">
-            <img src="imgs/behind-the-scenes.webp" width="1400" height="2100" alt="Hands shaping an unfinished clay pot on the wheel" loading="lazy">
+            <img src="imgs/behind-the-scenes.webp" width="1400" height="2100" data-p-media="5" alt="Hands shaping an unfinished clay pot on the wheel" loading="lazy">
           </button>
           <div class="gallery-item__overlay" aria-hidden="true"></div>
         </li>
       </ul>
       <div style="text-align:center; margin-top: 2.5rem;">
-        <a href="about.html#gallery" class="btn btn--outline">View Full Gallery</a>
+        <a href="about.html#gallery" class="btn btn--outline" data-p-keep>View Full Gallery</a>
       </div>
     </div>
   </section>
@@ -341,9 +345,9 @@
     <div class="container">
       <div class="footer__inner">
         <div>
-          <div class="footer__brand-name">Orla Brennick</div>
-          <p class="footer__brand-desc">Studio potter from Galway, Ireland. This is the only website she controls.</p>
-          <div class="social-icons" style="margin-top: 1.5rem;">
+          <div class="footer__brand-name" data-p-tpl="{name}">Orla Brennick</div>
+          <p class="footer__brand-desc" data-p-tpl="[{Profession}. ][Based in {location}. ]This is the only website {first} controls.">Studio potter from Galway, Ireland. This is the only website she controls.</p>
+          <div class="social-icons" style="margin-top: 1.5rem;" data-p="social">
             <a href="links.html#instagram-brennickclay" class="social-icon" aria-label="Orla Brennick on Instagram (demo account)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none"/></svg>
             </a>
@@ -359,8 +363,8 @@
           </div>
         </div>
         <div>
-          <p class="footer__col-title">Navigate</p>
-          <ul class="footer__links">
+          <p class="footer__col-title" data-p-keep>Navigate</p>
+          <ul class="footer__links" data-p-keep>
             <li><a href="./">Home</a></li>
             <li><a href="about.html">About</a></li>
             <li><a href="timeline.html">Timeline</a></li>
@@ -371,15 +375,15 @@
           </ul>
         </div>
         <div>
-          <p class="footer__col-title">Verified Accounts</p>
-          <ul class="footer__links">
+          <p class="footer__col-title" data-p-keep>Verified Accounts</p>
+          <ul class="footer__links" data-p-keep>
             <li><a href="links.html">All official accounts &rarr;</a></li>
           </ul>
         </div>
       </div>
       <div class="footer__bottom">
-        <span>© 2026 Orla Brennick. All rights reserved.</span>
-        <span>Fictional demo · Official Site</span>
+        <span data-p-tpl="© 2026 {name}. All rights reserved.">© 2026 Orla Brennick. All rights reserved.</span>
+        <span data-p-tpl="Demo preview · Official Site">Fictional demo · Official Site</span>
       </div>
     </div>
   </footer>
@@ -391,5 +395,6 @@
   </div>
 
   <script src="js/main.js" defer></script>
+  <script src="../js/personalize.js" defer></script>
 </body>
 </html>

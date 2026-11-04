@@ -17,18 +17,18 @@
   <link rel="stylesheet" href="css/pages.css">
   <link rel="stylesheet" href="css/responsive.css">
 </head>
-<body>
+<body data-p-demo data-p-title="Page Not Found | {name}">
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <aside class="demo-ribbon" aria-label="Demo notice">
-    <p class="demo-ribbon__text"><strong>Demo site:</strong> fictional creator, this is what every LeakScan client gets.</p>
+    <p class="demo-ribbon__text"><strong>Demo site:</strong> <span data-p-tpl="a preview for {name}, built from the free scan.">fictional creator, this is what every LeakScan client gets.</span></p>
     <a class="demo-ribbon__back" href="../">&larr; Back to LeakScan</a>
     <button class="demo-ribbon__close" type="button" aria-label="Dismiss demo notice">&times;</button>
   </aside>
 
   <nav class="nav" role="navigation" aria-label="Main navigation">
     <div class="nav__inner">
-      <a href="./" class="nav__logo">Orla Brennick</a>
+      <a href="./" class="nav__logo" data-p-tpl="{name}">Orla Brennick</a>
       <ul class="nav__links">
         <li><a href="./">Home</a></li>
         <li><a href="about.html">About</a></li>
@@ -46,9 +46,9 @@
   <main id="main-content">
     <section class="section" style="min-height: 80vh; display: flex; align-items: center; padding-top: calc(var(--nav-h) + 3rem);">
       <div class="container" style="max-width: 640px; text-align: center;">
-        <p class="eyebrow">Error 404</p>
+        <p class="eyebrow" data-p-keep>Error 404</p>
         <div class="divider divider--center"></div>
-        <h1 style="font-size: clamp(3rem, 8vw, 5.5rem);">Not Here</h1>
+        <h1 data-p-keep style="font-size: clamp(3rem, 8vw, 5.5rem);">Not Here</h1>
         <p style="color: var(--text-muted); margin-top: 1.5rem; line-height: 1.85;">
           That page doesn't exist. If you followed a link promising a Brennick Clay sale, a giveaway
           prize or a free glaze notebook and landed here, that link was lying to you.
@@ -57,7 +57,8 @@
           The <a href="links.html" style="color: var(--accent);">official account list</a> is the only place
           her real profiles are published.
         </p>
-        <div style="margin-top: 2.5rem; display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+        <p data-p-show hidden style="color: var(--text-muted); margin-top: 1.5rem; line-height: 1.85;">That page doesn't exist. The <a href="links.html" style="color: var(--accent);">official account list</a> is the only place <span data-p-tpl="{first}’s">the creator’s</span> real profiles are published.</p>
+        <div style="margin-top: 2.5rem; display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;" data-p-keep>
           <a href="./" class="btn btn--primary">Back to Home</a>
           <a href="verify.html" class="btn btn--outline">Verify an Account</a>
         </div>
@@ -68,12 +69,13 @@
   <footer class="footer" role="contentinfo">
     <div class="container">
       <div class="footer__bottom" style="border-top: none;">
-        <span>© 2026 Orla Brennick. All rights reserved.</span>
-        <span>Fictional demo · Official Site</span>
+        <span data-p-tpl="© 2026 {name}. All rights reserved.">© 2026 Orla Brennick. All rights reserved.</span>
+        <span data-p-tpl="Demo preview · Official Site">Fictional demo · Official Site</span>
       </div>
     </div>
   </footer>
 
   <script src="js/main.js" defer></script>
+  <script src="../js/personalize.js" defer></script>
 </body>
 </html>

@@ -798,5 +798,41 @@
    "domain": "forumleak.example",
    "kind": "page"
   }
- ]
+ ],
+ "profile": {
+  "display_name": "Mira Example",
+  "first_name": "Mira",
+  "username": "demo.creator",
+  "platform": "onlyfans.com",
+  "tagline": "illustrator of quiet city mornings",
+  "profession": "illustrator",
+  "location": "Lisbon, Portugal",
+  "bio": "Mira Example draws quiet city mornings in ink and watercolour and posts the process from sketch to finished page. Synthetic fixture text.",
+  "about_short": "Mira shares slow drawing videos and the occasional sketchbook tour. Synthetic fixture text.",
+  "followers": 12000,
+  "accounts": [
+   {
+    "platform": "instagram",
+    "handle": "mira.example",
+    "url": "https://www.instagram.com/mira.example/"
+   },
+   {
+    "platform": "tiktok",
+    "handle": "mira.draws",
+    "url": "https://www.tiktok.com/@mira.draws"
+   },
+   {
+    "platform": "youtube",
+    "handle": "MiraExampleArt",
+    "url": "https://www.youtube.com/@MiraExampleArt"
+   }
+  ],
+  "site_domain": "miraexample.com",
+  "avatar": true,
+  "sources": [
+   "synthetic fixture"
+  ],
+  "confidence": 0.9,
+  "generated_by": "fixture"
+ }
 }

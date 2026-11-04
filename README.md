@@ -9,16 +9,37 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
 
 - Free scan: the hero form (`#scan`, plain GET) sends `p=<platform>&h=<handle>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
-  (`https://scan.srv1395798.hstgr.cloud`, set once at the top of `js/scan.js`, overridden by `<body data-api>`), reads the
+  (same origin, except on `*.github.io` → `https://scan.srv1395798.hstgr.cloud`; set once at the top of `js/scan.js`
+  and `js/personalize.js`, overridden by `<body data-api>`), reads the
   SSE stream (progress → result → done), then renders the report: summary, a Google look-alike (All / Images / Videos,
   Phone / Computer, thumbnails via `/api/thumb`, blurred until Reveal), per-site table, all links (copy / .txt) and the
   prefilled message CTAs. The URL becomes `scan/?r=<slug>`, which reopens the report via `GET /api/scan-result/<slug>`.
   Without JS it links to https://jackbase.me/scan.
+- Personalization (`js/personalize.js`): after a scan the landing page and the demo site (`showcase/`) show her data.
+  Slug: `?r=` → `localStorage['leakscan.last']` (written by `scan.js`) → none (page unchanged, no API call). One
+  `GET /api/scan-result/<slug>` per tab (sessionStorage cache, 8 s timeout, failure = defaults); every value is
+  validated and rendered with textContent / built elements, never leak titles or snippets. Landing: hero line +
+  Reset, both "Your website" phones (name, top-4 leak domains by occurrences, blurred `/api/thumb` thumbs, IG / TikTok /
+  site rows hidden when unknown), hero card handles, showcase url bar + iframe `showcase/?r=`. Slots are `data-p="…"`.
+  Demo: only with `profile` (else Orla stays); name / bio / facts / links from `data-p-tpl` templates, everything not
+  marked is hidden (no pottery next to her name), avatar via `/api/avatar/<slug>` when `profile.avatar`, `?r=` kept on
+  links. Photos arrive later: `GET /api/media/<slug>` polled every 3 s for ≤ 90 s (stops on ready / none / 2nd 404),
+  swapped in with fade, fixed boxes; only `<API>/api/media/…` or same-origin `/api/media/…` srcs. The scan report card
+  links to `../?r=<slug>#website` + `../showcase/?r=<slug>` and shows "Gathering photos…" → "Photos ready".
+  `window.LeakScanPersonalize = {apply(result), applySlug(slug), pollMedia(slug, cb)}` re-personalizes in place
+  (idempotent) for a future inline scan.
+  Privacy: the slug lives only in this browser (localStorage, plus the cached result in sessionStorage); "Reset page"
+  clears it. Nothing is sent anywhere except the API reads above.
 - Scan stub: `python3 tools/scan_stub.py [--port 8930]` serves `site/` plus the API routes from the synthetic fixture
   `tools/fixtures/scan-sample.json` (magic handles `stub-fail`, `stub-429`, `stub-busy`, `stub-empty`; `--omit-results`
-  for break-it runs). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
+  for break-it runs; `--omit-profile` drops `profile`; `--media normal|relative|none|404`, or per slug
+  `POST /__stub/media?slug=&mode=`; preloaded slugs `demoR3port01`, `demoNoProf01` (no profile), `evilR3port01`
+  (malicious values); `/api/profile`, `/api/avatar`, `/api/media` routes). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
   E2E: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR` (starts its own stub; phone + desktop;
   form → progress → report, tab counts, device toggle, Reveal, CTAs, `?r=` reopen, error paths; never calls prod).
+  `--only scan|personalize`; `personalize` covers the flow above (no-slug text identical to main, phones, demo pages,
+  media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
+  need `profile`; `--omit-profile` turns only those red.
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
 - Gate: `python3 tools/check.py` (silent + exit 0 when green; prints each problem + exit 1). Runs in CI on every push/PR.
   Covers links/assets resolve, no unreferenced files in `assets/ css/ js/`, canonicals, sitemap, JSON-LD (+ FAQ sync),

@@ -59,18 +59,18 @@
   }
   </script>
 </head>
-<body>
+<body data-p-demo data-p-title="Official Statement | {name}">
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <aside class="demo-ribbon" aria-label="Demo notice">
-    <p class="demo-ribbon__text"><strong>Demo site:</strong> fictional creator, this is what every LeakScan client gets.</p>
+    <p class="demo-ribbon__text"><strong>Demo site:</strong> <span data-p-tpl="a preview for {name}, built from the free scan.">fictional creator, this is what every LeakScan client gets.</span></p>
     <a class="demo-ribbon__back" href="../">&larr; Back to LeakScan</a>
     <button class="demo-ribbon__close" type="button" aria-label="Dismiss demo notice">&times;</button>
   </aside>
 
   <nav class="nav" role="navigation" aria-label="Main navigation">
     <div class="nav__inner">
-      <a href="./" class="nav__logo">Orla Brennick</a>
+      <a href="./" class="nav__logo" data-p-tpl="{name}">Orla Brennick</a>
       <ul class="nav__links">
         <li><a href="./">Home</a></li>
         <li><a href="about.html">About</a></li>
@@ -88,12 +88,13 @@
   <main id="main-content">
     <section class="section" style="padding-top: calc(var(--nav-h) + 4rem);">
       <div class="container" style="max-width: 760px;">
-        <p class="eyebrow">Official Statement</p>
+        <p class="eyebrow" data-p-keep>Official Statement</p>
         <div class="divider"></div>
-        <h1 style="margin-bottom: 0.75rem; font-size: clamp(2rem, 4.5vw, 3.4rem);">Read this before you believe anything else about me</h1>
+        <h1 data-p-tpl="Official Statement from {name}" style="margin-bottom: 0.75rem; font-size: clamp(2rem, 4.5vw, 3.4rem);">Read this before you believe anything else about me</h1>
         <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2.5rem;">
           <time datetime="2026-11-03">Last updated 3 November 2026</time> · Written by Orla Brennick
         </p>
+        <p class="p-note" data-p-show hidden data-p-tpl="On {name}’s real site, this page is written with {first} during setup.">This page is written with the creator during setup.</p>
 
         <div class="post-body" style="max-width: 100%;">
 
@@ -167,12 +168,12 @@
     <div class="container">
       <div class="footer__inner">
         <div>
-          <div class="footer__brand-name">Orla Brennick</div>
-          <p class="footer__brand-desc">Studio potter from Galway, Ireland. This is the only website she controls.</p>
+          <div class="footer__brand-name" data-p-tpl="{name}">Orla Brennick</div>
+          <p class="footer__brand-desc" data-p-tpl="[{Profession}. ][Based in {location}. ]This is the only website {first} controls.">Studio potter from Galway, Ireland. This is the only website she controls.</p>
         </div>
         <div>
-          <p class="footer__col-title">Navigate</p>
-          <ul class="footer__links">
+          <p class="footer__col-title" data-p-keep>Navigate</p>
+          <ul class="footer__links" data-p-keep>
             <li><a href="./">Home</a></li>
             <li><a href="about.html">About</a></li>
             <li><a href="timeline.html">Timeline</a></li>
@@ -183,19 +184,20 @@
           </ul>
         </div>
         <div>
-          <p class="footer__col-title">Verified Accounts</p>
-          <ul class="footer__links">
+          <p class="footer__col-title" data-p-keep>Verified Accounts</p>
+          <ul class="footer__links" data-p-keep>
             <li><a href="links.html">All official accounts &rarr;</a></li>
           </ul>
         </div>
       </div>
       <div class="footer__bottom">
-        <span>© 2026 Orla Brennick. All rights reserved.</span>
-        <span>Fictional demo · Official Site</span>
+        <span data-p-tpl="© 2026 {name}. All rights reserved.">© 2026 Orla Brennick. All rights reserved.</span>
+        <span data-p-tpl="Demo preview · Official Site">Fictional demo · Official Site</span>
       </div>
     </div>
   </footer>
 
   <script src="js/main.js" defer></script>
+  <script src="../js/personalize.js" defer></script>
 </body>
 </html>
