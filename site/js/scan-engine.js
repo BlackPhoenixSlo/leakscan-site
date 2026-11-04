@@ -4,7 +4,8 @@
 (function () {
   'use strict';
   var API = (document.body.dataset.api || (location.hostname.slice(-9) === 'github.io' ? 'https://scan.srv1395798.hstgr.cloud' : '')).replace(/\/+$/, ''); // '' = same origin (VPS)
-  var REPORT_BASE = 'https://blackphoenixslo.github.io/leakscan-site/scan/?r=';
+  // Shareable report link on the host serving this page (GitHub Pages, the VPS, later abolita.com): js/ -> ../scan/.
+  var REPORT_BASE = new URL('../scan/?r=', document.currentScript.src).href;
   var PLATFORMS = { 'onlyfans.com': 'OnlyFans', 'instagram.com': 'Instagram', 'fansly.com': 'Fansly', 'tiktok.com': 'TikTok', 'patreon.com': 'Patreon' };
   var HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/, SLUG_RE = /^[A-Za-z0-9_-]{4,64}$/;
 
