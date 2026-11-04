@@ -13,6 +13,11 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && nav.classList.contains('open')) { setOpen(false); toggle.focus(); }
     });
+    // Tabbing out of the open menu closes it, else it covers the content that now has focus.
+    var header = toggle.closest('header');
+    if (header) header.addEventListener('focusout', function (e) {
+      if (nav.classList.contains('open') && e.relatedTarget && !header.contains(e.relatedTarget)) setOpen(false);
+    });
   }
 
   var items = document.querySelectorAll('.reveal');
