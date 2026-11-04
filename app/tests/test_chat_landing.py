@@ -213,7 +213,7 @@ class LandingPrompt(unittest.TestCase):
                      "invent prices", "guarantees", "timelines",
                      "success rates", "[Pricing](#pricing)", "https://t.me/jakabasej",
                      "https://wa.me/38640703992", "me@jackbase.dev", "No sexual or explicit",
-                     "Never reveal", "only help with LeakScan questions"):
+                     "Never reveal", "only help with Abolita questions"):
             self.assertIn(rule, p)
 
     def test_build_messages_default_prompt_unchanged(self):

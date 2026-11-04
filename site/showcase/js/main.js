@@ -47,7 +47,7 @@ if (toggle && navLinks) {
 
 // Demo ribbon (showcase only): dismissible, remembered for the session.
 // Hidden when framed (the landing page's preview iframe): there it would cover
-// the demo and its "Back to LeakScan" link would load the landing inside the frame.
+// the demo and its "Back to Abolita" link would load the landing inside the frame.
 const ribbon = document.querySelector('.demo-ribbon');
 if (ribbon && window.self !== window.top) ribbon.classList.add('is-hidden');
 else if (ribbon) {

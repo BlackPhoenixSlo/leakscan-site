@@ -153,7 +153,7 @@
     setTitle('Free scan report', '@' + d.handle,
       empty ? 'Scan of what Google shows for your ' + name + ' handle.'
         : 'Copies found on ' + d.domain_count + ' ' + plural(d.domain_count, 'site', 'sites') + '. Here is what Google shows for your ' + name + ' handle.');
-    document.title = '@' + d.handle + ' · Free scan report · LeakScan';
+    document.title = '@' + d.handle + ' · Free scan report · Abolita';
     $('summary').querySelector('[data-stat=domains]').textContent = num(d.domain_count);
     $('summary').querySelector('[data-label=domains]').textContent = plural(d.domain_count, 'site with copies found', 'sites with copies found');
     $('summary').querySelector('[data-stat=pages]').textContent = num(d.hit_count);
@@ -395,7 +395,7 @@
     }).join('');
   }
   function linksText() {
-    var d = state.data, out = ['LeakScan free scan report: ' + who(), 'Report: ' + REPORT_BASE + d.slug,
+    var d = state.data, out = ['Abolita free scan report: ' + who(), 'Report: ' + REPORT_BASE + d.slug,
       d.domain_count + ' sites, ' + d.hit_count + ' indexed pages, Google index ~' + num(d.google_total), ''];
     groups(d).forEach(function (g) { out.push(g.domain + ' (' + g.links.length + ')'); out = out.concat(g.links); out.push(''); });
     return out.join('\n');
