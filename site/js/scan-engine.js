@@ -58,6 +58,44 @@
     try { localStorage.setItem('leakscan.last', JSON.stringify({ slug: slug, handle: handle, platform: platform, name: pn, ts: Date.now() })); } catch (e) { /* storage blocked */ }
   }
 
+  // ---------- letter avatars + image items (scan page, hero card, #free band) ----------
+  var FAV_COLORS = ['#ea4335', '#4285f4', '#34a853', '#fbbc05', '#ab47bc', '#00acc1', '#ff7043']; // cse_mosaic _TAB_PALETTE
+  function favColor(dom) {
+    var s = 0;
+    for (var i = 0; i < (dom || '').length; i++) s += dom.charCodeAt(i);
+    return FAV_COLORS[s % FAV_COLORS.length];
+  }
+  // fav(dom, cls, src?) → <span class=cls> with the domain's first letter on its colour; src (an /api/thumb URL) layers
+  // a blurred thumb over it, dropped again if it fails to load.
+  function fav(dom, cls, src) {
+    var el = document.createElement('span');
+    el.className = cls || 'g-fav';
+    el.style.background = favColor(dom);
+    el.setAttribute('aria-hidden', 'true');
+    el.textContent = ((dom || '').charAt(0) || '?').toUpperCase();
+    if (src) {
+      var im = document.createElement('img');
+      im.src = src; im.alt = ''; im.loading = 'lazy'; im.decoding = 'async'; im.referrerPolicy = 'no-referrer';
+      im.addEventListener('error', function () { im.remove(); }, { once: true });
+      el.appendChild(im);
+    }
+    return el;
+  }
+  // images[] first (with the result that has the same thumb, if any), then the results' own thumbs; deduped, ok(src)
+  // filters. → [{src, title, domain, link}] (title/domain/link '' when no result matches).
+  function imageItems(images, results, ok, max) {
+    var by = {}, seen = {}, out = [];
+    results.forEach(function (r) { if (r.thumb && !by[r.thumb]) by[r.thumb] = r; });
+    var add = function (u, r) {
+      if (typeof u !== 'string' || seen[u] || !ok(u)) return;
+      seen[u] = 1;
+      out.push({ src: u, title: r && r.title || '', domain: r && r.domain || '', link: r && r.link || '' });
+    };
+    images.forEach(function (u) { add(u, by[u]); });
+    results.forEach(function (r) { add(r.thumb, r); });
+    return out.slice(0, max);
+  }
+
   // ---------- errors: err.kind = rate_limited | busy | bad_handle | not_found | failed (+ err.detail) | network ----------
   function apiError(status, code, fallback) {
     var err = new Error(code || fallback);
@@ -149,6 +187,6 @@
   window.LeakScanEngine = {
     API: API, REPORT_BASE: REPORT_BASE, PLATFORMS: PLATFORMS, SLUG_RE: SLUG_RE, HANDLE_RE: HANDLE_RE, cleanHandle: cleanHandle, cleanSocial: cleanSocial, thumb: thumb,
     who: who, setMessages: setMessages, sendReport: sendReport, remember: remember, runScan: runScan,
-    fetchResult: fetchResult, progressInfo: progressInfo
+    fetchResult: fetchResult, progressInfo: progressInfo, favColor: favColor, fav: fav, imageItems: imageItems
   };
 })();
