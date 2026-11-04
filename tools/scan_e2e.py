@@ -2,7 +2,7 @@
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline]
-        [--omit-results] [--omit-profile] [--break-allowlist]
+        [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs three scenarios.
@@ -31,6 +31,14 @@ requests, other questions streamed from the stub's /api/chat (request body: kb, 
 scrolls, allowlisted hosts only), failed / 429 / no-API (file://) fallbacks, retry, sessionStorage restore, reduced
 motion, JS off. Requests made by the lazy showcase iframe (disclosed Google Fonts, aborted) are not counted against
 the popup. --break-allowlist serves chat.js with its host allowlist disabled: only `links:` checks may go red.
+
+inline (js/inline-scan.js): the hero form scans in place; the card becomes the report: Links / Images / Sites tabs
+(counts from the fixture, switching never resizes the card), whole-row links, a film strip of what Google Images shows
+(blurred, ↗, links to its result or the full report) that drifts by itself after ~4 s idle, stops for good on a
+pointerdown and never moves under prefers-reduced-motion (no layout shift: card box + PerformanceObserver), the #free
+band's mini Google Images frame with her tiles; errors, reload, reset. --break-drift serves inline-scan.js with the
+drift speed 0: only `drift:` checks may go red. --break-phones serves personalize.js without the phone links: only
+`phones:` checks may go red.
 """
 import json, pathlib, re, socket, subprocess, sys, time, urllib.request
 from urllib.parse import parse_qs, quote, urlsplit
@@ -44,6 +52,43 @@ omit = "--omit-results" in sys.argv
 omit_profile = "--omit-profile" in sys.argv
 SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai", "inline"]
 BREAK_ALLOWLIST = "--break-allowlist" in sys.argv
+BREAK_DRIFT = "--break-drift" in sys.argv
+BREAK_PHONES = "--break-phones" in sys.argv
+GS_RE = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
+PEOPLE = {"imgs/portrait.webp", "imgs/hero-wide.webp", "imgs/studio-portrait.webp"}   # showcase hero defaults: Pexels people photos (tools/showcase/CREDITS.md)
+
+
+def _images(fx):
+    """Mirror of inline-scan.js model().images: images[] (with the result that has that thumb) then results' thumbs,
+    gstatic only, deduped, max 60; the ones with a link first. → [(src, link, domain)]"""
+    ok = lambda u: isinstance(u, str) and len(u) <= 600 and GS_RE.match(u)
+    res = [r for r in fx.get("results", []) if r.get("link")]
+    by, seen, out = {}, set(), []
+    for r in res:
+        if ok(r.get("thumb")) and r["thumb"] not in by:
+            by[r["thumb"]] = r
+
+    def add(u, r):
+        if ok(u) and u not in seen:
+            seen.add(u)
+            out.append((u, r["link"] if r else "", r["domain"] if r else ""))
+    for u in fx.get("images", [])[:200]:
+        add(u, by.get(u))
+    for r in res:
+        add(r.get("thumb"), r)
+    out = out[:60]
+    return [o for o in out if o[1]] + [o for o in out if not o[1]]
+
+
+def break_routes(ctx):
+    """--break-drift / --break-phones: serve the script with the feature disabled (wire boundary, same bytes otherwise)."""
+    for flag, name, old, new in ((BREAK_DRIFT, "inline-scan.js", "DRIFT_SPEED = 24", "DRIFT_SPEED = 0"),
+                                 (BREAK_PHONES, "personalize.js", "    phones(m, d);\n", "\n")):
+        if not flag:
+            continue
+        body = (ROOT / "site" / "js" / name).read_text(encoding="utf-8")
+        assert old in body, f"break: marker not found in {name}"
+        ctx.route(f"**/js/{name}", lambda r, _q, b=body.replace(old, new, 1): r.fulfill(body=b, content_type="application/javascript"))
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 fails = []
 
@@ -108,7 +153,17 @@ def scan_flow(browser, vp_name, vp):
     check(f"{vp_name} title shows handle", page.locator("#scan-title").inner_text() == "@demo.creator")
     check(f"{vp_name} aliases: header says Also found as the discovered handles", page.locator("#scan-aliases").is_visible()
           and page.locator("#scan-aliases").inner_text() == ALSO, page.locator("#scan-aliases").inner_text())
-    shot("2-report-full", full=True)
+    aff = page.evaluate("""() => {
+        const hint = document.querySelector('.g-hint'), deco = [...document.querySelectorAll('.g-tab-deco')];
+        return {hint: hint && hint.offsetParent !== null ? hint.textContent.trim() : null,
+          deco: deco.map(e => [e.tagName, e.tabIndex, e.getAttribute('aria-hidden'), +getComputedStyle(e).opacity, getComputedStyle(e).cursor]),
+          tabs: [...document.querySelectorAll('.g-tab')].map(e => getComputedStyle(e).cursor),
+          seg: [...document.querySelectorAll('#device label')].map(e => getComputedStyle(e).cursor)};
+    }""")
+    check(f"{vp_name} scan page: hint next to the frame", aff["hint"] == "Tap All · Images · Videos to switch, tap any result to open it.", aff["hint"])
+    check(f"{vp_name} scan page: decorative tabs muted, not focusable; real tabs + device toggle pointer",
+          aff["deco"] and all(d[0] == "SPAN" and d[1] == -1 and d[2] == "true" and d[3] < .6 and d[4] == "default" for d in aff["deco"])
+          and set(aff["tabs"]) == {"pointer"} and set(aff["seg"]) == {"pointer"}, aff)
 
     # 4. device + tabs (both devices, all three tabs)
     default = "phone" if vp_name == "phone" else "computer"
@@ -138,6 +193,7 @@ def scan_flow(browser, vp_name, vp):
             page.locator("[data-more=all]").click()
         n1 = page.locator("#g-panel .g-r").count()
         check(f"{vp_name}/{device} All tab count", (n0, n1) == (min(10, len(PAGES)), len(PAGES)), f"{n0}→{n1} want 10→{len(PAGES)}")
+        check(f"{vp_name}/{device} every result title carries open ↗", page.locator("#g-panel .g-r a.g-title > .g-go").count() == n1)
         check(f"{vp_name}/{device} tab aria-selected", page.locator("#g-tab-all").get_attribute("aria-selected") == "true"
               and page.locator("#g-tab-images").get_attribute("aria-selected") == "false")
         # Images
@@ -147,6 +203,30 @@ def scan_flow(browser, vp_name, vp):
         ni = page.locator("#g-panel .g-tile").count()
         check(f"{vp_name}/{device} Images tab count", ni == IMAGES, f"{ni} want {IMAGES}")
         page.wait_for_timeout(500)
+        go = lambda: page.eval_on_selector("#g-panel .g-tile-a .g-go", "e => [+getComputedStyle(e).opacity, getComputedStyle(e.querySelector('.g-go-w')).display]")
+        if vp_name == "phone":   # touch: a small ↗ that is always there. Fresh page: element shots taller than the
+            # viewport make Playwright drop touch emulation ((hover: none) stops matching) for the rest of the page's life
+            p3 = ctx.new_page()
+            p3.goto(base + "scan/?r=" + slug)
+            p3.wait_for_selector("#report:not([hidden])", timeout=5000)
+            if p3.locator("#device input:checked").get_attribute("value") != device:
+                p3.locator(f"#device label:has(input[value={device}])").click()
+                p3.wait_for_timeout(300)
+            p3.locator("#g-tab-images").click()
+            p3.wait_for_timeout(400)
+            g0 = p3.eval_on_selector("#g-panel .g-tile-a .g-go", "e => [+getComputedStyle(e).opacity, getComputedStyle(e.querySelector('.g-go-w')).display]")
+            check(f"{vp_name}/{device} tiles: persistent ↗ badge on touch", g0[0] > .8 and g0[1] == "none", g0)
+            p3.evaluate("document.querySelector('#g-panel .g-tile-a').scrollIntoView({block: 'center'})")
+            p3.screenshot(path=str(out / f"{vp_name}-4b-{device}-touch-badges.png"))
+            p3.close()
+        else:
+            g0 = go()
+            page.locator("#g-panel .g-tile-a").first.hover()
+            page.wait_for_timeout(300)
+            g1 = go()
+            check(f"{vp_name}/{device} tiles: 'open ↗' only on hover", g0[0] == 0 and g1[0] == 1 and g1[1] != "none", (g0, g1))
+            g.screenshot(path=str(out / f"{vp_name}-4b-{device}-tile-hover.png"))
+            page.mouse.move(0, 0)
         g.screenshot(path=str(out / f"{vp_name}-4-{device}-images.png"))
         # Videos
         page.locator("#g-tab-videos").click()
@@ -197,6 +277,8 @@ def scan_flow(browser, vp_name, vp):
     check(f"{vp_name} ?r= reopens without a new scan", len(posts) == n_posts
           and digits(p2.locator("[data-stat=domains]").inner_text()) == FX["domain_count"])
     p2.screenshot(path=str(out / f"{vp_name}-8-reopen.png"))
+    # full-page shots drop Playwright's touch emulation ((hover: none) stops matching), so take it here, on the throwaway page
+    p2.screenshot(path=str(out / f"{vp_name}-2-report-full.png"), full_page=True)
     p2.goto(base + "scan/?r=evilR3port01")
     p2.wait_for_selector("#report:not([hidden])", timeout=5000)
     check(f"{vp_name} aliases: malicious discovered handles never shown", p2.locator("#scan-aliases").is_hidden()
@@ -254,6 +336,19 @@ def top_domains(hits):
 
 
 TOP = top_domains(FX["hits"])
+
+
+def top_urls(hits):
+    """per domain, the URL of its most-seen hit (first one on a tie): what the before-phone's leak rows open"""
+    best, url = {}, {}
+    for h in hits:
+        d, n = h["domain"].lower().removeprefix("www."), h.get("occurrences") or 1
+        if d not in best or n > best[d]:
+            best[d], url[d] = n, h["url"]
+    return url
+
+
+TOP_URLS = top_urls(FX["hits"])
 GSTATIC = [u for u in FX["images"] if u.startswith("https://") and ".gstatic.com/" in u][:3]
 DEMO_PAGES = ["", "about.html", "links.html", "timeline.html", "verify.html", "blog.html", "statement.html",
               "blog/post-1.html", "blog/post-2.html", "blog/post-3.html", "404.html"]
@@ -291,6 +386,7 @@ def personalize_flow(browser, vp_name, vp):
                 net["outside"].append(r.request.url)
                 r.abort()
         ctx.route("**/*", route)
+        break_routes(ctx)
         ctx.on("page", lambda pg: (pg.on("dialog", lambda d: (net["dialogs"].append(d.message), d.dismiss())),
                                    pg.on("pageerror", lambda e: net["errors"].append(str(e)))))
         return ctx
@@ -320,6 +416,24 @@ def personalize_flow(browser, vp_name, vp):
     then = p2.evaluate("document.body.innerText")
     check(f"{tag} no slug: visible text identical to the page without the scripts", now == then, f"{len(now)} vs {len(then)} chars")
     check(f"{tag} no slug: no API call", not no_api, no_api)
+    static = page.evaluate("""() => ({links: document.querySelectorAll('.ba a').length,
+        roles: [...document.querySelectorAll('.ba .phone')].map(p => p.getAttribute('role')),
+        hidden: [...document.querySelectorAll('.ba .phone-screen')].map(s => s.getAttribute('aria-hidden')), hint: !!document.querySelector('.ba-hint'),
+        band: [document.querySelector('.gmini').getAttribute('role'), document.querySelectorAll('.gmini a').length, document.querySelectorAll('.gmini-grid .gi-card').length],
+        lav: [...document.querySelectorAll('.report-card .report-rows .lav')].map(e => e.textContent)})""")
+    check(f"{tag} no slug: phones = one image each, rows not links, no tap hint", static["links"] == 0 and static["roles"] == ["img", "img"]
+          and static["hidden"] == ["true", "true"] and not static["hint"], static)
+    check(f"{tag} no slug: #free band = static Google Images illustration, hero rows = letter avatars",
+          static["band"] == ["img", 0, 10] and static["lav"] == ["L", "F", "P", "F"], static)
+    page.locator("#showcase").scroll_into_view_if_needed()
+    try:
+        page.wait_for_function("() => { const f = document.querySelector('iframe[data-p=demo]'); const i = f && f.contentDocument && f.contentDocument.querySelector('img.hero__bg'); return i && i.complete && i.naturalWidth > 0; }", timeout=9000)
+    except Exception:
+        pass
+    hero0 = page.evaluate("() => { const i = document.querySelector('iframe[data-p=demo]').contentDocument.querySelector('img.hero__bg'); return [i.getAttribute('src'), i.alt, i.naturalWidth]; }")
+    check(f"{tag} no slug: showcase hero = a people photo (Pexels series, credited)", hero0[0] in PEOPLE and "Orla" in hero0[1] and hero0[2] > 0, hero0)
+    page.wait_for_timeout(500)
+    page.locator("#showcase").screenshot(path=str(out / f"{vp_name}-p0-showcase-default.png"))
     ctx2.close()
     ctx.close()
 
@@ -352,6 +466,28 @@ def personalize_flow(browser, vp_name, vp):
     check(f"{tag} profile: after phone site / blog / TikTok", after == [sd, f"{sd} › blog", f"{name}: Official site", "@" + ACC["tiktok"]["handle"]], after)
     check(f"{tag} after phone: removed row = top leak domain", page.locator('[data-p="gone"] .m-site').inner_text() == TOP[0])
     page.locator("#website").screenshot(path=str(out / f"{vp_name}-p2-your-website.png"))
+    ph = page.evaluate("""() => {
+        const r = k => [...document.querySelectorAll(`.ba [data-p="${k}"] > a.m-link`)].map(a => [a.getAttribute('href'), a.target, a.rel]);
+        return {rows: Object.fromEntries(['leak-1', 'leak-2', 'leak-3', 'leak-4', 'ig', 'tt', 'own', 'blog', 'gone'].map(k => [k, r(k)])),
+          roles: [...document.querySelectorAll('.ba .phone')].map(p => [p.getAttribute('role'), p.getAttribute('aria-label')]),
+          hidden: [...document.querySelectorAll('.ba .phone-screen')].map(s => s.getAttribute('aria-hidden')),
+          buried: document.querySelectorAll('.ba [aria-hidden=true] a, .ba [role=img] a').length,
+          hint: (document.querySelector('.ba-hint') || {}).textContent};
+    }""")
+    NT = ["_blank", "noopener noreferrer nofollow"]
+    want_rows = {**{f"leak-{i + 1}": [[TOP_URLS[d]] + NT] for i, d in enumerate(TOP)}, "ig": [[ACC["instagram"]["url"]] + NT] * 2,
+                 "tt": [[ACC["tiktok"]["url"]] + NT], "own": [["#showcase", "", ""]], "blog": [["#showcase", "", ""]], "gone": [["#pricing", "", ""]]}
+    check(f"{tag} phones: profile: every row links (leaks → her leak pages, IG / TikTok → her accounts, site → #showcase, Removed → #pricing)",
+          ph["rows"] == want_rows, ph["rows"])
+    check(f"{tag} phones: labelled groups, no aria-hidden over links, 'Tap a result to open it'",
+          [r[0] for r in ph["roles"]] == ["group", "group"] and all(r[1] and not r[1].startswith("Illustration") for r in ph["roles"])
+          and ph["hidden"] == [None, None] and ph["buried"] == 0 and ph["hint"] == "Tap a result to open it", ph)
+    page.locator('.ba [data-p="leak-1"] a').hover()
+    page.wait_for_timeout(300)
+    hov = page.eval_on_selector('.ba [data-p="leak-1"] a', "a => [getComputedStyle(a).backgroundColor, getComputedStyle(a.querySelector('.m-title')).textDecorationLine, getComputedStyle(a).cursor]")
+    check(f"{tag} phones: row hover = tint + underlined title + pointer", hov[0] != "rgba(0, 0, 0, 0)" and hov[1] == "underline" and hov[2] == "pointer", hov)
+    page.locator("#website").screenshot(path=str(out / f"{vp_name}-p2b-phones-hover.png"))
+    page.mouse.move(0, 0)
     check(f"{tag} profile: showcase url bar = site_domain", page.locator("[data-p=site-url]").inner_text() == sd)
     check(f"{tag} showcase iframe + button carry the slug", page.locator("iframe[data-p=demo]").get_attribute("src") == "showcase/?r=" + FX["slug"]
           and page.locator("a[data-p=demo]").get_attribute("href") == "showcase/?r=" + FX["slug"])
@@ -371,6 +507,9 @@ def personalize_flow(browser, vp_name, vp):
     except Exception:
         pass
     check(f"{tag} profile: demo iframe hero swapped to API media", "/api/media/" in (frame.locator("img.hero__bg").get_attribute("src") or ""))
+    hsrc = frame.locator("img.hero__bg").get_attribute("src") or ""
+    check(f"{tag} profile: iframe hero src passes MEDIA_RE (API origin /api/media/<slug>/<n>.jpg)",
+          re.fullmatch(re.escape(API) + r"/api/media/" + FX["slug"] + r"/\d+\.jpg", hsrc) is not None, hsrc)
     page.wait_for_timeout(700)
     page.locator("#showcase").screenshot(path=str(out / f"{vp_name}-p3-showcase-iframe.png"))
     ctx.close()
@@ -456,11 +595,11 @@ def personalize_flow(browser, vp_name, vp):
     page = ctx.new_page()
     page.goto(base + "showcase/?r=" + FX["slug"], wait_until="load")
     try:
-        page.wait_for_function("() => document.querySelector('img.hero__bg').naturalWidth === 120", timeout=6000)
+        page.wait_for_function("() => document.querySelector('img.hero__bg').naturalWidth === 480", timeout=6000)
     except Exception:
         pass
     rel = page.eval_on_selector("img.hero__bg", "e => [e.getAttribute('src'), e.naturalWidth]")
-    check(f"{tag} profile: same-origin relative media srcs accepted", rel == [f"/api/media/{FX['slug']}/0.jpg", 120], rel)
+    check(f"{tag} profile: same-origin relative media srcs accepted", rel == [f"/api/media/{FX['slug']}/0.jpg", 480], rel)
     ctx.close()
     stub_media(FX["slug"])
 
@@ -557,7 +696,8 @@ def personalize_flow(browser, vp_name, vp):
         const vis = s => q(s).filter(e => getComputedStyle(e).display !== 'none' && !e.hidden).length;
         const snap = () => ({search: q('[data-p=search]').map(e => e.textContent), url: q('[data-p=site-url]')[0].textContent,
             ig: vis('[data-p=ig]'), thumbs: q('[data-p=thumbs] img').length, handles: q('[data-p=report-handle],[data-p=scan-handle]').map(e => e.textContent),
-            line: vis('[data-p=scanned]'), leak1: q('[data-p=leak-1] .m-site')[0].textContent});
+            line: vis('[data-p=scanned]'), leak1: q('[data-p=leak-1] .m-site')[0].textContent, links: q('.ba a.m-link').length,
+            hints: q('.ba-hint').length});
         const out = {bad: [P.apply(null), P.apply({slug: '<x>'}), P.applySlug('../x')], keys: Object.keys(P).sort()};
         const full = await get('demoR3port01'), bare = await get('demoNoProf01');
         out.ok1 = P.apply(full); P.apply(full); out.a = snap();
@@ -567,6 +707,8 @@ def personalize_flow(browser, vp_name, vp):
     check(f"{tag} public API: window.LeakScanPersonalize {{apply, applySlug, pollMedia}}, junk rejected",
           api_res["keys"] == ["apply", "applySlug", "pollMedia"] and api_res["bad"] == [False, False, False] and api_res["ok1"] and api_res["ok2"], api_res)
     a, b2 = api_res["a"], api_res["b"]
+    check(f"{tag} phones: apply() twice = same links, other data re-wires (no IG / TikTok rows without a profile)",
+          (a["links"], a["hints"], b2["links"], b2["hints"]) == (10, 1, 7, 1), (a["links"], a["hints"], b2["links"], b2["hints"]))
     check(f"{tag} profile: apply() personalizes in place, twice = same DOM (3 thumbs, not 6)",
           a["search"] == [name, name] and a["url"] == sd and a["ig"] == 2 and a["thumbs"] == len(GSTATIC), a)
     check(f"{tag} apply() again with other data resets the slots first",
@@ -910,6 +1052,16 @@ def _rows(fx):
     return rows
 
 
+def _site_counts(rows):
+    occ, order = {}, []
+    for d, *_ in rows:
+        if d not in occ:
+            occ[d] = 0
+            order.append(d)
+        occ[d] += 1
+    return [(d, occ[d]) for d in order]
+
+
 def _sites(rows):
     occ, order = {}, []
     for d, *_ in rows:
@@ -926,9 +1078,11 @@ def inline_flow(browser, vp_name, vp):
     N = len(rows)
     net = {"outside": [], "bodies": [], "errors": [], "console": [], "nav": []}
 
-    def new_ctx(js=True, scheme="light"):
+    def new_ctx(js=True, scheme="light", motion="no-preference"):
         ctx = browser.new_context(viewport=vp, device_scale_factor=2 if vp_name == "phone" else 1, java_script_enabled=js,
-                                  is_mobile=vp_name == "phone", has_touch=vp_name == "phone", color_scheme=scheme)
+                                  is_mobile=vp_name == "phone", has_touch=vp_name == "phone", color_scheme=scheme, reduced_motion=motion)
+        # layout shifts, for the zero-CLS checks (PerformanceObserver, buffered from page start)
+        ctx.add_init_script("window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value, e.hadRecentInput]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}")
 
         def route(r, _req):
             if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost"):
@@ -937,6 +1091,7 @@ def inline_flow(browser, vp_name, vp):
                 net["outside"].append(r.request.url)
                 r.abort()
         ctx.route("**/*", route)
+        break_routes(ctx)
 
         def on_page(pg):
             pg.on("pageerror", lambda e: net["errors"].append(str(e)))
@@ -977,12 +1132,16 @@ def inline_flow(browser, vp_name, vp):
           msgs: L ? [...L.querySelectorAll('[data-msg]')].map(a => a.href) : [], role: c.getAttribute('role')};
     }""")
     ill = lambda page: page.evaluate("""() => {
-        const s = document.querySelector('.scan-report'), pill = s.querySelector('[data-live=scan-count]');
-        return {live: s.classList.contains('is-live'), pill: pill && pill.textContent, label: s.getAttribute('aria-label'),
-          rows: [...s.querySelectorAll('[data-live=scan-rows] li')].map(li => [li.querySelector('.row-url').textContent, li.querySelector('.chip').textContent]),
-          thumbs: [...s.querySelectorAll('[data-live=scan-rows] img.p-img')].map(i => i.src),
-          visible_illus: [...s.querySelectorAll('.report-rows:not(.live-rows) li')].filter(e => e.offsetParent !== null).length,
-          cap: s.closest('figure').querySelector('figcaption').textContent};
+        const s = document.querySelector('.gmini'), n = s.querySelector('[data-live] .gmini-n'), send = document.querySelector('[data-free-send]');
+        return {live: s.classList.contains('is-live'), pill: n && n.textContent, label: s.getAttribute('aria-label'), role: s.getAttribute('role'),
+          tiles: [...s.querySelectorAll('[data-live=band-grid] a.gi-card')].map(a => [a.href, a.target, a.rel, a.querySelector('img') ? a.querySelector('img').src : null]),
+          visible_illus: [...s.querySelectorAll('.gmini-grid:not(.live-grid) .gi-card')].filter(e => e.offsetParent !== null).length,
+          send: send.getAttribute('href')};
+    }""")
+    strip = lambda page: page.evaluate("""() => {
+        const s = document.querySelector('.report-card .live-strip'), c = document.querySelector('.report-card').getBoundingClientRect();
+        return s && {x: s.scrollLeft, drift: s.getAttribute('data-drift'), card: [c.width, c.height], max: s.scrollWidth - s.clientWidth,
+          shifts: window.__ls.slice()};
     }""")
     msgs_ok = lambda m, *need: len(m) == 3 and m[0].startswith("https://t.me/jakabasej?text=") and m[1].startswith(
         "https://wa.me/38640703992?text=") and m[2].startswith("mailto:me@jackbase.dev?") and all(all(x in u for x in need) for u in m)
@@ -1026,11 +1185,84 @@ def inline_flow(browser, vp_name, vp):
     focus = page.evaluate("document.activeElement.className")
     box = page.locator(".report-card").bounding_box()
     check(f"{tag} hero: card focused + scrolled into view", "live-title" in focus and box["y"] >= 0 and box["y"] < vp["height"] - 100, f"{focus} y={box['y']:.0f}")
+    IM = _images(FX)
+    NI = len(IM)
+    tile_href = lambda it: it[1] or base + "scan/?r=" + slug
+    want_tiles = lambda k: [[tile_href(it), "_blank" if it[1] else "", "noopener noreferrer nofollow" if it[1] else "",
+                             API + "/api/thumb?u=" + quote(it[0], safe="")] for it in IM[:k]]
     i = ill(page)
+    check(f"{tag} band: #free mini Google Images = her first 10 image results (link → result in a new tab, else the report)",
+          i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] is None
+          and [t[:3] + [t[3]] for t in i["tiles"]] == want_tiles(10), i)
+    check(f"{tag} band: 'Send me the report' = Telegram with the report link", (i["send"] or "").startswith("https://t.me/jakabasej?text=")
+          and quote(REPORT_BASE + slug, safe="") in i["send"], i["send"])
+    hero = page.evaluate("""() => {
+        const c = document.querySelector('.report-card'), q = s => [...c.querySelectorAll(s)];
+        return {tabs: q('.live-tab').map(b => [b.id, b.textContent, b.getAttribute('aria-selected'), b.tabIndex]),
+          panels: q('.live-panel').map(p => [p.id, p.classList.contains('on'), getComputedStyle(p).visibility]),
+          strip: q('.live-strip a.gi-card').map(a => [a.href, a.target, a.rel, a.querySelector('img').src]),
+          stripH: (c.querySelector('.live-strip-h') || {}).textContent,
+          blur: getComputedStyle(c.querySelector('.live-strip .gi-img')).filter, ico: q('.live-rows .live-ico').length,
+          rowH: Math.min(...q('.live-rows a.live-link').map(a => a.getBoundingClientRect().height)),
+          sites: q('.live-sites a.live-link').map(a => [a.href, a.target, a.rel])};
+    }""")
     sites = _sites(rows)
-    check(f"{tag} hero: illustration pill + rows = real counts", i["live"] and i["pill"] == f"{N} links found" and i["visible_illus"] == 0
-          and i["rows"] == [[d, f"{n} link" + ("s" if n != 1 else "")] for d, n in sites] and f"{N} links" in i["label"], i)
-    check(f"{tag} hero: illustration thumbs via the stub /api/thumb", i["thumbs"] and all(t.startswith(API + "/api/thumb?u=") for t in i["thumbs"]), i["thumbs"])
+    check(f"{tag} hero: tabs Links / Images / Sites with the fixture's counts, Links selected",
+          hero["tabs"] == [["lt-links", f"Links{N}", "true", 0], ["lt-images", f"Images{NI}", "false", -1], ["lt-sites", f"Sites{FX['domain_count']}", "false", -1]]
+          and [p[1:] for p in hero["panels"]] == [[True, "visible"], [False, "hidden"], [False, "hidden"]], hero["tabs"])
+    check(f"{tag} hero: rows >= 44px with a letter avatar / blurred site thumb each", hero["rowH"] >= 44 and hero["ico"] == 5, hero["rowH"])
+    check(f"{tag} hero: strip 'What Google Images shows for @demo.creator' = first 24 images, blurred, link → result / report",
+          hero["stripH"] == "What Google Images shows for @demo.creator" and hero["strip"] == want_tiles(24) and "blur" in hero["blur"], hero["strip"][:3])
+    by_dom = {}
+    for d, _t, u, _b in rows:
+        by_dom.setdefault(d, u)
+    check(f"{tag} hero: Sites tab = top 6 sites, each opens its first link in a new tab",
+          hero["sites"] == [[by_dom[d], "_blank", "noopener noreferrer nofollow"] for d in [x[0] for x in sorted(_site_counts(rows), key=lambda x: -x[1])][:6]], hero["sites"])
+    # tabs switch the body without moving anything; Reveal unblurs
+    cbox = lambda: page.evaluate("() => { const r = document.querySelector('.report-card').getBoundingClientRect(); return [r.x, r.y + scrollY, r.width, r.height]; }")
+    card0 = cbox()
+    page.locator("#lt-images").click()
+    page.wait_for_timeout(350)
+    gi = page.evaluate("() => [document.querySelector('#lp-images').classList.contains('on'), getComputedStyle(document.querySelector('#lp-links')).visibility, document.querySelectorAll('#lp-images .live-grid a.gi-card').length, (document.querySelector('#lp-images .live-more') || {}).textContent]")
+    card1 = cbox()
+    check(f"{tag} hero: Images tab shows the 12-image grid in place (card box unchanged)", gi == [True, "hidden", 12, f"+ {NI - 12} more in the full report"]
+          and card0 == card1, (gi, card0, card1))
+    shot(page, "3b-card-images", ".report-card")
+    page.locator("#lp-images .live-reveal").click()
+    page.wait_for_timeout(400)
+    rv = page.evaluate("() => [getComputedStyle(document.querySelector('#lp-images .gi-img')).filter, [...document.querySelectorAll('.report-card .live-reveal')].map(b => b.getAttribute('aria-pressed'))]")
+    check(f"{tag} hero: Reveal unblurs (both toggles in sync)", rv[0] == "none" and set(rv[1]) == {"true"}, rv)
+    page.locator("#lp-images .live-reveal").click()
+    page.locator("#lt-sites").click()
+    page.wait_for_timeout(350)
+    check(f"{tag} hero: Sites tab in place (card box unchanged, page coords)", cbox() == card0, (cbox(), card0))
+    shot(page, "3c-card-sites", ".report-card")
+    page.locator("#lt-links").focus()
+    page.keyboard.press("ArrowRight")
+    check(f"{tag} hero: arrow keys move between tabs", page.evaluate("document.activeElement.id") == "lt-images"
+          and page.locator("#lp-images").get_attribute("class") == "live-panel on")
+    page.locator("#lt-links").click()
+    page.mouse.move(0, 0)
+    # drift: idle ~4 s → the strip scrolls itself; 2 frames 2 s apart; a pointerdown on it stops it for good
+    try:
+        page.wait_for_function("() => { const s = document.querySelector('.report-card .live-strip'); return s && s.scrollLeft > 4; }", timeout=9000)
+    except Exception:
+        pass
+    a0 = strip(page)
+    page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-t0.png"))
+    page.wait_for_timeout(2000)
+    a1 = strip(page)
+    page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-t2.png"))
+    check(f"{tag} drift: idle → the strip scrolls by itself (rAF), ~24 px/s", a0["drift"] == "on" and 20 <= a1["x"] - a0["x"] <= 90, (a0["x"], a1["x"]))
+    late = [x for x in a1["shifts"] if x[1] > 0 and not x[2] and x[0] > page.evaluate("performance.now()") - 4000]
+    check(f"{tag} hero: zero layout shift while the strip drifts / loads (card box + PerformanceObserver)",
+          a0["card"] == a1["card"] and [round(v) for v in a1["card"]] == [round(card0[2]), round(card0[3])] and not late, (a0["card"], a1["card"], late))
+    page.locator(".report-card .live-strip").dispatch_event("pointerdown")
+    b0 = strip(page)["x"]
+    page.wait_for_timeout(2000)
+    b1 = strip(page)
+    check(f"{tag} hero: pointerdown on the strip stops the drift for good", b1["x"] == b0 and b1["drift"] is None, (b0, b1["x"], b1["drift"]))
+    page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-after-pointerdown.png"))
     last = json.loads(page.evaluate("localStorage.getItem('leakscan.last')") or "{}")
     check(f"{tag} hero: localStorage leakscan.last", last.get("slug") == slug and last.get("handle") == "demo.creator", last)
     # personalize (same checks as #18's ?r= path, via apply())
@@ -1055,9 +1287,9 @@ def inline_flow(browser, vp_name, vp):
     page.evaluate("window.scrollTo(0, 0)")
     shot(page, "3-settled", ".hero")
     shot(page, "3-settled-card", ".report-card")
-    page.locator(".browser-scan").scroll_into_view_if_needed()
+    page.locator("#free").scroll_into_view_if_needed()
     page.wait_for_timeout(700)
-    shot(page, "4-illustration", ".browser-scan")
+    shot(page, "4-band", "#free")
     page.locator("#website").scroll_into_view_if_needed()
     page.wait_for_timeout(700)
     shot(page, "5-phones", "#website")
@@ -1071,7 +1303,7 @@ def inline_flow(browser, vp_name, vp):
         pass
     c2 = card(page)
     check(f"{tag} reload ?r= restores hero card (rows, count, socials), no new scan", c2["rows"] == c["rows"] and c2["count"] == c["count"]
-          and c2["socials"] == "Instagram @demo.ig" and ill(page)["pill"] == f"{N} links found" and len(net["bodies"]) == n_posts, c2["count"])
+          and c2["socials"] == "Instagram @demo.ig" and ill(page)["pill"] == f"{NI} images" and len(net["bodies"]) == n_posts, c2["count"])
 
     # 4. second scan resets, badges only from data (stub-mixed: live true / false / missing, then Google results)
     submit(page, "stub-mixed")
@@ -1095,7 +1327,8 @@ def inline_flow(browser, vp_name, vp):
     c = card(page)
     i = ill(page)
     check(f"{tag} zero hits: honest empty state, send still there", c["empty"] and c["empty"].startswith("No leaks found for @stub-empty right now")
-          and c["count"] == "0 links found" and not c["rows"] and c["open"] and msgs_ok(c["msgs"], "stub-empty") and i["pill"] == "0 links found", c)
+          and c["count"] == "0 links found" and not c["rows"] and c["open"] and msgs_ok(c["msgs"], "stub-empty") and not i["live"]
+          and i["visible_illus"] > 0 and page.locator(".report-card .live-tabs").count() == 0, c)
     check(f"{tag} body: x.com URL → x, no instagram", net["bodies"] == [{"platform": "onlyfans.com", "handle": "stub-empty", "level": "low", "x": "demo_x"}], net["bodies"])
     check(f"{tag} hero: X social in the header", c["socials"] == "X @demo_x", c["socials"])
     page.locator(".report-card").screenshot(path=str(out / f"{vp_name}-i6-empty.png"))
@@ -1140,6 +1373,21 @@ def inline_flow(browser, vp_name, vp):
     page.wait_for_timeout(1200)
     check(f"{tag} Reset page resets hero card + illustration", not card(page)["live"] and not ill(page)["live"] and page.url == base
           and page.evaluate("localStorage.getItem('leakscan.last')") is None and card(page)["role"] == "img")
+    ctx.close()
+
+    # 7b. reduced motion: the report restores from ?r=, the strip never moves by itself
+    ctx = new_ctx(motion="reduce")
+    page = ctx.new_page()
+    page.goto(base + "?r=" + slug, wait_until="load")
+    try:
+        page.wait_for_selector(".report-card .live-strip a.gi-card", timeout=8000)
+    except Exception:
+        pass
+    page.mouse.move(0, 0)
+    page.wait_for_timeout(6500)
+    r = strip(page)
+    check(f"{tag} hero: reduced motion → strip still, no drift after 6.5 s idle", r and r["x"] == 0 and r["drift"] is None and r["max"] > 0, r and (r["x"], r["drift"], r["max"]))
+    page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-reduced-motion.png"))
     ctx.close()
 
     # 8. no JS: plain GET to scan/ with h + ig; scan/ reads h / ig / x and posts the socials
