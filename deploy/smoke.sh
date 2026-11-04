@@ -7,7 +7,7 @@ B="${1:-http://127.0.0.1:8081}"; shift || true
 fail=0
 ok() { printf 'ok    %s\n' "$1"; }
 bad() { printf 'FAIL  %s\n' "$1"; fail=1; }
-# check NAME URL WANT_CODE(s, a|b) [GREP] [extra curl args...]
+# check NAME URL WANT_CODE(s, a|b) [GREP | !MUST_BE_ABSENT] [extra curl args...]
 check() {
   local name="$1" url="$2" want="$3" pat="${4:-}"; shift 4 2>/dev/null || shift $#
   local body code
@@ -15,7 +15,8 @@ check() {
   code="$(curl -s --max-time 15 -o "$body" -w '%{http_code}' "$@" "$url")"
   case "|$want|" in
     *"|$code|"*)
-      if [ -n "$pat" ] && ! grep -q -- "$pat" "$body"; then bad "$name: $url -> $code but no \"$pat\""
+      if [ "${pat#!}" != "$pat" ] && grep -q -- "${pat#!}" "$body"; then bad "$name: $url -> $code but has \"${pat#!}\""
+      elif [ -n "$pat" ] && [ "${pat#!}" = "$pat" ] && ! grep -q -- "$pat" "$body"; then bad "$name: $url -> $code but no \"$pat\""
       else ok "$name: $code${pat:+ (\"$pat\")}"; fi ;;
     *) bad "$name: $url -> $code (want $want)" ;;
   esac
@@ -23,6 +24,7 @@ check() {
 }
 check healthz        "$B/healthz"                         200 '"ok": true'
 check landing        "$B/"                                200 'LeakScan'
+check landing-is-site "$B/"                               200 '!id="app-config"'
 check scan-page      "$B/scan/"                           200 'Free leak scan'
 check legacy-ui      "$B/app/"                            200 'Find Your Leaks'
 check legacy-js      "$B/static/app.js"                   200 'prefillFromUrl'

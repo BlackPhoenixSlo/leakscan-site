@@ -7,14 +7,14 @@
 # 4) wait for the container healthcheck, then deploy/smoke.sh on the VPS (port 8081) and over https.
 set -euo pipefail
 H="${1:?usage: deploy/push.sh <ssh-host>}"
-R=/root/leakscan
+R="${LEAKSCAN_DIR:-/root/leakscan}"   # remote dir (override only for local dry runs)
 cd "$(dirname "$0")/.."
 [ -f app/public_app.py ] && [ -f site/index.html ] || { echo "run from a leakscan-site checkout" >&2; exit 2; }
 
 echo "== backup"
 ssh "$H" "set -e; test -f $R/.env || { echo 'missing $R/.env' >&2; exit 3; }
-  mkdir -p /root/leakscan-backups; cd $R
-  f=/root/leakscan-backups/leakscan-\$(date -u +%Y%m%dT%H%M%SZ).tgz
+  mkdir -p $R-backups; cd $R
+  f=$R-backups/leakscan-\$(date -u +%Y%m%dT%H%M%SZ).tgz
   tar czf \$f \$(ls -d *.py public_static site app deploy docker-compose.yml Dockerfile .dockerignore 2>/dev/null)
   echo \"backup \$f\""
 
@@ -43,6 +43,6 @@ SITE_HOST="$(envv SITE_HOST)"; SITE_HOST="${SITE_HOST:-abolita.srv1395798.hstgr.
 
 echo "== smoke (VPS :8081)"
 ssh "$H" "bash -s -- http://127.0.0.1:8081" < deploy/smoke.sh
-echo "== smoke (https: $API_HOST $SITE_HOST)"
-bash deploy/smoke.sh "https://$API_HOST" "$API_HOST" "$SITE_HOST"
+echo "== smoke (https: full suite via $SITE_HOST, healthz + / via $API_HOST)"
+bash deploy/smoke.sh "https://$SITE_HOST" "$API_HOST"
 echo "deployed. rollback: tar xzf the backup above in $R, then the old root compose: cd $R && LEAKSCAN_PORT=8081 docker compose -p leakscan up -d --build"
