@@ -13,7 +13,8 @@ Showcase adaptation: no sitemap.xml and no netlify.toml ship with the
 showcase, so those two legs are gone. Two showcase-only rules replace them:
 every page is <meta name="robots" content="noindex, nofollow"> (the demo must
 not rank), and every page carries the demo ribbon linking back to the
-LeakScan landing page one level above site/showcase/.
+LeakScan landing page one level above site/showcase/. Every page also has
+exactly one <h1> and no skipped heading levels (h2 -> h4).
 
 Silent and exit 0 when every statement of the page set agrees.
 
@@ -61,6 +62,7 @@ class Page(HTMLParser):
         self.has_footer = False
         self.robots: list[str] = []
         self.ribbon: list[str] = []
+        self.headings: list[int] = []
         self._depth = {"nav": 0, "footer": 0}
         self._ribbon_tag: str | None = None
         self._ribbon_depth = 0
@@ -70,6 +72,9 @@ class Page(HTMLParser):
             self._depth[tag] += 1
             self.has_footer |= tag == "footer"
         a = dict(attrs)
+
+        if len(tag) == 2 and tag[0] == "h" and tag[1] in "123456":
+            self.headings.append(int(tag[1]))
 
         if tag == "meta" and (a.get("name") or "").lower() == "robots":
             self.robots.append((a.get("content") or "").strip())
@@ -223,7 +228,7 @@ def check_blog(parsed):
 
 
 def check_showcase(parsed, paths):
-    """Showcase-only rules: noindex everywhere, and a ribbon back to LeakScan.
+    """Showcase-only rules: noindex, one h1 + no level skips, ribbon back to LeakScan.
 
     The ribbon's back link must resolve to the landing page's own index.html
     (the directory above site/showcase/), from either depth — `../` on root
@@ -235,6 +240,13 @@ def check_showcase(parsed, paths):
         if page.robots != [ROBOTS]:
             errors.append(f"{rel}: robots meta is {page.robots or 'missing'}, "
                           f"must be exactly one '{ROBOTS}'")
+        if page.headings.count(1) != 1:
+            errors.append(f"{rel}: {page.headings.count(1)} <h1> elements (want exactly 1)")
+        for prev, cur in zip([0] + page.headings, page.headings):
+            if cur > prev + 1:
+                errors.append(f"{rel}: heading skips h{prev} -> h{cur}" if prev
+                              else f"{rel}: first heading is h{cur}, not h1")
+                break
         if not page.ribbon:
             errors.append(f"{rel}: no demo ribbon (class=\"{RIBBON_CLASS}\") with a link")
             continue
