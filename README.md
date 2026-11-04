@@ -7,6 +7,8 @@ iframes it as `showcase/`. The demo loads Google Fonts (so the homepage does too
 discloses that and `tools/check.py` keeps the two in sync. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 
+- Free scan: the hero form (`#scan`, plain GET, no JS) sends `p=<platform>&h=<handle>&go=1` to
+  https://jackbase.me/scan (Jaka's scan app, which auto-starts the scan). Contact links stay as the fallback.
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
 - Gate: `python3 tools/check.py` (silent + exit 0 when green; prints each problem + exit 1). Runs in CI on every push/PR.
   Covers links/assets resolve, no unreferenced files in `assets/ css/ js/`, canonicals, sitemap, JSON-LD (+ FAQ sync),

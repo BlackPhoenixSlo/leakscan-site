@@ -140,12 +140,28 @@ strong { font-weight: 650; }
 .eyebrow { font: 650 .8rem/1.4 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin-bottom: .9em; }
 .accent { color: var(--accent); font-style: italic; }
 .lead { font-size: clamp(1.1rem, 2.4vw, 1.28rem); color: var(--muted); max-width: 36em; }
-.cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 22px; }
-.cta-alt { display: flex; gap: 12px; flex-wrap: wrap; }
+/* Free-scan form: plain GET to the scan tool, works without JS. Stacked on phones, one row from 560px. */
+.scan-form { display: grid; gap: 10px; margin: 28px 0 10px; max-width: 600px; }
+@media (min-width: 560px) { .scan-form { grid-template-columns: auto 1fr auto; } }
+.scan-field {
+  min-height: 56px; width: 100%; min-width: 0; padding: 0 1.2em; border-radius: 999px;
+  border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
+  font: 500 1.05rem/1.2 var(--sans); box-shadow: var(--shadow);
+}
+.scan-field::placeholder { color: var(--muted); opacity: .8; }
+.scan-field:hover { border-color: var(--muted); }
+.scan-field:focus { border-color: var(--accent); }
+.scan-platform {
+  -webkit-appearance: none; appearance: none; cursor: pointer; padding-right: 2.6em;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23948779' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 1em center / 18px;
+}
+.scan-note { margin: 0 0 14px; color: var(--muted); font-size: .95rem; }
+.scan-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 22px; color: var(--muted); font-size: .95rem; }
+.scan-alt span { margin-right: 4px; }
+.scan-alt .btn { min-height: 44px; }
 @media (max-width: 519px) {
-  .cta-row .btn-lg { width: 100%; }
-  .cta-alt { width: 100%; }
-  .cta-alt .btn { flex: 1; }
+  .scan-alt span { flex-basis: 100%; }
+  .scan-alt .btn { flex: 1 1 auto; padding-inline: .7em; gap: .4em; }
 }
 .assurances { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--muted); font-size: .97rem; }
 .assurances li { display: inline-flex; align-items: flex-start; gap: 8px; }
@@ -225,22 +241,16 @@ strong { font-weight: 650; }
 .url { flex: 1; max-width: 460px; margin-inline: auto; padding: 5px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: .82rem; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; }
 .browser figcaption { padding: 12px 16px; font-size: .88rem; color: var(--muted); border-top: 1px solid var(--line); background: var(--surface); }
 
-/* Fake Google, desktop. Always light inside the device, like a real screenshot. */
-.g-desktop { background: #fff; color: #202124; padding: 20px clamp(14px, 3vw, 28px) 24px; font-family: Arial, Helvetica, sans-serif; }
-.g-top { display: flex; align-items: center; gap: clamp(12px, 3vw, 28px); }
-.g-logo { font: 700 1.5rem/1 Arial, sans-serif; color: #4285f4; letter-spacing: -.02em; }
-.g-logo b { color: #ea4335; font-weight: 700; }
-.g-logo i { font-style: normal; color: #fbbc05; }
-.g-logo i:last-child { color: #ea4335; }
-.g-search, .m-search { flex: 1; max-width: 560px; display: flex; justify-content: space-between; align-items: center; padding: 9px 18px; border-radius: 999px; border: 1px solid #dfe1e5; box-shadow: 0 1px 6px rgb(32 33 36 / .14); font-size: .95rem; color: #202124; }
-.g-search .icon, .m-search .icon { color: #4285f4; }
-.g-tabs, .m-tabs { display: flex; gap: 18px; margin: 16px 0 14px; font-size: .85rem; color: #5f6368; border-bottom: 1px solid #ebebeb; }
-.g-tabs span, .m-tabs span { padding-bottom: 8px; }
-.g-tabs .on, .m-tabs .on { color: #1a73e8; border-bottom: 3px solid #1a73e8; font-weight: 600; }
-.g-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-@media (max-width: 639px) { .g-grid .thumb:nth-child(n+7) { display: none; } }
-@media (min-width: 640px) { .g-grid { grid-template-columns: repeat(6, 1fr); } }
-.g-grid .thumb { aspect-ratio: 4 / 5; border-radius: 10px; }
+/* Scan report mock in #free */
+.scan-report { padding: clamp(16px, 3vw, 28px); }
+.scan-report .report-rows { padding-bottom: 0; }
+
+/* Fake Google, phone. Always light inside the device, like a real screenshot. */
+.m-search { flex: 1; max-width: 560px; display: flex; justify-content: space-between; align-items: center; padding: 9px 18px; border-radius: 999px; border: 1px solid #dfe1e5; box-shadow: 0 1px 6px rgb(32 33 36 / .14); font-size: .95rem; color: #202124; }
+.m-search .icon { color: #4285f4; }
+.m-tabs { display: flex; gap: 18px; margin: 16px 0 14px; font-size: .85rem; color: #5f6368; border-bottom: 1px solid #ebebeb; }
+.m-tabs span { padding-bottom: 8px; }
+.m-tabs .on { color: #1a73e8; border-bottom: 3px solid #1a73e8; font-weight: 600; }
 
 /* Before / after phones */
 .ba { display: grid; gap: 28px; justify-items: center; align-items: center; }
