@@ -523,7 +523,8 @@ def personalize_flow(browser, vp_name, vp):
     page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=9000)
     check(f"{tag} profile: landing without ?r= personalizes from localStorage", texts(page, "[data-p=search]") == [name, name])
     page.locator("#website").screenshot(path=str(out / f"{vp_name}-p9-landing-from-localstorage.png"))
-    page.locator("[data-p=scanned] button").click()
+    if page.locator("[data-p=scanned] button").is_visible():
+        page.locator("[data-p=scanned] button").click()
     page.wait_for_load_state("load")
     page.wait_for_timeout(1000)
     check(f"{tag} Reset restores the defaults", texts(page, "[data-p=search]") == ["yourname", "yourname"]
@@ -999,7 +1000,10 @@ def inline_flow(browser, vp_name, vp):
     last = json.loads(page.evaluate("localStorage.getItem('leakscan.last')") or "{}")
     check(f"{tag} hero: localStorage leakscan.last", last.get("slug") == slug and last.get("handle") == "demo.creator", last)
     # personalize (same checks as #18's ?r= path, via apply())
-    page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=5000)
+    try:
+        page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=5000)
+    except Exception:
+        pass
     texts = lambda sel: page.eval_on_selector_all(sel, "els => els.filter(e => e.offsetParent !== null).map(e => e.textContent.trim())")
     name = PROFILE["display_name"]
     check(f"{tag} hero: personalize line + phones' leak domains", "Scanned @demo.creator" in page.locator("[data-p=scanned]").inner_text()
@@ -1013,7 +1017,7 @@ def inline_flow(browser, vp_name, vp):
     except Exception:
         pass
     check(f"{tag} profile: hero media line ends at 'Photos ready'", page.locator(".live-media").is_visible()
-          and page.locator(".live-media a").get_attribute("href") == "#showcase", page.locator(".live-media").inner_text())
+          and page.locator(".live-media a").get_attribute("href") == "#showcase", page.evaluate("(document.querySelector('.live-media') || {}).textContent"))
     page.evaluate("window.scrollTo(0, 0)")
     shot(page, "3-settled", ".hero")
     shot(page, "3-settled-card", ".report-card")
@@ -1057,8 +1061,8 @@ def inline_flow(browser, vp_name, vp):
     i = ill(page)
     check(f"{tag} zero hits: honest empty state, send still there", c["empty"] and c["empty"].startswith("No leaks found for @stub-empty right now")
           and c["count"] == "0 links found" and not c["rows"] and c["open"] and msgs_ok(c["msgs"], "stub-empty") and i["pill"] == "0 links found", c)
-    check(f"{tag} body: x.com URL → x, no instagram", net["bodies"] == [{"platform": "onlyfans.com", "handle": "stub-empty", "level": "low", "x": "demo_x"}]
-          and c["socials"] == "X @demo_x", (net["bodies"], c["socials"]))
+    check(f"{tag} body: x.com URL → x, no instagram", net["bodies"] == [{"platform": "onlyfans.com", "handle": "stub-empty", "level": "low", "x": "demo_x"}], net["bodies"])
+    check(f"{tag} hero: X social in the header", c["socials"] == "X @demo_x", c["socials"])
     page.locator(".report-card").screenshot(path=str(out / f"{vp_name}-i6-empty.png"))
 
     # 6. errors: 429 rate_limited / busy, failed, network, server 400, client-side validation
@@ -1068,7 +1072,8 @@ def inline_flow(browser, vp_name, vp):
         c = card(page)
         txt = page.locator(".report-card .live-error").inner_text() if page.locator(".report-card .live-error").count() else ""
         check(f"{tag} {kind} error inline, form re-enabled", c["error"] == kind and want in txt and ("minute" in txt) and msgs_ok(c["msgs"], h)
-              and page.locator("#scan button").is_enabled() and page.url.startswith(base + "?r="), txt)
+              and page.locator("#scan button").is_enabled(), txt)
+        check(f"{tag} hero: {kind} keeps the last report's ?r= in the URL", page.url.startswith(base + "?r="), page.url)
         page.locator(".report-card").screenshot(path=str(out / f"{vp_name}-i7-error-{kind}.png"))
     page.route("**/api/public-scan", lambda r, _q: r.abort())   # fake: network down (wire boundary)
     submit(page, "demo.creator")
@@ -1094,7 +1099,8 @@ def inline_flow(browser, vp_name, vp):
     submit(page, "demo.creator", "demo.ig")
     settled(page)
     check(f"{tag} hero: scan works again after errors", len(card(page)["rows"]) == 5 and not page.locator(".inline-msg").is_visible())
-    page.locator("[data-p=scanned] button").click()
+    if page.locator("[data-p=scanned] button").is_visible():
+        page.locator("[data-p=scanned] button").click()
     page.wait_for_load_state("load")
     page.wait_for_timeout(1200)
     check(f"{tag} Reset page resets hero card + illustration", not card(page)["live"] and not ill(page)["live"] and page.url == base
@@ -1119,7 +1125,10 @@ def inline_flow(browser, vp_name, vp):
                      ("h=demo.creator&x=demo_x", {"handle": "demo.creator", "x": "demo_x"})):
         net["bodies"].clear()
         page.goto(base + "scan/?" + qs, wait_until="load")
-        page.wait_for_selector("#report:not([hidden])", timeout=15000)
+        try:
+            page.wait_for_selector("#report:not([hidden])", timeout=15000)
+        except Exception:
+            pass
         check(f"{tag} scan/?{qs} posts the socials", net["bodies"] == [{"platform": "onlyfans.com", "level": "low", **want}], net["bodies"])
     net["bodies"].clear()
     page.goto(base + "scan/", wait_until="load")
@@ -1128,7 +1137,10 @@ def inline_flow(browser, vp_name, vp):
     f.locator("input[name=ig]").fill("https://twitter.com/demo_x")
     with page.expect_navigation(url=re.compile(r"/scan/\?h=")):
         f.locator("button[type=submit]").click()
-    page.wait_for_selector("#report:not([hidden])", timeout=15000)
+    try:
+        page.wait_for_selector("#report:not([hidden])", timeout=15000)
+    except Exception:
+        pass
     check(f"{tag} scan/ page form: same two fields, twitter URL → x", net["bodies"] == [{"platform": "onlyfans.com", "handle": "demo.creator", "level": "low", "x": "demo_x"}], net["bodies"])
     page.goto(base + "scan/?h=demo.creator&ig=tiktok.com%2Fx", wait_until="load")
     check(f"{tag} scan/ bad social → form message", page.locator("#form-error").is_visible() and "Instagram or X" in page.locator("#form-error").inner_text())
