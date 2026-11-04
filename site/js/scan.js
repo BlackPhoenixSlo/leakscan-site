@@ -1,8 +1,9 @@
 // Free scan page: runs the scan on Jaka's scan server and renders the report. Plain ES2017, no tracking, no third
-// parties. The API host is set in ONE place below; <body data-api="..."> overrides it (tools/scan_stub.py does that).
+// parties. The API host is set in ONE place below: same origin, except on *.github.io (the VPS API host);
+// <body data-api="..."> overrides it (tools/scan_stub.py does that).
 (function () {
   'use strict';
-  var API = (document.body.dataset.api || 'https://scan.srv1395798.hstgr.cloud').replace(/\/+$/, '');
+  var API = (document.body.dataset.api || (location.hostname.slice(-9) === 'github.io' ? 'https://scan.srv1395798.hstgr.cloud' : '')).replace(/\/+$/, ''); // '' = same origin (VPS)
   var REPORT_BASE = 'https://blackphoenixslo.github.io/leakscan-site/scan/?r=';
   var PLATFORMS = { 'onlyfans.com': 'OnlyFans', 'instagram.com': 'Instagram', 'fansly.com': 'Fansly', 'tiktok.com': 'TikTok', 'patreon.com': 'Patreon' };
   var HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/;
@@ -259,9 +260,33 @@
       'Hi Jaka,\n\nI ran the free scan.\nMy report link: ' + link + '\nMy handle: ' + who() + '\n\nThanks!');
     $('deep-link').href = 'https://jackbase.me/scan?p=' + encodeURIComponent(state.platform) + '&h=' + encodeURIComponent(d.handle) + '&l=deep&go=1';
     $('g-note').textContent = 'Rendered from Google’s index for @' + d.handle + '. Not a live screenshot.';
+    var r = encodeURIComponent(d.slug);
+    $('after-link').href = '../?r=' + r + '#website';
+    $('demo-link').href = '../showcase/?r=' + r;
+    if (/^[A-Za-z0-9_-]{4,64}$/.test(d.slug)) {
+      // read by js/personalize.js on the homepage + demo site; stays in this browser only
+      var pn = raw.profile && typeof raw.profile.display_name === 'string' && raw.profile.display_name.length <= 60 ? raw.profile.display_name : null;
+      try { localStorage.setItem('leakscan.last', JSON.stringify({ slug: d.slug, handle: d.handle, platform: state.platform, name: pn, ts: Date.now() })); } catch (e) { /* storage blocked */ }
+    }
+    mediaStatus(raw.profile && typeof raw.profile === 'object' ? d.slug : null);
     show('report', true);
     if (!empty) { renderGoogle(); renderSites(); renderLinks(); }
     if (fresh) $('scan-title').focus({ preventScroll: true });
+  }
+
+  // Demo-site photos arrive after the scan: js/personalize.js polls /api/media/<slug>; this line mirrors it.
+  var mediaToken = 0;
+  function mediaStatus(slug) {
+    var el = $('after-media'), tok = ++mediaToken;
+    el.hidden = true;
+    if (!slug || !window.LeakScanPersonalize) return;
+    window.LeakScanPersonalize.pollMedia(slug, function (imgs, phase) {
+      if (tok !== mediaToken) return;
+      var ready = phase === 'ready' || (phase !== 'pending' && imgs.length > 0);
+      el.textContent = ready ? 'Photos ready' : 'Gathering photos for your demo site…';
+      el.dataset.phase = ready ? 'ready' : phase;
+      el.hidden = !ready && phase !== 'pending';
+    });
   }
 
   // ---------- "What Google shows" ----------

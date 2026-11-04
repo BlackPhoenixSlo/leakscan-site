@@ -24,6 +24,7 @@
 <link rel="stylesheet" href="../css/styles.css">
 <link rel="stylesheet" href="../css/scan.css">
 <script>document.documentElement.classList.add('js')</script>
+<script src="../js/personalize.js" defer></script>
 <script src="../js/scan.js" defer></script>
 </head>
 <body>
@@ -121,6 +122,13 @@
       </div>
       <div id="g-stage" class="g-stage"></div>
       <p class="g-note" id="g-note">Rendered from Google's index. Not a live screenshot.</p>
+      <div class="after-card" id="after-card">
+        <p class="after-kicker">Your website</p>
+        <p class="after-title"><a id="after-link" href="../#website">See how it looks after cleanup — your name, your pages on top</a></p>
+        <p class="after-text">The LeakScan homepage and the demo site now show your name, your accounts and the leak sites from this scan.</p>
+        <a class="btn btn-ghost btn-sm" id="demo-link" href="../showcase/">Open your demo site<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a>
+        <p class="after-media" id="after-media" role="status" hidden></p>
+      </div>
     </div>
   </section>
 

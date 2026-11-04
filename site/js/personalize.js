@@ -1,0 +1,468 @@
+// After a free scan, fills the landing mockups ("Your website", showcase frame) and the demo site (showcase/) with the
+// scanned creator's data. Plain ES5-ish, no deps, no third parties (only the scan API host).
+// Slug: ?r=<slug> -> localStorage['leakscan.last'].slug (written by js/scan.js) -> nothing: page keeps its defaults.
+// One fetch of GET <API>/api/scan-result/<slug> per page (sessionStorage cache, 8s timeout); any failure = defaults.
+// Every API value is validated in clean(); rendering uses textContent / createElement only, never innerHTML.
+(function () {
+  'use strict';
+  var API = ((document.body && document.body.getAttribute('data-api')) || (location.hostname.slice(-9) === 'github.io' ? 'https://scan.srv1395798.hstgr.cloud' : '')).replace(/\/+$/, ''); // '' = same origin (VPS)
+  var LAST = 'leakscan.last', CACHE = 'leakscan.r.', MEDIA = 'leakscan.media.';
+  var SLUG_RE = /^[A-Za-z0-9_-]{4,64}$/, HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/, DOMAIN_RE = /^[a-z0-9.-]+$/;
+  var GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
+  var PLAT = {
+    instagram: ['Instagram', 'instagram.com'], tiktok: ['TikTok', 'tiktok.com'], youtube: ['YouTube', 'youtube.com'],
+    patreon: ['Patreon', 'patreon.com'], onlyfans: ['OnlyFans', 'onlyfans.com'], fansly: ['Fansly', 'fansly.com'],
+    x: ['X', 'x.com', 'twitter.com'], threads: ['Threads', 'threads.net'], twitch: ['Twitch', 'twitch.tv']
+  };
+  // Before-phone rows: same phrasing as the static mockup, name swapped in. Never the leak pages' own titles.
+  var LEAK_TITLES = ['{n} leaked: full gallery', '{n}: all photos and videos', '{n} videos (new)', '{n} leak thread'];
+
+  var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
+  var $$ = function (sel, root) { return (root || document).querySelectorAll(sel); };
+  function hide(el) { if (el) { el.style.display = 'none'; el.setAttribute('data-p-off', ''); } }
+  function text(el, s) { if (el) el.textContent = s; }
+  function make(tag, attrs, kids) {
+    var el = document.createElement(tag);
+    for (var k in attrs) if (attrs.hasOwnProperty(k)) el.setAttribute(k, attrs[k]);
+    (kids || []).forEach(function (c) { el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return el;
+  }
+
+  // ---------- validation ----------
+  function str(v, max) {
+    if (typeof v !== 'string') return null;
+    var s = v.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, ' ').replace(/\s+/g, ' ').trim();
+    return s && s.length <= max && !/[<>{}]|javascript:|data:/i.test(s) ? s : null;
+  }
+  function handle(v) {
+    if (typeof v !== 'string') return null;
+    var h = v.trim().replace(/^@/, '');
+    return HANDLE_RE.test(h) ? h : null;
+  }
+  function domain(v) {
+    if (typeof v !== 'string') return null;
+    var d = v.trim().toLowerCase().replace(/^www\./, '');
+    return d.length <= 80 && DOMAIN_RE.test(d) && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) ? d : null;
+  }
+  function platKey(v) {
+    if (typeof v !== 'string') return null;
+    var k = v.trim().toLowerCase().replace(/^www\./, '').replace(/\.(com|net|tv)$/, '');
+    if (k === 'twitter') k = 'x';
+    return PLAT.hasOwnProperty(k) ? k : null;
+  }
+  function accountUrl(u, key) {
+    if (typeof u !== 'string' || u.length > 200) return null;
+    var x;
+    try { x = new URL(u); } catch (e) { return null; }
+    if (x.protocol !== 'https:' || x.username || x.password || x.port) return null;
+    var h = x.hostname.toLowerCase();
+    return PLAT[key].slice(1).some(function (d) { return h === d || h.slice(-d.length - 1) === '.' + d; }) ? x.href : null;
+  }
+  function cleanProfile(p) {
+    if (!p || typeof p !== 'object') return null;
+    var o = {
+      display_name: str(p.display_name, 60), first_name: str(p.first_name, 30), username: handle(p.username),
+      tagline: str(p.tagline, 120), profession: str(p.profession, 60), location: str(p.location, 60),
+      bio: str(p.bio, 700), about_short: str(p.about_short, 320), site_domain: domain(p.site_domain),
+      avatar: p.avatar === true, accounts: []
+    };
+    var seen = {};
+    (Array.isArray(p.accounts) ? p.accounts : []).slice(0, 12).forEach(function (a) {
+      var k = a && platKey(a.platform), h = a && handle(a.handle);
+      if (!k || !h || seen[k]) return;
+      seen[k] = 1;
+      o.accounts.push({ key: k, handle: h, url: accountUrl(a.url, k) });
+    });
+    o.name = o.display_name || o.first_name || o.username;
+    if (!o.name) return null;
+    o.first = o.first_name || o.name.split(' ')[0];
+    return o;
+  }
+  function clean(r, slug) {
+    if (!r || typeof r !== 'object') return null;
+    var h = handle(r.handle);
+    if (!h) return null;
+    var occ = {}, order = [];
+    (Array.isArray(r.hits) ? r.hits : []).slice(0, 1000).forEach(function (x) {
+      var d = x && domain(x.domain);
+      if (!d) return;
+      var n = typeof x.occurrences === 'number' && x.occurrences > 0 ? Math.min(x.occurrences, 1e6) : 1;
+      if (!occ.hasOwnProperty(d)) { occ[d] = 0; order.push(d); }
+      occ[d] += n;
+    });
+    order.sort(function (a, b) { return occ[b] - occ[a]; });
+    var images = (Array.isArray(r.images) ? r.images : []).filter(function (u) {
+      return typeof u === 'string' && u.length <= 600 && GSTATIC_RE.test(u);
+    });
+    return { slug: slug, handle: h, platform: platKey(r.platform), leaks: order.slice(0, 4), images: images.slice(0, 3),
+      profile: cleanProfile(r.profile) };
+  }
+
+  // ---------- slug + data ----------
+  function getSlug() {
+    var m = /[?&]r=([^&#]*)/.exec(location.search);
+    if (m) {
+      var s;
+      try { s = decodeURIComponent(m[1]); } catch (e) { return null; }
+      return SLUG_RE.test(s) ? s : null;
+    }
+    try {
+      var last = JSON.parse(localStorage.getItem(LAST) || 'null');
+      if (last && typeof last.slug === 'string' && SLUG_RE.test(last.slug)) return last.slug;
+    } catch (e) { /* storage blocked or junk: defaults */ }
+    return null;
+  }
+  function load(slug, cb) {
+    try {
+      var c = JSON.parse(sessionStorage.getItem(CACHE + slug) || 'null');
+      // A result without a profile may get one shortly (generated after the scan): re-ask after a minute.
+      if (c && c.m && (c.m.profile || Date.now() - c.ts < 60000)) return cb(c.m);
+    } catch (e) { /* ignore */ }
+    if (!window.fetch) return;
+    var ctrl = window.AbortController ? new AbortController() : null, late = false;
+    var timer = setTimeout(function () { late = true; if (ctrl) ctrl.abort(); }, 8000);
+    fetch(API + '/api/scan-result/' + encodeURIComponent(slug), { credentials: 'omit', signal: ctrl ? ctrl.signal : undefined })
+      .then(function (res) { if (!res.ok) throw new Error('http ' + res.status); return res.json(); })
+      .then(function (j) {
+        clearTimeout(timer);
+        var m = late ? null : clean(j, slug);
+        if (!m) return;
+        try { sessionStorage.setItem(CACHE + slug, JSON.stringify({ ts: Date.now(), m: m })); } catch (e) { /* ignore */ }
+        cb(m);
+      })
+      .catch(function () { clearTimeout(timer); });
+  }
+
+  // ---------- demo photos: they arrive after the scan, so poll ----------
+  // GET <API>/api/media/<slug> every 3s for up to 90s; stop on "ready" / "none" / a second 404 (or network error).
+  // cb(images, phase) on every answer; phase = 'pending' | 'ready' | 'none' | 'stopped'. Only API-hosted media srcs pass:
+  // absolute on the API origin, or same-origin relative "/api/media/...".
+  var MEDIA_RE = new RegExp('^(?:' + (API || location.origin).replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&') +
+    ')?\\/api\\/media\\/[A-Za-z0-9_-]{4,64}\\/[A-Za-z0-9_-]{1,40}\\.(jpe?g|png|webp)$');
+  function cleanMedia(j) {
+    return (j && Array.isArray(j.images) ? j.images : []).slice(0, 12).filter(function (it) {
+      return it && typeof it.src === 'string' && it.src.length <= 300 && MEDIA_RE.test(it.src);
+    }).map(function (it) { return { src: it.src }; });
+  }
+  function pollMedia(slug, cb) {
+    if (!SLUG_RE.test(slug || '') || !window.fetch) return;
+    try {
+      var c = JSON.parse(sessionStorage.getItem(MEDIA + slug) || 'null');
+      if (c && c.phase) return cb(c.images, c.phase);
+    } catch (e) { /* ignore */ }
+    var t0 = Date.now(), misses = 0, imgs = [];
+    var next = function (phase) {
+      if (phase === 'ready' || phase === 'none') {
+        try { sessionStorage.setItem(MEDIA + slug, JSON.stringify({ phase: phase, images: imgs })); } catch (e) { /* ignore */ }
+      }
+      if (phase === 'pending' && Date.now() - t0 < 90000) { setTimeout(tick, 3000); return; }
+      if (phase === 'pending') cb(imgs, 'stopped');
+    };
+    var miss = function () {
+      misses++;
+      if (misses >= 2 || Date.now() - t0 >= 90000) cb(imgs, 'stopped'); else setTimeout(tick, 3000);
+    };
+    var tick = function () {
+      fetch(API + '/api/media/' + encodeURIComponent(slug), { credentials: 'omit' }).then(function (res) {
+        if (!res.ok) throw new Error('http ' + res.status);
+        return res.json();
+      }).then(function (j) {
+        var phase = j && (j.status === 'ready' || j.status === 'none') ? j.status : 'pending';
+        imgs = cleanMedia(j);
+        cb(imgs, phase);
+        next(phase);
+      }, miss);
+    };
+    tick();
+  }
+
+  // ---------- the shared dictionary ----------
+  function dict(m) {
+    var p = m.profile || {}, acc = {};
+    (p.accounts || []).forEach(function (a) { acc[a.key] = a; });
+    if (m.platform && !acc[m.platform]) acc[m.platform] = { key: m.platform, handle: m.handle, url: null };
+    var main = (p.accounts && p.accounts[0]) || (m.platform && acc[m.platform]);
+    var base = (p.username || m.handle).toLowerCase().replace(/[^a-z0-9-]/g, '') || 'yourname';
+    return {
+      name: p.name || m.handle, first: p.first || m.handle, handle: p.username || m.handle,
+      tagline: p.tagline, profession: p.profession, location: p.location, bio: p.bio, about_short: p.about_short,
+      site: p.site_domain || base + '.com', accounts_n: p.accounts && p.accounts.length ? String(p.accounts.length) : null,
+      main_platform: main ? PLAT[main.key][0] : null,
+      ig: acc.instagram && acc.instagram.handle, tiktok: acc.tiktok && acc.tiktok.handle, acc: acc
+    };
+  }
+  // "{key}" = value, "{Key}" = value with a capital first letter, "{a|b}" = first non-empty; "{key}." drops the value's own
+  // trailing full stop.
+  // "[ ... ]" = optional part, dropped when a key inside is empty; an empty key outside one fails the template (null).
+  function fill(tpl, d) {
+    var sub = function (s) {
+      var miss = false;
+      var out = s.replace(/\{([\w|]+)\}/g, function (all, keys, at) {
+        var v = null, dot = s.charAt(at + all.length) === '.'; // the template adds its own full stop
+        keys.split('|').some(function (k) {
+          var low = k.charAt(0).toLowerCase() + k.slice(1), x = typeof d[low] === 'string' ? d[low] : null;
+          if (x && dot) x = x.replace(/\.$/, '');
+          if (x && k !== low) x = x.charAt(0).toUpperCase() + x.slice(1);
+          v = x;
+          return !!x;
+        });
+        if (!v) miss = true;
+        return v || '';
+      });
+      return miss ? null : out;
+    };
+    var out = sub(tpl.replace(/\[([^\]]*)\]/g, function (_, seg) { return sub(seg) || ''; }));
+    return out && out.trim() ? out.trim() : null;
+  }
+  function templates(d) {
+    each($$('[data-p-tpl]'), function (el) {
+      var t = fill(el.getAttribute('data-p-tpl'), d);
+      if (t) text(el, t); else hide(el.closest('[data-p-unit]') || el);
+    });
+    each($$('[data-p-alt]'), function (el) { el.setAttribute('alt', fill(el.getAttribute('data-p-alt'), d) || ''); });
+  }
+
+  // ---------- landing: "Your website" phones, showcase frame, hero line ----------
+  // Idempotent: every top-level [data-p] slot is put back to its pristine markup (deep clone taken before the first
+  // fill; no innerHTML) and then filled, so apply() can run again with another result.
+  var SNAP = null;
+  function pristine() {
+    var tops = Array.prototype.filter.call($$('[data-p]'), function (el) { return !el.parentElement.closest('[data-p]'); });
+    if (!SNAP) { SNAP = tops.map(function (el) { return [el, el.cloneNode(true)]; }); return; }
+    SNAP.forEach(function (p) {
+      var el = p[0], s = p[1], i;
+      for (i = el.attributes.length - 1; i >= 0; i--) if (!s.hasAttribute(el.attributes[i].name)) el.removeAttribute(el.attributes[i].name);
+      for (i = 0; i < s.attributes.length; i++) {
+        if (el.getAttribute('data-p') === 'demo' && /^(src|href)$/.test(s.attributes[i].name)) continue; // set below; no double load
+        if (el.getAttribute(s.attributes[i].name) !== s.attributes[i].value) el.setAttribute(s.attributes[i].name, s.attributes[i].value);
+      }
+      el.textContent = '';
+      each(s.cloneNode(true).childNodes, function (c) { el.appendChild(c.cloneNode(true)); });
+    });
+  }
+  function landing(m) {
+    pristine();
+    var d = dict(m), name = d.name, q = function (k) { return document.querySelector('[data-p="' + k + '"]'); };
+    var row = function (k, site, title) {
+      each($$('[data-p="' + k + '"]'), function (r) {
+        if (site == null) return hide(r);
+        if (site) text(r.querySelector('.m-site'), site);
+        if (title) text(r.querySelector('.m-title'), title);
+      });
+    };
+    each($$('[data-p="search"]'), function (el) { text(el, name); });
+    if (m.leaks.length) {
+      LEAK_TITLES.forEach(function (t, i) { row('leak-' + (i + 1), m.leaks[i] || null, t.replace('{n}', name)); });
+      row('gone', m.leaks[0]);
+    } // no leak domains: the leak rows stay the generic illustration
+    each($$('[data-p="thumbs"] .thumb'), function (span, i) {
+      var u = m.images[i];
+      if (!u) return;
+      var img = make('img', { src: API + '/api/thumb?u=' + encodeURIComponent(u), alt: '', width: '60', height: '60',
+        loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', 'class': 'p-img' });
+      img.addEventListener('error', function () { img.remove(); }, { once: true });
+      span.appendChild(img);
+    });
+    row('ig', d.ig ? '' : null, d.ig ? name + ' (@' + d.ig + ')' : '');
+    row('tt', d.tiktok ? '' : null, d.tiktok ? '@' + d.tiktok : '');
+    row('own', d.site, name + ': Official site');
+    row('blog', d.site + ' \u203a blog');
+    if (m.profile) text(q('site-url'), d.site);
+    // Hero "Weekly report" card + "Free scan report" illustration: only the handle for now. Their rows / "N links
+    // found" pill are marked (report-row-*, scan-row-*, scan-count) but stay the illustration: no invented statuses.
+    each($$('[data-p="report-handle"], [data-p="scan-handle"]'), function (el) { text(el, '@' + m.handle); });
+    var demo = 'showcase/?r=' + encodeURIComponent(m.slug);
+    each($$('[data-p="demo"]'), function (el) {
+      var k = el.tagName === 'IFRAME' ? 'src' : 'href';
+      if (el.getAttribute(k) !== demo) el.setAttribute(k, demo);
+    });
+
+    var line = q('scanned');
+    if (line) {
+      var reset = make('button', { type: 'button', 'class': 'linkish' }, ['Reset page']);
+      reset.addEventListener('click', function () {
+        try { localStorage.removeItem(LAST); sessionStorage.removeItem(CACHE + m.slug); } catch (e) { /* ignore */ }
+        location.href = location.pathname;
+      });
+      line.textContent = '';
+      [ 'Scanned ', make('strong', {}, ['@' + m.handle]), ' \u2014 this page now shows your results. ',
+        make('a', { href: 'scan/?r=' + encodeURIComponent(m.slug) }, ['Back to your report']), ' \u00b7 ', reset
+      ].forEach(function (c) { line.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+      line.hidden = false;
+    }
+  }
+
+  // ---------- demo site ----------
+  // With a profile, every content block that is not marked data-p / data-p-tpl / data-p-keep / data-p-unit /
+  // data-p-show is hidden: Orla's facts and pottery prose never show next to someone else's name.
+  var BLOCKS = 'p,li,h1,h2,h3,h4,h5,h6,blockquote,figure,picture,img,table,dl,ol,ul,.btn,.chip,.notice,.facts-row,' +
+    '.fact-item,.social-card,.link-btn,.blog-card,.post-meta';
+  var MARK = '[data-p],[data-p-tpl],[data-p-keep],[data-p-unit],[data-p-show],[data-p-media-only]';
+  var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1, NAV: 1, svg: 1 };
+
+  function ownText(el) {
+    for (var n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 3 && n.nodeValue.trim()) return true;
+    return false;
+  }
+  function strong(s) { return make('strong', {}, [s]); }
+  var builders = {
+    eyebrow: function (el, d) {
+      var t = [d.profession && d.profession.charAt(0).toUpperCase() + d.profession.slice(1), d.location].filter(Boolean).join(' \u00b7 ');
+      if (t) text(el, t); else hide(el);
+    },
+    welcome: function (el, d) {
+      var kids = ['This is the official website of ', strong(d.name)];
+      if (d.tagline) kids.push(', ' + d.tagline.replace(/\.$/, ''));
+      if (d.ig) kids.push(', known as ', strong('@' + d.ig), ' on Instagram');
+      if (d.tiktok) kids.push(d.ig ? ' and as ' : ', known as ', strong('@' + d.tiktok), ' on TikTok');
+      kids.push('.');
+      if (d.location) kids.push(' ' + d.first + ' is based in ', strong(d.location), '.');
+      el.textContent = '';
+      kids.forEach(function (c) { el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    },
+    'links-bio': function (el, d) {
+      var t = [d.profession && d.profession.charAt(0).toUpperCase() + d.profession.slice(1), d.location].filter(Boolean).join(' \u00b7 ');
+      el.textContent = '';
+      if (t) { el.appendChild(document.createTextNode(t)); el.appendChild(make('br')); }
+      el.appendChild(document.createTextNode('These are my only accounts.'));
+    },
+    links: function (el, d) {
+      var n = 0;
+      el.textContent = '';
+      Object.keys(d.acc).forEach(function (k) {
+        var a = d.acc[k];
+        if (!a.url) return;
+        var icon = document.querySelector('.link-btn[id^="' + k + '-"] svg');
+        var btn = make('a', { 'class': 'link-btn' + (n ? '' : ' link-btn--featured'), id: 'p-' + k, href: a.url,
+          target: '_blank', rel: 'noopener noreferrer nofollow' },
+          [make('span', { 'class': 'link-btn__label' }, [PLAT[k][0] + ' \u2014 @' + a.handle])]);
+        if (icon) btn.insertBefore(icon.cloneNode(true), btn.firstChild);
+        el.appendChild(btn);
+        n++;
+      });
+      if (!n) hide(el);
+    },
+    social: function (el, d) {
+      each($$('a.social-icon', el), function (a) {
+        var k = ((a.getAttribute('href') || '').split('#')[1] || '').split('-')[0], acc = d.acc[k];
+        if (!acc || !acc.url) return hide(a);
+        a.setAttribute('href', 'links.html#p-' + k);
+        a.setAttribute('aria-label', d.name + ' on ' + PLAT[k][0]);
+      });
+    },
+    avatar: function (el, d, m) {
+      if (!m.profile.avatar) return;
+      var orig = el.getAttribute('src');
+      el.addEventListener('error', function () { el.setAttribute('src', orig); }, { once: true });
+      el.removeAttribute('srcset');
+      el.setAttribute('src', API + '/api/avatar/' + encodeURIComponent(m.slug));
+      el.setAttribute('alt', d.name);
+    }
+  };
+
+  function showEl(el) { if (el) { el.style.display = ''; el.removeAttribute('data-p-off'); } }
+  function swapImg(img, src, d) {
+    img.setAttribute('data-p-src', src);
+    var pre = new Image();
+    pre.onload = function () {
+      if (img.getAttribute('data-p-src') !== src) return;
+      var pic = img.parentNode;
+      if (pic && pic.tagName === 'PICTURE') each($$('source', pic), function (x) { x.remove(); });
+      // fixed box: keep the placeholder's aspect ratio, crop the photo into it
+      if (img.getAttribute('width')) img.style.aspectRatio = img.getAttribute('width') + ' / ' + img.getAttribute('height');
+      img.style.objectFit = 'cover';
+      img.classList.add('p-fade');
+      img.style.opacity = '0';
+      img.removeAttribute('srcset');
+      img.setAttribute('src', src);
+      img.setAttribute('alt', 'Photo of ' + d.name);
+      var unit = img.closest('[data-p-media-only]');
+      if (unit) {
+        showEl(unit);
+        showEl(unit.closest('[data-p-gallery]'));
+        var b = unit.querySelector('button[aria-label]');
+        if (b) b.setAttribute('aria-label', 'View larger: photo of ' + d.name);
+      }
+      requestAnimationFrame(function () { requestAnimationFrame(function () { img.style.opacity = ''; }); });
+    };
+    pre.src = src;
+  }
+  function media(m, d) {
+    var slots = $$('img[data-p-media]');
+    if (!slots.length) return;
+    pollMedia(m.slug, function (imgs) {
+      each(slots, function (img) {
+        var it = imgs[+img.getAttribute('data-p-media')];
+        if (it && img.getAttribute('data-p-src') !== it.src) swapImg(img, it.src, d);
+      });
+    });
+  }
+
+  function demo(m) {
+    if (!m.profile) return; // scan only: the demo stays the fictional creator
+    var d = dict(m);
+    each($$('[data-p]'), function (el) {
+      var b = builders[el.getAttribute('data-p')];
+      if (b) b(el, d, m);
+    });
+    templates(d);
+    each($$('[data-p-show]'), function (el) { if (!el.hasAttribute('data-p-off')) el.hidden = false; });
+    each(document.body.children, function (top) {
+      if (SKIP[top.tagName] || top.matches('.demo-ribbon, .lightbox, .skip-link')) return;
+      each([top].concat(Array.prototype.slice.call($$('*', top))), function (el) {
+        if (SKIP[el.tagName] || el.closest('svg, script, style')) return;
+        if (!(el.matches(BLOCKS) || ownText(el))) return;
+        if (el.closest(MARK) || el.querySelector(MARK)) return;
+        hide(el);
+      });
+      each([top].concat(Array.prototype.slice.call($$('section, header', top))), function (s) {
+        if (s.matches('section, header') && !s.innerText.trim() && !s.querySelector('img:not([data-p-off])')) hide(s);
+      });
+    });
+    // photos-only blocks (galleries) stay hidden until their photo arrives
+    each($$('[data-p-media-only], [data-p-gallery]'), hide);
+    media(m, d);
+    var t = fill(document.body.getAttribute('data-p-title') || '', d);
+    if (t) document.title = t;
+    // keep the slug on every internal link so navigating inside the demo (and the landing iframe) stays personalized
+    each($$('a[href]'), function (a) {
+      var raw = a.getAttribute('href');
+      if (!raw || raw.charAt(0) === '#' || /^[a-z][a-z0-9+.-]*:/i.test(raw)) return;
+      var u;
+      try { u = new URL(raw, location.href); } catch (e) { return; }
+      if (u.origin !== location.origin) return;
+      u.searchParams.set('r', m.slug);
+      a.setAttribute('href', u.href);
+    });
+    document.documentElement.classList.add('p-on');
+  }
+
+  // ---------- public API ----------
+  // apply(result): personalize from an in-memory scan result (e.g. right after an inline scan), no reload.
+  // applySlug(slug): fetch + personalize. pollMedia(slug, cb): the demo-photo poller. Safe to call repeatedly.
+  var isDemo = document.body.hasAttribute('data-p-demo'), shown = null;
+  function render(m) {
+    if (!isDemo) return landing(m);
+    if (!shown) { shown = m.slug; return demo(m); }
+    // the demo's whitelist hiding is one-way: a different creator = reload with her slug (model already cached)
+    if (shown !== m.slug) location.replace(location.pathname + '?r=' + encodeURIComponent(m.slug));
+  }
+  function apply(result) {
+    var slug = result && typeof result.slug === 'string' && SLUG_RE.test(result.slug) ? result.slug : null;
+    var m = slug && clean(result, slug);
+    if (!m) return false;
+    try { sessionStorage.setItem(CACHE + slug, JSON.stringify({ ts: Date.now(), m: m })); } catch (e) { /* ignore */ }
+    render(m);
+    return true;
+  }
+  function applySlug(slug) {
+    if (typeof slug !== 'string' || !SLUG_RE.test(slug)) return false;
+    load(slug, render);
+    return true;
+  }
+  window.LeakScanPersonalize = { apply: apply, applySlug: applySlug, pollMedia: pollMedia };
+
+  if (!document.querySelector('[data-p]') && !isDemo) return; // e.g. scan/: poller only
+  var slug = getSlug();
+  if (slug) applySlug(slug);
+})();

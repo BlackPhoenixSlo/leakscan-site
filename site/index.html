@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="css/styles.css">
 <script>document.documentElement.classList.add('js')</script>
 <script src="js/main.js" defer></script>
+<script src="js/personalize.js" defer></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -241,6 +242,7 @@
         <input class="scan-field scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="yourhandle" aria-label="Your handle">
         <button class="btn btn-primary btn-lg" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Scan for free</button>
       </form>
+      <p class="scanned" data-p="scanned" hidden></p>
       <p class="scan-note">Free. No account. You see every link it finds.</p>
       <p class="scan-alt"><span>Or just message me:</span>
         <a class="btn btn-ghost btn-sm" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Telegram</a>
@@ -259,15 +261,15 @@
       <div class="report-head" aria-hidden="true">
         <div>
           <p class="report-kicker">Weekly report</p>
-          <p class="report-title">@yourhandle</p>
+          <p class="report-title" data-p="report-handle">@yourhandle</p>
         </div>
         <span class="chip chip-soft"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>Re-scanned</span>
       </div>
       <ul class="report-rows" aria-hidden="true">
-        <li><span class="thumb t1"></span><span class="row-url">leak-mirror.example/yourhandle</span><span class="chip chip-dead">Dead</span></li>
-        <li><span class="thumb t2"></span><span class="row-url">free-galleries.example/p/2231</span><span class="chip chip-cached">Cached</span></li>
-        <li><span class="thumb t3"></span><span class="row-url">pirate-tube.example/v/yourname</span><span class="chip chip-live">Live</span></li>
-        <li><span class="thumb t4"></span><span class="row-url">forum-dump.example/thread/88</span><span class="chip chip-dead">Dead</span></li>
+        <li data-p="report-row-1"><span class="thumb t1"></span><span class="row-url">leak-mirror.example/yourhandle</span><span class="chip chip-dead">Dead</span></li>
+        <li data-p="report-row-2"><span class="thumb t2"></span><span class="row-url">free-galleries.example/p/2231</span><span class="chip chip-cached">Cached</span></li>
+        <li data-p="report-row-3"><span class="thumb t3"></span><span class="row-url">pirate-tube.example/v/yourname</span><span class="chip chip-live">Live</span></li>
+        <li data-p="report-row-4"><span class="thumb t4"></span><span class="row-url">forum-dump.example/thread/88</span><span class="chip chip-dead">Dead</span></li>
       </ul>
       <div class="report-foot" aria-hidden="true">
         <img src="assets/avatar-jaka.svg" alt="" width="36" height="36">
@@ -312,16 +314,16 @@
         <div class="report-head" aria-hidden="true">
           <div>
             <p class="report-kicker">Free scan report</p>
-            <p class="report-title">@yourhandle</p>
+            <p class="report-title" data-p="scan-handle">@yourhandle</p>
           </div>
-          <span class="chip chip-live">5 links found</span>
+          <span class="chip chip-live" data-p="scan-count">5 links found</span>
         </div>
         <ul class="report-rows" aria-hidden="true">
-          <li><span class="thumb t1"></span><span class="row-url">leak-mirror.example/yourhandle</span><span class="chip chip-soft">Leak site</span></li>
-          <li><span class="thumb t2"></span><span class="row-url">free-galleries.example/p/2231</span><span class="chip chip-soft">Leak site</span></li>
-          <li><span class="thumb t3"></span><span class="row-url">pirate-tube.example/v/yourhandle</span><span class="chip chip-soft">Leak site</span></li>
-          <li><span class="thumb t4"></span><span class="row-url">forum-dump.example/thread/88</span><span class="chip chip-soft">Forum</span></li>
-          <li><span class="thumb t5"></span><span class="row-url">image-board.example/u/yourhandle</span><span class="chip chip-soft">Forum</span></li>
+          <li data-p="scan-row-1"><span class="thumb t1"></span><span class="row-url">leak-mirror.example/yourhandle</span><span class="chip chip-soft">Leak site</span></li>
+          <li data-p="scan-row-2"><span class="thumb t2"></span><span class="row-url">free-galleries.example/p/2231</span><span class="chip chip-soft">Leak site</span></li>
+          <li data-p="scan-row-3"><span class="thumb t3"></span><span class="row-url">pirate-tube.example/v/yourhandle</span><span class="chip chip-soft">Leak site</span></li>
+          <li data-p="scan-row-4"><span class="thumb t4"></span><span class="row-url">forum-dump.example/thread/88</span><span class="chip chip-soft">Forum</span></li>
+          <li data-p="scan-row-5"><span class="thumb t5"></span><span class="row-url">image-board.example/u/yourhandle</span><span class="chip chip-soft">Forum</span></li>
         </ul>
       </div>
       <figcaption>Illustration. Your real report lists every link the scan found. Send me its link and I remove one page free.</figcaption>
@@ -392,13 +394,13 @@
         <figcaption><span class="chip chip-live">Before</span>Leak sites own your name</figcaption>
         <div class="phone" role="img" aria-label="Illustration: before. A phone showing Google results for a creator's name, where the top results are leak sites with blurred thumbnails.">
           <div class="phone-screen" aria-hidden="true">
-            <div class="m-search">yourname<svg class="icon"><use href="#i-search"/></svg></div>
+            <div class="m-search"><span data-p="search">yourname</span><svg class="icon"><use href="#i-search"/></svg></div>
             <div class="m-tabs"><span class="on">All</span><span>Images</span><span>Videos</span></div>
-            <div class="m-result bad"><span class="fav"></span><div><span class="m-site">leak-mirror.example</span><span class="m-title">yourname leaked: full gallery</span><span class="m-thumbs"><span class="thumb t1"></span><span class="thumb t2"></span><span class="thumb t3"></span></span></div></div>
-            <div class="m-result bad"><span class="fav"></span><div><span class="m-site">free-galleries.example</span><span class="m-title">yourname: all photos and videos</span><span class="m-lines"><i></i><i></i></span></div></div>
-            <div class="m-result bad"><span class="fav"></span><div><span class="m-site">pirate-tube.example</span><span class="m-title">yourname videos (new)</span><span class="m-lines"><i></i><i></i></span></div></div>
-            <div class="m-result bad"><span class="fav"></span><div><span class="m-site">forum-dump.example</span><span class="m-title">yourname leak thread</span><span class="m-lines"><i></i></span></div></div>
-            <div class="m-result"><span class="fav ig"></span><div><span class="m-site">Instagram</span><span class="m-title">yourname (@yourname)</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result bad" data-p="leak-1"><span class="fav"></span><div><span class="m-site">leak-mirror.example</span><span class="m-title">yourname leaked: full gallery</span><span class="m-thumbs" data-p="thumbs"><span class="thumb t1"></span><span class="thumb t2"></span><span class="thumb t3"></span></span></div></div>
+            <div class="m-result bad" data-p="leak-2"><span class="fav"></span><div><span class="m-site">free-galleries.example</span><span class="m-title">yourname: all photos and videos</span><span class="m-lines"><i></i><i></i></span></div></div>
+            <div class="m-result bad" data-p="leak-3"><span class="fav"></span><div><span class="m-site">pirate-tube.example</span><span class="m-title">yourname videos (new)</span><span class="m-lines"><i></i><i></i></span></div></div>
+            <div class="m-result bad" data-p="leak-4"><span class="fav"></span><div><span class="m-site">forum-dump.example</span><span class="m-title">yourname leak thread</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result" data-p="ig"><span class="fav ig"></span><div><span class="m-site">Instagram</span><span class="m-title">yourname (@yourname)</span><span class="m-lines"><i></i></span></div></div>
           </div>
         </div>
       </figure>
@@ -407,13 +409,13 @@
         <figcaption><span class="chip chip-dead">After</span>The goal: your pages on top</figcaption>
         <div class="phone" role="img" aria-label="Illustration: after. The same Google search now shows the creator's official website and blog posts on top, followed by their social profiles; the leak result is marked removed.">
           <div class="phone-screen" aria-hidden="true">
-            <div class="m-search">yourname<svg class="icon"><use href="#i-search"/></svg></div>
+            <div class="m-search"><span data-p="search">yourname</span><svg class="icon"><use href="#i-search"/></svg></div>
             <div class="m-tabs"><span class="on">All</span><span>Images</span><span>Videos</span></div>
-            <div class="m-result good"><span class="fav own"></span><div><span class="m-site">yourname.com</span><span class="m-title">Yourname: Official site</span><span class="m-links"><i>Links</i><i>About</i><i>Blog</i></span></div></div>
-            <div class="m-result good"><span class="fav own"></span><div><span class="m-site">yourname.com › blog</span><span class="m-title">Behind the scenes of my new studio</span><span class="m-lines"><i></i></span></div></div>
-            <div class="m-result"><span class="fav ig"></span><div><span class="m-site">Instagram</span><span class="m-title">yourname (@yourname)</span><span class="m-lines"><i></i></span></div></div>
-            <div class="m-result"><span class="fav tt"></span><div><span class="m-site">TikTok</span><span class="m-title">@yourname</span><span class="m-lines"><i></i></span></div></div>
-            <div class="m-result gone"><span class="fav"></span><div><span class="m-site">leak-mirror.example</span><span class="m-title">Removed</span></div></div>
+            <div class="m-result good" data-p="own"><span class="fav own"></span><div><span class="m-site">yourname.com</span><span class="m-title">Yourname: Official site</span><span class="m-links"><i>Links</i><i>About</i><i>Blog</i></span></div></div>
+            <div class="m-result good" data-p="blog"><span class="fav own"></span><div><span class="m-site">yourname.com › blog</span><span class="m-title">Behind the scenes of my new studio</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result" data-p="ig"><span class="fav ig"></span><div><span class="m-site">Instagram</span><span class="m-title">yourname (@yourname)</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result" data-p="tt"><span class="fav tt"></span><div><span class="m-site">TikTok</span><span class="m-title">@yourname</span><span class="m-lines"><i></i></span></div></div>
+            <div class="m-result gone" data-p="gone"><span class="fav"></span><div><span class="m-site">leak-mirror.example</span><span class="m-title">Removed</span></div></div>
           </div>
         </div>
       </figure>
@@ -434,10 +436,10 @@
       <p>A live demo built for a fictional creator. Scroll around inside it. Yours is built around your name, your links and your look.</p>
     </div>
     <figure class="browser browser-demo reveal">
-      <div class="browser-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">yourname.com</span></div>
-      <iframe src="showcase/" title="Demo of an official creator website" tabindex="-1" loading="lazy" width="1200" height="720"></iframe>
+      <div class="browser-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url" data-p="site-url">yourname.com</span></div>
+      <iframe data-p="demo" src="showcase/" title="Demo of an official creator website" tabindex="-1" loading="lazy" width="1200" height="720"></iframe>
     </figure>
-    <p class="center reveal"><a class="btn btn-primary" href="showcase/">Open the demo site<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a></p>
+    <p class="center reveal"><a class="btn btn-primary" data-p="demo" href="showcase/">Open the demo site<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a></p>
   </div>
 </section>
 

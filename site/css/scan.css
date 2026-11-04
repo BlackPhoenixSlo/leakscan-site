@@ -56,6 +56,12 @@
 #reveal[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .g-stage { display: flex; justify-content: center; }
 .g-note { margin: 14px auto 0; text-align: center; color: var(--muted); font-size: .9rem; }
+.after-card { max-width: 720px; margin: 24px auto 0; padding: 20px 22px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); text-align: center; }
+.after-kicker { margin: 0 0 4px; color: var(--accent); font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.after-title { margin: 0 0 6px; font-size: 1.15rem; font-weight: 700; }
+.after-title a { color: var(--ink); }
+.after-text { margin: 0 0 12px; color: var(--muted); font-size: .95rem; }
+.after-media { margin: 10px 0 0; color: var(--muted); font-size: .9rem; }
 
 /* ---------- Google dark look-alike (shared) ---------- */
 .g-dark { --g-bg: #202124; --g-text: #e8eaed; --g-muted: #9aa0a6; --g-tab: #bdc1c6; --g-on: #8ab4f8; --g-pill: #303134; --g-line: #3c4043;
