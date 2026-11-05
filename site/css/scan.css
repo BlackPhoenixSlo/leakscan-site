@@ -43,7 +43,7 @@
 .stats strong { display: block; font: 650 clamp(1.6rem, 5vw, 2.4rem)/1.1 var(--serif); color: var(--accent); }
 .stats span { display: block; margin-top: 4px; color: var(--muted); font-size: .9rem; line-height: 1.3; }
 @media (max-width: 479px) { .stats { gap: 8px; } .stats li { padding: 12px 10px; } .stats span { font-size: .8rem; } }
-@media (max-width: 379px) { .stats li { padding: 10px 6px; } .stats strong { font-size: 1.05rem; } }
+@media (max-width: 379px) { .stats li { padding: 10px 6px; } .stats strong { font-size: 1.05rem; } .links-actions .btn { padding-inline: 12px; } }
 
 .scan-section { padding: clamp(28px, 5vw, 56px) 0; }
 .scan-section .section-head { margin-bottom: 20px; }

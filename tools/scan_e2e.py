@@ -395,6 +395,11 @@ for _u, _d in [(h["url"], h["domain"]) for h in HUGE["hits"]] + [(r["link"], r["
 HUGE_LINKS = sum(len(v) for v in HUGE_SITES.values())
 HUGE_TOP = max(HUGE_SITES, key=lambda d: len(HUGE_SITES[d]))
 NODE_BUDGET = 900   # whole page after the report renders (main before this change: ~3,800 at this size)
+IN_VIEW = """() => { const a = document.activeElement, r = a.getBoundingClientRect(), s = a.closest('.ph-scroll');
+    let top = document.querySelector('.rnav').getBoundingClientRect().bottom, bot = innerHeight;   /* clear of the sticky nav, */
+    if (s) { const sr = s.getBoundingClientRect(), t = s.querySelector('.g-tabs');                 /* inside the phone screen, */
+        top = Math.max(top, sr.top, t ? t.getBoundingClientRect().bottom : 0); bot = Math.min(bot, sr.bottom); }   /* under its tabs */
+    return r.top >= top - 1 && r.bottom <= bot + 1 ? true : [Math.round(r.top), Math.round(r.bottom), Math.round(top), Math.round(bot)]; }"""
 
 
 def huge_flow(browser, vp_name, vp):
@@ -468,11 +473,13 @@ def huge_flow(browser, vp_name, vp):
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop, document.querySelectorAll('#g-panel .g-tile').length]")
         check(f"{tag} pin: a tab switched mid-scroll opens at its top, frame stays put", abs(st[0] - g["pin"]) <= 1 and st[1] == 0 and st[2] > 0, st)
         page.locator("#g-tab-all").click()
-        page.locator("[data-more=all]").focus()
+        page.locator("[data-more=all]").evaluate("b => b.focus()")   # as Tab would: the screen scrolls to it, the page follows
+        page.wait_for_timeout(300)
         page.keyboard.press("Enter")
-        page.wait_for_timeout(200)
+        page.wait_for_timeout(400)
         nx = page.evaluate("() => { const a = document.activeElement, r = a.closest('.g-r'); return [a.className, [...document.querySelectorAll('#g-panel .g-r')].indexOf(r)]; }")
-        check(f"{tag} keyboard More results → focus on the first new result", nx == ["g-title", 10], nx)
+        nx.append(page.evaluate(IN_VIEW))
+        check(f"{tag} keyboard More results → focus on the first new result, in view", nx == ["g-title", 10, True], nx)
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
         page.wait_for_timeout(150)
     page.mouse.move(vp["width"] / 2, vp["height"] / 2)
@@ -492,20 +499,24 @@ def huge_flow(browser, vp_name, vp):
     cls0 = page.evaluate(CLS)   # report built + the whole scroll story, no clicks yet
 
     # 3. show more sites, open a site, its links in steps, close = gone
-    page.locator("#lx-more").focus()
+    page.locator("#lx-more").evaluate("b => { b.scrollIntoView({block: 'center', behavior: 'instant'}); b.focus(); }")   # as Tab would bring it
     page.keyboard.press("Enter")
+    page.wait_for_timeout(400)
     nx = page.evaluate("() => { const a = document.activeElement, rows = [...document.querySelectorAll('#lx-list .lx-site')]; return [a.tagName, rows.indexOf(a.closest('.lx-site'))]; }")
-    check(f"{tag} incremental: keyboard Show more sites → focus on the first new site", nx == ["SUMMARY", 10], nx)
+    nx.append(page.evaluate(IN_VIEW))
+    check(f"{tag} incremental: keyboard Show more sites → focus on the first new site, in view", nx == ["SUMMARY", 10, True], nx)
     page.keyboard.press("Enter")   # open that site from the keyboard
     page.wait_for_timeout(100)
     lm = page.locator("#lx-list .lx-site").nth(10).locator(".lx-lmore")
     if lm.count():
-        lm.focus()
+        lm.evaluate("b => { b.scrollIntoView({block: 'center', behavior: 'instant'}); b.focus(); }")
         page.keyboard.press("Enter")
+        page.wait_for_timeout(400)
         nx = page.evaluate("() => { const a = document.activeElement, l = a.closest('.lx-links'); return [a.tagName, l ? [...l.children].indexOf(a.parentNode) : -1]; }")
+        nx.append(page.evaluate(IN_VIEW))
     else:
         nx = None
-    check(f"{tag} incremental: keyboard Show more links → focus on the first new link", nx == ["A", 10], nx)
+    check(f"{tag} incremental: keyboard Show more links → focus on the first new link, in view", nx == ["A", 10, True], nx)
     page.locator("#lx-list .lx-site").nth(10).locator("summary").click()
     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
     page.wait_for_timeout(100)
