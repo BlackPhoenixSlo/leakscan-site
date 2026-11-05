@@ -5,7 +5,7 @@
   end card .vo-cta, no cues of its own: data-cue-cta; a phone replica of the landing: 3 .vo-step scenes (hero with the
   site's h1 + the onlyfans.com/ field + "Scan now", scan card, report card with tabs + *.example placeholder rows only) +
   the "Rewatch this video with YOUR content" toast with the name flip + the real form inside it; named mode: the same take
-  with her handle, ending "This is what I'd clear for <name>" + the contact row, no form). The 5 cued ones each have numeric data-cue-live <
+  typing jakabasej too, ending "This is what I'd clear for <name>" + the contact row, no form). The 5 cued ones each have numeric data-cue-live <
   data-cue-removed < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending);
   room for the animations (js/video-overlays.js): removed - live >= 0.45 s pop-in (google-images: >= 1.2 s, its tap +
   grid; an optional data-cue-tap sits in live + 0.45 .. removed - 0.7), out - removed >= 1.95 s (snap shake 0.25 + wipe

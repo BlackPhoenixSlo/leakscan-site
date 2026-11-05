@@ -34,7 +34,7 @@ Room rules (`tools/video/check_video.py` checks them): prefabs never overlap; re
 (`google-images` >= 1.2 s: tap + grid; its tap in live + 0.45 .. removed − 0.7), out − removed >= 1.95 s.
 
 After states ("Removed" stamp kept on all 5): `google` = the landing after-phone's results, her site first
-(`<name>.com`; `?name=Tessa` → `tessa.com`; a scan → its `profile.site_domain`, else `<handle>.com`), then
+(`<name>.com`; `?name=SophieStar` → `sophiestar.com`; a scan → its `profile.site_domain`, else `<handle>.com`), then
 `instagram.com › <handle>`, TikTok, her blog; no leak rows. `google-images` = her own photos, not blurred (the landing
 after-phone's `assets/phone/photo-*.jpg`, also for a scan), captioned with her site / Instagram. X / Reddit / Mega: the
 leak is gone.
@@ -47,14 +47,16 @@ leak is gone.
 | texts | "Your name" (search box, posts, after state `yourname.com`) | her name / scan texts |
 | images | default blurred thumbs | after a scan result: her real ones (below); `?name=` alone: the defaults |
 | speech | none | her name at `data-cue-say-start` (0.2 s, in the take's 1.5 s silent start) and at `data-cue-say` (the 2 s end hold), each once, + "for <name>" pill (2 s at the start) |
-| end | `cta-steps`: the "Type your name in the link → this video rebuilds with YOUR leaks" card at `data-cue-cta` (default `data-cue-say`), stays: a phone-shaped replica of the landing (dark, the site's tokens / fonts / logo), one 10 s take from its cue (0-4.1 s the hero: the camera zooms onto the `onlyfans.com/` field, types "Jaka Basej" as the handle `jakabasej` (the viewer's own once typed in the form), pulls back, "Scan now" pressed; 4.1-6.8 s the scan card "FREE SCAN · ONLYFANS @handle", "Searching Google, step N of 9…" walking Google → Google Images → X → Reddit → Mega, bar, skeleton rows; 6.8-9.8 s the report card: zoom onto "N links found" rolling to 87, pull back over tabs Links 87 / Images 12 / Sites 31, 5 placeholder `*.example` rows with grey blurred thumbs + Live pills, "+ 82 more in the full report", the blurred Google Images strip; from 8.75 s "Rewatch this video with YOUR content" + "for Your name" flipping to the name), still looping after the take ends; under it the real form = the name bar's rebuild (below) | the same take with HER handle typed, no title / form / flip, ending on "This is what I'd clear for <name>" + Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev (text, no links: the page loads / links nothing external), held 5 s per loop (15 s), still looping after the take ends |
+| end | `cta-steps`: the "Type your name in the link → this video rebuilds with YOUR leaks" card at `data-cue-cta` (default `data-cue-say`), stays: a phone-shaped replica of the landing (dark, the site's tokens / fonts / logo), one 10 s take from its cue (0-4.1 s the hero: the camera zooms onto the `onlyfans.com/` field, types "Jaka Basej" as the handle `jakabasej` (the viewer's own once typed in the form), pulls back, "Scan now" pressed; 4.1-6.8 s the scan card "FREE SCAN · ONLYFANS @handle", "Searching Google, step N of 9…" walking Google → Google Images → X → Reddit → Mega, bar, skeleton rows; 6.8-9.8 s the report card: zoom onto "N links found" rolling to 87, pull back over tabs Links 87 / Images 12 / Sites 31, 5 placeholder `*.example` rows with grey blurred thumbs + Live pills, "+ 82 more in the full report", the blurred Google Images strip; from 8.75 s "Rewatch this video with YOUR content" + "for Your name" flipping to the name), still looping after the take ends; under it the real form = the name bar's rebuild (below) | the same take, also typing `jakabasej` ("@jakabasej" on the scan / report cards; the report's counts / rows / thumbs = hers), no title / form / flip, ending on "This is what I'd clear for <name>" + Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev (text, no links: the page loads / links nothing external), held 5 s per loop (15 s), still looping after the take ends |
 
 **Production images** (named, from a scan result: `?r=<slug>` → `GET <API>/api/scan-result/<slug>`, or the name bar's scan
 → the landing's own `POST <API>/api/public-scan` for `onlyfans.com/<handle>`; `<API>` = js/scan-engine.js's host): the
 cards are filled like the landing hero card (js/inline-scan.js): Google = her real result domains + titles (letter
 favicons, the first row with 3 thumbs), "About N results" = the scan's Google total; Google Images = 6 of her real Google
-thumbs with their domains, every X / Reddit / Mega photo too: `<API>/api/thumb?u=<gstatic>` only, always blurred
-(`.rm-img`, `.vo-real`); the cta-steps report = her real counts (Links = hits + results by URL, Images, Sites, "+ N more")
+thumbs with their domains, every X / Reddit / Mega photo too: `<API>/api/thumb?u=<gstatic>` only, people photos only (each
+probed like the landing report's gallery(): >= 16 px + `E.isPhoto`, so the same logos / banners / icons drop out;
+`VideoOverlays.photos` = {kept, dropped}), always blurred (video cards: `blur(5px) saturate(.95)` on `.rm-img` /
+`.vo-real`, the floor = styles.css `.live-ico`); the Images count = the kept ones; the cta-steps report = her real counts (Links = hits + results by URL, Images, Sites, "+ N more")
 + 5 titled rows + thumbs. After state: her own SFW photos (`GET <API>/api/media/<slug>` → `<API>/api/media/<slug>/<n>.jpg`,
 unblurred `.vo-own`), else the default photos. Leak URLs are read for their host only, never rendered. A failed scan /
 read = text only. While the name bar's scan runs: a yellow status pill ("Searching Google, step N of 9…"); the take plays
@@ -79,7 +81,7 @@ only after the play gesture, video ducked to 25 % meanwhile, pause / seek cancel
    (whisper word timestamps → every `data-cue-*`; needs `openai-whisper` or `faster-whisper` in that env, it prints the
    install line and exits 2 otherwise). Or read them off any player and edit `data-cue-*` by hand (rules above, `SCRIPT.md`).
 3. `python3 tools/video/check_video.py` and `cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT
-   --name Tessa` (both modes at every cue, geometry, counters, end card + form, snap, reduced motion, sfx, speech, scan-stub
+   --name SophieStar` (both modes at every cue, geometry, counters, end card + form, snap, reduced motion, sfx, speech, scan-stub
    texts + photos, production images).
 
 Test any moment: `?t=12.5`.
