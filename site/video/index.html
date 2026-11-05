@@ -26,7 +26,7 @@
      data-cue-say = the browser says the personalized name + "for <name>" (named mode only; -say is shifted by
      data-cue-named-shift when jack-named.mp4 plays, as every prefab cue); data-cue-cta (default -say) = the generic end card
      (cta-steps: the landing in a phone, one 10 s take, + the name form). The video fills the whole stage; at every width the cards are drawn on its right half (no panel); .vo-ui = full screen /
-     theater button, touch play bar, "Rotate" hint.
+     theater button (top right), touch play bar (the full stage width), "Rotate" hint.
      Edit them to the real timestamps after recording (site/video/CUES.md); tools/video/check_video.py keeps them sane. -->
 <main class="vo" id="vo">
   <h1 class="vo-sr">Jack: leaks on Google, X, Reddit and Mega, before and after the removal</h1>
@@ -163,7 +163,8 @@
            too (no-voice browsers). Personalized names only. -->
       <div class="vo-pf vo-for" data-off aria-hidden="true"><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
 
-      <!-- generic mode only (no ?name=, no scan): from data-cue-cta (default = data-cue-say) to the end, also after it. One 10 s take
+      <!-- both modes: from data-cue-cta (default = data-cue-say) to the end, also after it (named: her name typed, the toast = "This is
+           what I'd clear for <name>" + the contact row (.vo-nm), no title / form; generic: .vo-gen + the title + form). One 10 s take
            in a phone-shaped replica of the landing (site tokens, dark): 1 the hero, the camera zooms onto the onlyfans.com/ field,
            types "Jaka Basej" as a handle (or the viewer's typed name) + "Scan now" pressed, 2 the scan card ("Searching Google,
            step N of 9…", bar, skeleton rows), 3 the report card ("87 links found" rolling, tabs, rows, blurred strip) + "Rewatch
@@ -195,7 +196,9 @@
               <span class="vo-reveal">Reveal images</span>
               <span class="vo-strip"><i class="vo-th0"></i><i class="vo-th1"></i><i class="vo-th2"></i><i class="vo-th3"></i></span></span></div></div>
           </div>
-          <span class="vo-end"><span class="vo-end-h">Rewatch this video with <em>YOUR</em> content</span><span class="vo-end-f">for <span class="vo-mini-n">Your name</span></span></span>
+          <span class="vo-end"><span class="vo-end-h vo-gen">Rewatch this video with <em>YOUR</em> content</span><span class="vo-end-f vo-gen">for <span class="vo-mini-n">Your name</span></span>
+            <span class="vo-end-h vo-nm">This is what I'd clear for</span><span class="vo-end-f vo-nm"><span class="vo-end-who"></span></span>
+            <span class="vo-end-c vo-nm"><a href="https://t.me/jakabasej">Telegram @jakabasej</a><a href="https://wa.me/38640703992">WhatsApp +386 40 703 992</a><a href="mailto:me@jackbase.dev">me@jackbase.dev</a></span></span>
         </div>
         <form class="vo-cta-f" action="" method="get">
           <label class="vo-sr" for="vo-name">Your name</label>
