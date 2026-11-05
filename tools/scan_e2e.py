@@ -155,12 +155,13 @@ def scan_flow(browser, vp_name, vp):
           and page.locator("#scan-aliases").inner_text() == ALSO, page.locator("#scan-aliases").inner_text())
     aff = page.evaluate("""() => {
         const hint = document.querySelector('.g-hint'), deco = [...document.querySelectorAll('.g-tab-deco')];
-        return {hint: hint && hint.offsetParent !== null ? hint.textContent.trim() : null,
+        return {hint: hint && hint.offsetParent !== null ? hint.innerText.trim() : null,
           deco: deco.map(e => [e.tagName, e.tabIndex, e.getAttribute('aria-hidden'), +getComputedStyle(e).opacity, getComputedStyle(e).cursor]),
           tabs: [...document.querySelectorAll('.g-tab')].map(e => getComputedStyle(e).cursor),
           seg: [...document.querySelectorAll('#device label')].map(e => getComputedStyle(e).cursor)};
     }""")
-    check(f"{vp_name} scan page: hint next to the frame", aff["hint"] == "Tap All · Images · Videos to switch, tap any result to open it.", aff["hint"])
+    want_hint = "Tap All · Images · Videos to switch, tap any result to open it." if vp_name == "phone" else "Click All · Images · Videos to switch, click any result to open it."
+    check(f"{vp_name} scan page: hint next to the frame says Tap on touch / Click with a mouse", aff["hint"] == want_hint, aff["hint"])
     check(f"{vp_name} scan page: decorative tabs muted, not focusable; real tabs + device toggle pointer",
           aff["deco"] and all(d[0] == "SPAN" and d[1] == -1 and d[2] == "true" and d[3] < .6 and d[4] == "default" for d in aff["deco"])
           and set(aff["tabs"]) == {"pointer"} and set(aff["seg"]) == {"pointer"}, aff)
@@ -181,6 +182,19 @@ def scan_flow(browser, vp_name, vp):
             box = page.locator(".frame-computer").bounding_box()
             check(f"{vp_name} computer frame fits viewport", box["x"] >= 0 and box["x"] + box["width"] <= vp["width"] + 1,
                   f"x={box['x']:.0f} w={box['width']:.0f}")
+            small = vp_name == "phone"   # 1060 px frame at 350 px: tabs / tiles too small to tap
+            check(f"{vp_name} computer frame hint fits the scale", page.locator("#g-hint").inner_text().strip() == (
+                "Shrunk to fit this screen. Switch to Phone to tap results." if small else want_hint), page.locator("#g-hint").inner_text())
+            if small:
+                page.locator("#g-hint [data-device-go]").click()
+                page.wait_for_timeout(300)
+                check(f"{vp_name} hint 'Switch to Phone' = the Phone toggle", page.locator(".frame-phone").count() == 1
+                      and page.locator("#device input:checked").get_attribute("value") == "phone" and page.locator("#g-hint").inner_text().strip() == (
+                          # Playwright's full-page screenshot flips the touch context to hover + fine pointer: ask the page
+                          want_hint.replace("Tap", "Click").replace(" tap ", " click ") if page.evaluate("matchMedia('(hover: hover) and (pointer: fine)').matches") else want_hint),
+                      [page.locator(".frame-phone").count(), page.locator("#device input:checked").get_attribute("value"), page.locator("#g-hint").inner_text()])
+                page.locator("#device label:has(input[value=computer])").click()
+                page.wait_for_timeout(300)
         g = page.locator("#google")
         # All
         page.locator("#g-tab-all").click()
@@ -465,6 +479,9 @@ def personalize_flow(browser, vp_name, vp):
     sd = PROFILE["site_domain"]
     check(f"{tag} profile: after phone site / blog / TikTok", after == [sd, f"{sd} › blog", f"{name}: Official site", "@" + ACC["tiktok"]["handle"]], after)
     check(f"{tag} after phone: removed row = top leak domain", page.locator('[data-p="gone"] .m-site').inner_text() == TOP[0])
+    lav = page.eval_on_selector_all('.ba [data-p^="leak-"] .fav', "els => els.map(e => [e.textContent, getComputedStyle(e).backgroundColor])")
+    check(f"{tag} before phone: leak rows get letter avatars like the hero card", [l[0] for l in lav] == [d[0].upper() for d in TOP]
+          and all(l[1] != "rgb(215, 210, 204)" for l in lav), lav)
     page.locator("#website").screenshot(path=str(out / f"{vp_name}-p2-your-website.png"))
     ph = page.evaluate("""() => {
         const r = k => [...document.querySelectorAll(`.ba [data-p="${k}"] > a.m-link`)].map(a => [a.getAttribute('href'), a.target, a.rel]);
@@ -487,7 +504,8 @@ def personalize_flow(browser, vp_name, vp):
         page.locator('.ba [data-p="leak-1"] a').hover()
         page.wait_for_timeout(300)
         hov = page.eval_on_selector('.ba [data-p="leak-1"] a', "a => [getComputedStyle(a).backgroundColor, getComputedStyle(a.querySelector('.m-title')).textDecorationLine, getComputedStyle(a).cursor]")
-    check(f"{tag} phones: row hover = tint + underlined title + pointer", bool(hov) and hov[0] != "rgba(0, 0, 0, 0)" and hov[1] == "underline" and hov[2] == "pointer", hov)
+    check(f"{tag} phones: row hover = tint + underlined title + pointer (desktop; touch: no sticky tint)", bool(hov) and hov[2] == "pointer" and (
+          (hov[0] != "rgba(0, 0, 0, 0)" and hov[1] == "underline") if page.evaluate("matchMedia('(hover: hover)').matches") else (hov[0] == "rgba(0, 0, 0, 0)" and hov[1] == "none")), hov)
     page.locator("#website").screenshot(path=str(out / f"{vp_name}-p2b-phones-hover.png"))
     page.mouse.move(0, 0)
     check(f"{tag} profile: showcase url bar = site_domain", page.locator("[data-p=site-url]").inner_text() == sd)
@@ -547,6 +565,9 @@ def personalize_flow(browser, vp_name, vp):
     gal = page.eval_on_selector_all("[data-p-media-only] img", "els => els.map(e => [e.getAttribute('src'), e.naturalWidth])")
     check(f"{tag} profile: media ready: 4 gallery photos fade in from the API", shown(page, "[data-p-media-only]") == 4
           and all(g[0].startswith(API + "/api/media/") and g[1] > 0 for g in gal), gal)
+    alts = page.eval_on_selector_all("img[data-p-src]", "els => [...new Set(els.map(e => e.alt))]")
+    check(f"{tag} profile: media alts tell the photos apart ('<name>, photo n of N')", len(alts) >= 4
+          and all(re.fullmatch(re.escape(PROFILE["display_name"]) + r", photo \d of \d", a) for a in alts), alts)
     page.wait_for_timeout(700)
     page.screenshot(path=str(out / f"{vp_name}-p5-demo-media-ready.png"))
     about = page.locator("nav a[href*='about.html']").first.get_attribute("href") or ""
@@ -795,10 +816,14 @@ def askai(browser, vp_name, vp):
     def settle():
         page.wait_for_selector(".askai-log[aria-busy=false]", timeout=10000)
 
-    def click_L():   # phone: the launcher is hidden while the hero is on screen, so scroll past it first
-        if vp_name == "phone" and page.evaluate("document.querySelector('.hero').getBoundingClientRect().bottom > 0"):
-            page.evaluate("document.getElementById('how').scrollIntoView({behavior: 'instant'})")
-            page.wait_for_selector(".askai-launcher:not(.in-hero)", timeout=3000)
+    def click_L():   # hidden over the hero (phone), the report card's actions or the phones (any width): scroll to where it shows
+        shown = "(() => { const L = document.querySelector('.askai-launcher'), c = L.classList; return !c.contains('in-quiet') && !(c.contains('in-hero') && innerWidth < 720) && getComputedStyle(L).opacity === '1'; })()"
+        for sec in (None, "how", "pricing", "faq"):
+            if sec:
+                page.evaluate(f"document.getElementById('{sec}').scrollIntoView({{behavior: 'instant'}})")
+            page.wait_for_timeout(450)   # IntersectionObserver / rAF + the pill's fade settle
+            if page.evaluate(shown):
+                break
         L.click()
 
     # 1. launcher: covers no hero text / control at load (phone: hidden until the hero scrolls away)
@@ -1084,6 +1109,7 @@ def inline_flow(browser, vp_name, vp):
         ctx = browser.new_context(viewport=vp, device_scale_factor=2 if vp_name == "phone" else 1, java_script_enabled=js,
                                   is_mobile=vp_name == "phone", has_touch=vp_name == "phone", color_scheme=scheme, reduced_motion=motion)
         # layout shifts, for the zero-CLS checks (PerformanceObserver, buffered from page start)
+        ctx.add_init_script("window.__anim = []; const _a = Element.prototype.animate; Element.prototype.animate = function (k, o) { if (this.classList && this.classList.contains('report-card')) window.__anim.push([k, o && o.duration]); return _a.apply(this, arguments); };")
         ctx.add_init_script("window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value, e.hadRecentInput]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}")
 
         def route(r, _req):
@@ -1143,7 +1169,8 @@ def inline_flow(browser, vp_name, vp):
     strip = lambda page: page.evaluate("""() => {
         const s = document.querySelector('.report-card .live-strip'), c = document.querySelector('.report-card').getBoundingClientRect();
         const pb = document.querySelector('.report-card .live-strip-pause');
-        return s && {x: s.scrollLeft, drift: s.getAttribute('data-drift'), card: [c.width, c.height], max: s.scrollWidth - s.clientWidth,
+        const tr = s && s.querySelector('.live-strip-track'), tx = tr ? new DOMMatrix(getComputedStyle(tr).transform).m41 : 0;
+        return s && {x: Math.round(s.scrollLeft - tx), drift: s.getAttribute('data-drift'), card: [c.width, c.height], max: s.scrollWidth - s.clientWidth,
           shifts: window.__ls.slice(), pause: pb ? (pb.offsetParent ? 'shown' : 'none') : null, pauseLabel: pb && pb.getAttribute('aria-label')};
     }""")
     msgs_ok = lambda m, *need: len(m) == 3 and m[0].startswith("https://t.me/jakabasej?text=") and m[1].startswith(
@@ -1162,9 +1189,13 @@ def inline_flow(browser, vp_name, vp):
     page.wait_for_timeout(700)
     shot(page, "1-band-before", "#free")
     band_h0 = ill(page)["h"]
+    fh = page.evaluate("Math.round(document.getElementById('free').getBoundingClientRect().height)")
+    check(f"{tag} band: #free compact (<= 420 px desktop / 560 px phone)", fh <= (560 if vp_name == "phone" else 420), fh)
     page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
     page.wait_for_timeout(300)
     net["nav"].clear()
+    lcol = lambda: page.evaluate("() => ['.scan-alt', '.assurances'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return Math.round(r.top + scrollY); })")
+    lc0 = lcol()
     submit(page, "@demo.creator", "https://www.instagram.com/demo.ig/")
     page.wait_for_function("() => /step/.test((document.querySelector('.report-card .live-status') || {}).textContent || '')", timeout=5000)
     c = card(page)
@@ -1174,9 +1205,17 @@ def inline_flow(browser, vp_name, vp):
     shot(page, "2-progress", ".hero")
     check(f"{tag} body: onlyfans + handle + instagram from a pasted URL",
           net["bodies"] == [{"platform": "onlyfans.com", "handle": "demo.creator", "level": "low", "instagram": "demo.ig"}], net["bodies"])
+    fv = page.evaluate("[document.querySelector('#scan [name=h]').value, document.querySelector('#scan [name=ig]').value]")
+    check(f"{tag} form: a pasted URL / @name shows as the bare handle in the fields", fv == ["demo.creator", "demo.ig"], fv)
 
     # 2. settled hero card
     settled(page)
+    page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=5000)
+    lc1 = lcol()
+    check(f"{tag} hero: the left column doesn't move when the result lands (scanned line takes the note's slot)", lc1 == lc0, (lc0, lc1))
+    an = page.evaluate("window.__anim.map(a => [a[0].map(k => parseFloat(k.height)), a[1]])")
+    check(f"{tag} hero: the card eases to the result's height (one height animation, ~320 ms, no snap)", len(an) == 1 and an[0][0][1] > an[0][0][0] + 100
+          and 200 <= an[0][1] <= 500, an)
     slug = parse_qs(urlsplit(page.url).query).get("r", [""])[0]
     check(f"{tag} hero: no navigation, URL = index.html?r=<slug>", re.fullmatch(r"[A-Za-z0-9]{12}", slug or "") is not None
           and page.url == base + "?r=" + slug and all(urlsplit(u).path == "/" for u in net["nav"]), [page.url] + net["nav"])
@@ -1230,10 +1269,21 @@ def inline_flow(browser, vp_name, vp):
     by_dom = {}
     for d, _t, u, _b in rows:
         by_dom.setdefault(d, u)
-    check(f"{tag} hero: Sites tab = top 6 sites, each opens its first link in a new tab",
-          hero["sites"] == [[by_dom[d], "_blank", "noopener noreferrer nofollow"] for d in [x[0] for x in sorted(_site_counts(rows), key=lambda x: -x[1])][:6]], hero["sites"])
+    ns = len(hero["sites"])
+    check(f"{tag} hero: Sites tab = the top sites (6-12, as many as fit), each opens its first link in a new tab", 6 <= ns <= 12 and
+          hero["sites"] == [[by_dom[d], "_blank", "noopener noreferrer nofollow"] for d in [x[0] for x in sorted(_site_counts(rows), key=lambda x: -x[1])][:ns]], hero["sites"])
+    sg = page.evaluate("""() => { const p = document.querySelector('#lp-sites'), ul = p.querySelector('ul'), m = p.querySelector('.live-more'), others = [...document.querySelectorAll('.report-card .live-panel:not(#lp-sites)')];
+        const nat = e => e.lastElementChild.getBoundingClientRect().bottom - e.getBoundingClientRect().top;
+        return {gap: Math.round(m.getBoundingClientRect().top - ul.getBoundingClientRect().bottom), more: m.textContent, href: m.getAttribute('href'),
+          grew: Math.round(nat(p) - Math.max(...others.map(nat))), card: [document.querySelector('.report-card').getBoundingClientRect().width, document.querySelector('.hero-grid').clientWidth]}; }""")
+    nsites = len(_site_counts(rows))
+    check(f"{tag} hero: Sites panel has no empty band ('+N more sites' link at its foot, gap < one row, card not taller for it)", sg["gap"] < 52 + 12
+          and sg["grew"] <= 0 and sg["more"] == f"+ {nsites - ns} more sites in the full report" and sg["href"] == "scan/?r=" + slug, sg)
+    cw = page.evaluate("[document.querySelector('.report-card').getBoundingClientRect().right, document.querySelector('.hero-grid').getBoundingClientRect().right - parseFloat(getComputedStyle(document.querySelector('.hero-grid')).paddingRight)]")
+    check(f"{tag} hero: the card fits its column (no overflow into the gutter)", cw[0] <= cw[1] + 0.5, cw)
     # tabs switch the body without moving anything; Reveal unblurs
     cbox = lambda: page.evaluate("() => { const r = document.querySelector('.report-card').getBoundingClientRect(), d = document.documentElement.getBoundingClientRect(); return [Math.round(r.x - d.x), Math.round(r.y - d.y), r.width, r.height]; }")
+    page.wait_for_function("() => !document.querySelector('.report-card').getAnimations().length", timeout=3000)   # the card's height ease
     card0 = cbox()
     page.locator("#lt-images").click()
     page.wait_for_timeout(350)
@@ -1260,7 +1310,7 @@ def inline_flow(browser, vp_name, vp):
     page.mouse.move(0, 0)
     # drift: idle ~4 s → the strip scrolls itself; 2 frames 2 s apart; a pointerdown on it stops it for good
     try:
-        page.wait_for_function("() => { const s = document.querySelector('.report-card .live-strip'); return s && s.scrollLeft > 4; }", timeout=9000)
+        page.wait_for_function("() => { const s = document.querySelector('.report-card .live-strip'), t = s && s.querySelector('.live-strip-track'); return s && s.scrollLeft - new DOMMatrix(getComputedStyle(t).transform).m41 > 4; }", timeout=9000)
     except Exception:
         pass
     a0 = strip(page)
@@ -1269,6 +1319,11 @@ def inline_flow(browser, vp_name, vp):
     a1 = strip(page)
     page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-t2.png"))
     check(f"{tag} drift: idle → the strip scrolls by itself (rAF), ~24 px/s", a0["drift"] == "on" and 20 <= a1["x"] - a0["x"] <= 90, (a0["x"], a1["x"]))
+    sm = page.evaluate("""() => new Promise(done => { const t = document.querySelector('.report-card .live-strip-track'), xs = [];
+        const f = () => { xs.push(new DOMMatrix(getComputedStyle(t).transform).m41); if (xs.length < 40) requestAnimationFrame(f); else done(xs); }; requestAnimationFrame(f); })""")
+    moved = sum(1 for a, b in zip(sm, sm[1:]) if a != b)
+    check(f"{tag} drift: smooth, the track moves (translate3d, sub-pixel) on almost every frame, scrollLeft untouched", moved >= 30
+          and any(x != round(x) for x in sm), (moved, sm[:4]))
     check(f"{tag} hero: a visible 'Pause slideshow' button while it may move", a1["pause"] == "shown" and a1["pauseLabel"] == "Pause slideshow", a1["pause"])
     late = [x for x in a1["shifts"] if x[1] > 0 and not x[2] and x[0] > page.evaluate("performance.now()") - 4000]
     check(f"{tag} hero: zero layout shift while the strip drifts / loads (card box + PerformanceObserver)",
@@ -1290,6 +1345,36 @@ def inline_flow(browser, vp_name, vp):
     page.wait_for_timeout(1000)
     check(f"{tag} drift: Play restarts it at once, Stop ends it", c1["drift"] == "on" and c1["x"] - c0 >= 15 and c1["pauseLabel"] == "Pause slideshow"
           and c2["drift"] is None and strip(page)["x"] == c2["x"] and c2["pauseLabel"] == "Play slideshow", (c0, c1["x"], c2["x"], c1["drift"], c2["drift"]))
+    # tiles: a light placeholder in the light theme (no black flash), faded in once loaded; the #free frame stays Google-dark
+    tl = page.evaluate("""() => { const lum = e => { const m = getComputedStyle(e).backgroundImage.match(/rgba?\\(([^)]+)\\)/); if (!m) return null;
+        const [r, g, b] = m[1].split(',').map(parseFloat); return Math.round(.2126 * r + .7152 * g + .0722 * b); };
+        return {card: lum(document.querySelector('.report-card .gi-box')), band: lum(document.querySelector('.gmini .gi-box')),
+          waiting: [...document.querySelectorAll('.report-card .live-strip .gi-wait img')].filter(i => i.complete && i.naturalWidth).length,
+          loaded: [...document.querySelectorAll('.report-card .live-strip .gi-box:not(.gi-wait) img')].filter(i => i.complete && i.naturalWidth).length, fade: getComputedStyle(document.querySelector('.report-card .gi-img')).transitionProperty}; }""")
+    check(f"{tag} tiles: light placeholder in the light theme, Google-dark in #free, images fade in on load", tl["card"] is not None and tl["card"] > 150
+          and tl["band"] is not None and tl["band"] < 90 and tl["waiting"] == 0 and tl["loaded"] >= 3 and "opacity" in tl["fade"], tl)
+    # hover looks only where there is hover (a tap leaves nothing tinted)
+    page.locator(".report-card .live-link").first.hover()
+    page.wait_for_timeout(250)
+    hv = page.evaluate("getComputedStyle(document.querySelector('.report-card .live-link')).backgroundColor")
+    hov = page.evaluate("matchMedia('(hover: hover)').matches")   # Playwright's screenshots flip a touch context to hover: ask the page
+    bare = page.evaluate("""() => { const out = [], walk = (rules, gated) => { for (const r of rules) {
+        if (r.media) walk(r.cssRules, gated || /hover:\\s*hover/.test(r.conditionText || r.media.mediaText));
+        else if (r.selectorText && /\\.live-(link|tab):hover/.test(r.selectorText) && !gated) out.push(r.selectorText); } };
+      for (const sh of document.styleSheets) { try { walk(sh.cssRules, false); } catch (e) {} } return out; }""")
+    check(f"{tag} hero: row hover tint only where hover exists (phone: none after a tap)", (hv == "rgba(0, 0, 0, 0)") == (not hov) and not bare, [hv, hov, bare])
+    page.mouse.move(0, 0)
+    # the Ask AI pill never sits on the card's actions or on the before / after phones
+    def pill_clear(sel):
+        page.evaluate(f"document.querySelector('{sel}').scrollIntoView({{block: 'end', behavior: 'instant'}})")
+        page.wait_for_timeout(600)
+        return page.evaluate(f"""() => {{ const L = document.querySelector('.askai-launcher'), b = L.getBoundingClientRect(), r = document.querySelector('{sel}').getBoundingClientRect();
+            const over = r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom;
+            return [over, getComputedStyle(L).visibility]; }}""")
+    pa, pb = pill_clear(".report-card .live-actions"), pill_clear(".ba")
+    check(f"{tag} askai: launcher hidden while it would cover the card's actions / the phones", all(not o or v == "hidden" for o, v in (pa, pb))
+          and (pa[0] or pb[0]), (pa, pb))
+    page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
     last = json.loads(page.evaluate("localStorage.getItem('leakscan.last')") or "{}")
     check(f"{tag} hero: localStorage leakscan.last", last.get("slug") == slug and last.get("handle") == "demo.creator", last)
     # personalize (same checks as #18's ?r= path, via apply())

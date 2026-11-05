@@ -277,6 +277,12 @@
         if (site == null) return hide(r);
         if (site) text(r.querySelector('.m-site'), site);
         if (title) text(r.querySelector('.m-title'), title);
+        var f = site && /^(leak-\d|gone)$/.test(k) && r.querySelector('.fav'), E = window.LeakScanEngine;
+        if (f) { // a letter avatar per leak site, like the hero card's rows
+          f.textContent = site.charAt(0).toUpperCase();
+          f.classList.add('fav-l');
+          if (E && E.favColor) f.style.background = E.favColor(site);
+        }
       });
     };
     each($$('[data-p="search"]'), function (el) { text(el, name); });
@@ -318,8 +324,9 @@
         location.href = location.pathname;
       });
       line.textContent = '';
-      [ 'Scanned ', make('strong', {}, ['@' + m.handle]), ' \u2014 this page now shows your results. ',
-        make('a', { href: 'scan/?r=' + encodeURIComponent(m.slug) }, ['Back to your report']), ' \u00b7 ', reset
+      // one line in the note's slot (CSS): the handle shortens before anything wraps
+      [ make('span', {}, ['Scanned ', make('strong', {}, ['@' + m.handle])]), ' \u00b7 ',
+        make('a', { href: 'scan/?r=' + encodeURIComponent(m.slug) }, ['Your report']), ' \u00b7 ', reset
       ].forEach(function (c) { line.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
       line.hidden = false;
     }
@@ -442,7 +449,7 @@
   };
 
   function showEl(el) { if (el) { el.style.display = ''; el.removeAttribute('data-p-off'); } }
-  function swapImg(img, src, d) {
+  function swapImg(img, src, d, n, total) {
     img.setAttribute('data-p-src', src);
     var pre = new Image();
     pre.onload = function () {
@@ -452,18 +459,19 @@
       // fixed box: keep the placeholder's aspect ratio, crop the photo into it
       if (img.getAttribute('width')) img.style.aspectRatio = img.getAttribute('width') + ' / ' + img.getAttribute('height');
       img.style.objectFit = 'cover';
-      img.style.objectPosition = 'center 25%';   // her photo, focal point unknown: faces sit in the upper part of most photos
+      // her photo, focal point unknown: faces sit in the upper part of most photos (a portrait is cropped hardest)
+      img.style.objectPosition = pre.naturalHeight > pre.naturalWidth ? 'center 20%' : 'center 30%';
       img.classList.add('p-fade');
       img.style.opacity = '0';
       img.removeAttribute('srcset');
       img.setAttribute('src', src);
-      img.setAttribute('alt', 'Photo of ' + d.name);
+      img.setAttribute('alt', d.name + ', photo ' + (n + 1) + ' of ' + total);
       var unit = img.closest('[data-p-media-only]');
       if (unit) {
         showEl(unit);
         showEl(unit.closest('[data-p-gallery]'));
         var b = unit.querySelector('button[aria-label]');
-        if (b) b.setAttribute('aria-label', 'View larger: photo of ' + d.name);
+        if (b) b.setAttribute('aria-label', 'View larger: ' + d.name + ', photo ' + (n + 1) + ' of ' + total);
       }
       requestAnimationFrame(function () { requestAnimationFrame(function () { img.style.opacity = ''; }); });
     };
@@ -475,7 +483,7 @@
     pollMedia(m.slug, function (imgs) {
       each(slots, function (img) {
         var it = imgs[+img.getAttribute('data-p-media')];
-        if (it && img.getAttribute('data-p-src') !== it.src) swapImg(img, it.src, d);
+        if (it && img.getAttribute('data-p-src') !== it.src) swapImg(img, it.src, d, +img.getAttribute('data-p-media'), Math.min(imgs.length, slots.length));
       });
     });
   }

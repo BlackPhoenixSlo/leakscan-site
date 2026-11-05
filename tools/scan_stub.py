@@ -83,9 +83,16 @@ MEDIA_FILES = [ROOT / "site" / "showcase" / "imgs" / f"{n}.webp" for n in (   # 
     "editorial-02", "editorial-01", "behind-the-scenes", "editorial-03", "editorial-04")]
 
 
-def stand_in(key):
-    """A people photo standing in for a Google thumb / a gathered media photo (bytes; key picks which)."""
-    return MEDIA_FILES[hashlib.sha256(key.encode()).digest()[0] % len(MEDIA_FILES)].read_bytes()
+# Google thumbs: every showcase photo (not the og card / favicons), so a 16-tile grid shows 16 different pictures
+THUMB_FILES = sorted(f for f in (ROOT / "site" / "showcase" / "imgs").glob("*.webp") if f.stem != "og")
+
+
+def stand_in(key, pool=MEDIA_FILES):
+    """A people photo standing in for a Google thumb / a gathered media photo (bytes). The fixture's thumb ids are
+    numbered (…DEMO0001…): the number walks the pool, so neighbours never repeat; else a hash of key picks."""
+    n = re.search(r"DEMO(\d+)", key)
+    i = int(n.group(1)) if n else hashlib.sha256(key.encode()).digest()[0]
+    return pool[i % len(pool)].read_bytes()
 
 
 def avatar_png(seed, w=48, h=48, cell=12):
@@ -184,7 +191,7 @@ class Handler(SimpleHTTPRequestHandler):
             src = parse_qs(u.query).get("u", [""])[0]
             if not src.startswith("https://"):
                 return self.send_json(400, {"error": "bad_url"})
-            body = stand_in(src)
+            body = stand_in(src, THUMB_FILES)
             self.send_response(200)
             self.cors()
             self.send_header("Content-Type", "image/webp")

@@ -61,6 +61,10 @@
 .g-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 14px; color: var(--muted); font-size: .92rem; }
 @media (max-width: 559px) { .g-hint { justify-content: flex-start; align-items: flex-start; font-size: .88rem; line-height: 1.4; } .g-hint .icon { margin-top: 2px; } }
 .g-hint .icon { width: 16px; height: 16px; flex: none; color: var(--accent); }
+/* the hint fits the device: "Click" with a mouse, "Tap" on touch; a computer frame shrunk below tap size says so (js: fitComputer) */
+.g-hint-click, .g-hint-small, .g-hint[data-small] .g-hint-tap, .g-hint[data-small] .g-hint-click { display: none; }
+.g-hint[data-small] .g-hint-small { display: inline; }
+@media (hover: hover) and (pointer: fine) { .g-hint:not([data-small]) .g-hint-tap { display: none; } .g-hint:not([data-small]) .g-hint-click { display: inline; } }
 .g-stage { display: flex; justify-content: center; }
 .g-note { margin: 14px auto 0; text-align: center; color: var(--muted); font-size: .9rem; }
 .after-card { max-width: 720px; margin: 24px auto 0; padding: 20px 22px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); text-align: center; }

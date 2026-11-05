@@ -11,7 +11,7 @@
   if (!E || !form || !card || !window.fetch) return;
   var DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/, HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/;
   var GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
-  var ROWS = 5, SITES = 6, STRIP = 24, BAND = 10, MAX_IMAGES = 60;
+  var ROWS = 5, SITES = 6, MAX_SITES = 12, STRIP = 24, BAND = 10, MAX_IMAGES = 60;
   var btn = form.querySelector('button[type=submit]'), btnText = btn && btn.lastChild, btnLabel = btnText && btnText.nodeValue;
   var token = 0, busy = false, live = null, msg = null, saved = null;
   var P = function () { return window.LeakScanPersonalize; };
@@ -115,10 +115,21 @@
     if (text) form.elements[field || 'h'].focus();
   }
   form.noValidate = true; // own messages below, same rules as scan/
+  // A pasted profile URL / @name becomes the bare handle in the field (on blur and on submit), so the field never shows
+  // "onlyfans.com/https://…". An x.com link keeps its network on the field (data-net).
+  function tidy() {
+    var h = form.elements.h, ig = form.elements.ig, c = E.cleanHandle(h.value), so = E.cleanSocial(ig.value, ig.getAttribute('data-net'));
+    if (c && c !== h.value) h.value = c;
+    if (so && so.handle !== ig.value) { ig.value = so.handle; if (so.net === 'x') ig.setAttribute('data-net', 'x'); }
+  }
+  form.elements.h.addEventListener('change', tidy);
+  form.elements.ig.addEventListener('change', tidy);
+  form.elements.ig.addEventListener('input', function () { form.elements.ig.removeAttribute('data-net'); });
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     if (busy) return;
-    var h = E.cleanHandle(form.elements.h.value), social = E.cleanSocial(form.elements.ig.value);
+    tidy();
+    var h = E.cleanHandle(form.elements.h.value), social = E.cleanSocial(form.elements.ig.value, form.elements.ig.getAttribute('data-net'));
     if (!h) return formMsg('That handle doesn’t look right. Use letters, numbers, dots, dashes or underscores, like yourhandle.');
     if (social === false) return formMsg('That Instagram or X username doesn’t look right. Paste the profile link or type the name, like yourname.', 'ig');
     formMsg('');
@@ -173,8 +184,9 @@
   // (new tab); an image no result has links to the full report.
   function tile(it, slug, cap) {
     var img = make('img', 'gi-img', [], { src: E.thumb(it.src), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
-    var box = make('span', 'gi-box', [img, make('span', 'gi-go', [icon(it.link ? 'i-external-link' : 'i-arrow-right')])]);
-    img.addEventListener('error', function () { img.remove(); box.classList.add('gi-none'); }, { once: true });
+    var box = make('span', 'gi-box gi-wait', [img, make('span', 'gi-go', [icon(it.link ? 'i-external-link' : 'i-arrow-right')])]);
+    img.addEventListener('load', function () { box.classList.remove('gi-wait'); }, { once: true });   // fades in (CSS)
+    img.addEventListener('error', function () { img.remove(); box.classList.remove('gi-wait'); box.classList.add('gi-none'); }, { once: true });
     var label = it.link ? 'Image on ' + it.domain + (it.title ? ': ' + it.title : '') + ' (opens in a new tab)' : 'Image result: see it in the full report';
     return make('a', 'gi-card', [box, cap ? make('span', 'gi-cap', [E.fav(it.domain || 'google.com', 'gi-fav'), make('span', 'gi-cap-t', [it.domain || 'Google Images'])]) : null],
       it.link ? ext({ href: it.link, 'aria-label': label, title: it.domain }) : { href: 'scan/?r=' + encodeURIComponent(slug), 'aria-label': label });
@@ -200,8 +212,15 @@
   // ~4 s after the result shows, if the visitor does nothing, the strip scrolls itself slowly (rAF, ping-pong, a pause
   // at each end). Hover / focus pauses it; a tap, click, wheel or key on the strip stops it for good; any page activity
   // before it starts restarts the wait. Only while the strip is on screen, its tab is showing and the page is visible.
-  // Never under prefers-reduced-motion. scrollLeft only: nothing else moves, the card never changes size.
+  // Never under prefers-reduced-motion. While it moves, the inner track slides with translate3d (sub-pixel, on the
+  // compositor: smooth at 24 px/s); whenever it pauses or stops, the position goes back into the scroller's scrollLeft,
+  // so swipe, arrows and focus carry on from there. Nothing else moves, the card never changes size.
   var DRIFT_WAIT = 4000, DRIFT_SPEED = 24, DRIFT_HOLD = 1400, drifter = null;
+  function stripEdges(box, x, max) {
+    var p = box.querySelector('.live-strip-prev'), n = box.querySelector('.live-strip-next');
+    if (p) p.disabled = x <= 1;
+    if (n) n.disabled = x >= max - 1;
+  }
   function drift(box, strip, panel, now) {
     if (drifter) drifter.stop();
     drifter = null;
@@ -212,8 +231,23 @@
       if (btn) { btn.setAttribute('aria-label', on ? 'Pause slideshow' : 'Play slideshow'); btn.title = btn.getAttribute('aria-label'); }
     };
     var d = { box: box, dead: false, armed: false, hover: false, seen: !window.IntersectionObserver, raf: 0, timer: 0 };
-    var pos = 0, dir = 1, hold = 0, t0 = 0, io = null;
+    var track = strip.firstElementChild, pos = 0, dir = 1, hold = 0, t0 = 0, io = null, max = 0, moving = false;
+    var lift = function () {   // scrollLeft → transform (same frame: no visual jump)
+      moving = true;
+      pos = strip.scrollLeft;
+      strip.scrollLeft = 0;
+      track.style.transform = 'translate3d(' + -pos + 'px, 0, 0)';
+    };
+    var settle = function () {   // transform → scrollLeft
+      if (!moving) return;
+      moving = false;
+      track.style.transform = '';
+      strip.scrollLeft = pos;
+    };
+    d.strip = strip;
+    d.x = function () { return moving ? pos : strip.scrollLeft; };
     d.stop = function () {
+      settle();
       d.dead = true;
       clearTimeout(d.timer);
       if (d.raf) cancelAnimationFrame(d.raf);
@@ -225,23 +259,25 @@
     var frame = function (t) {
       d.raf = 0;
       if (d.dead || !strip.isConnected) return d.stop();
-      var dt = t0 ? Math.min(64, t - t0) : 0, max = strip.scrollWidth - strip.clientWidth;
+      var dt = t0 ? Math.min(64, t - t0) : 0;
       t0 = t;
+      if (!moving) max = strip.scrollWidth - strip.clientWidth;
       if (max > 1 && d.seen && !d.hover && panel.classList.contains('on') && !document.hidden) {
+        if (!moving) lift();
         if (hold > 0) hold -= dt;
         else {
           pos += dir * DRIFT_SPEED * dt / 1000;
           if (dir > 0 && pos >= max) { pos = max; dir = -1; hold = DRIFT_HOLD; } else if (dir < 0 && pos <= 0) { pos = 0; dir = 1; hold = DRIFT_HOLD; }
-          strip.scrollLeft = pos;
+          track.style.transform = 'translate3d(' + (-pos).toFixed(2) + 'px, 0, 0)';
+          stripEdges(box, pos, max);
         }
-      } else pos = strip.scrollLeft;
+      } else settle();
       d.raf = requestAnimationFrame(frame);
     };
     d.start = function () {
       if (d.dead || d.armed) return;
       d.armed = true;
       strip.setAttribute('data-drift', 'on');
-      pos = strip.scrollLeft;
       d.raf = requestAnimationFrame(frame);
     };
     d.wait = function () { clearTimeout(d.timer); if (!d.armed && !d.dead) d.timer = setTimeout(d.start, DRIFT_WAIT); };
@@ -267,7 +303,16 @@
   });
 
   // ---------- hero card: the live report ----------
-  function heroResult(m) {
+  // The card eases from the scanning height to the result's (no one-frame snap). Not on a page load, not under reduced motion.
+  function grow(h0) {
+    var h1 = card.offsetHeight;
+    if (reduce() || !card.animate || Math.abs(h1 - h0) < 2) return;
+    card.classList.add('is-growing');
+    var a = card.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: 320, easing: 'cubic-bezier(.2, .7, .2, 1)' });
+    a.onfinish = a.oncancel = function () { card.classList.remove('is-growing'); };
+  }
+  function heroResult(m, ease) {
+    var h0 = card.offsetHeight;
     if (!live || live.getAttribute('data-handle') !== m.handle) heroOpen(m.handle, m.platform);
     var n = m.rows.length, body = q('.live-body'), slugQ = encodeURIComponent(m.slug);
     live.setAttribute('data-slug', m.slug);
@@ -305,7 +350,7 @@
       if (n > ROWS) links.appendChild(make('p', 'live-more', ['+ ' + (n - ROWS) + ' more in the full report']));
       var tabs = [['links', 'Links', n, links]], strip = null, sbox = null;
       if (m.images.length) {
-        strip = make('div', 'live-strip', m.images.slice(0, STRIP).map(function (it) { return tile(it, m.slug); }),
+        strip = make('div', 'live-strip', [make('div', 'live-strip-track', m.images.slice(0, STRIP).map(function (it) { return tile(it, m.slug); }))],
           { role: 'group', 'aria-label': 'Google Images results for @' + m.handle });
         var nav = function (dir) {
           var b = make('button', 'live-strip-nav live-strip-' + (dir < 0 ? 'prev' : 'next'), [icon(dir < 0 ? 'i-arrow-right' : 'i-arrow-right')],
@@ -331,20 +376,19 @@
         tabs.push(['images', 'Images', m.images.length, grid]);
       }
       // Sites: per site, its first link
-      var sites = make('div', 'live-panel', [make('ul', 'report-rows live-sites', m.sites.slice(0, SITES).map(function (s) {
+      var sites = make('div', 'live-panel live-panel-sites', [make('ul', 'report-rows live-sites', m.sites.slice(0, MAX_SITES).map(function (s) {
         return make('li', '', [rowLink(s.url, s.domain, s.thumb, [make('span', 'live-dom', [s.domain]),
           make('span', 'live-ttl', [s.url.replace(/^https?:\/\/(www\.)?/, '')])],
           make('span', 'chip chip-soft', [plural(s.n, 'link', 'links')]), s.domain + ': ' + plural(s.n, 'link', 'links') + ' (opens its first link in a new tab)')]);
       }))]);
-      if (m.sites.length > SITES) sites.appendChild(make('p', 'live-more', ['+ ' + (m.sites.length - SITES) + ' more sites in the full report']));
+      if (m.sites.length > SITES) sites.appendChild(make('a', 'live-more live-more-a', [], { href: 'scan/?r=' + slugQ }));
       tabs.push(['sites', 'Sites', m.sites.length, sites]);
       body.appendChild(tabBar(tabs));
       body.appendChild(make('div', 'live-panels', tabs.map(function (t) { return t[3]; })));
+      fitSites(sites, m.sites.length, tabs.filter(function (t) { return t[3] !== sites; }).map(function (t) { return t[3]; }));
       if (strip) {
         var edges = function () {
-          var max = strip.scrollWidth - strip.clientWidth;
-          sbox.querySelector('.live-strip-prev').disabled = strip.scrollLeft <= 1;
-          sbox.querySelector('.live-strip-next').disabled = strip.scrollLeft >= max - 1;
+          if (!(drifter && drifter.strip === strip && drifter.x() !== strip.scrollLeft)) stripEdges(sbox, strip.scrollLeft, strip.scrollWidth - strip.clientWidth);
         };
         strip.addEventListener('scroll', edges, { passive: true });
         requestAnimationFrame(edges);
@@ -358,6 +402,18 @@
       make('p', 'live-media', [], { hidden: '' })]));
     E.sendReport(send, m.slug, m.handle, m.platform);
     mediaStatus(m);
+    if (ease) grow(h0);
+  }
+  // The Sites list shows as many sites (6 to 12) as fit in the height the other panels give the card: no empty band
+  // above the actions, the card never grows for it. "+N more sites" sits at the panel's foot.
+  function fitSites(panel, total, others) {
+    var list = panel.firstChild, more = panel.querySelector('.live-more'), top = panel.getBoundingClientRect().top;
+    var room = Math.max.apply(null, others.map(function (p) { var l = p.lastElementChild; return l ? l.getBoundingClientRect().bottom - top : 0; }));
+    var foot = more ? more.offsetHeight + 8 : 0;
+    while (list.children.length > SITES && list.getBoundingClientRect().bottom - top + foot > room) list.removeChild(list.lastChild);
+    var left = total - list.children.length;
+    if (more && left > 0) more.textContent = '+ ' + left + ' more ' + (left === 1 ? 'site' : 'sites') + ' in the full report';
+    else if (more) more.remove();
   }
   // [[key, label, count, panel]] → a tablist; the panels share one grid cell, so switching never moves anything else.
   function tabBar(tabs) {
@@ -397,7 +453,7 @@
     failed: ['The scan didn’t finish.', 'Try again in a minute, or message me your handle and I’ll run it for you.']
   };
   function heroError(kind, handle, platform) {
-    var e = ERR[kind] || ERR.failed, body = q('.live-body'), send = msgLinks();
+    var e = ERR[kind] || ERR.failed, body = q('.live-body'), send = msgLinks(), h0 = card.offsetHeight;
     card.removeAttribute('aria-busy');
     q('.live-status').textContent = '';
     q('.live-bar').hidden = true;
@@ -406,6 +462,7 @@
     var t = 'Hi Jaka, the free scan didn’t work for me. My handle: ' + E.who(handle, platform);
     E.setMessages(send, t, 'Free Google scan', 'Hi Jaka,\n\n' + t + '\n\nThanks!');
     live.setAttribute('data-error', kind);
+    grow(h0);
   }
 
   // Demo-site photos arrive after the scan (personalize.js polls /api/media/<slug>); this line mirrors scan/'s.
@@ -413,6 +470,10 @@
   function mediaStatus(m) {
     var el = q('.live-media'), tok = ++mediaTok;
     if (!el || !m.profile || !P()) return;
+    // its line is there from the first frame (the card eases to its final height once, nothing pops in later)
+    el.textContent = 'Gathering photos for your demo site…';
+    el.setAttribute('data-phase', 'pending');
+    el.hidden = false;
     P().pollMedia(m.slug, function (imgs, phase) {
       if (tok !== mediaTok || !el.isConnected) return;
       var ready = phase === 'ready' || (phase !== 'pending' && imgs.length > 0);
@@ -420,7 +481,7 @@
       el.appendChild(ready ? make('a', '', ['Photos ready: see your demo site'], { href: '#showcase' })
         : document.createTextNode('Gathering photos for your demo site…'));
       el.setAttribute('data-phase', ready ? 'ready' : phase);
-      el.hidden = !ready && phase !== 'pending';
+      el.style.visibility = !ready && phase !== 'pending' ? 'hidden' : '';   // keep the slot: no late shrink
     });
   }
 
@@ -486,7 +547,7 @@
         if (history.replaceState) history.replaceState(null, '', location.pathname + '?r=' + encodeURIComponent(m.slug) + location.hash);
         E.remember(raw, m.slug, m.handle, m.platform);
         if (P()) P().apply(raw.socials ? raw : Object.assign({}, raw, { socials: m.socials }));
-        heroResult(m);
+        heroResult(m, true);
         bandResult(m);
         settle();
       },

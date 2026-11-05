@@ -439,4 +439,23 @@
     new IntersectionObserver(function (en) { launcher.classList.toggle('in-hero', en[0].isIntersecting); }).observe(hero);
   }
   launcher.hidden = false;
+  // Any width: also out of the way while the pill would sit on the hero card's actions (after a scan) or on the
+  // before / after phones (.in-quiet, same look as .in-hero).
+  var QUIET = ['.report-card .live-actions', '.ba'], qraf = 0;
+  var quiet = function () {
+    qraf = 0;
+    var b = launcher.getBoundingClientRect(), hit = !dlg.open && document.activeElement !== launcher && QUIET.some(function (sel) {
+      var el = document.querySelector(sel), r = el && el.getBoundingClientRect();
+      return r && r.width && r.right > b.left - 8 && r.left < b.right + 8 && r.bottom > b.top - 8 && r.top < b.bottom + 8;
+    });
+    launcher.classList.toggle('in-quiet', hit);
+  };
+  var later = function () { if (!qraf) qraf = requestAnimationFrame(quiet); };
+  window.addEventListener('scroll', later, { passive: true });
+  window.addEventListener('resize', later);
+  if (window.ResizeObserver) new ResizeObserver(later).observe(document.body);   // the hero card growing into a report
+  launcher.addEventListener('focus', quiet);   // never hide the pill under keyboard focus (Esc returns focus here)
+  launcher.addEventListener('blur', later);
+  dlg.addEventListener('close', later);
+  later();
 })();

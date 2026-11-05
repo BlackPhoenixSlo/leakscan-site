@@ -302,7 +302,7 @@
     stage.querySelectorAll('img').forEach(function (im) {
       im.addEventListener('error', function () { im.parentNode.classList.add('g-img-none'); im.remove(); }, { once: true });
     });
-    if (!phone) fitComputer();
+    if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
     if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus(); }
   }
   var ro = null;
@@ -310,8 +310,10 @@
     var wrap = document.querySelector('.cw-scale'), frame = wrap && wrap.firstElementChild;
     if (!frame) return;
     var fit = function () {
-      var s = Math.min(1, wrap.clientWidth / frame.offsetWidth);
+      if (!wrap.isConnected) return;   // replaced by the next render (ResizeObserver still reports it, at 0 px)
+      var s = Math.min(1, wrap.clientWidth / frame.offsetWidth), hint = $('g-hint');
       frame.style.transform = s < 1 ? 'scale(' + s + ')' : '';
+      if (hint) hint.toggleAttribute('data-small', s < 0.6);   // tabs / tiles below a usable tap size: point to the Phone view
       wrap.style.height = Math.ceil(frame.offsetHeight * s) + 'px';
     };
     fit();
@@ -341,6 +343,10 @@
     i = e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length;
     state.tab = TABS[i][0];
     renderGoogle(true);
+  });
+  document.addEventListener('click', function (e) {   // "Switch to Phone" in the hint = the Phone toggle
+    var b = e.target.closest && e.target.closest('[data-device-go]'), r = b && document.querySelector('#device input[value="' + b.getAttribute('data-device-go') + '"]');
+    if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event('change')); r.focus(); }
   });
   document.querySelectorAll('#device input').forEach(function (r) {
     r.checked = r.value === state.device;
