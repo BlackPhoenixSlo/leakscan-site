@@ -650,8 +650,9 @@ def huge_flow(browser, vp_name, vp):
             sc2 = p2.evaluate(SCROLLERS)
             check(f"{tag} short screen ({w}x{h}): frame not pinned, short preview, no inner scroll box; More results expands it",
                   r[0] == "static" and 0 < r[1] < 10 and r[2] and not sc and not sc2 and n2 > r[1], [r, sc, n2, sc2])
-            pl = p2.evaluate("() => { const r = document.querySelector('.ph-reveal').getBoundingClientRect(), s = document.querySelector('.ph-screen').getBoundingClientRect(); return [Math.round(r.height), Math.round(r.left - s.left), Math.round(s.right - r.right)]; }")
-            check(f"{tag} short screen ({w}x{h}): Reveal pill on one line, inside the phone screen", pl[0] <= 44 and min(pl[1:]) >= 8, pl)
+            pl = p2.evaluate("""() => { const b = document.querySelector('.ph-reveal'), r = b.getBoundingClientRect(), s = document.querySelector('.ph-screen').getBoundingClientRect();
+                return [b.querySelector('span').getClientRects().length, Math.round(r.left - s.left), Math.round(s.right - r.right)]; }""")
+            check(f"{tag} short screen ({w}x{h}): Reveal pill label on one line, inside the phone screen", pl[0] == 1 and min(pl[1:]) >= 8, pl)
             # Show fewer: back to exactly the first look; focus on More, clear of the pinned header + section nav
             fl = {}
             for t, item in (("all", ".g-r"), ("images", ".g-tile"), ("videos", ".g-v")):
