@@ -4,7 +4,6 @@
   'use strict';
   var E = window.LeakScanEngine;
   var REPORT_BASE = E.REPORT_BASE, PLATFORMS = E.PLATFORMS, cleanHandle = E.cleanHandle, thumb = E.thumb, setMessages = E.setMessages;
-  var MAX_THUMBS = 120;   // every image Google shows (images[] + result thumbs, deduped)
   var G_COLORS = ['#4285f4', '#ea4335', '#fbbc05', '#4285f4', '#34a853', '#ea4335'];
 
   var $ = function (id) { return document.getElementById(id); };
@@ -242,7 +241,7 @@
       return '<span style="color:' + G_COLORS[i] + '">' + c + '</span>';
     }).join('') + '</span>';
   }
-  function imageItems(d) { return E.imageItems(d.images, d.results, function (u) { var t = thumb(u); return t && !state.dead[t]; }, MAX_THUMBS); }
+  function imageItems(d) { return E.imageItems(d.images, d.results, function (u) { var t = thumb(u); return t && !state.dead[t]; }, Infinity); }   // every image Google shows (images[] + result thumbs, deduped)
   function img(u, alt) {
     return '<span class="g-img"><img src="' + esc(thumb(u)) + '" alt="' + esc(alt || '') + '" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';
   }
@@ -367,6 +366,12 @@
   // An image tile whose thumb fails or loads blank (hotlink-blocked) leaves the grid / pack (no empty square): the next
   // image not shown yet takes its slot (same size: nothing below moves), else the tile goes. The dead thumb stays out of
   // later renders. Other thumbs (video stills, icons) fall back to their grey box.
+  function onScreen(e) {   // any part visible: inside the viewport, its scroll row (strip) and the phone's screen
+    var r = e.getBoundingClientRect(), cs = [e.parentNode, e.closest('.ph-scroll')].filter(Boolean).map(function (c) { return c.getBoundingClientRect(); });
+    return cs.concat([{ left: 0, top: 0, right: innerWidth, bottom: innerHeight }]).every(function (c) {
+      return r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom;
+    });
+  }
   function watchThumb(im) {
     var drop = function () {
       var t = im.closest('.g-tile, .g-pack-b');
@@ -383,8 +388,8 @@
         nu = tmp.firstElementChild;
         t.replaceWith(nu);
         watchThumb(nu.querySelector('img'));
-      } else if (last !== t) { nu = last; t.replaceWith(last); }   // all shown: the last one (off screen) takes the slot, nothing on screen moves
-      else { t.remove(); return; }
+      } else if (last !== t && !onScreen(last)) { nu = last; t.replaceWith(last); }   // all shown: the last one (off screen) takes the slot
+      else { im.parentNode.classList.add('g-img-none'); im.remove(); return; }   // it is on screen (few images): keep an empty slot, nothing moves
       if (had) { var f = nu.matches('a, button') ? nu : nu.querySelector('a'); if (f) f.focus({ preventScroll: true }); }
     };
     im.addEventListener('error', drop, { once: true });

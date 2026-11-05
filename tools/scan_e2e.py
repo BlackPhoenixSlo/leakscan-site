@@ -136,7 +136,7 @@ ALSO = "Also found as " + ", ".join("@" + a for a in FX["aliases"]["discovered"]
 # leak-page socials on platforms the profile does not have (the discovered Instagram never replaces hers)
 FOUND = [s["url"] for s in FX["aliases"]["socials"] if s["platform"] not in {a["platform"] for a in FX["profile"]["accounts"]}]
 VIDEOS = [r for r in FX["results"] if r["kind"] == "video"]
-IMAGES = min(120, len(dict.fromkeys(FX["images"] + [r["thumb"] for r in FX["results"] if r["thumb"] and r["kind"] != "video"])))   # video stills: Videos tab only
+IMAGES = len(dict.fromkeys(FX["images"] + [r["thumb"] for r in FX["results"] if r["thumb"] and r["kind"] != "video"]))   # video stills: Videos tab only
 
 
 def check(name, ok, detail=""):
@@ -399,7 +399,7 @@ for _u, _d in [(h["url"], h["domain"]) for h in HUGE["hits"]] + [(r["link"], r["
     HUGE_SITES.setdefault(_d, {})[_u] = 1
 HUGE_LINKS = sum(len(v) for v in HUGE_SITES.values())
 HUGE_TOP = max(HUGE_SITES, key=lambda d: len(HUGE_SITES[d]))
-HUGE_IMAGES = min(120, len(dict.fromkeys(HUGE["images"] + [r["thumb"] for r in HUGE["results"] if r.get("thumb") and r["kind"] != "video"])))
+HUGE_IMAGES = len(dict.fromkeys(HUGE["images"] + [r["thumb"] for r in HUGE["results"] if r.get("thumb") and r["kind"] != "video"]))
 HUGE_VIDEOS = sum(r["kind"] == "video" for r in HUGE["results"])
 NODE_BUDGET = 900   # whole page after the report renders (main before this change: ~3,800 at this size)
 IN_VIEW = """() => { const a = document.activeElement, r = a.getBoundingClientRect(), s = a.closest('.ph-scroll');
@@ -2361,6 +2361,28 @@ def tabs_flow(browser, vp_name, vp):
         back = page.evaluate("() => [...document.querySelectorAll('#g-stage img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1] || ''))")
         check(f"{tag} thumbs: a device switch keeps failed thumbs out (Computer view lists none of them)", back and not any(dead_thumb(u) for u in back), [u[-24:] for u in back if dead_thumb(u)])
         ctx.close()
+    # every thumb fails (late, after the report is up): the All strip keeps its height (visible slots stay as empty tiles), nothing below moves
+    ctx = new_ctx()
+    page = ctx.new_page()
+    held, hold = [], [True]
+    GIF1 = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==")   # 1x1: a "blank" thumb (drop path, no console 404)
+    page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] else r.fulfill(status=200, body=GIF1, content_type="image/gif"))
+    page.goto(base + "scan/?r=demoR3port01", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    page.wait_for_timeout(600)
+    POS = """() => { const s = document.querySelector('#g-panel .g-strip'), b = [...s.children];
+        return [s.offsetHeight, Math.round(document.querySelector('#g-panel .g-r').getBoundingClientRect().top + scrollY), b.length,
+                b.filter(e => e.querySelector('.g-img-none')).length, b.filter(e => { const i = e.querySelector('img'); return i && i.complete && i.naturalWidth >= 16; }).length]; }"""
+    a0, t0 = page.evaluate(POS), page.evaluate("performance.now()")
+    hold[0] = False
+    while held:
+        held.pop().fulfill(status=200, body=GIF1, content_type="image/gif")
+    page.wait_for_timeout(2000)
+    a1 = page.evaluate(POS)
+    ls = page.evaluate("(t0) => window.__ls.filter(x => x[0] > t0 && x[1] > 0 && !x[2]).map(x => x[3])", t0)
+    check(f"{tag} thumbs: every All-strip thumb comes back blank, late: strip keeps its height, results below stay put, failed visible slots stay as empty tiles, no layout shift",
+          a1[0] == a0[0] and a1[1] == a0[1] and a1[2] >= 1 and a1[3] >= 1 and a1[4] == 0 and not ls, [a0, a1, ls[:2]])
+    ctx.close()
 
     # ---------- (3) #free phone: tabs, illustration without a scan ----------
     ctx = new_ctx()
