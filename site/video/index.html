@@ -21,25 +21,26 @@
 </head>
 <body class="vo-page">
 <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol></svg>
-<!-- Cues: seconds into jack.mp4. live = prefab fades in, removed = the compare wipe starts, out = gone again.
+<!-- Cues: seconds into jack.mp4. live = the card slides in (bottom-right), removed = the compare wipe starts, out = it has
+     slid out again. data-cue-say (stage) = the browser says the personalized name + shows "for <name>" (never for the default).
      Edit them to the real timestamps after recording (site/video/CUES.md); tools/video/check_video.py keeps them sane. -->
 <main class="vo" id="vo">
   <h1 class="vo-sr">Jack: leaks on Google, X, Reddit and Mega, before and after the removal</h1>
-  <div class="vo-stage">
+  <div class="vo-stage" data-cue-say="31">
     <video class="vo-video" controls playsinline preload="auto" width="1920" height="1080">
       <source src="jack.mp4" type="video/mp4">
       <source src="jack.webm" type="video/webm">
     </video>
     <div class="vo-over" aria-hidden="true"><div class="vo-box">
 
-      <div class="vo-pf" data-prefab="google" data-cue-live="7.5" data-cue-removed="10.5" data-cue-out="13.5">
+      <div class="vo-pf" data-prefab="google" data-cue-live="7" data-cue-removed="8.4" data-cue-out="10.4">
         <p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><b>Google</b><span class="vo-st"><span class="vo-st-live">Leaks for <span data-vo="name">Orla Brennick</span></span><span class="vo-st-gone">A few days later: no leaks</span></span></p>
         <div class="phone vo-phone"><div class="phone-screen">
           <div class="m-search"><span data-vo="name">Orla Brennick</span><svg class="icon"><use href="#i-search"/></svg></div>
           <div class="m-tabs vo-tabs"><span class="on">All</span><span>Images</span><span>Videos</span></div>
           <div class="rm-stage vo-rs">
             <div class="rm-layer rm-live vo-g">
-              <div class="m-result bad"><span class="fav fav-l" style="background:#4285f4">L</span><div><span class="m-site" data-vo="host">leak-mirror.example</span><span class="m-title"><span data-vo="name">Orla Brennick</span> leaked: full gallery</span><span class="m-thumbs"><span class="thumb t1"></span><span class="thumb t2"></span><span class="thumb t3"></span></span></div></div>
+              <div class="m-result bad"><span class="fav fav-l" style="background:#4285f4">L</span><div><span class="m-site" data-vo="host">leak-mirror.example</span><span class="m-title"><span data-vo="name">Orla Brennick</span> leaked: full gallery</span><span class="m-thumbs"><span class="thumb t1"><img class="rm-img" src="../img/removals/behind-the-scenes.webp" alt="" width="240" height="240" decoding="async"></span><span class="thumb t2"><img class="rm-img" src="../img/removals/editorial-02.webp" alt="" width="240" height="240" decoding="async"></span><span class="thumb t3"><img class="rm-img" src="../img/removals/outdoors.webp" alt="" width="240" height="240" decoding="async"></span></span></div></div>
               <div class="m-result bad"><span class="fav fav-l" style="background:#ab47bc">F</span><div><span class="m-site">free-galleries.example</span><span class="m-title"><span data-vo="name">Orla Brennick</span>: all photos and videos</span><span class="m-lines"><i></i><i></i></span></div></div>
               <div class="m-result bad"><span class="fav fav-l" style="background:#00acc1">P</span><div><span class="m-site">pirate-tube.example</span><span class="m-title"><span data-vo="name">Orla Brennick</span> videos (new)</span><span class="m-lines"><i></i><i></i></span></div></div>
               <div class="m-result bad"><span class="fav fav-l" style="background:#fbbc05">F</span><div><span class="m-site">forum-dump.example</span><span class="m-title"><span data-vo="name">Orla Brennick</span> leak thread</span><span class="m-lines"><i></i><i></i></span></div></div>
@@ -55,7 +56,31 @@
         <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
       </div>
 
-      <div class="vo-pf" data-prefab="x" data-cue-live="13.5" data-cue-removed="15.8" data-cue-out="18">
+      <div class="vo-pf vo-gi" data-prefab="google-images" data-cue-live="10.4" data-cue-removed="11.8" data-cue-out="14">
+        <p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><b>Google Images</b><span class="vo-st"><span class="vo-st-live">Leaked photos of <span data-vo="name">Orla Brennick</span></span><span class="vo-st-gone">No leaked photos left</span></span></p>
+        <div class="phone vo-phone"><div class="phone-screen">
+          <div class="m-search"><span data-vo="name">Orla Brennick</span><svg class="icon"><use href="#i-search"/></svg></div>
+          <div class="m-tabs vo-tabs"><span class="vo-t-all">All</span><span class="vo-t-img">Images<span class="vo-tap"></span></span><span>Videos</span></div>
+          <div class="rm-stage vo-rs">
+            <div class="rm-layer rm-live vo-g">
+              <div class="vo-serp">
+                <div class="m-result bad"><span class="fav fav-l" style="background:#4285f4">L</span><div><span class="m-site" data-vo="host">leak-mirror.example</span><span class="m-title"><span data-vo="name">Orla Brennick</span> leaked: full gallery</span><span class="m-lines"><i></i><i></i></span></div></div>
+                <div class="m-result bad"><span class="fav fav-l" style="background:#ab47bc">F</span><div><span class="m-site">free-galleries.example</span><span class="m-title"><span data-vo="name">Orla Brennick</span>: all photos and videos</span><span class="m-lines"><i></i><i></i></span></div></div>
+              </div>
+              <div class="vo-grid"><span class="vo-gt"><img class="rm-img" src="../img/removals/portrait.webp" alt="" width="240" height="240" decoding="async"></span><span class="vo-gt"><img class="rm-img" src="../img/removals/editorial-01.webp" alt="" width="240" height="240" decoding="async"></span><span class="vo-gt"><img class="rm-img" src="../img/removals/studio-portrait.webp" alt="" width="240" height="240" decoding="async"></span><span class="vo-gt"><img class="rm-img" src="../img/removals/outdoors.webp" alt="" width="240" height="240" decoding="async"></span><span class="vo-gt"><img class="rm-img" src="../img/removals/behind-the-scenes.webp" alt="" width="240" height="240" decoding="async"></span><span class="vo-gt"><img class="rm-img" src="../img/removals/editorial-02.webp" alt="" width="240" height="240" decoding="async"></span></div>
+            </div>
+            <div class="rm-layer rm-gone vo-g">
+              <p class="vo-none">No results for <b data-vo="name">Orla Brennick</b></p>
+              <p class="vo-dmca">In response to complaints we received under the US Digital Millennium Copyright Act, we have removed 6 results from this page.</p>
+              <div class="vo-grid vo-grid-off"><span class="vo-gt"></span><span class="vo-gt"></span><span class="vo-gt"></span><span class="vo-gt"></span></div>
+            </div>
+            <span class="rm-handle"><span class="rm-knob"></span></span>
+          </div>
+        </div></div>
+        <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
+      </div>
+
+      <div class="vo-pf" data-prefab="x" data-cue-live="14" data-cue-removed="15.8" data-cue-out="18">
         <p class="vo-cap"><span class="vo-ico rm-ico-x">X</span><b>X</b><span class="vo-st"><span class="vo-st-live">A leak, posted 2 hours ago</span><span class="vo-st-gone">A few hours later: no leaks</span></span></p>
         <div class="vo-panel"><div class="rm-stage vo-rs">
           <div class="rm-layer rm-live xp">
@@ -124,6 +149,9 @@
         </div></div>
         <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
       </div>
+
+      <!-- data-cue-say: the browser says the name; this card shows it too (no-voice browsers). Personalized names only. -->
+      <div class="vo-pf vo-for" data-off><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
 
     </div></div>
   </div>
