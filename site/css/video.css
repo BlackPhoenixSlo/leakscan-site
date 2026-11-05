@@ -55,8 +55,8 @@
 /* Google Images prefab: "All" results, a tap on "Images" (--tap 0..1), the grid fades in (--g 0..1), then the wipe to "No results" */
 .vo-gi .vo-tabs > span { position: relative; }
 .vo-gi .vo-tabs > span { --c: 0; color: rgb(calc(95 - 69 * var(--c)) calc(99 + 16 * var(--c)) calc(104 + 128 * var(--c))); border-bottom-color: rgb(26 115 232 / var(--c)); }
-.vo-gi .vo-t-all { --c: calc(1 - var(--g)); }   /* grey #5f6368 <-> blue #1a73e8 */
-.vo-gi .vo-t-img { --c: var(--g); }
+.vo-gi .vo-tabs > .vo-t-all { --c: calc(1 - var(--g)); }   /* grey #5f6368 <-> blue #1a73e8 */
+.vo-gi .vo-tabs > .vo-t-img { --c: var(--g); }
 .vo-tap { position: absolute; left: 50%; top: 40%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgb(26 115 232 / .3);
   opacity: calc(var(--tap) * (1 - var(--tap)) * 4); transform: scale(calc(.4 + var(--tap) * .9)); }
 .vo-serp { position: absolute; inset: 0; background: #fff; opacity: calc(1 - var(--g)); }

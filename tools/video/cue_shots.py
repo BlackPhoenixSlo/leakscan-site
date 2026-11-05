@@ -82,9 +82,10 @@ def personalized(b, out, break_thumbs):
         for pid in ("google-images", "x"):
             pg.goto(f"{base}video/?prefab={pid}&state=live&r=demoRemove1")
             try:
-                pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete && i.src.includes('/api/thumb'))", timeout=8000)
+                pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete && i.naturalWidth > 0 && i.src.includes('/api/thumb'))", timeout=8000)
             except Exception:
                 pass
+            pg.wait_for_timeout(800)   # decode + paint of the blurred thumbs
             pg.screenshot(path=str(out / f"desktop-personalized-demoRemove1-{pid}-live.png"))
         check("personalized: no request outside the stub, no JS error", not ext and not errs, (ext, errs))
         ctx.close()
