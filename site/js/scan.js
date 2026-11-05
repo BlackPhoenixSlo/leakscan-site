@@ -305,8 +305,15 @@
     var stage = $('g-stage');
     stage.className = 'g-stage' + (state.revealed ? ' revealed' : '');
     stage.innerHTML = h;
+    // an image tile whose thumb fails or loads blank (hotlink-blocked) leaves the grid / pack (no empty square); other
+    // thumbs (video stills, icons) fall back to their grey box
     stage.querySelectorAll('img').forEach(function (im) {
-      im.addEventListener('error', function () { im.parentNode.classList.add('g-img-none'); im.remove(); }, { once: true });
+      var drop = function () {
+        var t = im.closest('.g-tile, .g-pack-b');
+        if (t) t.remove(); else { im.parentNode.classList.add('g-img-none'); im.remove(); }
+      };
+      im.addEventListener('error', drop, { once: true });
+      im.addEventListener('load', function () { if (im.naturalWidth < 16 || im.naturalHeight < 16) drop(); }, { once: true });
     });
     if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
     if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus(); }

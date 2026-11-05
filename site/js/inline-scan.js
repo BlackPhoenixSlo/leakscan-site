@@ -1,17 +1,17 @@
 // Landing hero: the free-scan form runs the scan right here (js/scan-engine.js) instead of opening scan/. The hero card
-// becomes the live report (Links / Images / Sites tabs + a film strip of what Google Images shows), the #free band's
-// mini Google Images frame shows her real image results, and js/personalize.js re-personalizes the phones / showcase /
+// becomes the live report (Links / Images / Sites tabs + a film strip of what Google Images shows), the #free phone
+// shows her real results (All / Images / Videos), and js/personalize.js re-personalizes the phones / showcase /
 // demo. Without JS the form still opens scan/. A slug from ?r= (else localStorage, same order as personalize.js)
 // re-renders the hero card on load. Every API value is validated; rendering is textContent / createElement only. Own
 // elements only (never personalize's data-p slots).
 (function () {
   'use strict';
   var E = window.LeakScanEngine, form = document.getElementById('scan'), card = document.querySelector('.report-card');
-  var band = document.querySelector('.gmini');
+  var band = document.querySelector('.phone-free');
   if (!E || !form || !card || !window.fetch) return;
   var DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/, HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/;
   var GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
-  var ROWS = 5, MAX_SITES = 12, STRIP = 24, BAND = 10, MAX_IMAGES = 60;
+  var ROWS = 5, MAX_SITES = 12, STRIP = 24, BAND = 9, BAND_ROWS = 4, BAND_VIDEOS = 3, MAX_IMAGES = 60;
   var btn = form.querySelector('button[type=submit]'), btnText = btn && btn.lastChild, btnLabel = btnText && btnText.nodeValue;
   var token = 0, busy = false, live = null, msg = null, saved = null;
   var P = function () { return window.LeakScanPersonalize; };
@@ -53,7 +53,8 @@
   }
   var okThumb = function (u) { return typeof u === 'string' && u.length <= 600 && GSTATIC_RE.test(u); };
   // raw API result → {slug, handle, platform, rows: [{url, domain, title, badge, thumb}], sites: [{domain, n, thumb, url}],
-  // images: [{src, title, domain, link}] (images[] + results' thumbs, deduped; link '' = no result has it), profile}
+  // images: [{src, title, domain, link}] (images[] + results' thumbs, deduped, no video stills; link '' = no result has
+  // it), videos: [{link, domain, title, thumb}] (video results), profile}
   function model(raw, fb) {
     if (!raw || typeof raw !== 'object') return null;
     var slug = typeof raw.slug === 'string' && E.SLUG_RE.test(raw.slug) ? raw.slug : null;
@@ -92,12 +93,13 @@
       if (!r) return;
       add(r.link, r.domain, r.title, 'Indexed', r.thumb);
       var x = link(r.link), d = x && (domain(r.domain) || domain(x.hostname));
-      if (d) res.push({ link: x.href, domain: d, title: str(r.title, 200), thumb: okThumb(r.thumb) ? r.thumb : null });
+      if (d) res.push({ link: x.href, domain: d, title: str(r.title, 200), thumb: okThumb(r.thumb) ? r.thumb : null, kind: r.kind === 'video' ? 'video' : 'page' });
     });
     m.sites.sort(function (a, b) { return b.n - a.n; });
     var imgs = E.imageItems((Array.isArray(raw.images) ? raw.images : []).slice(0, 200), res, okThumb, MAX_IMAGES);
     // the ones that open a page first: the strip / grid / band lead with tiles that go somewhere
     m.images = imgs.filter(function (it) { return it.link; }).concat(imgs.filter(function (it) { return !it.link; }));
+    m.videos = res.filter(E.isVideo);
     return m;
   }
 
@@ -184,17 +186,58 @@
       make('a', 'btn btn-ghost btn-sm', ['WhatsApp'], { 'data-msg': 'wa' }),
       make('a', 'btn btn-ghost btn-sm', ['Email'], { 'data-msg': 'mail' })]);
   }
-  // ---------- image tiles (hero strip + Images tab + #free band) ----------
+  // ---------- images that show ----------
+  // Every image is probed once, on our own API (/api/thumb). One that fails, or loads blank (a hotlink-blocked thumb
+  // comes back as a tiny placeholder), is dropped everywhere: its tile leaves the strip / grid / #free phone, the next
+  // image takes the slot (the grid reflows, no gap) and every count says what is left. No dark empty squares.
+  var BLANK = 16;   // px: a real thumb is larger on both sides
+  var shows = function (im) { return im.naturalWidth >= BLANK && im.naturalHeight >= BLANK; };
+  function gallery(m) {
+    if (m.pics) return m.pics;
+    var g = m.pics = { views: [], subs: [], dead: {} };
+    g.kill = function (src) {
+      if (g.dead[src]) return;
+      g.dead[src] = 1;
+      m.images = m.images.filter(function (it) { return it.src !== src; });
+      g.views = g.views.filter(function (v) { return v.box.isConnected; });
+      g.views.forEach(function (v) { v.sync(); });
+      g.subs.forEach(function (fn) { fn(m.images.length); });
+    };
+    m.images.slice().forEach(function (it) {
+      var im = new Image();
+      im.referrerPolicy = 'no-referrer';
+      im.onload = function () { if (!shows(im)) g.kill(it.src); };
+      im.onerror = function () { g.kill(it.src); };
+      im.src = E.thumb(it.src);
+    });
+    return g;
+  }
+  // view(m, box, max, cap): box shows the first `max` images that are still alive, refilled in order when one drops
+  function view(m, box, max, cap) {
+    var g = gallery(m), v = { box: box };
+    v.sync = function () {
+      var have = {};
+      Array.prototype.slice.call(box.children).forEach(function (el) {
+        var src = el.getAttribute('data-src');
+        if (g.dead[src]) el.remove(); else have[src] = 1;
+      });
+      m.images.forEach(function (it) { if (box.children.length < max && !have[it.src]) box.appendChild(tile(it, m.slug, cap, g)); });
+    };
+    g.views.push(v);
+    v.sync();
+    return box;
+  }
+  // ---------- image tiles (hero strip + Images tab + #free phone) ----------
   // Blurred until Reveal; ↗ on hover / focus (always on touch screens). A tile links to the result that has that image
   // (new tab); an image no result has links to the full report.
-  function tile(it, slug, cap) {
+  function tile(it, slug, cap, g) {
     var img = make('img', 'gi-img', [], { src: E.thumb(it.src), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
     var box = make('span', 'gi-box gi-wait', [img, make('span', 'gi-go', [icon(it.link ? 'i-external-link' : 'i-arrow-right')])]);
-    img.addEventListener('load', function () { box.classList.remove('gi-wait'); }, { once: true });   // fades in (CSS)
-    img.addEventListener('error', function () { img.remove(); box.classList.remove('gi-wait'); box.classList.add('gi-none'); }, { once: true });
+    img.addEventListener('load', function () { if (shows(img)) box.classList.remove('gi-wait'); else g.kill(it.src); }, { once: true });   // fades in (CSS)
+    img.addEventListener('error', function () { g.kill(it.src); }, { once: true });
     var label = it.link ? 'Image on ' + it.domain + (it.title ? ': ' + it.title : '') + ' (opens in a new tab)' : 'Image result: see it in the full report';
     return make('a', 'gi-card', [box, cap ? make('span', 'gi-cap', [E.fav(it.domain || 'google.com', 'gi-fav'), make('span', 'gi-cap-t', [it.domain || 'Google Images'])]) : null],
-      it.link ? ext({ href: it.link, 'aria-label': label, title: it.domain }) : { href: 'scan/?r=' + encodeURIComponent(slug), 'aria-label': label });
+      Object.assign({ 'data-src': it.src }, it.link ? ext({ href: it.link, 'aria-label': label, title: it.domain }) : { href: 'scan/?r=' + encodeURIComponent(slug), 'aria-label': label }));
   }
   function revealBtn(scope) {
     var b = make('button', 'live-reveal', [icon('i-eye'), make('span', '', ['Reveal images'])], { type: 'button', 'aria-pressed': 'false' });
@@ -361,7 +404,7 @@
       if (n > ROWS) links.appendChild(make('p', 'live-more', ['+ ' + (n - ROWS) + ' more in the full report']));
       var tabs = [['links', 'Links', n, links]], strip = null, sbox = null;
       if (m.images.length) {
-        strip = make('div', 'live-strip', [make('div', 'live-strip-track', m.images.slice(0, STRIP).map(function (it) { return tile(it, m.slug); }))],
+        strip = make('div', 'live-strip', [view(m, make('div', 'live-strip-track'), STRIP)],
           { role: 'group', 'aria-label': 'Google Images results for @' + m.handle });
         var nav = function (dir) {
           var b = make('button', 'live-strip-nav live-strip-' + (dir < 0 ? 'prev' : 'next'), [icon(dir < 0 ? 'i-arrow-right' : 'i-arrow-right')],
@@ -380,10 +423,8 @@
         links.appendChild(sbox);
         // Images: a grid of the first ones
         var GRID = window.matchMedia && matchMedia('(max-width: 559px)').matches ? 12 : 16;   // phone 3×4, else 4×4: fills the Links panel's height
-        var more = m.images.length - GRID, grid = make('div', 'live-panel', [
-          make('div', 'live-imgs-head', [make('p', '', [plural(m.images.length, 'image', 'images') + ' on Google Images']), revealBtn(live)]),
-          make('div', 'live-grid', m.images.slice(0, GRID).map(function (it) { return tile(it, m.slug); })),
-          more > 0 ? make('a', 'live-more live-more-a', ['+ ' + more + ' more in the full report'], { href: 'scan/?r=' + slugQ }) : null]);
+        var imgsN = make('p'), imgsMore = make('a', 'live-more live-more-a', [], { href: 'scan/?r=' + slugQ }), grid = make('div', 'live-panel', [
+          make('div', 'live-imgs-head', [imgsN, revealBtn(live)]), view(m, make('div', 'live-grid'), GRID), imgsMore]);
         tabs.push(['images', 'Images', m.images.length, grid]);
       }
       // Sites: per site, its first link
@@ -396,6 +437,17 @@
       tabs.push(['sites', 'Sites', m.sites.length, sites]);
       body.appendChild(tabBar(tabs));
       body.appendChild(make('div', 'live-panels', tabs.map(function (t) { return t[3]; })));
+      if (strip) {   // the counts say what shows: a dropped image (see gallery()) takes one off each
+        var tabN = body.querySelector('#lt-images .live-tab-n'), counts = function (k) {
+          imgsN.textContent = plural(k, 'image', 'images') + ' on Google Images';
+          imgsMore.textContent = '+ ' + (k - GRID) + ' more in the full report';
+          imgsMore.hidden = k <= GRID;
+          tabN.textContent = String(k);
+          sbox.hidden = !k;
+        };
+        gallery(m).subs.push(counts);
+        counts(m.images.length);
+      }
       fitSites(sites, m.sites.length);
       if (strip) {
         var edges = function () {
@@ -507,16 +559,21 @@
     });
   }
 
-  // ---------- #free band: the mini Google Images frame shows her real image results ----------
+  // ---------- #free phone: Google for her handle, her real results in its All / Images / Videos tabs ----------
   var bandSaved = null;
   function bandReset() {
     if (!band || !bandSaved) return;
     band.classList.remove('is-live', 'revealed');
     Array.prototype.forEach.call(document.querySelectorAll('[data-live]'), function (el) { el.remove(); });
-    band.setAttribute('role', 'img');
     band.setAttribute('aria-label', bandSaved.label);
     if (bandSaved.send) bandSaved.send.setAttribute('href', bandSaved.href);
   }
+  // a result row like the before / after phones': letter avatar, site, title; the whole row opens it (new tab)
+  function mRow(cls, url, dom, title, lead) {
+    return make('div', cls + ' is-link', [make('a', 'm-link', [lead, make('div', '', [make('span', 'm-site', [dom]), make('span', 'm-title', [title])]),
+      make('span', 'm-go', ['↗'], { 'aria-hidden': 'true' })], ext({ href: url, 'aria-label': dom + ': ' + title + ' (opens in a new tab)' }))]);
+  }
+  function rowTitle(t, url) { return t || url.replace(/^https?:\/\/(www\.)?/, ''); }
   function bandResult(m) {
     if (!band) return;
     var send = document.querySelector('[data-free-send]');
@@ -528,15 +585,32 @@
       E.sendReport(s, m.slug, m.handle, m.platform);
       send.setAttribute('href', s.firstChild.getAttribute('href'));
     }
-    if (!m.images.length) return; // nothing on Google Images: the frame stays the illustration
+    if (!m.rows.length) return; // nothing found: the phone stays the illustration
     band.classList.add('is-live');
-    band.removeAttribute('role');
-    band.setAttribute('aria-label', 'What Google Images shows for @' + m.handle);
-    band.querySelector('.gmini-top').appendChild(make('span', 'gmini-tools', [
-      make('span', 'gmini-n', [plural(m.images.length, 'image', 'images')]), revealBtn(band)], { 'data-live': 'band-tools' }));
-    var grid = band.querySelector('.gmini-grid');
-    grid.parentNode.insertBefore(make('div', 'gmini-grid live-grid', m.images.slice(0, BAND).map(function (it) { return tile(it, m.slug, true); }),
-      { 'data-live': 'band-grid' }), grid.nextSibling);
+    band.setAttribute('aria-label', 'Google results for @' + m.handle);
+    var put = function (k, kids) { document.getElementById('mp-free-' + k).appendChild(make('div', '', kids, { 'data-live': 'band-' + k })); };
+    put('all', m.rows.slice(0, BAND_ROWS).map(function (r) {
+      var f = make('span', 'fav fav-l', [r.domain.charAt(0).toUpperCase()], { 'aria-hidden': 'true' });
+      f.style.background = E.favColor(r.domain);
+      return mRow('m-result bad', r.url, r.domain, rowTitle(r.title, r.url), f);
+    }));
+    var empty = function (what) { return [make('p', 'm-empty', ['No ' + what + ' results for @' + m.handle + ' right now.'])]; };
+    if (m.images.length) {
+      var n = make('span', 'm-n');
+      put('images', [make('div', 'm-head', [n, revealBtn(band)]), view(m, make('div', 'm-grid'), BAND, true)]);
+      var count = function (k) { n.textContent = plural(k, 'image', 'images'); };
+      gallery(m).subs.push(count);
+      count(m.images.length);
+    } else put('images', empty('image'));
+    put('videos', m.videos.length ? [make('div', 'm-head', [make('span', 'm-n', [plural(m.videos.length, 'video', 'videos')]), revealBtn(band)])]
+      .concat(m.videos.slice(0, BAND_VIDEOS).map(function (v) {
+        var img = v.thumb && make('img', 'gi-img', [], { src: E.thumb(v.thumb), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+        if (img) {   // a still that fails / loads blank: the grey 16:9 box with its play mark stays, never a black hole
+          img.addEventListener('load', function () { if (!shows(img)) img.remove(); }, { once: true });
+          img.addEventListener('error', function () { img.remove(); }, { once: true });
+        }
+        return mRow('m-video bad', v.link, v.domain, rowTitle(v.title, v.link), make('span', 'm-vthumb', [img, make('span', 'm-play', [], { 'aria-hidden': 'true' })]));
+      })) : empty('video'));
   }
 
   // ---------- scan ----------
