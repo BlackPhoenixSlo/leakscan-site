@@ -142,13 +142,13 @@
   // ---------- report ----------
   function normalize(r) {
     var hits = Array.isArray(r.hits) ? r.hits.filter(function (h) { return h && safeUrl(h.url); }) : [];
-    var results = Array.isArray(r.results) ? r.results.filter(function (x) { return x && safeUrl(x.link); }).slice(0, 80) : [];
-    results.forEach(function (x) { x.domain = x.domain || host(x.link); });
+    var every = Array.isArray(r.results) ? r.results.filter(function (x) { return x && safeUrl(x.link); }) : [], results = every.slice(0, 80);
+    every.forEach(function (x) { x.domain = x.domain || host(x.link); });
     hits.forEach(function (h) { h.domain = h.domain || host(h.url); });
     var d = {
       slug: String(r.slug || ''), handle: String(r.handle || state.handle || ''), platform: r.platform || state.platform,
       hit_count: +r.hit_count || hits.length, domain_count: +r.domain_count || 0, google_total: +r.google_total || 0,
-      images: Array.isArray(r.images) ? r.images : [], hits: hits, results: results
+      images: Array.isArray(r.images) ? r.images : [], hits: hits, results: results, imgResults: every   // pages: 80; images: every result's thumb
     };
     d.status = r.status || (d.hit_count || results.length ? 'complete' : 'empty');
     var al = r.aliases && typeof r.aliases === 'object' && Array.isArray(r.aliases.discovered) ? r.aliases.discovered : [];
@@ -241,7 +241,7 @@
       return '<span style="color:' + G_COLORS[i] + '">' + c + '</span>';
     }).join('') + '</span>';
   }
-  function imageItems(d) { return E.imageItems(d.images, d.results, function (u) { var t = thumb(u); return t && !state.dead[t]; }, Infinity); }   // every image Google shows (images[] + result thumbs, deduped)
+  function imageItems(d) { return E.imageItems(d.images, d.imgResults, function (u) { var t = thumb(u); return t && !state.dead[t]; }, Infinity); }   // every image Google shows (images[] + result thumbs, deduped)
   function img(u, alt) {
     return '<span class="g-img"><img src="' + esc(thumb(u)) + '" alt="' + esc(alt || '') + '" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';
   }

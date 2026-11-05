@@ -2363,6 +2363,29 @@ def tabs_flow(browser, vp_name, vp):
         back = page.evaluate("() => [...document.querySelectorAll('#g-stage img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1] || ''))")
         check(f"{tag} thumbs: a device switch keeps failed thumbs out (Computer view lists none of them)", back and not any(dead_thumb(u) for u in back), [u[-24:] for u in back if dead_thumb(u)])
         ctx.close()
+    # more than 80 Google results (the page list stops at 80): every result's thumb is still in the strip and the Images tab
+    ctx = new_ctx()
+    page = ctx.new_page()
+    def many(r, _q):
+        d = json.loads(r.fetch().text())
+        d["results"] = d["results"] + [{"title": f"Extra page {k}", "link": f"https://extra{k}.example/p/{k}", "domain": f"extra{k}.example", "snippet": "x",
+                                        "thumb": f"https://encrypted-tbn0.gstatic.com/images?q=tbn:EXTRA{k:04d}", "kind": "page"} for k in range(90)]
+        many.pages = sum(x.get("kind") != "video" for x in d["results"][:80])
+        many.n = len(dict.fromkeys(d["images"] + [x["thumb"] for x in d["results"] if x.get("thumb") and x.get("kind") != "video"]))
+        r.fulfill(json=d)
+    page.route("**/api/scan-result/demoR3port01", many)
+    page.goto(base + "scan/?r=demoR3port01", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    strip_n = page.locator("#g-panel .g-strip > .g-pack-b").count()
+    while page.locator("#g-panel [data-more=all]").count():
+        page.locator("#g-panel [data-more=all]").click()
+    pages_n = page.locator("#g-panel .g-r").count()
+    page.locator("#g-tab-images").click()
+    while page.locator("#g-panel [data-more=images]").count():
+        page.locator("#g-panel [data-more=images]").click()
+    tab_n = page.locator("#g-panel .g-tile").count()
+    check(f"{tag} thumbs: > 80 results: every result's thumb in the strip and the Images tab (pages stay capped at 80)", strip_n == tab_n == many.n > 80 and pages_n == many.pages, [strip_n, tab_n, many.n, pages_n, many.pages])
+    ctx.close()
     # every thumb fails (late, after the report is up): the All strip keeps its height (visible slots stay as empty tiles), nothing below moves
     ctx = new_ctx()
     page = ctx.new_page()
