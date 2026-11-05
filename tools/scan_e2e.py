@@ -22,7 +22,8 @@ personalize (js/personalize.js): landing without a slug has byte-identical visib
 API; `?r=<slug>` fills both "Your website" phones (name, top leak domains by occurrences, blurred stub thumbs, IG /
 TikTok / site rows), the showcase url bar and iframe src; the demo iframe and every showcase page show the profile
 and no pottery / Orla / she-her text; demo photos poll /api/media (pending → ready swap, no layout jump; none / 404
-keep the placeholders; same-origin relative srcs are accepted and stop polling); scan-only results personalize the phones but leave the demo as Orla;
+keep the placeholders; same-origin relative srcs are accepted and stop polling); scan-only results personalize the phones but leave the demo as Orla
+(blog.html too: Orla's 3 posts; with a profile the 3 starter posts blog/own-*.html, cards + pages);
 the malicious fixture never reaches the DOM; scan → report card → landing → localStorage → Reset; the public
 window.LeakScanPersonalize.apply() re-personalizes in place and idempotently. Checks that need the
 profile are named "profile: …" (the --omit-profile break run must turn only those red). Non-loopback requests are
@@ -793,7 +794,10 @@ def top_urls(hits):
 TOP_URLS = top_urls(FX["hits"])
 GSTATIC = [u for u in FX["images"] if u.startswith("https://") and ".gstatic.com/" in u][:3]
 DEMO_PAGES = ["", "about.html", "links.html", "timeline.html", "verify.html", "blog.html", "statement.html",
-              "blog/post-1.html", "blog/post-2.html", "blog/post-3.html", "404.html"]
+              "blog/post-1.html", "blog/post-2.html", "blog/post-3.html", "blog/own-1.html", "blog/own-2.html",
+              "blog/own-3.html", "404.html"]
+ORLA_POSTS = ["blog/post-1.html", "blog/post-2.html", "blog/post-3.html"]
+OWN_POSTS = ["blog/own-1.html", "blog/own-2.html", "blog/own-3.html"]   # starter posts: shown only with a profile
 FONT_HOSTS = {"fonts.googleapis.com", "fonts.gstatic.com"}   # the demo's disclosed Google Fonts; aborted here
 PROD_HOSTS = ("scan.srv1395798.hstgr.cloud", "72.62.92.114", "jackbase.me")
 
@@ -1108,6 +1112,57 @@ def personalize_flow(browser, vp_name, vp):
     ig = [s["handle"] for s in FX["aliases"]["socials"] if s["platform"] == "instagram"][0]
     got = (texts(page, '[data-p="ig"] .m-title'), shown(page, '[data-p="tt"]'))
     check(f"{tag} aliases: scan-only: leak-page Instagram fills the IG rows", got == ([f"{h} (@{ig})"] * 2, 0), got)
+    ctx.close()
+
+    # E2. blog: no profile → Orla's 3 posts exactly as before; profile → the 3 starter posts in her name (cards + pages)
+    cards = ("() => [...document.querySelectorAll('.blog-card')].filter(c => c.offsetParent !== null)"
+             ".map(c => c.querySelector('a.blog-card__link').getAttribute('href'))")
+    ctx = new_ctx()
+    page = ctx.new_page()
+    seen = {}
+    for q in ("", "?r=demoNoProf01"):
+        page.goto(base + "showcase/blog.html" + q, wait_until="load")
+        page.wait_for_timeout(1500)
+        seen[q] = (page.evaluate(cards), page.evaluate("document.body.innerText"), page.title())
+        check(f"{tag} blog {q or 'no slug'}: Orla's 3 posts, no starter cards", seen[q][0] == ORLA_POSTS
+              and "Orla" in seen[q][2], seen[q][0])
+    check(f"{tag} blog: scan-only page text identical to no slug", seen[""][1] == seen["?r=demoNoProf01"][1])
+    stub_media(FX["slug"])
+    page.goto(base + "showcase/blog.html?r=" + FX["slug"], wait_until="load")
+    try:
+        page.wait_for_function(f"() => document.title.includes({json.dumps(name)})", timeout=6000)
+    except Exception:
+        pass
+    hrefs = page.evaluate(cards)
+    t = page.evaluate("document.body.innerText")
+    check(f"{tag} profile: blog: 3 starter cards (?r= kept), Orla's hidden, no pottery / Orla, setup note",
+          [urlsplit(h).path.split("/showcase/")[-1] for h in hrefs] == OWN_POSTS
+          and all(f"r={FX['slug']}" in h for h in hrefs) and not POTTERY.search(t + page.title())
+          and f"Prewritten for {PROFILE['first_name']}" in t, (hrefs, POTTERY.findall(t)[:6]))
+    page.screenshot(path=str(out / f"{vp_name}-p8-blog.png"), full_page=True)
+    for i, href in enumerate(hrefs):
+        title = page.evaluate(f"() => [...document.querySelectorAll('.blog-card')].filter(c => c.offsetParent !== null)[{i}]"
+                              ".querySelector('.blog-card__title').textContent.trim()")
+        page.goto(href, wait_until="load")
+        try:
+            page.wait_for_function("() => [...document.querySelectorAll('img[data-p-media]')].every(i => (i.getAttribute('src') || '').includes('/api/media/') && i.complete && i.naturalWidth > 0)", timeout=15000)
+        except Exception:
+            pass
+        rel = OWN_POSTS[i] if i < len(OWN_POSTS) else href
+        pt = page.evaluate("document.body.innerText")
+        body = page.locator("article.post-body").inner_text()
+        st = page.evaluate("""() => ({h1: document.querySelector('h1').textContent.trim(),
+            author: document.querySelector('.post-meta__author').textContent.trim(),
+            media: [...document.querySelectorAll('img[data-p-media]')].map(i => [(i.getAttribute('src') || '').includes('/api/media/'), getComputedStyle(i.closest('[data-p-media-only]') || i).display !== 'none']),
+            links: [...document.querySelectorAll('article a[href]')].map(a => a.getAttribute('href'))})""")
+        check(f"{tag} profile: {rel}: title + author = her name, ≥ 350 words, photos from the API, ?r= kept, no pottery / Orla / she",
+              st["h1"] == title and name in page.title() and st["author"] == name and len(body.split()) >= 350
+              and st["media"] == [[True, True], [True, True]] and st["links"] and all(f"r={FX['slug']}" in h for h in st["links"])
+              and not POTTERY.search(pt + page.title()) and not PRONOUN.search(pt),
+              (st["h1"], st["author"], len(body.split()), st["media"], POTTERY.findall(pt)[:4], PRONOUN.findall(pt)[:4]))
+        page.screenshot(path=str(out / f"{vp_name}-p8-{rel.replace('/', '-').removesuffix('.html')}.png"), full_page=True)
+        page.goto(base + "showcase/blog.html?r=" + FX["slug"], wait_until="load")
+        page.wait_for_function(f"() => document.title.includes({json.dumps(name)})", timeout=6000)
     ctx.close()
 
     # F. malicious values never reach the DOM

@@ -111,10 +111,11 @@
           <p class="eyebrow" data-p-keep>The Blog</p>
           <div class="divider divider--center"></div>
           <h1 style="font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 700; text-transform: none; letter-spacing: -0.025em;" data-p-tpl="In {first}’s own words">In her own words</h1>
-          <p class="p-note" data-p-show hidden data-p-tpl="On {name}’s real site, this page is written with {first} during setup.">This page is written with the creator during setup.</p>
           <p style="color: var(--text-muted); margin-top: 1.25rem; line-height: 1.85;">
             Notes from the studio: throwing and trimming, glazes and reduction firing, drying pots in the Galway damp, and how the work actually gets made.
           </p>
+          <p style="color: var(--text-muted); margin-top: 1.25rem; line-height: 1.85;" data-p-show hidden data-p-tpl="Notes from {first}: why this site exists, what a normal week looks like, and how to tell the real accounts from the fakes.">Notes from the creator.</p>
+          <p class="p-note" data-p-show hidden data-p-tpl="Prewritten for {first}: during setup we add {first}’s own photos and change a few words together.">Prewritten for the creator: during setup we add their photos and change a few words together.</p>
         </div>
 
         <!-- ==================================================================
@@ -171,10 +172,50 @@
             </div>
           </article>
 
+
+          <!-- Starter posts for the personalized demo (?r=<slug> with a scan profile; hidden otherwise, Orla's cards
+               above are hidden then). First person, written to fit any creator; js/personalize.js swaps in her name,
+               details and scan photos. Demo content: not in the ItemList or feed.xml. -->
+
+          <article class="blog-card" data-p-show hidden>
+            <div class="blog-card__img">
+              <img src="imgs/timeline-hero.webp" width="2400" height="1350" data-p-media="0" alt="" loading="lazy">
+            </div>
+            <div class="blog-card__body">
+              <p class="blog-card__meta">Personal · 4 min read</p>
+              <h2 class="blog-card__title" id="own-1-title">Why I Built This Site, and Why It Is the Only One I Control</h2>
+              <p class="blog-card__excerpt">Why I finally made one place online that is really mine: the fake account that changed my mind, what lives here, and how I deal with copies of my work.</p>
+              <a href="blog/own-1.html" class="blog-card__link" id="own-1-more" aria-labelledby="own-1-more own-1-title">Read More <span aria-hidden="true">→</span></a>
+            </div>
+          </article>
+
+          <article class="blog-card" data-p-show hidden>
+            <div class="blog-card__img">
+              <img src="imgs/editorial-02.webp" srcset="imgs/720/editorial-02.webp 720w, imgs/editorial-02.webp 1067w" sizes="(max-width: 768px) calc(100vw - 3rem), (max-width: 1024px) 50vw, 360px" width="1400" height="2100" data-p-media="1" alt="" loading="lazy">
+            </div>
+            <div class="blog-card__body">
+              <p class="blog-card__meta">Behind the Scenes · 5 min read</p>
+              <h2 class="blog-card__title" id="own-2-title">What a Normal Week Actually Looks Like</h2>
+              <p class="blog-card__excerpt">Less glamour, more planning: the admin day, the long shooting days, editing, the inbox, and the boundaries I keep.</p>
+              <a href="blog/own-2.html" class="blog-card__link" id="own-2-more" aria-labelledby="own-2-more own-2-title">Read More <span aria-hidden="true">→</span></a>
+            </div>
+          </article>
+
+          <article class="blog-card" data-p-show hidden>
+            <div class="blog-card__img">
+              <img src="imgs/studio-portrait.webp" srcset="imgs/720/studio-portrait.webp 720w, imgs/studio-portrait.webp 1600w" sizes="(max-width: 768px) calc(100vw - 3rem), (max-width: 1024px) 50vw, 360px" width="2400" height="3200" data-p-media="2" alt="" loading="lazy">
+            </div>
+            <div class="blog-card__body">
+              <p class="blog-card__meta">Staying Safe · 4 min read</p>
+              <h2 class="blog-card__title" id="own-3-title">The Accounts That Are Really Me, and the Ones That Are Not</h2>
+              <p class="blog-card__excerpt">Fake accounts copy my name, my photos and even my bio. How to check in ten seconds whether a profile or a message is really me.</p>
+              <a href="blog/own-3.html" class="blog-card__link" id="own-3-more" aria-labelledby="own-3-more own-3-title">Read More <span aria-hidden="true">→</span></a>
+            </div>
+          </article>
         </div>
 
         <div style="text-align:center; margin-top: 3.5rem;">
-          <a href="links.html" class="btn btn--outline">The Official Account List</a>
+          <a href="links.html" class="btn btn--outline" data-p-keep>The Official Account List</a>
         </div>
 
       </div>

@@ -64,7 +64,12 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   site rows hidden when unknown), hero card handles, showcase url bar + iframe `showcase/?r=`. Slots are `data-p="…"`.
   Demo: only with `profile` (else Orla stays); name / bio / facts / links from `data-p-tpl` templates, everything not
   marked is hidden (no pottery next to her name), avatar via `/api/avatar/<slug>` when `profile.avatar`, `?r=` kept on
-  links. Photos arrive later: `GET /api/media/<slug>` polled every 3 s for ≤ 90 s (stops on ready / none / 2nd 404),
+  links. Blog: Orla's posts (`blog/post-*.html`, in the ItemList + `feed.xml`) are hidden then and three
+  first-person starter posts show instead (`blog/own-1..3.html`, cards `data-p-show hidden` in `blog.html`; not in the
+  ItemList / feed: demo content): why this site, a normal week, real vs fake accounts. Any creator; swaps = name /
+  first name, profession, location, follower count (`profile.followers`, 2 significant figures, < 100 = dropped),
+  IG / TikTok handles, site; each optional swap drops its clause when unknown. Body stays ads-safe (no paid-platform
+  names, nothing explicit); at setup the owner adds her photos and changes a few words. Photos arrive later: `GET /api/media/<slug>` polled every 3 s for ≤ 90 s (stops on ready / none / 2nd 404),
   swapped in with fade, fixed boxes; only `<API>/api/media/…` or same-origin `/api/media/…` srcs. The scan report card
   links to `../?r=<slug>#website` + `../showcase/?r=<slug>` and shows "Gathering photos…" → "Photos ready".
   `window.LeakScanPersonalize = {apply(result), applySlug(slug), pollMedia(slug, cb)}` re-personalizes in place
@@ -87,6 +92,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   toggle, drag, keys, `mega[]` / hit personalization). Break-it flags (each turns only its own checks red):
   `--break-allowlist`, `--break-drift`, `--break-phones`, `--break-thumbs`, `--break-remove`, `--break-incremental`
   (every explorer step 1e9: only `incremental:` checks). `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
+  blog: Orla's posts without a profile, starter cards + post pages with one,
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.
 - Ask-AI popup: `js/chat.js` + `css/chat.css`, markup at the end of `index.html` (launcher + `<dialog id="askai">`; also

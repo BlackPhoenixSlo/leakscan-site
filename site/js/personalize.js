@@ -68,13 +68,20 @@
     var h = x.hostname.toLowerCase().replace(/^www\./, '');
     return !x.username && !x.password && (h === d || h.slice(-d.length - 1) === '.' + d) ? x.href : null;
   }
+  // follower count for prose: 2 significant figures ("12,000", "1.2 million"); < 100 or not a number = unknown
+  function people(n) {
+    if (typeof n !== 'number' || !isFinite(n) || n < 100) return null;
+    if (n >= 1e6) return Math.round(n / 1e5) / 10 + ' million';
+    var k = Math.pow(10, String(Math.round(n)).length - 2);
+    return (Math.round(n / k) * k).toLocaleString('en-US');
+  }
   function cleanProfile(p) {
     if (!p || typeof p !== 'object') return null;
     var o = {
       display_name: str(p.display_name, 60), first_name: str(p.first_name, 30), username: handle(p.username),
       tagline: str(p.tagline, 120), profession: str(p.profession, 60), location: str(p.location, 60),
       bio: str(p.bio, 700), about_short: str(p.about_short, 320), site_domain: domain(p.site_domain),
-      avatar: p.avatar === true, accounts: []
+      avatar: p.avatar === true, followers: people(p.followers), accounts: []
     };
     var seen = {};
     (Array.isArray(p.accounts) ? p.accounts : []).slice(0, 12).forEach(function (a) {
@@ -222,6 +229,7 @@
     return {
       name: p.name || m.handle, first: p.first || m.handle, handle: p.username || m.handle,
       tagline: p.tagline, profession: p.profession, location: p.location, bio: p.bio, about_short: p.about_short,
+      followers: p.followers,
       site: p.site_domain || base + '.com', accounts_n: p.accounts && p.accounts.length ? String(p.accounts.length) : null,
       main_platform: main ? PLAT[main.key][0] : null,
       ig: acc.instagram && acc.instagram.handle, tiktok: acc.tiktok && acc.tiktok.handle, acc: acc
