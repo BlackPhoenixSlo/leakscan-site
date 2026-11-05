@@ -7,6 +7,19 @@ iframes it as `showcase/`. The demo loads Google Fonts (so the homepage does too
 discloses that and `tools/check.py` keeps the two in sync. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 
+- Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card) · `#free` one Google
+  phone (All / Images / Videos tabs; after a scan her real results, `js/inline-scan.js`) · `#why` · `#how` (7 steps) ·
+  `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop close, page
+  behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs, `js/main.js`) ·
+  `#pricing` · `#faq` · `#removals` · `#contact`. `tools/check.py` fails if a section id is missing here.
+- `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
+  Reddit, a leak site), each a live leak vs. its removed state. Remove / Show again animates the compare edge; the
+  handle drags (pointer anywhere on the stage, arrow / PageUp / PageDown / Home / End on the handle); "Reveal images"
+  unblurs the `img/removals/` thumbs. Personalized from the same shared scan result as the hero card (`?r=` or last
+  scan, and after an in-page scan by wrapping `LeakScanPersonalize.apply`): Mega from the result's top-level `mega[]`
+  (always present, `[]` = none; first item's `title`, `size` in bytes, `images`, `videos`, `age` ISO UTC; its `url` is
+  an aggregator page and is never shown), else a mega.nz hit's title; X poster + text, Reddit subreddit + title, the
+  most-seen other host, `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
 - Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
   `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
@@ -41,7 +54,9 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   (malicious values); `/api/profile`, `/api/avatar`, `/api/media` routes). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
   E2E: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR` (starts its own stub; phone + desktop;
   form → progress → report, tab counts, device toggle, Reveal, CTAs, `?r=` reopen, error paths; never calls prod).
-  `--only scan|personalize|askai|inline`; `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
+  `--only scan|personalize|askai|inline|tabs|removals` (`tabs`: phone tabs + demo pop-out; `removals`: the panels,
+  toggle, drag, keys, `mega[]` / hit personalization). Break-it flags (each turns only its own checks red):
+  `--break-allowlist`, `--break-drift`, `--break-phones`, `--break-thumbs`, `--break-remove`. `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.
 - Ask-AI popup: `js/chat.js` + `css/chat.css`, markup at the end of `index.html` (launcher + `<dialog id="askai">`; also
