@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Gate for site/video/ (Jack's video page). Silent + exit 0 when green; prints each problem + exit 1.
 
-- exactly the 4 prefabs google, x, reddit, mega (in script order), each with numeric data-cue-live < data-cue-removed
-  < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending)
+- exactly the 5 prefabs google, google-images, x, reddit, mega (in script order), each with numeric data-cue-live <
+  data-cue-removed < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending);
+  room for the animations (js/video-overlays.js): removed - live >= 0.4 s slide-in (google-images: >= 1.2 s, its tap +
+  grid), out - removed >= 1.95 s (wipe 1.2 + stamp 0.35 + slide-out 0.4)
+- .vo-stage has a numeric data-cue-say after the last prefab's out (the spoken name)
 - the page is noindex and not in sitemap.xml
 - no external requests: no http(s):// or protocol-relative src/href/poster in the page, no http(s):// URL in
   js/video-overlays.js or css/video.css (the og:image <meta content> is a URL, not a load)
@@ -15,7 +18,9 @@ from html.parser import HTMLParser
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SITE = ROOT / "site"
 PAGE = SITE / "video" / "index.html"
-ORDER = ["google", "x", "reddit", "mega"]
+ORDER = ["google", "google-images", "x", "reddit", "mega"]
+MIN_LIVE = {"google-images": 1.2}   # seconds from live to removed (default: the 0.4 s slide-in)
+MIN_HOLD = 1.95                     # seconds from removed to out: wipe + stamp + slide-out
 CUES = ("data-cue-live", "data-cue-removed", "data-cue-out")
 VIDEO_BUDGET = 60_000_000   # the real recording replaces the ~0.2 MB placeholder; keep the repo sane
 
@@ -23,10 +28,12 @@ VIDEO_BUDGET = 60_000_000   # the real recording replaces the ~0.2 MB placeholde
 class P(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.prefabs, self.refs, self.robots, self.sources = [], [], "", []
+        self.prefabs, self.refs, self.robots, self.sources, self.say = [], [], "", [], None
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
+        if "vo-stage" in (a.get("class") or "").split():
+            self.say = a.get("data-cue-say")
         if "data-prefab" in a:
             self.prefabs.append(a)
         if tag == "meta" and a.get("name") == "robots":
@@ -56,9 +63,19 @@ def main():
             continue
         if not 0 <= live < rem < out:
             bad.append(f"video/index.html: prefab {pid} cues not ascending: live {live} < removed {rem} < out {out}")
+        if rem - live < MIN_LIVE.get(pid, 0.4):
+            bad.append(f"video/index.html: prefab {pid}: removed {rem} - live {live} < {MIN_LIVE.get(pid, 0.4)} s")
+        if out - rem < MIN_HOLD:
+            bad.append(f"video/index.html: prefab {pid}: out {out} - removed {rem} < {MIN_HOLD} s")
         if prev_out is not None and live < prev_out:
             bad.append(f"video/index.html: prefab {pid} comes in at {live} before {prev_id} is out at {prev_out}")
         prev_out, prev_id = out, pid
+    try:
+        say = float(p.say)
+        if prev_out is not None and say < prev_out:
+            bad.append(f"video/index.html: data-cue-say {say} before the last prefab is out at {prev_out}")
+    except (TypeError, ValueError):
+        bad.append(f"video/index.html: .vo-stage needs a numeric data-cue-say (got {p.say!r})")
     if "noindex" not in p.robots:
         bad.append("video/index.html: no <meta name=robots content=noindex>")
     if "video/" in (SITE / "sitemap.xml").read_text(encoding="utf-8"):

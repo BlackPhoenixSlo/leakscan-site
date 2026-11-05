@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Render the 4 video overlay prefabs (site/video/?prefab=…) as CapCut-ready clips, 1920x1080, 30 fps, 6 s each:
-live (0-2.4 s) → compare wipe (2.4-3.6 s) → "Removed" stamp → hold. The prefab sits on the right half of the frame
-(same place as on the web page), so the clip drops on top of Jack's video with no repositioning.
+"""Render the 5 video overlay prefabs (site/video/?prefab=…) as CapCut-ready clips, 1920x1080, 30 fps, 6 s each:
+slide in (0-0.4 s) → live → compare wipe (2.4-3.6 s) → "Removed" stamp → slide out (5.6-6 s). The card sits in the
+bottom-right corner (40 px margin, same place as on the web page), so the clip drops on top of Jack's video with no
+repositioning and needs no CapCut in / out animation.
 
-Per prefab ID (google, x, reddit, mega) in OUT_DIR:
+Per prefab ID (google, google-images, x, reddit, mega) in OUT_DIR:
   ID.mov          ProRes 4444 with real alpha (yuva444p10le): frames = page.screenshot(omit_background=True) of
                   ?prefab=ID&bg=none, one per frame via VideoOverlays.seek(t) (exact, no real-time jitter)
   ID-green.mp4    H.264 yuv420p on chroma #00FF00 (the same frames composited by ffmpeg) for CapCut's Chroma key
-  ID-first.png / ID-last.png   first / last frame on green, screenshots of ?prefab=ID&state=live|removed&bg=green
-                  (so the chroma mode itself is exercised too)
+  ID-live.png / ID-removed.png   the settled states (1.6 s / 5.4 s) on green, screenshots of
+                  ?prefab=ID&state=live|removed&bg=green (so the chroma mode itself is exercised too)
+  ID-in.png / ID-out.png   mid slide-in (0.1 s) / mid slide-out (5.8 s), stills from ID-green.mp4
 Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/render_prefabs.py OUT_DIR [--name X] [--keep-frames]
 Needs ffmpeg with prores_ks + libx264."""
 import argparse, pathlib, shutil, subprocess, sys, urllib.parse
@@ -16,7 +18,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from serve import serve
 from playwright.sync_api import sync_playwright
 
-PREFABS = ("google", "x", "reddit", "mega")
+PREFABS = ("google", "google-images", "x", "reddit", "mega")
 FPS, SECONDS, W, H = 30, 6, 1920, 1080
 
 
@@ -39,7 +41,7 @@ def main():
         pg = ctx.new_page()
         ready = "() => window.VideoOverlays && [...document.images].every(i => i.complete) && document.fonts.status === 'loaded'"
         for pid in PREFABS:
-            for state, name in (("live", "first"), ("removed", "last")):
+            for state, name in (("live", "live"), ("removed", "removed")):
                 pg.goto(f"{base}video/?prefab={pid}&state={state}&bg=green{extra}")
                 pg.wait_for_function(ready)
                 pg.screenshot(path=str(out / f"{pid}-{name}.png"))
@@ -56,6 +58,8 @@ def main():
             ff("-f", "lavfi", "-i", f"color=c=0x00FF00:s={W}x{H}:r={FPS}", *seq, "-filter_complex",
                "[0][1]overlay=shortest=1,format=yuv420p", "-c:v", "libx264", "-crf", "14", "-preset", "medium",
                "-movflags", "+faststart", str(out / f"{pid}-green.mp4"))
+            for t, name in ((0.1, "in"), (5.8, "out")):
+                ff("-ss", str(t), "-i", str(out / f"{pid}-green.mp4"), "-frames:v", "1", str(out / f"{pid}-{name}.png"))
             if not a.keep_frames:
                 shutil.rmtree(frames)
             print(pid, "ok")

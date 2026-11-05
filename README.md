@@ -21,15 +21,19 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   an aggregator page and is never shown), else a mega.nz hit's title; X poster + text, Reddit subreddit + title, the
   most-seen other host, `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
 - Video page `site/video/` (noindex, not in the sitemap; `css/video.css` + `js/video-overlays.js`, own files): Jack's
-  face video (`video/jack.mp4`, left half; `jack.webm` = the Chromium fallback of the 30 s placeholder) with 4 overlay
-  prefabs on the right half (Google phone, X, Reddit, Mega, each live → the #removals compare wipe → "Removed"),
+  face video (`video/jack.mp4`, full frame, uncovered; `jack.webm` = the Chromium fallback of the 30 s placeholder) with
+  5 overlay prefabs as one small card in the bottom-right corner (520x540 of 1920x1080, 40 px margin; Google phone,
+  Google Images (tap "Images" → grid), X, Reddit, Mega: slide in → the #removals compare wipe → "Removed" → slide out),
   driven by `video.currentTime` against `data-cue-live / -removed / -out` on each `.vo-pf`. Name from `?name=` (1-40
   letters / digits / space . - _), else the shared scan result (`?r=` / last scan, via `LeakScanRemovals.model` from
-  `js/removals.js`), else Orla. `?t=<sec>` seeks; `?prefab=google|x|reddit|mega&state=live|removed&bg=green|none` = one
-  prefab, no video. Space = play / pause; under 900px the overlays stack below the video. Cue sheet + CapCut steps:
-  `site/video/CUES.md`. Gate: `tools/video/check_video.py` (CI). Proof: `tools/video/cue_shots.py OUT`; clips for
-  CapCut (ProRes 4444 alpha .mov + green .mp4): `tools/video/render_prefabs.py OUT` (both via `cd ~/leakhunt && uv run
-  python …`; `tools/video/serve.py` = local server with Range, which `<video>` seeking needs).
+  `js/removals.js`: texts + its `/api/thumb` thumbs in every `.rm-img`, blurred), else Orla. `data-cue-say` on
+  `.vo-stage`: a personalized name is spoken (`speechSynthesis`, after the play gesture, video ducked) + "for <name>"
+  pill. `?t=<sec>` seeks; `?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none` = one prefab,
+  no video. Space = play / pause; under 900px the card sits below the video. Cue sheet + CapCut steps:
+  `site/video/CUES.md`. Gate: `tools/video/check_video.py` (CI). Proof: `tools/video/cue_shots.py OUT` (cue shots,
+  corner geometry, scan-stub texts + thumbs, speech); clips for CapCut (ProRes 4444 alpha .mov + green .mp4, own
+  in / out animation): `tools/video/render_prefabs.py OUT` (both via `cd ~/leakhunt && uv run python …`;
+  `tools/video/serve.py` = local server with Range, which `<video>` seeking needs).
 - Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
   `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
