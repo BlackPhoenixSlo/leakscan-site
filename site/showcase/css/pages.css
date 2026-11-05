@@ -301,6 +301,9 @@
 .post-meta { flex-wrap: wrap; row-gap: 0.35rem; }
 .post-meta > * { white-space: nowrap; }
 .post-meta__author { color: var(--accent); }
+.post-figure { margin: 2.5rem 0; }
+.post-figure img { display: block; width: 100%; max-width: 440px; height: auto; margin: 0 auto; border-radius: var(--radius-lg); }
+ol.post-list { list-style: decimal; }
 
 
 /* Showcase: inline links and the pull quote inside the bio and timeline. */
