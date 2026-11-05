@@ -5,6 +5,8 @@
   Used as an inline SVG sprite in `site/*.html`; the logo/favicon shield is Lucide `shield-check`.
 - **Fonts**: none shipped. System font stacks only (serif: Iowan Old Style / Palatino / Georgia; sans: system-ui) on the landing pages.
   The showcase demo loads Fraunces and Karla (SIL Open Font License) from Google Fonts.
-- **Photos**: none on the landing pages. All their imagery is CSS/SVG drawn for this site (device mockups, blurred
-  gradient thumbnails, initials avatar). Google's name and colours appear only inside illustrative mockups.
-  The showcase demo (`site/showcase/imgs/`) uses Pexels photos, credited in `tools/showcase/CREDITS.md`.
+- **Photos**: the showcase demo (`site/showcase/imgs/`) uses Pexels photos (Pexels License), credited per file in
+  `tools/showcase/CREDITS.md`. The landing page reuses small crops of those same photos (the fictional demo creator's
+  "own" pictures) in two places: `site/assets/phone/` (After phone, Images / Videos tabs) and `site/img/removals/`
+  (blurred thumbnails in the `#removals` mock-ups). Everything else on the landing pages is CSS/SVG drawn for this site
+  (device mockups, gradient thumbnails, initials avatar). Google's name and colours appear only inside illustrative mockups.

@@ -27,6 +27,8 @@ Checks every HTML file under site/ (except site/showcase/**):
   the scan server can't leave the policy pointing at the old one
 - privacy.html names the VPS host the site is also served from (SITE_HOST in deploy/.env.example), so the
   abolita.com cut-over can't leave the policy naming only the old host
+- README.md names every <section id> of index.html as `#id` (its landing-page map can't silently go stale), and
+  CREDITS.md names every directory outside showcase/ that ships .jpg/.jpeg/.webp photos
 """
 import json, pathlib, re, sys
 from html.parser import HTMLParser
@@ -331,6 +333,17 @@ def main():
         bad("deploy/.env.example has no SITE_HOST= line: can't check privacy.html names the VPS host")
     elif vps[1] not in privacy:
         bad(f"site is served from {vps[1]} but privacy.html does not name it")
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    for sid in re.findall(r'<section\b[^>]*\bid="([^"]+)"', (SITE / "index.html").read_text(encoding="utf-8")):
+        if f"`#{sid}`" not in readme:
+            bad(f"index.html has <section id={sid}> but README.md's landing-page map does not name `#{sid}`")
+    credits = (ROOT / "CREDITS.md").read_text(encoding="utf-8")
+    photo_dirs = {f.parent.relative_to(ROOT).as_posix() for f in SITE.rglob("*")
+                  if f.suffix.lower() in (".jpg", ".jpeg", ".webp") and "showcase" not in f.relative_to(SITE).parts}
+    for d in sorted(photo_dirs):
+        if f"`{d}/`" not in credits:
+            bad(f"{d}/ ships photos but CREDITS.md does not name `{d}/` (say where they come from)")
 
     for p in problems:
         print(p)
