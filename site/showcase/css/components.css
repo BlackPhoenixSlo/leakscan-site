@@ -706,8 +706,18 @@
   cursor: pointer;
 }
 .demo-ribbon__close:hover { color: var(--text); }
-/* Keep the footer's last line clear of the ribbon while it is showing. */
-body:has(.demo-ribbon:not(.is-hidden)) .footer { padding-bottom: 6rem; }
+/* Keep the hero CTAs and the footer's last line clear of the ribbon while it is
+   showing. --ribbon-clear = ribbon height + bottom offset (js/main.js). Not on
+   screens shorter than the hero's 600px min-height: there the hero bottom is
+   below the fold anyway and the extra padding would push its top under the nav. */
+@media (min-height: 600px) {
+  body:has(.demo-ribbon:not(.is-hidden)) .hero__content {
+    padding-bottom: max(clamp(3.5rem, 8vw, 6rem), calc(var(--ribbon-clear, 0px) + 1.5rem));
+  }
+}
+body:has(.demo-ribbon:not(.is-hidden)) .footer {
+  padding-bottom: max(6rem, calc(var(--ribbon-clear, 0px) + 1.5rem));
+}
 
 /* "demo" marker on account rows: they point at this page, not a platform. */
 .demo-tag {
