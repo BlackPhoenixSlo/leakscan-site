@@ -23,7 +23,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   an aggregator page and is never shown), else a mega.nz hit's title; X poster + text, Reddit subreddit + title, the
   most-seen other host, `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
 - Video page `site/video/` (noindex, not in the sitemap; `css/video.css` + `js/video-overlays.js`, own files): Jack's
-  face video (full frame, Jack on the left half; `jack.webm` = the Chromium fallback of the 44 s placeholder) with 5
+  face video (full frame, Jack on the left half; `jack.webm` = the one take, a 40 s placeholder until Jack's recording; drop-in: CUES.md "After recording") with 5
   overlay prefabs drawn on the video's right half, no panel of their own (640x720 box scaled to 960x1080, vertically centred; Google phone, Google
   Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → Jack's snap = shake + flash + "GONE." → the
   #removals compare wipe with rolling counters → "Removed" slam + CSS confetti → slide out; reduced motion = fades;
