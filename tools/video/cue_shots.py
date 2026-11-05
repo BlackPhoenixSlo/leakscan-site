@@ -53,7 +53,7 @@ Plus:
   the drawn picture (object-fit + videoWidth / Height) covers the whole stage (full screen: the centred 16:9 picture, the
   overlay = its right half); .vo-over / .vo-box = the stage's right half, transparent (no background, no shadow: the
   cards are drawn straight on the video); at a card-free time (3 s) the screen's right half = the video frame's right half
-  (screenshot vs drawImage(video), 8x8 grid, every cell |diff| < 16) -> full-frame-<vp>.png
+  (screenshot, native controls off (declared), vs drawImage(video), 8x8 grid, every cell |diff| < 8) -> full-frame-<vp>.png
 --break-full serves css/video.css with the old split layout appended (the video in the left half, an opaque panel behind
   the cards): only the "full frame:" checks go red.
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
@@ -657,7 +657,11 @@ def full_frame(b, base, out):
             pg.wait_for_function("w => document.documentElement.dataset.voFull === w", arg=how, timeout=4000)
             pg.wait_for_timeout(500)
         shot = out / f"full-frame-{vp}.png"
-        png = pg.screenshot(path=str(shot))
+        pg.screenshot(path=str(shot))
+        if how is None:   # declared: native controls off for the pixel probe (their gradient darkens the bottom of the frame)
+            pg.evaluate("() => { document.querySelector('.vo-video').controls = false; }")
+            pg.wait_for_timeout(300)
+            png = pg.screenshot()
         st, vb, pic, ov, pov, pbx, sr, orr, full = pg.evaluate(FULL)
         check(f"full frame: {vp}: the <video> box == the stage box -> {shot.name}", all(near(x, y) for x, y in zip(vb, [0, 0, st[2], st[3]])), (st, vb))
         if how == "fs":   # the whole take, centred: the overlay = the right half of that picture
@@ -671,7 +675,7 @@ def full_frame(b, base, out):
               near(ov[0], st[2] / 2) and near(ov[1], 0) and near(ov[2], st[2] / 2) and near(ov[3], st[3]) and clear(pov) and clear(pbx), (st, ov, pov, pbx))
         if how is None:   # the theater is rotated on screen: its geometry above is enough
             a_, v_ = pg.evaluate(PIX, [base64.b64encode(png).decode(), [.56, .1, .96, .9]])
-            check(f"full frame: {vp}: the screen's right half (no card at 3 s) = the video frame's right half", max(abs(x - y) for x, y in zip(a_, v_)) < 16,
+            check(f"full frame: {vp}: the screen's right half (no card at 3 s) = the video frame's right half", max(abs(x - y) for x, y in zip(a_, v_)) < 8,
                   max(abs(x - y) for x, y in zip(a_, v_)))
         ctx.close()
 
