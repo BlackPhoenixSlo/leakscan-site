@@ -4,6 +4,8 @@ All photos in `site/showcase/imgs/` (except the favicons) are from
 [Pexels](https://www.pexels.com/) under the [Pexels License](https://www.pexels.com/license/)
 (free to use, attribution not required; credited here anyway). The files are
 cropped, resized WebP derivatives made by `tools/showcase/make_images.py`.
+`imgs/720/NAME` is `imgs/NAME` downscaled to 720 px for card `srcset`s (same photo,
+same credit; `make_images.py --variants`).
 
 The demo creator, Orla Brennick, is fictional. Since 2026-11 the homepage and the
 blog / about headers use one Pexels series by Monstera Production (one model, a potter
