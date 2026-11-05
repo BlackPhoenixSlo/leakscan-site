@@ -2198,6 +2198,27 @@ def tabs_flow(browser, vp_name, vp):
     sp = page.evaluate("() => [...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16])")
     check(f"{tag} thumbs: scan page Images grid: failed / blank tiles removed, the rest painted", sp and all(ok for _u, ok in sp) and not any(dead_thumb(u) for u, _ok in sp), [u[-24:] for u, ok in sp if not ok][:4])
     ctx.close()
+    if vp_name == "desktop":   # desktop Images: every thumb answers late (after the tab is up): same-size tiles, nothing moves
+        ctx = new_ctx()
+        page = ctx.new_page()
+        held, hold = [], [True]   # held until the tab is up; later requests (spare tiles) pass
+        page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] else r.continue_())
+        page.goto(base + "scan/?r=demoBrokenT1", wait_until="load")
+        page.wait_for_selector("#g-tab-images", timeout=8000)
+        page.evaluate("document.getElementById('g-stage').scrollIntoView({block: 'start', behavior: 'instant'})")
+        page.wait_for_timeout(300)
+        t0, y0 = page.evaluate("() => { document.querySelector('#g-tab-images').click(); return [performance.now(), document.getElementById('sites').getBoundingClientRect().top]; }")
+        page.wait_for_timeout(600)
+        hold[0] = False
+        while held:
+            held.pop().continue_()
+        page.wait_for_timeout(1800)
+        d1 = page.evaluate("""(t0) => [document.getElementById('sites').getBoundingClientRect().top, document.querySelectorAll('.g-grid .g-tile img').length,
+            [...document.querySelectorAll('.g-grid .g-tile img')].filter(i => i.complete && i.naturalWidth >= 16).length,
+            window.__ls.filter(x => x[0] > t0 + 200 && x[1] > 0 && !x[2]).map(x => x[3])]""", t0)
+        check(f"{tag} thumbs: desktop Images, thumbs answering late: tiles keep their size, the sections below stay put, no layout shift",
+              d1[1] > 8 and d1[2] == d1[1] and abs(d1[0] - y0) < 1 and not d1[3], [y0] + d1[:3] + [d1[3][:2]])
+        ctx.close()
     if vp_name == "phone":   # pinned phone: a failed tile's slot goes to the next image (same size), nothing moves
         ctx = new_ctx()
         page = ctx.new_page()

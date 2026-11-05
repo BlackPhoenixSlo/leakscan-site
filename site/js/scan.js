@@ -27,8 +27,10 @@
   var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone', revealed: false,
     more: null, fitted: null, expanded: null, dead: {}, log: [], retry: null };
   // phone preview: items per tab (fitPhone trims the first look), tabs fitted / grown by More (per device + report)
-  var MORE0 = { all: 10, images: 12, videos: 6 };
-  function resetPreview() { state.more = Object.assign({}, MORE0); state.fitted = {}; state.expanded = {}; state.first = {}; }
+  // desktop Images: 3 rows of 8 to start (spares for a failed thumb's slot, see watchThumb), +3 rows per More
+  var MORE0 = { all: 10, images: 12, videos: 6 }, DESK = { images: 24 };
+  function more0(k) { return (state.device === 'phone' ? 0 : DESK[k]) || MORE0[k]; }
+  function resetPreview() { state.more = {}; Object.keys(MORE0).forEach(function (k) { state.more[k] = more0(k); }); state.fitted = {}; state.expanded = {}; state.first = {}; }
   resetPreview();
   state.device = window.matchMedia('(min-width: 720px)').matches ? 'computer' : 'phone';
 
@@ -259,7 +261,7 @@
     return (left > 0 ? '<button type="button" class="g-more" data-more="' + kind + '">' + esc(label) + '</button>' : '') +
       (state.more[kind] > firstLook(kind) ? '<button type="button" class="g-less" data-less="' + kind + '">Show fewer</button>' : '');
   }
-  function firstLook(k) { return state.first[k] || MORE0[k]; }
+  function firstLook(k) { return state.first[k] || more0(k); }
 
   function panelAll(d, phone) {
     var pages = d.results.filter(function (r) { return r.kind !== 'video'; });
@@ -292,7 +294,7 @@
   function panelImages(d, phone) {
     var items = imageItems(d);
     if (!items.length) return '<p class="g-empty">No image results indexed for this handle.</p>';
-    var n = phone ? Math.min(state.more.images, items.length) : items.length;
+    var n = Math.min(state.more.images, items.length);
     var h = '<div class="g-safe" aria-hidden="true"><span>Image results Google has indexed for your handle</span></div>';
     h += '<div class="g-grid">' + items.slice(0, n).map(gTile).join('') + '</div>';
     return h + more('images', 'Show more images', items.length - n);
@@ -419,7 +421,7 @@
       if (innerWidth === vpW && Math.abs(innerHeight - vpH) < 150) return;
       vpW = innerWidth; vpH = innerHeight;
       if (state.device !== 'phone' || !state.data) return;
-      Object.keys(MORE0).forEach(function (t) { state.first[t] = 0; if (!state.expanded[t]) { state.more[t] = MORE0[t]; state.fitted[t] = false; } });
+      Object.keys(MORE0).forEach(function (t) { state.first[t] = 0; if (!state.expanded[t]) { state.more[t] = more0(t); state.fitted[t] = false; } });
       if (!state.expanded[state.tab]) renderGoogle($('g-stage').contains(document.activeElement));
     }, 200);
   });
@@ -487,7 +489,7 @@
     else if (t.dataset.goto) { state.tab = t.dataset.goto; renderGoogle(true); }
     else {
       var k = t.dataset.more, sel = '#g-panel ' + ITEM[k], had = document.querySelectorAll(sel).length;
-      state.more[k] += MORE_STEP[k];
+      state.more[k] += (state.device === 'phone' ? 0 : DESK[k]) || MORE_STEP[k];
       state.expanded[k] = true;
       renderGoogle(false);
       var nx = document.querySelectorAll(sel)[had];   // keyboard: carry on at the first new result
