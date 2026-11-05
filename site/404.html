@@ -16,8 +16,9 @@
 <meta name="twitter:title" content="Page not found · Abolita">
 <meta name="twitter:description" content="This page doesn't exist. Head back to Abolita or message Jaka directly.">
 <meta name="twitter:image" content="https://blackphoenixslo.github.io/leakscan-site/assets/og.png">
-<link rel="icon" href="https://blackphoenixslo.github.io/leakscan-site/assets/favicon.svg" type="image/svg+xml">
-<!-- Self-contained on purpose: a 404 can be served at any URL depth, where relative paths would break. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32'%3E%3Crect width='32' height='32' rx='9' fill='%23a8431c'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' transform='translate(4 4)'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/g%3E%3C/svg%3E" type="image/svg+xml">
+<!-- Self-contained on purpose: a 404 can be served at any URL depth, where relative paths would break, and on any
+     host (Pages + VPS), so no absolute loads either: icon inlined, home links fixed up by the script below. -->
 <style>
 :root { --bg:#fbf8f3; --surface:#fff; --ink:#1f1a15; --muted:#5c5248; --line:#e6ddd0; --accent:#a8431c; --accent-hover:#8f3615; --on-accent:#fff; color-scheme:light dark; }
 @media (prefers-color-scheme: dark) { :root { --bg:#15120f; --surface:#1f1b17; --ink:#f3ece2; --muted:#bcb0a2; --line:#362f28; --accent:#f0915f; --accent-hover:#f5a87e; --on-accent:#1d120b; } }
@@ -49,5 +50,10 @@ p { color:var(--muted); margin:0 0 1em; }
     <a class="btn" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan.%20My%20creator%20name%20%2F%20handles%3A%20">Message Jaka on Telegram</a>
   </div>
 </main>
+<script>
+// Home links default to Pages; on any other host (VPS, local) point them at that host's root instead.
+if (location.pathname.indexOf("/leakscan-site/") !== 0)
+  document.querySelectorAll('a[href="https://blackphoenixslo.github.io/leakscan-site/"]').forEach(function (a) { a.href = "/"; });
+</script>
 </body>
 </html>
