@@ -34,13 +34,17 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   from `js/removals.js`: texts + its `/api/thumb` thumbs in every `.rm-img`, blurred; site / Instagram / TikTok from
   its profile, as personalize.js): plays `jack-named.mp4` if present (HEAD probe; cues + `data-cue-named-shift`) else
   `jack.mp4`, speaks the name at `data-cue-say-start` + `data-cue-say` (`speechSynthesis`, video ducked) + "for
-  <name>" pill; generic = "Your name", `jack.mp4`, no speech, end card at `data-cue-cta` (default `-say`) with a
-  `?name=` form. `?t=<sec>` seeks; `?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none` = one
-  prefab, no video. Space = play / pause; under 900px the card sits below the video. Script (2 takes):
+  <name>" pill; generic = "Your name", `jack.mp4`, no speech, end card `cta-steps` at `data-cue-cta` (default `-say`):
+  3 steps on an 8 s loop (type your name → run the free scan → rewatch with YOUR content; keeps looping after the
+  take ends) over a `?name=` form. `?t=<sec>` seeks; `?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none`
+  (or `cta-steps&state=step1|2|3`) = one prefab, no video. Space = play / pause. Every width: cards inside the 16:9
+  stage's right half (phones too, no stacking); full screen button = the stage (Fullscreen API), iPhone = rotated CSS
+  theater (Esc / X / back closes); touch: own play bar, tap-to-play + "Rotate for full size" hint. Script (2 takes):
   `site/video/SCRIPT.md`; cue sheet + CapCut steps + SFX: `site/video/CUES.md`. Gate: `tools/video/check_video.py`
-  (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry, after state, counters, end
-  card + form, snap, reduced motion, sfx, speech, named take, scan-stub texts + thumbs); clips for CapCut (ProRes 4444
-  alpha .mov + green .mp4, own in / out animation, silent): `tools/video/render_prefabs.py OUT`; cues from a take
+  (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry at both widths, after state,
+  counters, end card + form + cta-steps, snap, reduced motion, sfx, speech, named take, player: tap / theater / full
+  screen, scan-stub texts + thumbs); 6 clips for CapCut (ProRes 4444 alpha .mov + green .mp4, own in / out animation,
+  silent; `cta-steps` 8 s, generic only): `tools/video/render_prefabs.py OUT`; cues from a take
   (whisper / faster-whisper word timestamps → `data-cue-*` diff, untested on a real take):
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).
