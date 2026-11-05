@@ -59,7 +59,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   Send report), a Google look-alike (All / Images / Videos, Phone / Computer, thumbnails via `/api/thumb`, blurred until
   Reveal; the Phone frame, ~80% of the screen tall, is pinned while page scroll scrolls its screen 1:1, then the page
   moves on; All's first look is fitted to <= 1.5 screens of that scrolling, More adds the rest; its Images block is one
-  swipe strip of every image (snap, edge peek, arrow keys; desktop: arrows on hover); the Images tab (3 columns) and
+  swipe strip of every image, video results' stills included with a play badge (snap, edge peek, arrow keys; desktop: arrows on hover); the Images tab (3 columns) and
   Videos tab show everything up to 60 in the phone's own scroll, More past 60 (desktop Images: 24, +More); screens
   < 600 px tall get a static frame, no inner scroll box), "Where the copies are" (every site, most links first: 10 sites, +25 per click; a
   site's links built only when opened, 10 then +50, removed again on close; one filter over domains + URLs; Copy all /

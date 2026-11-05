@@ -115,6 +115,23 @@ def _images(fx, alive=False, extra=()):
     return [o for o in out if not dead_thumb(o[0], extra)] if alive else out
 
 
+def _scan_images(fx, alive=False):
+    """Mirror of scan.js imageItems() (videos: true): images[] (each an image result, whatever result shares its thumb) then
+    every result's thumb, video results' stills included, gstatic only, deduped, no cap. → [(src, video)]; alive: minus the
+    thumbs the stub answers 404 or blank."""
+    ok = lambda u: isinstance(u, str) and len(u) <= 600 and GS_RE.match(u)
+    res = [r for r in fx.get("results", []) if r.get("link")]
+    by, seen, out = {}, set(), []
+    for r in res:
+        if r.get("thumb") and r["thumb"] not in by:
+            by[r["thumb"]] = r
+    for u, r in [(u, by.get(u)) for u in fx.get("images", [])] + [(r.get("thumb"), r) for r in res]:
+        if ok(u) and u not in seen:
+            seen.add(u)
+            out.append((u, is_video(r)))
+    return [o for o in out if not dead_thumb(o[0])] if alive else out
+
+
 def break_routes(ctx):
     """--break-drift / --break-phones: serve the script with the feature disabled (wire boundary, same bytes otherwise)."""
     for flag, name, old, new in ((BREAK_DRIFT, "inline-scan.js", "DRIFT_SPEED = 24", "DRIFT_SPEED = 0"),
@@ -136,7 +153,7 @@ ALSO = "Also found as " + ", ".join("@" + a for a in FX["aliases"]["discovered"]
 # leak-page socials on platforms the profile does not have (the discovered Instagram never replaces hers)
 FOUND = [s["url"] for s in FX["aliases"]["socials"] if s["platform"] not in {a["platform"] for a in FX["profile"]["accounts"]}]
 VIDEOS = [r for r in FX["results"] if r["kind"] == "video"]
-IMAGES = len(dict.fromkeys(FX["images"] + [r["thumb"] for r in FX["results"] if r["thumb"] and r["kind"] != "video"]))   # video stills: Videos tab only
+IMAGES = len(_scan_images(FX))   # the scan page: video stills too (play badge)
 
 
 def check(name, ok, detail=""):
@@ -392,14 +409,15 @@ def open_all_sites(page):
 
 
 sys.path.insert(0, str(ROOT / "tools"))
-from scan_stub import huge_result   # noqa: E402  (the stub's own generator: the e2e expects what it serves)
+from scan_stub import huge_result, videos_result   # noqa: E402  (the stub's own generator: the e2e expects what it serves)
 HUGE = huge_result("stub-huge")
+VIDS = _scan_images(videos_result("stub-videos"))   # real-report shape: 33 unique thumbs, 18 from video results
 HUGE_SITES = {}
 for _u, _d in [(h["url"], h["domain"]) for h in HUGE["hits"]] + [(r["link"], r["domain"]) for r in HUGE["results"]]:
     HUGE_SITES.setdefault(_d, {})[_u] = 1
 HUGE_LINKS = sum(len(v) for v in HUGE_SITES.values())
 HUGE_TOP = max(HUGE_SITES, key=lambda d: len(HUGE_SITES[d]))
-HUGE_IMAGES = len(dict.fromkeys(HUGE["images"] + [r["thumb"] for r in HUGE["results"] if r.get("thumb") and r["kind"] != "video"]))
+HUGE_IMAGES = len(_scan_images(HUGE))
 HUGE_VIDEOS = sum(r["kind"] == "video" for r in HUGE["results"])
 NODE_BUDGET = 900   # whole page after the report renders (main before this change: ~3,800 at this size)
 IN_VIEW = """() => { const a = document.activeElement, r = a.getBoundingClientRect(), s = a.closest('.ph-scroll');
@@ -2279,6 +2297,7 @@ def tabs_flow(browser, vp_name, vp):
     # ---------- (1) report card: broken thumbs leave, counts follow ----------
     E = _images(BROKEN)                # what the client lists before any probe (video still already skipped)
     A = _images(BROKEN, alive=True)    # what shows once the 404 / blank ones are dropped
+    AS = _scan_images(BROKEN, alive=True)   # the scan page's list (video stills included)
     vids = {r["thumb"] for r in BROKEN["results"] if r.get("kind") == "video" and r.get("thumb")}
     G = 12 if vp_name == "phone" else 16
     ctx = new_ctx()
@@ -2356,8 +2375,8 @@ def tabs_flow(browser, vp_name, vp):
         # every image already shown (phone Images: all up to 60): a failed slot is taken by the last tile, so the count is every live image
         d0 = next(i for i, u in enumerate(s0) if dead_thumb(u)) if any(dead_thumb(u) for u in s0) else -1
         check(f"{tag} thumbs: pinned phone Images: failed tiles' slots filled in place (spare image, else the last tile), every live image painted, tiles above untouched, no layout shift",
-              d0 >= 0 and len(s1[0]) == (len(s0) if len(A) > len(s0) else len(A)) and all(ok for _u, ok in s1[0]) and [u for u, _ok in s1[0][:d0]] == s0[:d0]
-              and not dead_thumb(s1[0][d0][0]) and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(A), len(s1[0]), d0, s1[1][:2]])
+              d0 >= 0 and len(s1[0]) == (len(s0) if len(AS) > len(s0) else len(AS)) and all(ok for _u, ok in s1[0]) and [u for u, _ok in s1[0][:d0]] == s0[:d0]
+              and not dead_thumb(s1[0][d0][0]) and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(AS), len(s1[0]), d0, s1[1][:2]])
         page.locator("#device input[value=computer]").check(force=True)
         page.wait_for_timeout(300)
         back = page.evaluate("() => [...document.querySelectorAll('#g-stage img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1] || ''))")
@@ -2371,7 +2390,7 @@ def tabs_flow(browser, vp_name, vp):
         d["results"] = d["results"] + [{"title": f"Extra page {k}", "link": f"https://extra{k}.example/p/{k}", "domain": f"extra{k}.example", "snippet": "x",
                                         "thumb": f"https://encrypted-tbn0.gstatic.com/images?q=tbn:EXTRA{k:04d}", "kind": "page"} for k in range(90)]
         many.pages = sum(x.get("kind") != "video" for x in d["results"][:80])
-        many.n = len(dict.fromkeys(d["images"] + [x["thumb"] for x in d["results"] if x.get("thumb") and x.get("kind") != "video"]))
+        many.n = len(_scan_images(d))
         r.fulfill(json=d)
     page.route("**/api/scan-result/demoR3port01", many)
     page.goto(base + "scan/?r=demoR3port01", wait_until="load")
@@ -2386,6 +2405,38 @@ def tabs_flow(browser, vp_name, vp):
     tab_n = page.locator("#g-panel .g-tile").count()
     check(f"{tag} thumbs: > 80 results: every result's thumb in the strip and the Images tab (pages stay capped at 80)", strip_n == tab_n == many.n > 80 and pages_n == many.pages, [strip_n, tab_n, many.n, pages_n, many.pages])
     ctx.close()
+    # a report that is mostly video results (real 2_YPj7TbK4rm shape): every unique thumb in the strip and the Images tab,
+    # video results' stills with a play badge; images[] entries that share a video still stay image results. Fresh scan + reopen
+    for how in ("scan/?h=stub-videos", "scan/?r=demoVideos01"):
+        ctx = new_ctx()
+        page = ctx.new_page()
+        page.goto(base + how, wait_until="load")
+        page.wait_for_selector("#report:not([hidden])", timeout=15000)
+        page.wait_for_timeout(300)
+        TILES = """(sel) => { const t = [...document.querySelectorAll(sel)];
+            return [t.length, t.filter(e => e.querySelector('.g-vid')).length, t.map(e => decodeURIComponent(e.querySelector('img').getAttribute('src').split('u=')[1]))]; }"""
+        sv = page.evaluate(TILES, "#g-panel .g-strip > .g-pack-b")
+        badge = page.evaluate("() => { const e = document.querySelector('#g-panel .g-strip .g-vid'), b = e && getComputedStyle(e, '::after'); return b ? [b.content, b.width, b.position] : null; }") or [None] * 3
+        page.locator("#g-tab-images").click()
+        while page.locator("#g-panel [data-more=images]").count():
+            page.locator("#g-panel [data-more=images]").click()
+        iv = page.evaluate(TILES, "#g-panel .g-tile")
+        if how.endswith("demoVideos01"):
+            page.evaluate("document.querySelector('#g-panel .g-tile').scrollIntoView({block: 'start', behavior: 'instant'})")
+            page.wait_for_timeout(500)
+            shot(page, "v-videos-images-tab")
+        page.locator("#g-tab-videos").click()
+        vn = page.locator("#g-panel .g-v").count()
+        if how.endswith("demoVideos01"):
+            page.locator("#g-tab-all").click()
+            page.evaluate("document.querySelector('#g-panel .g-strip').scrollIntoView({block: 'center', behavior: 'instant'})")
+            page.wait_for_timeout(500)
+            shot(page, "v-videos-all-strip")
+        want = [u for u, _v in VIDS]
+        check(f"{tag} videos report ({how.split('?')[1]}): strip + Images tab = all {len(VIDS)} unique thumbs in order, play badge on the {sum(v for _u, v in VIDS)} from video results, Videos tab 34",
+              sv[2] == iv[2] == want and sv[1] == iv[1] == sum(v for _u, v in VIDS) and vn == 34 and badge[0] == '""' and badge[1] == "24px" and badge[2] == "absolute",
+              [sv[:2], iv[:2], len(want), vn, badge])
+        ctx.close()
     # every thumb fails (late, after the report is up): the All strip keeps its height (visible slots stay as empty tiles), nothing below moves
     ctx = new_ctx()
     page = ctx.new_page()
