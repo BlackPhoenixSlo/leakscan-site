@@ -148,6 +148,10 @@
 .g-more { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 420px; min-height: 44px; margin: 8px auto 0; border: 1px solid var(--g-line); border-radius: 999px; background: var(--g-pill); color: var(--g-text); font: inherit; font-size: 14px; cursor: pointer; }
 @media (hover: hover) { .g-more:hover { background: #3c4043; } }
 .g-more:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; }
+.g-rise { transition: opacity .5s ease-out, transform .5s cubic-bezier(.2, .8, .2, 1); }
+.g-rise:not(.g-in):not(:focus) { opacity: 0; transform: translateY(18px); }
+.g-rise:focus { transition: none; }   /* keyboard focus: shown at once, outline included */
+@media (prefers-reduced-motion: reduce) { .g-rise { transition: none; } .g-rise:not(.g-in):not(:focus) { opacity: 1; transform: none; } }
 .g-less { display: block; min-height: 44px; margin: 2px auto 0; padding: 0 16px; border: 0; background: none; color: var(--g-muted); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 @media (hover: hover) { .g-less:hover { color: var(--g-text); } }
 .g-less:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; border-radius: 999px; }
