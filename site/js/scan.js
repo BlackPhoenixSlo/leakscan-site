@@ -25,10 +25,10 @@
 
   // ---------- state ----------
   var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone', revealed: false,
-    more: null, fitted: null, expanded: null, dead: null, log: [], retry: null };
-  // phone preview: items per tab (fitPhone trims the first look), tabs fitted / grown by More, thumbs that failed
+    more: null, fitted: null, expanded: null, dead: {}, log: [], retry: null };
+  // phone preview: items per tab (fitPhone trims the first look), tabs fitted / grown by More (per device + report)
   var MORE0 = { all: 10, images: 12, videos: 6 };
-  function resetPreview() { state.more = Object.assign({}, MORE0); state.fitted = {}; state.expanded = {}; state.dead = {}; }
+  function resetPreview() { state.more = Object.assign({}, MORE0); state.fitted = {}; state.expanded = {}; }
   resetPreview();
   state.device = window.matchMedia('(min-width: 720px)').matches ? 'computer' : 'phone';
 
@@ -157,6 +157,7 @@
     mark('leakscan:report-start');
     var d = state.data = normalize(raw);
     resetPreview();
+    state.dead = {};   // per report: a device switch keeps the thumbs known to fail
     state.handle = d.handle;
     state.platform = PLATFORMS[d.platform] ? d.platform : state.platform;
     if (d.slug && history.replaceState) history.replaceState(null, '', '?r=' + encodeURIComponent(d.slug));

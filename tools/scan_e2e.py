@@ -2146,6 +2146,10 @@ def tabs_flow(browser, vp_name, vp):
         check(f"{tag} thumbs: pinned phone Images: failed tiles swapped in place for the next image (same count, all painted), no layout shift",
               any(dead_thumb(u) for u in s0) and len(A) > len(s0) and len(s1[0]) == len(s0) and all(ok for _u, ok in s1[0])
               and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(A), len(s1[0]), s1[1][:2]])
+        page.locator("#device input[value=computer]").check(force=True)
+        page.wait_for_timeout(300)
+        back = page.evaluate("() => [...document.querySelectorAll('#g-stage img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1] || ''))")
+        check(f"{tag} thumbs: a device switch keeps failed thumbs out (Computer view lists none of them)", back and not any(dead_thumb(u) for u in back), [u[-24:] for u in back if dead_thumb(u)])
         ctx.close()
 
     # ---------- (3) #free phone: tabs, illustration without a scan ----------
