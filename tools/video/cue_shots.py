@@ -78,7 +78,14 @@ def personalized(b, out, break_thumbs):
         im = pg.evaluate(IMGS)
         check(f"personalized ?r=demoRemove1: all {len(im)} .rm-img = scan thumbs via {api}/api/thumb, loaded, blurred",
               len(im) == 13 and all(s.startswith(api + "/api/thumb?u=") and w > 0 and "blur(" in f for s, w, f in im), im[:3])
-        pg.screenshot(path=str(out / "desktop-personalized-demoRemove1-x-live.png"))
+        # evidence shots via the solo view (the stub has no Range, so the page's <video> can't seek to a cue)
+        for pid in ("google-images", "x"):
+            pg.goto(f"{base}video/?prefab={pid}&state=live&r=demoRemove1")
+            try:
+                pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete && i.src.includes('/api/thumb'))", timeout=8000)
+            except Exception:
+                pass
+            pg.screenshot(path=str(out / f"desktop-personalized-demoRemove1-{pid}-live.png"))
         check("personalized: no request outside the stub, no JS error", not ext and not errs, (ext, errs))
         ctx.close()
     finally:
