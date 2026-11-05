@@ -159,24 +159,26 @@
         <span class="vo-kw"><span class="vo-kw-live">MEGA <span data-vo="mega-gb">52 GB</span></span><span class="vo-kw-gone">GONE.</span></span>
       </div>
 
-      <!-- data-cue-say: the browser says the name; this card shows it too (no-voice browsers). Personalized names only. -->
+      <!-- data-cue-say-start (2 s) / data-cue-say (stays to the end + after it): the browser says the name; this pill shows it
+           too (no-voice browsers). Personalized names only. -->
       <div class="vo-pf vo-for" data-off aria-hidden="true"><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
 
       <!-- generic mode only (no ?name=, no scan): from data-cue-cta (default = data-cue-say) to the end, also after it; 3 steps on an
-           8 s loop (?prefab=cta-steps = the CapCut clip, without the form); its form = the name bar's in-place rebuild -->
+           8 s loop: 1 the landing's scan box types "Jaka Basej" (or the viewer's name) + "Scan now" pressed, 2 "Searching Google, step N
+           of 9…" + "87 links found", 3 the rewatch (?prefab=cta-steps = the CapCut clip, without the form); its form = the name bar's in-place rebuild -->
       <div class="vo-pf vo-cta" data-prefab="cta-steps" data-off>
         <p class="vo-cta-t">Type your name in the link → this video rebuilds with YOUR leaks</p>
         <div class="vo-steps" aria-hidden="true">
           <div class="vo-step">
             <p class="vo-step-h"><span class="vo-step-n">1</span>Type your name</p>
             <span class="vo-mi"><span class="vo-mi-t"></span><span class="vo-mi-c"></span></span>
-            <span class="vo-mbtn">Rebuild it</span>
+            <span class="vo-mbtn"><svg class="icon"><use href="#i-search"/></svg>Scan now</span>
           </div>
           <div class="vo-step">
             <p class="vo-step-h"><span class="vo-step-n">2</span>Run the free scan</p>
             <span class="vo-mb"><i></i></span>
-            <p class="vo-ms">Scanning Google · X · Reddit · Mega…</p>
-            <p class="vo-mc"><b class="vo-mc-n">0</b> leaks found</p>
+            <p class="vo-ms">Searching Google, step 1 of 9…</p>
+            <p class="vo-mc"><b class="vo-mc-n">0</b><span class="vo-mc-u"> links found</span></p>
           </div>
           <div class="vo-step">
             <p class="vo-step-h"><span class="vo-step-n">3</span>Rewatch this video with YOUR content</p>
@@ -190,9 +192,6 @@
           <button type="submit">Rebuild it</button>
         </form>
       </div>
-
-      <!-- the name bar's submit: a one-shot 1.2 s "REBUILDING FOR <NAME>…" card (glitch + scanlines) over the right half, then the restart -->
-      <div class="vo-rb" data-off aria-hidden="true"><p class="vo-rb-t">Rebuilding for <b class="vo-rb-n"></b>…</p></div>
 
     </div></div>
     <!-- player UI (not in the ?prefab= clips): full screen (the stage, so the cards stay; iPhone: rotated "theater"), touch play bar + hint -->

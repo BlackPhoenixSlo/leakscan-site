@@ -4,12 +4,13 @@
 // URL: ?name=<1-40 letters/digits/space . - _> (else the shared scan result: ?r= or the last scan, like #removals)
 //      ?t=<sec> seek · ?sfx=0 no sound · ?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none: one prefab, no video
 //      (?prefab=cta-steps&state=step1|step2|step3: the generic end card's 3 steps, 8 s, no form: the 6th CapCut clip).
-// Two modes (html[data-vo-mode]): "named" (?name= or a scan result: her texts, the name spoken, "for <name>" pill, the
-// jack-named.mp4 take if the server has it) and "generic" (texts say "Your name", default blurred thumbs, no speech, at
-// data-cue-cta (default data-cue-say) the "Type your name" card = cta-steps: 3 steps on an 8 s loop, type your name → run the
-// free scan → rewatch this video with YOUR content, kept looping after the video ends).
-// Name bar (.vo-nb, under the stage; full screen / theater: the .vo-nb-pill opens it) + the end card's form = rebuild(): in
-// place, no reload: named mode + texts, ?name= via history.replaceState, a 1.2 s "REBUILDING FOR <NAME>…" card + pop, then
+// Two modes (html[data-vo-mode]): "named" (?name= or a scan result: her texts, the name spoken, "for <name>" pill: 2 s at
+// data-cue-say-start, from data-cue-say on it stays to the end + after it; the jack-named.mp4 take if the server has it) and
+// "generic" (texts say "Your name", default blurred thumbs, no speech, at data-cue-cta (default data-cue-say) the "Type your
+// name" card = cta-steps: 3 steps on an 8 s loop, the landing's scan box types "Jaka Basej" (or the viewer's typed name) +
+// "Scan now" → "Searching Google, step N of 9…" + "87 links found" → rewatch this video with YOUR content, kept looping
+// after the video ends). Name bar (.vo-nb, under the stage; full screen / theater: the .vo-nb-pill opens it) + the end
+// card's form = rebuild(): in place, no reload, no interstitial: pop, named mode + texts, ?name= via history.replaceState,
 // the take (jack-named.mp4 if the server has it) restarts from 0, playing (the submit is the gesture). Reset = generic again.
 // Player UI (.vo-ui): full screen = the stage (Fullscreen API, + landscape lock on Android), else (iPhone) a CSS "theater":
 // the stage fixed + rotated 90deg (Esc / X / back closes); touch devices: no native controls, own play bar, a tap on the
@@ -30,8 +31,10 @@
   var IN = 0.45, OUT = 0.4, SHAKE = 0.25, WIPE = 0.95, STAMP = 0.2, BURST = 0.6, KW = 0.6, SLIDE = 160;   // seconds; px
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
   var GENERIC = 'Your name', NAMED_TAKE = 'jack-named.mp4';
-  // cta-steps: step windows (s into its 8 s loop), the name it types (or what the viewer typed in the form), the count it rolls to
-  var STEPS = [[0, 2.6], [2.6, 5.3], [5.3, 8]], CYCLE = 8, DEMO = 'Orla Brennick', LEAKS = 37;
+  // cta-steps: step windows (s into its 8 s loop), the name it types (or what the viewer typed in the form), the count it
+  // rolls to, the scan's progress line (the landing's "Searching Google, step N of 9…", js/scan-engine.js progressInfo)
+  var STEPS = [[0, 2.6], [2.6, 5.3], [5.3, 8]], CYCLE = 8, DEMO = 'Jaka Basej', LEAKS = 87, NSTEP = 9;
+  var WHERE = ['Google', 'Google Images', 'X', 'Reddit', 'Mega'];
   var SOLO_CTA = { end: 8, step1: 2.2, step2: 3.9, step3: 7.2 };   // ?prefab=cta-steps: clip length, state= stills
   // ?prefab= timeline = the CapCut clip: in 0-0.45, snap at 2.4, wipe 2.65-3.6, stamp 3.6, out 5.6-6; state=live / removed = these stills
   var SOLO = { wipe: 2.4, end: 6, live: 1.6, removed: 5.4 };
@@ -95,7 +98,10 @@
     bs.setProperty('--caret', u < STEPS[0][1] && (n < name.length || Math.floor(u * 2.5) % 2 === 0) ? '1' : '0');
     bs.setProperty('--press', bump((u - 2.0) / 0.3).toFixed(3));
     bs.setProperty('--bar', p.toFixed(3));
-    setText(box.querySelector('.vo-mc-n'), String(Math.round(LEAKS * p)));
+    var k = Math.max(1, Math.ceil(p * NSTEP)), m = Math.round(LEAKS * p);
+    setText(box.querySelector('.vo-ms'), p >= 1 ? 'Done: ' + NSTEP + ' of ' + NSTEP + ' steps' : 'Searching ' + WHERE[Math.min(WHERE.length - 1, Math.floor(p * WHERE.length))] + ', step ' + k + ' of ' + NSTEP + '…');
+    setText(box.querySelector('.vo-mc-n'), String(m));
+    setText(box.querySelector('.vo-mc-u'), m === 1 ? ' link found' : ' links found');
     bs.setProperty('--cp', (1 + 0.25 * bump((u - 4.6) / 0.4)).toFixed(3));
     bs.setProperty('--fl', ((f < 0.5 ? f : f - 1) * 180).toFixed(1));   // 0 → 90deg, swap the text, -90 → 0
     setText(box.querySelector('.vo-mini-n'), f >= 0.5 ? name : GENERIC);
@@ -109,7 +115,10 @@
   function draw(t) {
     var cards = pfs;
     if (!root.classList.contains('vo-solo')) {
-      if (forc) { var s0 = sayStart(), s1 = sayEnd(); forc.live = isFinite(s0) && t < s1 ? s0 : s1; forc.out = forc.live + 2; cards = cards.concat([forc]); }
+      if (forc) {   // 2 s at the start cue; from the end cue on it stays (the name at the end, also after the take ends)
+        var s0 = sayStart(), s1 = sayEnd(), early = isFinite(s0) && t < s1;
+        forc.live = early ? s0 : s1; forc.out = early ? s0 + 2 : Infinity; cards = cards.concat([forc]);
+      }
       if (ctac) { ctac.live = ctaAt(); cards = cards.concat([ctac]); }
     }
     cards.forEach(function (c) {
@@ -278,7 +287,7 @@
   if (solo !== null) {
     var one = pfs.concat(ctac ? [ctac] : []).filter(function (c) { return c.id === solo; })[0] || pfs[0], cfg = one === ctac ? SOLO_CTA : SOLO;
     pfs.forEach(function (c) { if (c !== one) c.el.remove(); });
-    [forEl, one === ctac ? one.el.querySelector('form') : ctaEl, root.querySelector('.vo-ui'), nb, root.querySelector('.vo-rb')].forEach(function (el) { if (el) el.remove(); });
+    [forEl, one === ctac ? one.el.querySelector('form') : ctaEl, root.querySelector('.vo-ui'), nb].forEach(function (el) { if (el) el.remove(); });
     pfs = [one];
     if (one === ctac) { ctac = null; one.live = 0; } else { one.live = 0; one.removed = SOLO.wipe; one.out = SOLO.end; one.tap = TAP; }
     root.classList.add('vo-solo');
@@ -308,7 +317,7 @@
   function unduck() { if (ducked !== null) { video.volume = ducked; ducked = null; } }
   function hush() { if (SPEECH && ducked !== null) window.speechSynthesis.cancel(); unduck(); }
   function speak(t) {   // from the play loop / ended only, so never before the user's play gesture
-    if (!who || !SPEECH || !gesture() || busy) return;   // (busy: the rebuild card is up, the restart comes after it)
+    if (!who || !SPEECH || !gesture()) return;
     says.forEach(function (s) {
       var at = s.at();
       if (s.done || !isFinite(at) || t < at || t > at + 2 || ducked !== null) return;
@@ -459,42 +468,21 @@
   document.addEventListener('webkitfullscreenchange', onFs);
   window.addEventListener('popstate', function () { theater(false, true); });
   // ---------- the name: bar + end card form → rebuild() in place; Change / Reset; the full screen pill ----------
-  var BAD = 'Use 1-40 letters, digits, spaces or . - _', RB = 1.2, rbEl = root.querySelector('.vo-rb'), rbRaf = null, rbTok = 0, busy = false;
+  var BAD = 'Use 1-40 letters, digits, spaces or . - _', gen = 0;
   var nbInp = nbForm && nbForm.querySelector('input'), nbErr = nb && nb.querySelector('.vo-nb-err'), nbPill = ui && ui.querySelector('.vo-nb-pill');
-  function rbCard(n) {   // the one-shot card, wall clock (the video is paused meanwhile)
-    if (!rbEl) return;
-    setText(rbEl.querySelector('.vo-rb-n'), n);
-    rbEl.removeAttribute('data-off');
-    cancelAnimationFrame(rbRaf);
-    var t0 = performance.now(), st = rbEl.style;
-    (function frame(now) {
-      var u = clamp((now - t0) / 1000 / RB), gl = u < 0.25 || (u > 0.5 && u < 0.58) || (u > 0.8 && u < 0.85);
-      st.setProperty('--o', Math.min(clamp(u / 0.06), clamp((1 - u) / 0.1)).toFixed(3));
-      st.setProperty('--sc', pop(clamp(u / 0.3)).toFixed(4));
-      st.setProperty('--gx', gl ? (Math.sin(now * 0.09) * 7).toFixed(2) : '0');
-      st.setProperty('--sl', ((now - t0) * 0.04 % 40).toFixed(1));
-      if (u < 1) rbRaf = requestAnimationFrame(frame); else rbEl.setAttribute('data-off', '');
-    })(t0);
-  }
   function restart() { says.forEach(function (s) { s.done = false; }); endT = Infinity; post = null; lastT = null; }
-  function rebuild(n) {   // generic (or another name) → named for n, in place; called from a submit = a user gesture
-    var tok = ++rbTok;
-    busy = true;
-    if (video.paused) { var pr = video.play(); if (pr) pr.catch(noop); }   // unlocks the element for the delayed play (iOS)
-    video.pause();
-    var ac = audio();
+  function rebuild(n) {   // generic (or another name) → named for n, in place, at once; called from a submit = a user gesture
+    var g = ++gen, ac = audio();
     if (ac) SOUND.pop(ac);
     apply(values({ name: n }));
     personal(n);
     history.replaceState(history.state, '', location.pathname + '?name=' + encodeURIComponent(n));
-    rbCard(n);
     restart();
-    setTimeout(function () { named().then(function (ok) { if (tok === rbTok && who === n) { busy = false; restart(); take(ok, 0, true); } }); }, RB * 1000);
+    take(root.getAttribute('data-vo-take') === 'named', 0, true);   // now, inside the gesture (iOS)
+    named().then(function (ok) { if (ok && g === gen && who === n && root.getAttribute('data-vo-take') !== 'named') { restart(); take(true, 0, true); } });
   }
   function reset() {
-    rbTok++;
-    busy = false;
-    if (rbEl) { cancelAnimationFrame(rbRaf); rbEl.setAttribute('data-off', ''); }
+    gen++;
     apply(values({ name: GENERIC }));
     generic();
     if (nbInp) nbInp.value = '';

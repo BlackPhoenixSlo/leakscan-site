@@ -20,7 +20,8 @@
   and the ?sfx=0 switch
 - name bar (.vo-nb) under the stage, outside it: label "Your name", input name=name maxlength=40, button "Rebuild this
   video with my name", the "👇 type your name" hint pill (.vo-nb-hint, pulsing) + Change / Reset; the full screen pill
-  (.vo-nb-pill in .vo-ui) and the rebuild card (.vo-rb); js: one rebuild() for both forms, history.replaceState, no reload
+  (.vo-nb-pill in .vo-ui), no rebuild interstitial card (.vo-rb / rbCard gone); js: one rebuild() for both forms,
+  history.replaceState, no reload
 - css/video.css has a prefers-reduced-motion: reduce block that drops the particles (.vo-burst) and the shake
 - merged at every width: css/video.css has no max-width media query (the old < 900px "card below the video" stacking)
   and never puts .vo-over in the flow; full screen + theater CSS present (.vo-stage:fullscreen; [data-vo-full="theater"]
@@ -183,8 +184,10 @@ def name_bar(html):
             'class="vo-nb-hint"', "&#x1F447; type your name", 'class="vo-nb-chg"', 'class="vo-nb-rst"')
     if not m or not stage_end or not all(k in m[1] for k in need):
         bad.append("video/index.html: the name bar .vo-nb (after the stage, before </main>) needs " + ", ".join(k for k in need if not m or k not in m[1]))
-    if 'class="vo-nb-pill"' not in html or 'class="vo-rb"' not in html:
-        bad.append("video/index.html: the full screen name pill (.vo-nb-pill) / the rebuild card (.vo-rb) missing")
+    if 'class="vo-nb-pill"' not in html:
+        bad.append("video/index.html: the full screen name pill (.vo-nb-pill) missing")
+    if "vo-rb" in html or "vo-rb" in (SITE / "css" / "video.css").read_text(encoding="utf-8") or "rbCard" in (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8"):
+        bad.append("video/index.html / css / js: the rebuild card (.vo-rb, rbCard) is dropped: submit rebuilds at once")
     css = (SITE / "css" / "video.css").read_text(encoding="utf-8")
     if "@keyframes vo-nb-pulse" not in css or "[data-vo-full] .vo-nb-pill" not in css or "--nb-h" not in css:
         bad.append("css/video.css: hint pulse (@keyframes vo-nb-pulse), [data-vo-full] .vo-nb-pill, the --nb-h room under the stage missing")

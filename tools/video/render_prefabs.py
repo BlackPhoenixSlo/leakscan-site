@@ -18,7 +18,7 @@ Per prefab ID (google, google-images, x, reddit, mega, cta-steps) in OUT_DIR:
   ID-in.png / ID-snap.png / ID-burst.png / ID-out.png   mid pop-in (0.1 s) / mid shake (2.5 s) / confetti (4.0 s) /
                   mid slide-out (5.8 s), stills from ID-green.mp4
   cta-steps: cta-steps-step1/2/3.png (state=, 2.2 / 3.9 / 7.2 s) + -in / -typing / -scanning / -flip.png (0.1 / 1.0 / 3.6 / 6.2 s)
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/render_prefabs.py OUT_DIR [--name X] [--keep-frames]
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/render_prefabs.py OUT_DIR [--name X] [--only ID] [--keep-frames]
 Needs ffmpeg with prores_ks + libx264."""
 import argparse, pathlib, shutil, subprocess, sys, urllib.parse
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -42,6 +42,7 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--name")
     ap.add_argument("--keep-frames", action="store_true")
+    ap.add_argument("--only", choices=PREFABS, help="render just this prefab")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -51,7 +52,7 @@ def main():
         ctx = b.new_context(viewport={"width": W, "height": H})
         pg = ctx.new_page()
         ready = "() => window.VideoOverlays && [...document.images].every(i => i.complete) && document.fonts.status === 'loaded'"
-        for pid in PREFABS:
+        for pid in [a.only] if a.only else PREFABS:
             if a.name and pid in GENERIC_ONLY:
                 print(pid, "skipped (generic only)")
                 continue

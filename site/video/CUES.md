@@ -43,16 +43,15 @@ leak is gone.
 |---|---|---|
 | take | `jack.mp4` (Script A) | `jack-named.mp4` (Script B) if the server has it (HEAD probe), else `jack.mp4` |
 | texts | "Your name" (search box, posts, after state `yourname.com`) | her name / scan texts + scan thumbs |
-| speech | none | her name at `data-cue-say-start` (0.3 s, in Script B's 1.5 s opening gap) and at `data-cue-say` (end), each once, + "for <name>" pill 2 s |
-| end | `cta-steps`: the "Type your name in the link → this video rebuilds with YOUR leaks" card at `data-cue-cta` (default `data-cue-say`), stays: 3 steps on an 8 s loop from its cue (1 "Type your name": a mock input types the name letter by letter, the viewer's own once typed in the form; 2 "Run the free scan": bar + "Scanning Google · X · Reddit · Mega…", "N leaks found" rolls to 37; 3 "Rewatch this video with YOUR content": a mini of this page flips "Your name" → the name with a pop), still looping after the take ends; under it the real form = the name bar's rebuild (below) | the pill (never the steps) |
+| speech | none | her name at `data-cue-say-start` (0.3 s, in Script B's 1.5 s opening gap) and at `data-cue-say` (end), each once, + "for <name>" pill (2 s at the start; from `data-cue-say` it stays to the end and after the take ends: the name on the last frame) |
+| end | `cta-steps`: the "Type your name in the link → this video rebuilds with YOUR leaks" card at `data-cue-cta` (default `data-cue-say`), stays: 3 steps on an 8 s loop from its cue (1 "Type your name": the landing's scan box (pill input + orange "Scan now" pill, site `--accent`) types "Jaka Basej" letter by letter, the viewer's own once typed in the form, then "Scan now" is pressed; 2 "Run the free scan": bar + "Searching Google, step N of 9…" walking Google → Google Images → X → Reddit → Mega, "N links found" rolls to 87; 3 "Rewatch this video with YOUR content": a mini of this page flips "Your name" → the name with a pop), still looping after the take ends; under it the real form = the name bar's rebuild (below) | the pill (never the steps) |
 
 **Name bar** (both modes, under the stage; full screen / theater: a "Your name" pill top-left opens it): generic =
 "Your name" input (1-40 letters / digits / space . - _, textContent only) + "Rebuild this video with my name", a pulsing
 yellow "👇 type your name" pill on it from 0 s until the first focus (Script A line 9 points at it). Submit (or the end
 card's form, same function) = in place, no reload: named mode, every prefab re-personalized, cta-steps off, "for <name>"
-pill + both say cues armed, `?name=` via `history.replaceState`, a 1.2 s "REBUILDING FOR <NAME>…" card (glitch +
-scanlines + pop) over the right half with the video paused, then `jack-named.mp4` (else `jack.mp4`) restarts from 0,
-playing (the submit is the gesture). Then the bar reads "Rebuilt for <name>" + Change (the input again) / Reset (generic,
+pill + both say cues armed, `?name=` via `history.replaceState`, a pop, and at once (no interstitial card)
+`jack-named.mp4` (else `jack.mp4`) restarts from 0, playing (the submit is the gesture). Then the bar reads "Rebuilt for <name>" + Change (the input again) / Reset (generic,
 URL without query, restart). `?name=` on load works as before.
 
 Script B is Script A with a 1.5 s silent gap before line 1 and its own line 9, so while `jack-named.mp4` plays every

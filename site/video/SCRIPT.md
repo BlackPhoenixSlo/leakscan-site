@@ -39,7 +39,7 @@ After recording: `tools/video/cues_from_take.py` (CUES.md) reads these key words
 | 6 | "**Reddit**. Leaks."; removed on "**Nothing**" | `reddit` | 22.8 | – | 24.2 | 26.2 |
 | 7 | "**Mega** folders"; removed on "**Gone** in a day" | `mega` | 26.2 | – | 29.6 | 31.8 |
 | 8 | – | none | – | – | – | – |
-| 9 | last word's end + 0.5 | A: `cta-steps`, the "Type your name" end card (`data-cue-cta`, default `data-cue-say`): 3 steps on an 8 s loop (1 types a name, 2 scans "… 37 leaks found", 3 a mini of this page flips "Your name" → the name) over the real form; CapCut: `cta-steps.mov`. B: the name spoken + pill (`data-cue-say`), no steps | 40.5 | – | – | stays, loops past the end (pill 2 s) |
+| 9 | last word's end + 0.5 | A: `cta-steps`, the "Type your name" end card (`data-cue-cta`, default `data-cue-say`): 3 steps on an 8 s loop (1 the landing's scan box types "Jaka Basej" + "Scan now", 2 "Searching Google, step N of 9…" → "87 links found", 3 a mini of this page flips "Your name" → the name) over the real form; CapCut: `cta-steps.mov`. B: the name spoken + pill (`data-cue-say`), no steps | 40.5 | – | – | stays, loops past the end (B: the pill stays past the end too) |
 
 Rules: live = 0.3 s before the platform word; removed = the word right after the snap; out = the next platform word
 − 0.2 s (mega: end of "Gone in a day" + 0.5), at least removed + 1.95 s; the next card comes in no earlier than the
