@@ -4,10 +4,12 @@ stdlib only. `serve(handler, path)` answers GET/HEAD (public_app routes only tho
   - resolves under SITE_DIR only (realpath + prefix check; dot-segments and NUL rejected)
   - directory -> index.html (`/scan` -> 301 `/scan/` so relative links resolve)
   - missing -> site/404.html with status 404; never a directory listing
-  - html: `Cache-Control: no-cache`; assets: `public, max-age=86400`
+  - html / js / css: `Cache-Control: no-cache` (+ Last-Modified, If-Modified-Since → 304: a deploy reaches returning
+    visitors at once, script tags carry no version); other assets: `public, max-age=86400`
   - one `Range: bytes=a-b` → 206 (+ Accept-Ranges): Safari plays <video> only with it, and seeking needs it
 Returns False only when SITE_DIR is missing (caller falls back to its own routes).
 """
+import email.utils
 import os
 import re
 import sys
@@ -80,7 +82,13 @@ def _range(h, size):
 
 def _send(h, code, full, cache):
     ctype = TYPES.get(os.path.splitext(full)[1].lower(), "application/octet-stream")
-    size = os.path.getsize(full)
+    size, mtime = os.path.getsize(full), int(os.path.getmtime(full))
+    try:
+        since = email.utils.parsedate_to_datetime(h.headers.get("If-Modified-Since")).timestamp()
+    except (TypeError, ValueError, IndexError):
+        since = None
+    if code == 200 and since is not None and mtime <= since:
+        return _plain(h, 304, "", {"Cache-Control": cache, "Last-Modified": email.utils.formatdate(mtime, usegmt=True)})
     rng = _range(h, size) if code == 200 else None
     if rng is False:
         return _plain(h, 416, "Range not satisfiable", {"Content-Range": f"bytes */{size}"})
@@ -94,6 +102,7 @@ def _send(h, code, full, cache):
         if rng:
             h.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         h.send_header("Cache-Control", cache)
+        h.send_header("Last-Modified", email.utils.formatdate(mtime, usegmt=True))
         h.send_header("X-Content-Type-Options", "nosniff")
         h.end_headers()
         if h.command != "HEAD":
@@ -133,8 +142,7 @@ def serve(h, path):
         q = urllib.parse.urlsplit(h.path).query
         _plain(h, 301, "Moved", {"Location": redirect + ("?" + q if q else "")})
     elif full:
-        html = full.endswith(".html")
-        _send(h, 200, full, "no-cache" if html else "public, max-age=86400")
+        _send(h, 200, full, "no-cache" if full.endswith((".html", ".js", ".css")) else "public, max-age=86400")
     elif os.path.isfile(os.path.join(SITE_DIR, "404.html")):
         _send(h, 404, os.path.join(SITE_DIR, "404.html"), "no-cache")
     else:

@@ -2389,6 +2389,16 @@ def tabs_flow(browser, vp_name, vp):
     check(f"{tag} videos: video stills only after every real image (strip; images[]' leading still moved back), none if photos fill it",
           any(u in vids for u in BROKEN["images"][:1]) and vs == sorted(vs) and st["strip"][:1] != BROKEN["images"][:1], [sum(vs), len(vs)])
     shot(page, "1-card-images-broken-removed", ".report-card")
+    # #free band Videos rows: a logo still (no person photo) leaves its 16:9 box grey + play mark, the row stays
+    page.locator("#free").scroll_into_view_if_needed()
+    page.locator("#mt-free-videos").click()
+    page.wait_for_timeout(1500)
+    BV = [r for r in BROKEN["results"] if is_video(r)][:3]
+    bv = page.evaluate("""() => [...document.querySelectorAll('[data-live=band-videos] a.m-link')].map(a => { const i = a.querySelector('.m-vthumb img');
+        return [a.href, i ? (i.complete && i.naturalWidth >= 16) : null, !!a.querySelector('.m-vthumb .m-play')]; })""")
+    check(f"{tag} videos: #free Videos rows: logo still dropped (grey box + play kept, row stays), the rest painted",
+          [x[0] for x in bv] == [r["link"] for r in BV] and [x[1] for x in bv] == [None if dead_thumb(r.get("thumb") or "DEAD") else True for r in BV]
+          and all(x[2] for x in bv) and any("LOGO" in (r.get("thumb") or "") for r in BV), bv)
     # the same report on the scan page: failed tiles leave its Images grid too
     ctx.close()
     ctx = new_ctx()
@@ -2399,6 +2409,14 @@ def tabs_flow(browser, vp_name, vp):
     page.wait_for_timeout(1500)
     sp = page.evaluate("() => [...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16])")
     check(f"{tag} thumbs: scan page Images grid: failed / blank tiles removed, the rest painted", sp and all(ok for _u, ok in sp) and not any(dead_thumb(u) for u, _ok in sp), [u[-24:] for u, ok in sp if not ok][:4])
+    page.locator("#g-tab-videos").click()
+    page.wait_for_timeout(1500)
+    VS = [r for r in BROKEN["results"] if r.get("kind") == "video"]
+    sv = page.evaluate("() => [...document.querySelectorAll('#g-panel .g-v .g-vthumb')].map(a => { const i = a.querySelector('img'); return [a.href, i ? (i.complete && i.naturalWidth >= 16) : a.querySelector('.g-img-none') ? null : false]; })")
+    check(f"{tag} videos: scan page Videos tab: logo still → grey box (row stays, count honest), the rest painted",
+          [x[0] for x in sv] == [r["link"] for r in VS[:len(sv)]] and len(sv) == min(5 if vp_name == "phone" else 8, len(VS))
+          and [x[1] for x in sv] == [None if dead_thumb(r.get("thumb") or "DEAD") else True for r in VS[:len(sv)]]
+          and any("LOGO" in (r.get("thumb") or "") for r in VS[:len(sv)]), sv)
     ctx.close()
     if vp_name == "desktop":   # desktop Images: every thumb answers late (after the tab is up): same-size tiles, nothing moves
         ctx = new_ctx()
