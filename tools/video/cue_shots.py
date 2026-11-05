@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Real-path proof for site/video/: serve site/ (Range-capable, tools/video/serve.py), open video/?name=NAME&t=<cue> at
 phone 390x844 and desktop 1440x900, wait until the <video> has seeked there, screenshot, and assert: only the cue's
-prefab is on screen, in the right state (wipe --p 100 live / 0 removed), NAME is in it, on desktop it sits in the
-bottom-right corner (left >= 60 % / top >= 45 % of the frame: Jack's face stays uncovered), no request leaves
-127.0.0.1, no console error. Each prefab is shot live (settled, <= live + 1.3 s) and removed (removed + 2 s).
+prefab is on screen, in the right state (wipe --p 100 live / 0 removed), NAME is in it, on desktop it sits on the
+right half, vertically centred (left >= 50 %, centre within 5 % of the middle: Jack on the left stays uncovered), no
+request leaves 127.0.0.1, no console error. Each prefab is shot live (settled, <= live + 1.3 s) and removed (removed + 2 s).
+After state (removed): google lists NAME's site (<name>.com) + instagram.com and no leak host; google-images shows >= 4
+loaded, unblurred photos of her own (not .rm-img), no "No results".
 Plus:
-- frame-1920-google-live.png: the full 1920x1080 frame (placeholder take + the google card, live) = the framing proof
+- frame-1920-google-live.png / frame-1920-google-images-removed.png: the full 1920x1080 frame = the framing proof
 - personalized (tools/scan_stub.py, ?r=demoRemove1): texts from the scan result in every prefab; every .rm-img = the
   scan's thumbs via <API>/api/thumb, loaded, still blurred; and ?name= keeps the default photos (img/removals)
 - speech (data-cue-say): speechSynthesis.speak stubbed (declared: no voice in headless), cue moved to 29.2 s (declared:
@@ -25,9 +27,24 @@ VIEWPORTS = {"phone": dict(viewport={"width": 390, "height": 844}, device_scale_
 SEEKED = ("t => { const v = document.querySelector('video'); return v.readyState >= 3 && !v.seeking"
           " && Math.abs(v.currentTime - t) < 0.05 }")
 # demoRemove1 (tools/scan_stub.py): what its scan result must put in the [data-vo] slots
-WANT_TEXT = {"name": "Mira Example", "x-at": "@demo_reposter", "x-l1": "Mira Example leaked full set", "sub": "r/demo_leaksub",
+WANT_TEXT = {"name": "Mira Example", "site": "miraexample.com", "ig": "mira.example", "tt": "mira.draws", "x-at": "@demo_reposter", "x-l1": "Mira Example leaked full set", "sub": "r/demo_leaksub",
              "rd-title": "Mira Example new pack in comments", "mega-title": "demo.creator MEGA pack 2026",
              "mega-meta": "6.2 GB · 412 images · 88 videos · 3 days ago"}
+OWN = "() => [...document.querySelectorAll('.vo-own')].map(i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter])"
+# the after layer of the visible prefab: [text, [[src, naturalWidth, filter] of its <img>]]
+AFTER = """() => { const g = [...document.querySelectorAll('.vo-pf')].find(e => !e.hasAttribute('data-off')).querySelector('.rm-gone');
+  return [g.textContent.replace(/\\s+/g, ' '), [...g.querySelectorAll('img')].map(i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter, i.classList.contains('rm-img')])]; }"""
+LEAK_HOSTS = re.compile(r"\.example\b|leak|pirate|forum-dump|free-galleries", re.I)
+
+
+def after_ok(pid, name, txt, imgs):
+    site = re.sub(r"[^a-z0-9-]", "", name.lower()) + ".com"
+    if pid == "google":
+        return site in txt and "instagram.com" in txt and not LEAK_HOSTS.search(txt)
+    own = [i for i in imgs if i[1] > 0 and i[2] == "none" and not i[3]]
+    return len(own) >= 4 and "No results" not in txt and site in txt and "Instagram" in txt and not LEAK_HOSTS.search(txt)
+
+
 IMGS = "() => [...document.querySelectorAll('.rm-img')].map(i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter])"
 SAY_STUB = """window.__said = []; if ('speechSynthesis' in window) speechSynthesis.speak = u => { const v = document.querySelector('video');
   __said.push([u.text, v.currentTime, v.volume, u.rate, u.lang]); setTimeout(() => u.onend && u.onend(), 400); };"""
@@ -78,15 +95,22 @@ def personalized(b, out, break_thumbs):
         im = pg.evaluate(IMGS)
         check(f"personalized ?r=demoRemove1: all {len(im)} .rm-img = scan thumbs via {api}/api/thumb, loaded, blurred",
               len(im) == 13 and all(s.startswith(api + "/api/thumb?u=") and w > 0 and "blur(" in f for s, w, f in im), im[:3])
+        own = pg.evaluate(OWN)
+        check(f"personalized ?r=demoRemove1: the {len(own)} after photos stay the landing after-phone's (assets/phone), unblurred",
+              len(own) == 6 and all(s.startswith("../assets/phone/") and w > 0 and f == "none" for s, w, f in own), own[:3])
         # evidence shots via the solo view (the stub has no Range, so the page's <video> can't seek to a cue)
-        for pid in ("google-images", "x"):
-            pg.goto(f"{base}video/?prefab={pid}&state=live&r=demoRemove1")
+        for pid, state in (("google-images", "live"), ("x", "live"), ("google", "removed"), ("google-images", "removed")):
+            pg.goto(f"{base}video/?prefab={pid}&state={state}&r=demoRemove1")
             try:
                 pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete && i.naturalWidth > 0 && i.src.includes('/api/thumb'))", timeout=8000)
             except Exception:
                 pass
             pg.wait_for_timeout(800)   # decode + paint of the blurred thumbs
-            pg.screenshot(path=str(out / f"desktop-personalized-demoRemove1-{pid}-live.png"))
+            pg.screenshot(path=str(out / f"desktop-personalized-demoRemove1-{pid}-{state}.png"))
+            if state == "removed":
+                txt, imgs = pg.evaluate(AFTER)
+                check(f"personalized ?r=demoRemove1: {pid} after state = miraexample.com + Instagram, no leak host",
+                      after_ok(pid, "miraexample", txt, imgs) and ("mira.example" in txt or pid == "google-images"), txt)
         check("personalized: no request outside the stub, no JS error", not ext and not errs, (ext, errs))
         ctx.close()
     finally:
@@ -162,12 +186,18 @@ def main():
                     vis = [s[0] for s in st]
                     ok = vis == [pid] and float(st[0][1]) == (100 if state == "live" else 0) and a.name in st[0][2]
                     box = [round(x, 3) for x in st[0][3]] if st else None
-                    corner = vp == "phone" or (box and box[0] >= .6 and box[1] >= .45 and box[2] <= 1 and box[3] <= 1)
+                    corner = vp == "phone" or (box and box[0] >= .5 and box[1] >= 0 and box[2] <= 1 and box[3] <= 1
+                                               and abs((box[1] + box[3]) / 2 - .5) <= .05)
                     print(f"{vp} t={t:g} {pid} {state}: visible={vis} p={[s[1] for s in st]} box={box} -> {shot.name}")
                     if not ok:
                         check(f"{vp} t={t:g}: only {pid} {state} with {a.name!r}", False, [(s[0], s[1]) for s in st])
                     if not corner:
-                        check(f"{vp} t={t:g}: {pid} in the bottom-right corner (left >= .6, top >= .45 of the frame)", False, box)
+                        check(f"{vp} t={t:g}: {pid} on the right half, vertically centred (left >= .5, centre .5 +- .05)", False, box)
+                    if state == "removed" and pid in ("google", "google-images"):
+                        txt, imgs = pg.evaluate(AFTER)
+                        check(f"{vp} t={t:g}: {pid} after state = {a.name}'s site + Instagram"
+                              + (", >= 4 unblurred own photos" if pid == "google-images" else "") + ", no leak host",
+                              after_ok(pid, a.name, txt, imgs), (txt[:160], imgs[:2]))
             check(f"{vp}: no console errors", not errs, errs)
             check(f"{vp}: no requests outside the local server", not ext, sorted(set(ext)))
             if vp == "desktop":   # defaults stay for ?name= (no scan photos without a scan)
@@ -175,16 +205,17 @@ def main():
                 check(f"?name={a.name}: all {len(im)} .rm-img keep the default photos (img/removals), blurred",
                       len(im) == 13 and all(s.startswith("../img/removals/") and "blur(" in f for s, w, f in im), im[:3])
             ctx.close()
-        # the framing proof: the whole 1920x1080 frame, google card live
+        # the framing proof: the whole 1920x1080 frame (google live, google-images removed)
         ctx = b.new_context(viewport={"width": 1920, "height": 1080})
         pg = ctx.new_page()
-        g = next(c for c in cues if c[0] == "google")
-        t = g[1] + 1
-        pg.goto(f"{base}video/?name={a.name}&t={t:g}")
-        pg.wait_for_function(SEEKED, arg=t, timeout=15000)
-        pg.wait_for_timeout(1500)
-        pg.locator(".vo-stage").screenshot(path=str(out / "frame-1920-google-live.png"))
-        print(f"framing proof t={t:g} -> frame-1920-google-live.png")
+        for pid, state in (("google", "live"), ("google-images", "removed")):
+            c = next(c for c in cues if c[0] == pid)
+            t = c[1] + 1 if state == "live" else min(c[2] + 2.0, c[3] - 0.45)
+            pg.goto(f"{base}video/?name={a.name}&t={t:g}")
+            pg.wait_for_function(SEEKED, arg=t, timeout=15000)
+            pg.wait_for_timeout(1500)
+            pg.locator(".vo-stage").screenshot(path=str(out / f"frame-1920-{pid}-{state}.png"))
+            print(f"framing proof t={t:g} -> frame-1920-{pid}-{state}.png")
         ctx.close()
         speech(b, base, a.name)
         personalized(b, out, a.break_thumbs)

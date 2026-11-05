@@ -5,6 +5,9 @@
   data-cue-removed < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending);
   room for the animations (js/video-overlays.js): removed - live >= 0.4 s slide-in (google-images: >= 1.2 s, its tap +
   grid), out - removed >= 1.95 s (wipe 1.2 + stamp 0.35 + slide-out 0.4)
+- after state (the .rm-gone layer) = the landing after-phone: google lists her site (data-vo=site) + instagram.com, no
+  leak host (*.example, data-vo=host); google-images shows >= 4 of her own photos (<img>, not the blurred .rm-img) and no
+  "No results" / copyright notice
 - .vo-stage has a numeric data-cue-say after the last prefab's out (the spoken name)
 - the page is noindex and not in sitemap.xml
 - no external requests: no http(s):// or protocol-relative src/href/poster in the page, no http(s):// URL in
@@ -45,10 +48,30 @@ class P(HTMLParser):
                 self.refs.append((tag, k, a[k]))
 
 
+def gone_layer(html, pid):
+    """the inner HTML of prefab pid's after layer (.rm-gone … up to its .rm-handle), '' if missing"""
+    m = re.search(r'data-prefab="%s".*?class="rm-layer rm-gone[^"]*">(.*?)<span class="rm-handle">' % re.escape(pid), html, re.S)
+    return m.group(1) if m else ""
+
+
+def after_state(html):
+    bad = []
+    g = gone_layer(html, "google")
+    if re.search(r"\.example\b|data-vo=\"host\"", g) or 'data-vo="site"' not in g or "instagram.com" not in g:
+        bad.append("video/index.html: google after state must list her site (data-vo=site) + instagram.com and no leak host")
+    gi = gone_layer(html, "google-images")
+    own = [i for i in re.findall(r"<img\b[^>]*>", gi) if "rm-img" not in i]
+    if len(own) < 4 or re.search(r"No results|Digital Millennium", gi):
+        bad.append(f"video/index.html: google-images after state needs >= 4 unblurred photos (got {len(own)}), no 'No results' / notice")
+    return bad
+
+
 def main():
     bad = []
     p = P()
-    p.feed(PAGE.read_text(encoding="utf-8"))
+    html = PAGE.read_text(encoding="utf-8")
+    p.feed(html)
+    bad += after_state(html)
     ids = [a.get("data-prefab") for a in p.prefabs]
     if ids != ORDER:
         bad.append(f"video/index.html: prefabs {ids}, want {ORDER}")
