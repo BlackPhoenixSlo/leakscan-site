@@ -444,7 +444,8 @@ def huge_flow(browser, vp_name, vp):
           (rows(), page.locator("#lx-list a").count(), page.locator("#lx-more").inner_text()))
     first = page.locator("#lx-list .lx-name").first.inner_text()
     check(f"{tag} biggest site first", first == HUGE_TOP, first)
-    check(f"{tag} no thumbnail fetched beyond the first screen (lazy)", len(thumbs) <= 8, len(thumbs))
+    thumbs0 = len(thumbs)   # at load, before any scroll / tab / reopen
+    check(f"{tag} no thumbnail fetched beyond the first screen (lazy)", thumbs0 <= 8, thumbs0)
 
     # 2. the scroll story: summary → pinned phone (screen scrolls 1:1) → the sites
     if phone:
@@ -594,7 +595,7 @@ def huge_flow(browser, vp_name, vp):
     check(f"{tag} no request left loopback", not outside, outside)
     check(f"{tag} no JS / console errors", not errors, errors)
     (out / f"{vp_name}-huge-metrics.json").write_text(json.dumps({"render_ms": round(ms), "reopen_ms": round(ms2), "dom_elements": nodes,
-                                                                  "wheel_steps_to_sites": steps, "cls": [cls[0][0], cls[1][0]], "thumbs_at_load": len(thumbs)}))
+                                                                  "wheel_steps_to_sites": steps, "cls": [cls[0][0], cls[1][0]], "thumbs_at_load": thumbs0, "thumbs_total": len(thumbs)}))
     ctx.close()
     if phone:   # a screen too short to pin the phone (landscape): the frame scrolls with the page, its screen by itself
         ctx = browser.new_context(viewport={"width": 390, "height": 560}, device_scale_factor=2, is_mobile=True, has_touch=True)
