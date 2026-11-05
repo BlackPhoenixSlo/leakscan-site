@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs]
-        [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals]
+        [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-remove]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs three scenarios.
@@ -49,6 +49,15 @@ on click and keys without moving anything, the demo pops out to a full-screen la
 focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the #free phone: same
 tabs, the illustration without a scan, her handle / rows / tiles / videos + Reveal with ?r=; no horizontal overflow.
 Screenshots: <vp>-t*.png. --break-thumbs serves inline-scan.js with the drop disabled: only `thumbs:` checks may go red.
+
+removals (js/removals.js, the #removals "Where I remove from" panels): section placed after #faq and directly before
+#contact; demo defaults (Orla Brennick); leak-side images blurred by default (+ Reveal); Remove flips all 4 panels
+(Mega / X / Reddit / leak site) to their removed state and Show again back, with zero layout shift; a drag on the stage
+moves the compare edge + clip; arrow keys on the handle; reduced motion = no transition; no horizontal overflow (390);
+?r=demoRemove1 personalizes from the backend's top-level `mega` list + x.com / reddit.com / top other host hits, thumbs via
+/api/thumb, still blurred, no URL rendered; no mega[] → demo fallback; evil values dropped. Screenshots of every panel
+live + removed, light + dark. --break-remove serves removals.js without the Remove click handler: only `toggle:` checks
+may go red.
 """
 import base64
 import json, pathlib, re, socket, subprocess, sys, time, urllib.request
@@ -61,11 +70,12 @@ out = pathlib.Path(sys.argv[1]).expanduser()
 out.mkdir(parents=True, exist_ok=True)
 omit = "--omit-results" in sys.argv
 omit_profile = "--omit-profile" in sys.argv
-SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai", "inline", "tabs"]
+SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai", "inline", "tabs", "removals"]
 BREAK_ALLOWLIST = "--break-allowlist" in sys.argv
 BREAK_DRIFT = "--break-drift" in sys.argv
 BREAK_PHONES = "--break-phones" in sys.argv
 BREAK_THUMBS = "--break-thumbs" in sys.argv
+BREAK_REMOVE = "--break-remove" in sys.argv
 GS_RE = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 PEOPLE = {"imgs/portrait.webp", "imgs/hero-wide.webp", "imgs/studio-portrait.webp"}   # showcase hero defaults: Pexels people photos (tools/showcase/CREDITS.md)
 
@@ -1966,6 +1976,200 @@ def tabs_flow(browser, vp_name, vp):
     check(f"{tag} no request left loopback but the demo's aborted Google Fonts", hosts <= FONT_HOSTS, sorted(hosts))
     check(f"{tag} no JS errors, no console errors (the stub's 404 thumbs aside)", not net["errors"] and not net["console"], net["errors"] + net["console"])
 
+# ---------- removals (js/removals.js, css/removals.css: the #removals "Where I remove from" panels) ----------
+RM_PANELS = ("mega", "x", "reddit", "site")
+RM_STATE = """() => { const y0 = scrollY, out = [...document.querySelectorAll('#removals .rm-card')].map(c => {
+  const s = c.querySelector('.rm-stage'), b = c.querySelector('.rm-btn');
+  s.scrollIntoView({block: 'center', behavior: 'instant'});
+  const r = s.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width * .75, r.top + r.height / 2), cb = c.getBoundingClientRect();
+  return {k: c.dataset.rm, p: c.querySelector('.rm-handle').getAttribute('aria-valuenow'), pressed: b.getAttribute('aria-pressed'),
+    label: b.textContent, clip: getComputedStyle(c.querySelector('.rm-gone')).clipPath,
+    shown: top && top.closest('.rm-gone') ? 'gone' : top && top.closest('.rm-live') ? 'live' : String(top && top.className),
+    box: [r.x, r.y + scrollY, r.width, r.height].map(Math.round), card: [cb.x, cb.y + scrollY, cb.width, cb.height].map(Math.round)}; });
+  scrollTo({top: y0, behavior: 'instant'}); return out; }"""
+RM_TEXT = """() => Object.fromEntries([...document.querySelectorAll('#removals [data-rm-k]')].map(e => [e.dataset.rmK, e.textContent]))"""
+
+
+def removals_flow(browser, vp_name, vp):
+    tag = f"{vp_name} removals:"
+    net = {"outside": [], "errors": [], "results": [], "dialogs": []}
+
+    def new_ctx(scheme="light", motion="no-preference"):
+        ctx = browser.new_context(viewport=vp, device_scale_factor=2 if vp_name == "phone" else 1, is_mobile=vp_name == "phone",
+                                  has_touch=vp_name == "phone", color_scheme=scheme, reduced_motion=motion)
+        ctx.add_init_script("window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value, e.hadRecentInput]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}")
+
+        def route(r, _req):
+            if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost"):
+                r.continue_()
+            else:
+                net["outside"].append(r.request.url)
+                r.abort()
+        ctx.route("**/*", route)
+        if BREAK_REMOVE:   # wire boundary: removals.js served with the Remove click handler gone (same bytes otherwise)
+            body = (ROOT / "site" / "js" / "removals.js").read_text(encoding="utf-8")
+            old = "card.querySelector('.rm-btn').addEventListener('click',"
+            assert old in body, "break: marker not found in removals.js"
+            ctx.route("**/js/removals.js", lambda r: r.fulfill(body=body.replace(old, "(function () {})(", 1), content_type="application/javascript"))
+
+        def on_page(pg):
+            pg.on("pageerror", lambda e: net["errors"].append(str(e)))
+            pg.on("dialog", lambda d: (net["dialogs"].append(d.message), d.dismiss()))
+            pg.on("request", lambda q: "/api/scan-result/" in q.url and net["results"].append(q.url))
+        ctx.on("page", on_page)
+        return ctx
+
+    def open_(ctx, q=""):
+        page = ctx.new_page()
+        page.goto(base + q, wait_until="load")
+        page.locator("#removals .section-head").scroll_into_view_if_needed()
+        page.locator("#removals .rm-grid").scroll_into_view_if_needed()
+        page.wait_for_timeout(700)
+        return page
+
+    def settled_imgs(page):
+        try:
+            page.wait_for_function("() => [...document.querySelectorAll('#removals .rm-img')].every(i => i.complete && i.naturalWidth > 0)", timeout=6000)
+        except Exception:
+            pass
+
+    for scheme in ("light", "dark"):
+        ctx = new_ctx(scheme)
+        page = open_(ctx)
+        order = page.evaluate("() => { const r = document.getElementById('removals'); return [r && r.previousElementSibling && r.previousElementSibling.id, r && r.nextElementSibling && r.nextElementSibling.id, r && r.closest('main') && r.closest('main').id]; }")
+        if scheme == "light":
+            check(f"{tag} section sits after #faq, directly before #contact, inside <main>", order == ["faq", "contact", "main"], order)
+            t = page.evaluate(RM_TEXT)
+            check(f"{tag} defaults: demo creator (Orla Brennick / brennickclay) in every panel",
+                  t.get("name") == "Orla Brennick" and t.get("mega-title") == "brennickclay – pack" and t.get("x-l1") == "Orla Brennick leaked"
+                  and t.get("album") == "Orla Brennick – album" and t.get("host") == "leak-mirror.example", t)
+            outs = page.eval_on_selector_all("#removals .rm-out", "es => es.map(e => e.textContent)")
+            check(f"{tag} one outcome line per panel", outs == ["Mega: folder disabled", "X: media disabled after copyright report",
+                                                             "Reddit: removed on copyright notice", "Leak sites: album deleted or 404"], outs)
+            check(f"{tag} no links in the section (mock-ups only)", page.locator("#removals a").count() == 0)
+        settled_imgs(page)
+        blur = page.eval_on_selector_all("#removals .rm-img", "es => es.map(e => [e.getAttribute('src'), getComputedStyle(e).filter, e.naturalWidth])")
+        check(f"{tag} {scheme}: every leak-side image blurred by default, loaded from site/img", len(blur) == 10 and all(
+            "blur(" in b[1] and b[0].startswith("img/removals/") and b[2] > 0 for b in blur), blur)
+        sw = page.evaluate("() => [document.documentElement.scrollWidth, innerWidth, Math.max(...[...document.querySelectorAll('#removals *')].map(e => e.parentElement.closest('.rm-stage') ? 0 : e.getBoundingClientRect().right))]")
+        check(f"{tag} {scheme}: no horizontal overflow", sw[0] <= sw[1] and sw[2] <= sw[1] + 0.5, sw)
+        cols = page.evaluate("() => new Set([...document.querySelectorAll('#removals .rm-card')].map(c => Math.round(c.getBoundingClientRect().x))).size")
+        check(f"{tag} {scheme}: layout {'stacked' if vp_name == 'phone' else '2x2'}", cols == (1 if vp_name == "phone" else 2), cols)
+        before = page.evaluate(RM_STATE)
+        check(f"{tag} {scheme}: starts live (edge at 100, removed layer clipped away)", all(
+            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Remove" and s["shown"] == "live" for s in before), before)
+        for k, card in zip(RM_PANELS, page.locator("#removals .rm-card").all()):
+            card.screenshot(path=str(out / f"removals-{vp_name}-{scheme}-{k}-1-live.png"))
+        page.evaluate("() => { window.__ls.length = 0; }")
+        for b in page.locator("#removals .rm-btn").all():
+            b.click()
+        page.wait_for_timeout(1000)
+        after = page.evaluate(RM_STATE)
+        check(f"{tag} {scheme}: toggle: Remove flips all 4 panels to removed (edge 0, removed layer on top, 'Show again')",
+              [s["k"] for s in after] == list(RM_PANELS) and all(s["p"] == "0" and s["pressed"] == "true" and s["label"] == "Show again"
+                                                               and s["shown"] == "gone" and s["clip"] == "inset(0px 0px 0px 0%)" for s in after), after)
+        ls = page.evaluate("() => window.__ls.filter(e => !e[2]).reduce((a, e) => a + e[1], 0)")
+        check(f"{tag} {scheme}: CLS 0 on toggle, stage + card boxes unchanged", ls == 0 and [s["box"] + s["card"] for s in before] == [s["box"] + s["card"] for s in after],
+              f"cls={ls}")
+        for k, card in zip(RM_PANELS, page.locator("#removals .rm-card").all()):
+            card.screenshot(path=str(out / f"removals-{vp_name}-{scheme}-{k}-2-removed.png"))
+        page.locator("#removals .rm-btn").first.click()
+        page.wait_for_timeout(1000)
+        back = page.evaluate(RM_STATE)[0]
+        check(f"{tag} {scheme}: toggle: Show again puts the leak back", back["p"] == "100" and back["shown"] == "live" and back["label"] == "Remove", back)
+        if scheme == "light":
+            # drag: grab the stage near its right edge, pull to 30 %
+            st = page.locator('#removals .rm-card[data-rm="x"] .rm-stage')
+            st.scroll_into_view_if_needed()
+            r = st.bounding_box()
+            y = r["y"] + r["height"] * .4
+            page.mouse.move(r["x"] + r["width"] - 4, y)
+            page.mouse.down()
+            for f in (.8, .6, .45, .3):
+                page.mouse.move(r["x"] + r["width"] * f, y, steps=3)
+            page.mouse.up()
+            d = page.evaluate(RM_STATE)[1]
+            check(f"{tag} drag moves the edge and the clip (left = leak, right = removed)", 27 <= int(d["p"]) <= 33
+                  and d["clip"] == f"inset(0px 0px 0px {d['p']}%)" and d["shown"] == "gone", d)
+            st.screenshot(path=str(out / f"removals-{vp_name}-drag-x-30.png"))
+            page.locator('#removals .rm-card[data-rm="x"] .rm-handle').focus()
+            page.keyboard.press("End")
+            k1 = page.evaluate(RM_STATE)[1]
+            page.keyboard.press("ArrowLeft")
+            k2 = page.evaluate(RM_STATE)[1]
+            check(f"{tag} keyboard on the handle: End = all leak, ArrowLeft steps 10", k1["p"] == "100" and k2["p"] == "90", [k1["p"], k2["p"]])
+            page.locator("#removals .rm-reveal").click()
+            page.wait_for_timeout(500)   # filter transition .25s
+            rv = page.eval_on_selector_all("#removals .rm-img", "es => es.map(e => getComputedStyle(e).filter)")
+            check(f"{tag} Reveal unblurs, Blur images re-blurs", all(f == "none" for f in rv) and page.locator("#removals .rm-reveal").inner_text().strip() == "Blur images")
+            page.locator("#removals .rm-reveal").click()
+        ctx.close()
+
+    # reduced motion: no transition, the flip is immediate
+    ctx = new_ctx(motion="reduce")
+    page = open_(ctx)
+    page.locator("#removals .rm-btn").first.click()
+    rm = page.evaluate("() => [getComputedStyle(document.querySelector('#removals .rm-gone')).transitionDuration, document.querySelector('#removals .rm-handle').getAttribute('aria-valuenow')]")
+    check(f"{tag} toggle: reduced motion flips with no transition", rm == ["0s", "0"], rm)
+    ctx.close()
+
+    # personalized: ?r=<slug> (shared scan-result request), the backend's mega[], x / reddit / leak-site hits, thumbs still blurred
+    MEGA = {"title": "demo.creator MEGA pack 2026", "meta": "6.2 GB · 412 images · 88 videos · 3 days ago"}
+    top_leak = top_domains(FX["hits"])[0]
+    for scheme in ("light", "dark"):
+        ctx = new_ctx(scheme)
+        net["results"].clear()
+        page = open_(ctx, "?r=demoRemove1")
+        try:
+            page.wait_for_function("() => document.getElementById('removals').getAttribute('data-rm-for') === 'demo.creator'", timeout=6000)
+        except Exception:
+            pass
+        settled_imgs(page)
+        t = page.evaluate(RM_TEXT)
+        if scheme == "light":
+            check(f"{tag} ?r=: personalized name + handle + mega title / size / counts", t.get("name") == FX["profile"]["display_name"]
+                  and t.get("mega-title") == MEGA["title"] and t.get("mega-meta") == MEGA["meta"] and t.get("mega-img") == "412 files"
+                  and t.get("mega-vid") == "88 files", t)
+            check(f"{tag} ?r=: x.com hit → X post, reddit.com hit → subreddit + title, top other host → leak-site chrome",
+                  t.get("x-at") == "@demo_reposter" and t.get("x-l1") == "Mira Example leaked full set" and t.get("sub") == "r/demo_leaksub"
+                  and t.get("rd-title") == "Mira Example new pack in comments" and t.get("host") == top_leak, t)
+            html = page.inner_html("#removals")
+            check(f"{tag} ?r=: no URL rendered, no links", "mega.nz/" not in html and "x.com/" not in html and "reddit.com/" not in html
+                  and page.locator("#removals a").count() == 0)
+            check(f"{tag} ?r=: one /api/scan-result request (shared with the hero card)", len(net["results"]) == 1, net["results"])
+        th = page.eval_on_selector_all("#removals .rm-img", "es => es.map(e => [e.getAttribute('src'), getComputedStyle(e).filter, e.naturalWidth])")
+        check(f"{tag} ?r= {scheme}: real thumbs via <API>/api/thumb, still blurred", all(
+            s[0].startswith(API + "/api/thumb?u=") and "blur(" in s[1] and s[2] > 0 for s in th), th[:2])
+        page.locator("#removals .rm-grid").screenshot(path=str(out / f"removals-{vp_name}-{scheme}-personalized-1-live.png"))
+        for b in page.locator("#removals .rm-btn").all():
+            b.click()
+        page.wait_for_timeout(1000)
+        page.locator("#removals .rm-grid").screenshot(path=str(out / f"removals-{vp_name}-{scheme}-personalized-2-removed.png"))
+        ctx.close()
+
+    # no mega[] / no x / reddit hits → demo shapes with her name; hostile values never reach the DOM
+    ctx = new_ctx()
+    page = open_(ctx, "?r=demoNoProf01")
+    try:
+        page.wait_for_function("() => document.getElementById('removals').getAttribute('data-rm-for') === 'demo.creator'", timeout=6000)
+    except Exception:
+        pass
+    t = page.evaluate(RM_TEXT)
+    check(f"{tag} no mega[]: fallback '<handle> – pack' + demo counts, her handle as name", t.get("mega-title") == "demo.creator – pack"
+          and t.get("mega-meta") == "4 GB · 369 images · 1069 videos · 7 minutes ago" and t.get("name") == "demo.creator"
+          and t.get("x-at") == "@leak.mirror" and t.get("sub") == "r/democreator_leaks", t)
+    page.goto(base + "?r=evilR3port01", wait_until="load")
+    page.wait_for_timeout(1500)
+    html = page.inner_html("#removals")
+    t = page.evaluate(RM_TEXT)
+    check(f"{tag} hostile mega[] dropped (no markup, no javascript:, no oversize)", "onerror" not in html and "javascript" not in html
+          and "xxxxx" not in html and page.locator("#removals img:not(.rm-img)").count() == 0 and not net["dialogs"], t.get("mega-meta"))
+    ctx.close()
+    hosts = {urlsplit(u).hostname for u in net["outside"]}
+    check(f"{tag} no request left loopback but the demo iframe's aborted Google Fonts, no JS errors", hosts <= FONT_HOSTS and not net["errors"],
+          sorted(hosts) + net["errors"])
+
+
 with socket.socket() as s:
     s.bind(("127.0.0.1", 0))
     port = s.getsockname()[1]
@@ -2014,6 +2218,8 @@ try:
                 thumb_paint(pw, vp_name, vp)
             if "tabs" in SCENARIOS:
                 tabs_flow(browser, vp_name, vp)
+            if "removals" in SCENARIOS:
+                removals_flow(browser, vp_name, vp)
         browser.close()
 finally:
     stub.terminate()
