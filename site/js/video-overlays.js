@@ -1,20 +1,26 @@
-// site/video/: overlay prefabs (Google, Google Images, X, Reddit, Mega) on the right half (Jack is on the left), driven by the face video's currentTime. Cues are the
-// data-cue-live / -removed / -out seconds on each .vo-pf (site/video/CUES.md, SCRIPT.md). draw(t) is a pure function of t (no CSS
-// transitions), so seeking, ?t= and frame-by-frame capture (tools/video/render_prefabs.py) all show the exact frame.
-// URL: ?name=<1-40 letters/digits/space . - _> (else the shared scan result: ?r= or the last scan, like #removals)
-//      ?t=<sec> seek · ?sfx=0 no sound · ?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none: one prefab, no video
-//      (?prefab=cta-steps&state=step1|step2|step3: the generic end card's phone take, 10 s, no form: the 6th CapCut clip).
-// Two modes (html[data-vo-mode]): "named" (?name= or a scan result: her texts, the name spoken, "for <name>" pill: 2 s at
-// data-cue-say-start + from data-cue-say to data-cue-cta; the jack-named.mp4 take if the server has it; at data-cue-cta the same
-// cta-steps take with HER name typed as the handle, ending on "This is what I'd clear for <name>" + the contact row, held 5 s
-// per loop, no title / form) and
-// "generic" (texts say "Your name", default blurred thumbs, no speech, at data-cue-cta (default data-cue-say) the "Type your
-// name" card = cta-steps: a phone replica of the landing, one 10 s take: the camera zooms onto the onlyfans.com/ field,
-// types "Jaka Basej" as a handle (or the viewer's typed name), "Scan now" → the scan card "Searching Google, step N of 9…"
-// → the report "87 links found" + tabs + placeholder rows → "Rewatch this video with YOUR content" + the name flip, kept
-// looping after the video ends). Name bar (.vo-nb, under the stage; full screen / theater: the .vo-nb-pill opens it) + the end
-// card's form = rebuild(): in place, no reload, no interstitial: pop, named mode + texts, ?name= via history.replaceState,
-// the take (jack-named.mp4 if the server has it) restarts from 0, playing (the submit is the gesture). Reset = generic again.
+// site/video/: overlay prefabs (Google, Google Images, X, Reddit, Mega) on the right half of Jack's take (jack.webm, one take for
+// both modes; Jack sits on the left), driven by the video's currentTime. Cues = the data-cue-live / -removed / -out seconds on
+// each .vo-pf (site/video/CUES.md, SCRIPT.md). draw(t) is a pure function of t (no CSS transitions): seeking and ?t= show
+// the exact frame. URL: ?name=<1-40 letters/digits/space . - _> (texts only) · ?r=<slug> (else the last scan) = a stored scan
+// result · ?t=<sec> seek · ?sfx=0 no sound.
+// Two modes (html[data-vo-mode]): "generic" ("Your name", default blurred thumbs, no speech; at data-cue-cta the cta-steps
+// end card: a phone replica of the landing, one 10 s take: zoom onto the onlyfans.com/ field, types "Jaka Basej" (or the
+// viewer's typed name) as a handle, "Scan now" → "Searching Google, step N of 9…" → the report "87 links found" + tabs + rows →
+// "Rewatch this video with YOUR content" + the name flip, looping after the video ends) and "named" (?name=, ?r= or the name
+// bar: her texts, the name spoken at data-cue-say-start (in the take's 1.5 s silent opening) and data-cue-say, "for <name>"
+// pill 2 s; at data-cue-cta the same take with HER handle, ending on "This is what I'd clear for <name>" + the contact row,
+// held 5 s per loop).
+// Production images (named): a scan result (js/scan-engine.js: ?r= → fetchResult(slug) = GET <API>/api/scan-result/<slug>; the
+// name bar → runScan = the landing's POST <API>/api/public-scan, onlyfans.com/<handle>) fills the cards like the landing
+// hero card (js/inline-scan.js model): Google rows = her real result domains + titles, Google Images grid + every .rm-img
+// = her real Google thumbs via <API>/api/thumb (blurred, .rm-img), the cta-steps report = her real counts (links / images /
+// sites) + rows + thumbs; the after photos = her own SFW photos (GET <API>/api/media/<slug> → /<n>.jpg, unblurred .vo-own),
+// else the defaults. A failed scan / read = text only. Leak URLs are read for their host, never rendered.
+// While the name bar's scan runs: the .vo-wait status pill ("Searching Google, step N of 9…"); the take plays its intro and
+// holds (paused) just before the first card until the result lands (at most WAIT_MAX s), then plays on.
+// Name bar (.vo-nb, under the stage; full screen / theater: the .vo-nb-pill opens it) + the end card's form = rebuild(): in
+// place, no reload: named mode + texts, ?name= (then ?r=<slug> once the scan lands) via history.replaceState, the take
+// restarts from 0, playing (the submit is the gesture). Reset = generic again.
 // Player UI (.vo-ui): full screen = the stage (Fullscreen API, + landscape lock on Android), else (iPhone) a CSS "theater":
 // the stage fixed + rotated 90deg (Esc / X / back closes); touch devices: no native controls, own play bar, a tap on the
 // stage plays / pauses, "Rotate for full size" hint after the first tap.
@@ -23,17 +29,15 @@
 // "Removed" stamp slams in (scale 2 → 1, 0.2 s) + a 12-piece confetti burst; slides out (0.4 s, gone at the out cue).
 // google-images taps "Images" at data-cue-tap (default live + 0.6) and shows the image grid 0.3 s later.
 // prefers-reduced-motion: css/video.css drops the shake / scale / particles / wipe for plain fades (same custom properties).
-// Sound (web page only, never in ?prefab= renders): WebAudio-synthesized pop at live, whoosh + thud at removed, only while
-// playing after the user's play gesture, low volume.
-// Keys: space = play / pause, Esc closes the theater. textContent only; requests: the scan-result read (js/scan-engine.js) and, named only, a HEAD
-// for jack-named.mp4 (same folder).
+// Sound: WebAudio-synthesized pop at live, whoosh + thud at removed, only while playing after the user's play gesture, low volume.
+// Keys: space = play / pause, Esc closes the theater. textContent only; requests: the scan API above (js/scan-engine.js host) only.
 (function () {
   'use strict';
   var root = document.getElementById('vo');
   if (!root) return;
   var IN = 0.45, OUT = 0.4, SHAKE = 0.25, WIPE = 0.95, STAMP = 0.2, BURST = 0.6, KW = 0.6, SLIDE = 160;   // seconds; px
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
-  var GENERIC = 'Your name', NAMED_TAKE = 'jack-named.mp4';
+  var GENERIC = 'Your name', WAIT_MAX = 45, HOLD_LEAD = 0.4;   // the scan hold: at most 45 s, 0.4 s before the first card
   // cta-steps: one 10 s take (s into its loop) in a phone replica of the landing: the hero, the camera zooms onto the
   // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form), "Scan now"; the scan card
   // ("Searching <place>, step N of 9…", js/scan-engine.js progressInfo); the report card (LEAKS links rolling, tabs, rows)
@@ -41,17 +45,16 @@
   // back in over the loop's last 0.2 s)
   var CYCLE = 10, DEMO = 'Jaka Basej', LEAKS = 87, NSTEP = 9, SCENES = [[0, 4.1], [4.1, 6.8], [6.8, 9.8]];
   var HOLD = 5, SETTLED = 9.65;   // named: the loop holds its settled end (toast + contacts) 5 s, then loops (15 s)
-  var WHERE = ['Google', 'Google Images', 'X', 'Reddit', 'Mega'];
-  var SOLO_CTA = { end: 10, step1: 3.05, step2: 5.6, step3: 9.65 };   // ?prefab=cta-steps: clip length, state= stills
-  // ?prefab= timeline = the CapCut clip: in 0-0.45, snap at 2.4, wipe 2.65-3.6, stamp 3.6, out 5.6-6; state=live / removed = these stills
-  var SOLO = { wipe: 2.4, end: 6, live: 1.6, removed: 5.4 };
-  var q = new URLSearchParams(location.search), solo = q.get('prefab');
+  var WHERE = ['Google', 'Google Images', 'X', 'Reddit', 'Mega'], TABS = [LEAKS, 12, 31];   // the placeholder report's tabs
+  var q = new URLSearchParams(location.search);
   var video = root.querySelector('.vo-video'), over = root.querySelector('.vo-over'), stage = root.querySelector('.vo-stage');
-  var forEl = root.querySelector('.vo-for'), ctaEl = root.querySelector('.vo-cta'), forc = null, ctac = null, who = null, shift = 0, endT = Infinity;
+  var forEl = root.querySelector('.vo-for'), ctaEl = root.querySelector('.vo-cta'), forc = null, ctac = null, who = null, endT = Infinity;
+  var real = null;   // named + a scan result: report(raw) (her real rows, counts, thumbs); null = the placeholders
   var num = function (el, k) { var v = el.getAttribute(k); return v === null ? NaN : parseFloat(v); };
   var pfs = Array.prototype.map.call(root.querySelectorAll('.vo-pf[data-prefab][data-cue-live]'), function (el) {
-    var c = { el: el, id: el.getAttribute('data-prefab'), l0: num(el, 'data-cue-live'), r0: num(el, 'data-cue-removed'), o0: num(el, 'data-cue-out'),
-      t0: num(el, 'data-cue-tap'), rolls: el.querySelectorAll('.vo-roll') };
+    var c = { el: el, id: el.getAttribute('data-prefab'), live: num(el, 'data-cue-live'), removed: num(el, 'data-cue-removed'), out: num(el, 'data-cue-out'),
+      tap: num(el, 'data-cue-tap'), rolls: el.querySelectorAll('.vo-roll') };
+    if (!isFinite(c.tap)) c.tap = c.live + TAP;
     var burst = document.createElement('span');   // 12 confetti pieces, deterministic spread over the stamp
     burst.className = 'vo-burst';
     for (var i = 0; i < 12; i++) {
@@ -63,10 +66,6 @@
     el.appendChild(burst);
     return c;
   });
-  function retime() {   // the cues of the take that plays (shift = data-cue-named-shift while jack-named.mp4 plays)
-    pfs.forEach(function (c) { c.live = c.l0 + shift; c.removed = c.r0 + shift; c.out = c.o0 + shift; c.tap = (isFinite(c.t0) ? c.t0 : c.l0 + TAP) + shift; });
-  }
-  retime();
 
   var clamp = function (x) { return x < 0 ? 0 : x > 1 ? 1 : x; };
   var ease = function (x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
@@ -115,7 +114,7 @@
   }
   function steps(c, t) {   // cta-steps at t: u = seconds into its loop (from the card's live cue, = the clip's 0 s)
     var v = Math.max(0, t - c.live) % (c.named ? CYCLE + HOLD : CYCLE), u = c.named && v >= SETTLED ? Math.max(SETTLED, v - HOLD) : v;
-    var box = c.steps, name = c.named ? who : demoName(), h = handle(name), bs = box.style, q1 = function (s) { return box.querySelector(s); };
+    var box = c.steps, name = c.named ? who : demoName(), rr = c.named ? real : null, h = rr ? rr.handle : handle(name), bs = box.style, q1 = function (s) { return box.querySelector(s); };
     var sc = box.querySelectorAll('.vo-step'), pgs = box.querySelectorAll('.vo-pg'), W = q1('.vo-scr').clientWidth, T0 = W / 390;
     Array.prototype.forEach.call(sc, function (el, i) {
       var a = u - SCENES[i][0], d = SCENES[i][1] - SCENES[i][0], o = i === 0 && u >= SCENES[2][1] ? clamp((u - SCENES[2][1]) / 0.2) : a >= 0 && a < d + 0.2 ? Math.min(i ? clamp(a / 0.2) : 1, clamp((d + 0.2 - a) / 0.2)) : 0;
@@ -139,14 +138,20 @@
     bs.setProperty('--bar', p.toFixed(3));
     bs.setProperty('--shim', (1 - (u * 0.8) % 1).toFixed(3));
     // 3 the report card: zoom onto "N links found" while it rolls to LEAKS, pull back over the tabs + rows; the end toast + flip
-    var chip = lay(q1('.vo-mc'), pgs[2]), m = Math.round(LEAKS * (1 - Math.pow(1 - clamp((u - 7.2) / 0.75), 3))), f = clamp((u - 9.05) / 0.25);
+    var tabs = rr ? [rr.links, rr.nimg, rr.sites] : TABS, L = tabs[0];   // her real counts, else the placeholder's
+    var chip = lay(q1('.vo-mc'), pgs[2]), m = Math.round(L * (1 - Math.pow(1 - clamp((u - 7.2) / 0.75), 3))), f = clamp((u - 9.05) / 0.25);
     camera(pgs[2], [[7, top(1.42)], [7.5, [chip.x + chip.w / 2, chip.y + chip.h / 2 - 16, 2.4]], [8.1, [chip.x + chip.w / 2, chip.y + chip.h / 2 - 16, 2.4]], [8.6, top(0.8)]], u);
     setText(q1('.vo-mc-n'), String(m));
     setText(q1('.vo-mc-u'), m === 1 ? ' link found' : ' links found');
     bs.setProperty('--cp', (1 + 0.2 * bump((u - 7.95) / 0.3)).toFixed(3));
     var ttl = [' full set', ' PPV pack', '', ' video bundle', ' photo set'];
+    Array.prototype.forEach.call(box.querySelectorAll('.vo-tabs2 b'), function (el, i) { setText(el, String(tabs[i])); });
+    setText(q1('.vo-more'), '+ ' + Math.max(0, L - 5) + ' more in the full report');
     Array.prototype.forEach.call(box.querySelectorAll('.vo-row'), function (el, i) {
-      setText(el.querySelector('.vo-ttl'), i === 2 ? 'Search results for ' + h : h + ttl[i]);
+      var r = rr && rr.rows[i], d = el.querySelector('.vo-dom');
+      if (d.__def == null) d.__def = d.textContent;
+      setText(d, r ? r.dom : d.__def);
+      setText(el.querySelector('.vo-ttl'), r ? r.title : i === 2 ? 'Search results for ' + h : h + ttl[i]);
       el.style.setProperty('--ro', (u < 7 ? 1 : clamp((u - 8.15 - i * 0.08) / 0.2)).toFixed(3));
     });
     var eo = u < SCENES[2][1] ? clamp((u - 8.75) / 0.3) : clamp((SCENES[2][1] + 0.2 - u) / 0.2);
@@ -159,17 +164,15 @@
   }
   var cueAt = function (k) { return num(stage, k); };
   var sayStart = function () { return cueAt('data-cue-say-start'); };
-  var sayEnd = function () { return Math.min(cueAt('data-cue-say') + shift, endT); };   // or when the video ends, if that comes first
+  var sayEnd = function () { return Math.min(cueAt('data-cue-say'), endT); };   // or when the video ends, if that comes first
   var ctaAt = function () { var c = cueAt('data-cue-cta'); return Math.min(isFinite(c) ? c : cueAt('data-cue-say'), endT); };
   function draw(t) {
     var cards = pfs;
-    if (!root.classList.contains('vo-solo')) {
-      if (forc) {   // 2 s at the start cue; from the say cue to the cta cue (then the named cta-steps take carries the name)
-        var s0 = sayStart(), s1 = sayEnd(), early = isFinite(s0) && t < s1;
-        forc.live = early ? s0 : s1; forc.out = early ? s0 + 2 : ctac ? ctaAt() : Infinity; cards = cards.concat([forc]);
-      }
-      if (ctac) { ctac.live = ctaAt(); cards = cards.concat([ctac]); }
+    if (forc) {   // 2 s at the start cue; from the say cue to the cta cue (then the named cta-steps take carries the name)
+      var s0 = sayStart(), s1 = sayEnd(), early = isFinite(s0) && t < s1;
+      forc.live = early ? s0 : s1; forc.out = early ? s0 + 2 : ctac ? ctaAt() : Infinity; cards = cards.concat([forc]);
     }
+    if (ctac) { ctac.live = ctaAt(); cards = cards.concat([ctac]); }
     cards.forEach(function (c) {
       var a = clamp((t - c.live) / IN), b = clamp((t - (c.out - OUT)) / OUT), o = Math.min(clamp(a * 1.5), 1 - b);
       var k = (t - c.removed) / SHAKE, sh = k >= 0 && k < 1 ? 1 - k : 0, r = t - c.removed - SHAKE;
@@ -227,6 +230,7 @@
     if (m.mvid != null) v['mega-vid'] = m.mvid + ' files';
     if (m.mimg != null) v['mega-img'] = m.mimg + ' files';
     if (m.host) v.host = m.host;
+    if (m.gcount) v['g-count'] = m.gcount;
     return v;
   }
   // her own site + accounts from the raw result, the way personalize.js dict() reads them (it is not loaded here)
@@ -256,24 +260,115 @@
       im.setAttribute('src', src);
     });
   }
-  var seekTo = null, probe = null, noop = function () {};   // the pending ?t= (played-take seconds); the jack-named.mp4 HEAD
-  var sources = video ? Array.prototype.slice.call(video.querySelectorAll('source')) : [];   // jack.mp4 / .webm, for Reset
-  function named() {   // does the server have jack-named.mp4? (HEAD, once, named mode only) → Promise<bool>
-    if (!probe) probe = solo !== null || !video || !window.fetch || !video.canPlayType('video/mp4') ? Promise.resolve(false)
-      : fetch(NAMED_TAKE, { method: 'HEAD', cache: 'no-store' }).then(function (r) { return r.ok && /^video\//.test(r.headers.get('content-type') || ''); }, function () { return false; });
-    return probe;
+  // ---------- the production scan result → her real rows, counts, thumbs (= js/inline-scan.js model(), not loaded here) ----------
+  var E = window.LeakScanEngine, R = window.LeakScanRemovals, noop = function () {};
+  var GSTATIC = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/, okThumb = function (u) { return typeof u === 'string' && u.length <= 600 && GSTATIC.test(u); };
+  function str(v, max) {   // text only (never a URL: leak links are read for their host, not shown)
+    if (typeof v !== 'string') return null;
+    var s = v.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, ' ').replace(/\s+/g, ' ').trim();
+    return s && s.length <= max && !/[<>{}]|javascript:|data:|https?:\/\/|www\./i.test(s) ? s : null;
   }
-  function take(on, at, go) {   // play jack-named.mp4 (on) or jack.mp4 (its <source>s) from `at`, playing if go
-    if (on !== (root.getAttribute('data-vo-take') === 'named')) {
-      if (on) { sources.forEach(function (s) { s.remove(); }); video.src = NAMED_TAKE; root.setAttribute('data-vo-take', 'named'); }
-      else { video.removeAttribute('src'); sources.forEach(function (s) { video.appendChild(s); }); root.removeAttribute('data-vo-take'); }
-      shift = on ? num(stage, 'data-cue-named-shift') || 0 : 0;
-      retime();
-      video.addEventListener('loadedmetadata', function () { video.currentTime = at; if (go) video.play().catch(noop); }, { once: true });
-      video.load();
-    } else { video.currentTime = at; if (go) video.play().catch(noop); }
-    draw(at);
+  function dom(v) { var d = typeof v === 'string' ? v.trim().toLowerCase().replace(/^www\./, '') : ''; return d.length <= 80 && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) ? d : null; }
+  function link(u) {
+    if (typeof u !== 'string' || u.length > 600 || !/^https?:\/\/[^\s"'<>\\]+$/i.test(u)) return null;
+    try { var x = new URL(u); return x.username || x.password ? null : x; } catch (e) { return null; }
   }
+  // raw → {slug, handle, links, sites, nimg (the landing card's Links / Sites / Images tabs), rows [{dom, title}] (titled ones),
+  // imgs [/api/thumb URLs], gtotal}
+  function report(raw) {
+    var seen = {}, by = {}, rows = [], res = [], sites = 0;
+    var add = function (u, d, title) {
+      var x = link(u);
+      if (!x || seen[x.href]) return;
+      d = dom(d) || dom(x.hostname);
+      if (!d) return;
+      seen[x.href] = 1;
+      rows.push({ dom: d, title: str(title, 200) });
+      if (!by[d]) { by[d] = 1; sites++; }
+    };
+    (Array.isArray(raw.hits) ? raw.hits : []).slice(0, 1000).forEach(function (h) { if (h) add(h.url, h.domain, h.title); });
+    (Array.isArray(raw.results) ? raw.results : []).slice(0, 200).forEach(function (r) {
+      if (!r) return;
+      add(r.link, r.domain, r.title);
+      var x = link(r.link), d = x && (dom(r.domain) || dom(x.hostname));
+      if (d) res.push({ link: x.href, domain: d, title: str(r.title, 200), thumb: okThumb(r.thumb) ? r.thumb : null, kind: r.kind === 'video' ? 'video' : 'page' });
+    });
+    var items = E.imageItems((Array.isArray(raw.images) ? raw.images : []).slice(0, 200), res, okThumb, 60);
+    var g = typeof raw.google_total === 'number' && raw.google_total > 0 && raw.google_total < 1e9 ? Math.round(raw.google_total) : null;
+    return { slug: raw.slug, handle: R && R.model(raw).handle, links: rows.length, sites: sites, nimg: items.length,
+      rows: rows.filter(function (r) { return r.title; }), imgs: items.map(function (it) { return E.thumb(it.src); }).filter(Boolean),
+      gtotal: g && 'About ' + g.toLocaleString('en-US') + ' results' };
+  }
+  function el(tag, cls, kids) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    (kids || []).forEach(function (k) { if (k != null) e.appendChild(typeof k === 'string' ? document.createTextNode(k) : k); });
+    return e;
+  }
+  function pic(src, cls) { var im = el('img', cls); im.alt = ''; im.decoding = 'async'; im.referrerPolicy = 'no-referrer'; im.src = src; return im; }
+  function letter(d, cls) { var s = el('span', cls, [d.charAt(0).toUpperCase()]); s.style.background = E.favColor(d); return s; }
+  var swapped = [];   // boxes whose children realize() replaced, each with its default children
+  function put(box, kids) {
+    if (!box) return;
+    if (!box.__kids) { box.__kids = Array.prototype.slice.call(box.childNodes); swapped.push(box); }
+    box.replaceChildren.apply(box, kids);
+  }
+  function unput() { swapped.forEach(function (b) { b.replaceChildren.apply(b, b.__kids); }); }
+  // her real rows + thumbs into the Google / Google Images live layers and the cta-steps report (rows' thumbs, the strip)
+  function realize() {
+    var r = real, im = r.imgs || [], at = function (i) { return im.length ? im[i % im.length] : null; }, q1 = function (s) { return root.querySelector(s); };
+    var row = function (x, th) {
+      return el('div', 'm-result bad', [letter(x.dom, 'fav fav-l'), el('div', '', [el('span', 'm-site', [x.dom]), el('span', 'm-title', [x.title]),
+        th.length ? el('span', 'm-thumbs', th.map(function (s, i) { return el('span', 'thumb t' + (i + 1), [pic(s, 'rm-img')]); })) : el('span', 'm-lines', [el('i'), el('i')])])]);
+    };
+    if (r.rows.length) {
+      put(q1('.vo-pf[data-prefab="google"] .rm-live'), r.rows.slice(0, 4).map(function (x, i) { return row(x, i || !im.length ? [] : [at(0), at(1), at(2)]); }));
+      put(q1('.vo-gi .vo-serp'), r.rows.slice(0, 2).map(function (x) { return row(x, []); }));
+    }
+    if (im.length) {
+      put(q1('.vo-gi .rm-live .vo-grid'), [0, 1, 2, 3, 4, 5].map(function (i) {
+        var x = r.rows[i % Math.max(1, r.rows.length)], d = x ? x.dom : r.handle + '.com';
+        return el('span', 'vo-gc', [el('span', 'vo-gt', [pic(at(i), 'rm-img')]), el('span', 'gi-cap', [letter(d, 'gi-fav'), el('span', 'gi-cap-t', [d])])]);
+      }));
+      Array.prototype.forEach.call(root.querySelectorAll('.vo-rows .vo-th, .vo-strip i'), function (b, i) { put(b, [pic(at(i), 'vo-real')]); });
+    }
+  }
+  // her own SFW photos (the scan's /api/media/<slug>: Instagram etc.) into the Google Images after grid, unblurred; none = defaults
+  var owns = root.querySelectorAll('.vo-own');
+  Array.prototype.forEach.call(owns, function (im) { im.__def = im.getAttribute('src'); });
+  function photos(slug, g, n) {
+    if (!window.fetch || !E.SLUG_RE.test(slug || '')) return;
+    var base = E.API + '/api/media/' + encodeURIComponent(slug);
+    fetch(base, { credentials: 'omit' }).then(function (res) { return res.ok ? res.json() : null; }).then(function (j) {
+      if (g !== gen || !j) return;
+      var k = Array.isArray(j.images) ? Math.min(j.images.length, 12) : 0;
+      if (j.status === 'pending' && (n || 0) < 10) setTimeout(photos, 4000, slug, g, (n || 0) + 1);   // more may come
+      if (k) Array.prototype.forEach.call(owns, function (im, i) {
+        var src = base + '/' + (i % k) + '.jpg';
+        im.referrerPolicy = 'no-referrer';
+        im.addEventListener('error', function () { if (im.getAttribute('src') === src) im.setAttribute('src', im.__def); }, { once: true });
+        im.setAttribute('src', src);
+      });
+    }, noop);
+  }
+  // a scan result → named mode with her texts + real images; false if unusable (text only stays)
+  function useResult(raw) {
+    var m = R && E && R.model(raw);
+    if (!m || !E.SLUG_RE.test(raw.slug || '')) return false;
+    var o = mine(raw); m.site = o.site; m.ig = o.ig; m.tt = o.tt;
+    var r = report(raw);
+    m.gcount = r.gtotal;
+    apply(values(m));
+    real = r;
+    thumbs(real.imgs.length ? real.imgs : m.thumbs);
+    personal(m.name);
+    realize();
+    photos(raw.slug, gen);
+    draw(video.currentTime);
+    return true;
+  }
+  var seekTo = null;   // the pending ?t=
+  function take(at, go) { video.currentTime = at; if (go) video.play().catch(noop); draw(at); }
   function mode(m) { document.documentElement.setAttribute('data-vo-mode', m); }
   var nb = root.querySelector('.vo-nb');
   var cta = function (nm) { return ctaEl ? { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps'), named: nm } : null; };
@@ -297,66 +392,33 @@
   Array.prototype.forEach.call(slots, function (el) { el.__def = el.textContent; });
   Array.prototype.forEach.call(imgs, function (im) { im.__def = im.getAttribute('src'); });
   function apply(v) {
+    real = null;
+    unput();
     Array.prototype.forEach.call(slots, function (el) { el.textContent = el.__def; if (el.classList.contains('vo-roll')) el.__src = el.__def; });
     Array.prototype.forEach.call(imgs, function (im) { if (im.getAttribute('src') !== im.__def) im.setAttribute('src', im.__def); });
+    Array.prototype.forEach.call(owns, function (im) { if (im.getAttribute('src') !== im.__def) im.setAttribute('src', im.__def); });
     fill(v);
   }
+  var gen = 0;   // bumped by every rebuild / Reset: a late scan / media answer for an older one is dropped
   apply(values({ name: GENERIC }));
   generic();
   var name = q.get('name');
   name = name === null ? null : name.replace(/\s+/g, ' ').trim();
-  if (name && NAME_RE.test(name)) {
+  if (name && NAME_RE.test(name)) {   // texts only (no scan without the viewer's submit)
     fill(values({ name: name }));
     personal(name);
-    named().then(function (ok) { if (ok && who !== null) take(true, video.readyState >= 1 ? video.currentTime : seekTo || 0, !video.paused); });
   }
   else {   // the shared scan result, same slug rule as js/removals.js (?r= → last scan → none = generic)
-    var E = window.LeakScanEngine, R = window.LeakScanRemovals, slug = q.get('r');
+    var slug = q.get('r'), g0 = gen;
     if (slug === null) { try { slug = (JSON.parse(localStorage.getItem('leakscan.last') || 'null') || {}).slug; } catch (e) { slug = null; } }
     if (E && E.fetchResult && R && typeof slug === 'string' && E.SLUG_RE.test(slug)) {
-      E.fetchResult(slug).then(function (raw) {
-        var m = R.model(raw);
-        if (!m || who !== null) return;   // (a name typed in meanwhile wins)
-        var o = mine(raw); m.site = o.site; m.ig = o.ig; m.tt = o.tt; fill(values(m)); thumbs(m.thumbs); personal(m.name);
-        if (solo === null && video) {
-          draw(video.currentTime);
-          named().then(function (ok) { if (ok && who === m.name) take(true, video.readyState >= 1 ? video.currentTime : seekTo || 0, !video.paused); });
-        }
-      }, function () { /* generic */ });
+      E.fetchResult(slug).then(function (raw) { if (g0 === gen && who === null) useResult(raw); }, function () { /* generic */ });
     }
   }
   var form = ctaEl && ctaEl.querySelector('form'), nbForm = nb && nb.querySelector('form');
 
   // ---------- clock ----------
-  var api = { prefabs: pfs.map(function (c) { return c.id; }).concat(ctac ? [ctac.id] : []), SOLO: SOLO, SOLO_CTA: SOLO_CTA, draw: draw };
-  var bg = q.get('bg');
-  if (bg === 'green' || bg === 'none') document.documentElement.classList.add(bg === 'green' ? 'vo-green' : 'vo-clear');
-  if (solo !== null) {
-    var one = pfs.concat(ctac ? [ctac] : []).filter(function (c) { return c.id === solo; })[0] || pfs[0], cfg = one === ctac ? SOLO_CTA : SOLO;
-    pfs.forEach(function (c) { if (c !== one) c.el.remove(); });
-    [forEl, one === ctac ? one.el.querySelector('form') : ctaEl, root.querySelector('.vo-ui'), nb].forEach(function (el) { if (el) el.remove(); });
-    pfs = [one];
-    if (one === ctac) { ctac = null; one.live = 0; } else { one.live = 0; one.removed = SOLO.wipe; one.out = SOLO.end; one.tap = TAP; }
-    root.classList.add('vo-solo');
-    if (video) { video.pause(); video.removeAttribute('src'); video.remove(); }
-    var state = q.get('state'), at = state && /^(live|removed|step[123])$/.test(state) ? cfg[state] : undefined, t0 = null, held = null;
-    // seek(t) stops the clock and draws exactly t (the frame renderer calls it once per frame)
-    api.seek = function (t) { held = t; draw(t); };
-    if (typeof at === 'number') api.seek(at);
-    else {
-      var tick = function (now) {
-        if (held !== null) return;
-        if (t0 === null) t0 = now;
-        var t = Math.min(cfg.end, (now - t0) / 1000);
-        draw(t);
-        if (t < cfg.end) requestAnimationFrame(tick);
-      };
-      draw(0);
-      requestAnimationFrame(tick);
-    }
-    window.VideoOverlays = api;
-    return;
-  }
+  var api = { prefabs: pfs.map(function (c) { return c.id; }).concat(ctac ? [ctac.id] : []), draw: draw };
   var gesture = function () { return !navigator.userActivation || navigator.userActivation.hasBeenActive; };
 
   // ---------- the name, spoken (named only): data-cue-say-start and data-cue-say, each once per playback ----------
@@ -444,7 +506,12 @@
   });   // a say / card cue past the end: now, fully popped in
 
   var looping = false;
-  function loop() { var t = video.currentTime; draw(t); speak(t); sounds(t); sync(); if (!video.paused && !video.ended) requestAnimationFrame(loop); else looping = false; }
+  function loop() {
+    var t = video.currentTime, h0 = holdAt();
+    if (scanning && !held && !video.paused && t >= h0 && t < h0 + 1) { held = true; video.pause(); }   // the scan still runs: wait at the first card
+    draw(t); speak(t); sounds(t); sync();
+    if (!video.paused && !video.ended) requestAnimationFrame(loop); else looping = false;
+  }
   function kick() { if (!looping) { looping = true; requestAnimationFrame(loop); } }
   video.addEventListener('play', kick);
   ['seeked', 'timeupdate', 'loadeddata', 'pause'].forEach(function (ev) { video.addEventListener(ev, function () { draw(video.currentTime); }); });
@@ -515,27 +582,55 @@
   document.addEventListener('webkitfullscreenchange', onFs);
   window.addEventListener('popstate', function () { theater(false, true); });
   // ---------- the name: bar + end card form → rebuild() in place; Change / Reset; the full screen pill ----------
-  var BAD = 'Use 1-40 letters, digits, spaces or . - _', gen = 0;
+  var BAD = 'Use 1-40 letters, digits, spaces or . - _';
   var nbInp = nbForm && nbForm.querySelector('input'), nbErr = nb && nb.querySelector('.vo-nb-err'), nbPill = ui && ui.querySelector('.vo-nb-pill');
   function restart() { says.forEach(function (s) { s.done = false; }); endT = Infinity; post = null; lastT = null; }
+  // the name bar's scan = the landing's free scan (js/scan-engine.js runScan, as js/inline-scan.js): onlyfans.com/<handle(n)>;
+  // .vo-wait shows its progress, the take holds just before the first card until it lands (<= WAIT_MAX s); fail = text only
+  var waitEl = root.querySelector('.vo-wait'), scanning = 0, held = false, waitT = null;
+  var holdAt = function () { return pfs.length ? pfs[0].live - HOLD_LEAD : Infinity; };
+  function waiting(on, text) {
+    clearTimeout(waitT);
+    if (on) { html.setAttribute('data-vo-wait', ''); setText(waitEl, text); return; }
+    html.removeAttribute('data-vo-wait');
+    scanning = 0;
+    if (held) { held = false; video.play().catch(noop); }
+  }
+  function scanFor(n, g) {
+    var h = n.toLowerCase().replace(/[^a-z0-9._]/g, '');
+    if (!E || !E.runScan || !R || !E.HANDLE_RE.test(h)) return;
+    scanning = g;
+    waiting(true, 'Scanning @' + h + '…');
+    waitT = setTimeout(function () { if (scanning === g) waiting(false); }, WAIT_MAX * 1000);
+    E.runScan({ platform: 'onlyfans.com', handle: h,
+      onProgress: function (t) { if (scanning === g) setText(waitEl, E.progressInfo(t).stage); },
+      onResult: function (raw) {
+        if (g !== gen) return;
+        if (useResult(raw)) history.replaceState(history.state, '', location.pathname + '?r=' + encodeURIComponent(raw.slug));
+        if (scanning === g) waiting(false);
+      },
+      onError: function () { if (scanning === g) waiting(false); } });
+  }
   function rebuild(n) {   // generic (or another name) → named for n, in place, at once; called from a submit = a user gesture
     var g = ++gen, ac = audio();
     if (ac) SOUND.pop(ac);
+    waiting(false);
     apply(values({ name: n }));
     personal(n);
     history.replaceState(history.state, '', location.pathname + '?name=' + encodeURIComponent(n));
     restart();
-    take(root.getAttribute('data-vo-take') === 'named', 0, true);   // now, inside the gesture (iOS)
-    named().then(function (ok) { if (ok && g === gen && who === n && root.getAttribute('data-vo-take') !== 'named') { restart(); take(true, 0, true); } });
+    take(0, true);   // now, inside the gesture (iOS)
+    scanFor(n, g);
   }
   function reset() {
     gen++;
+    waiting(false);
     apply(values({ name: GENERIC }));
     generic();
     if (nbInp) nbInp.value = '';
     history.replaceState(history.state, '', location.pathname);
     restart();
-    take(false, 0, true);
+    take(0, true);
   }
   function onName(f, err) {   // the bar (inline message) and the end card's form (the browser's bubble) share the submit
     if (!f) return;

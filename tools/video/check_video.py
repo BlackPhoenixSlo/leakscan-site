@@ -4,8 +4,8 @@
 - exactly 6 prefabs: the 5 cued ones google, google-images, x, reddit, mega (in script order) + cta-steps (the generic
   end card .vo-cta, no cues of its own: data-cue-cta; a phone replica of the landing: 3 .vo-step scenes (hero with the
   site's h1 + the onlyfans.com/ field + "Scan now", scan card, report card with tabs + *.example placeholder rows only) +
-  the "Rewatch this video with YOUR content" toast with the name flip + the real form inside it; named mode: the same take with her handle, ending "This is what I'd clear for <name>" + the contact row, no form); tools/video/render_prefabs.py renders
-  the same 6. The 5 cued ones each have numeric data-cue-live <
+  the "Rewatch this video with YOUR content" toast with the name flip + the real form inside it; named mode: the same take
+  with her handle, ending "This is what I'd clear for <name>" + the contact row, no form). The 5 cued ones each have numeric data-cue-live <
   data-cue-removed < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending);
   room for the animations (js/video-overlays.js): removed - live >= 0.45 s pop-in (google-images: >= 1.2 s, its tap +
   grid; an optional data-cue-tap sits in live + 0.45 .. removed - 0.7), out - removed >= 1.95 s (snap shake 0.25 + wipe
@@ -14,11 +14,12 @@
   leak host (*.example, data-vo=host); google-images shows >= 4 of her own photos (<img>, not the blurred .rm-img) and no
   "No results" / copyright notice
 - both modes: .vo-stage has numeric data-cue-say (named: the name at the end, after the last prefab's out),
-  data-cue-say-start (named: the name in the take's opening gap, its 2 s pill out before the first prefab) and
-  data-cue-named-shift >= 0 (jack-named.mp4 runs that much behind jack.mp4); the generic end card (.vo-cta) exists with
-  the exact ask + a form (input name=name) and its cue (data-cue-cta, default data-cue-say) is after the last out; the
-  "for <name>" pill (.vo-for) exists; js/video-overlays.js keeps the generic name "Your name", the jack-named.mp4 probe
-  and the ?sfx=0 switch
+  data-cue-say-start (named: the name in the take's 1.5 s silent opening, its 2 s pill out before the first prefab); the
+  generic end card (.vo-cta) exists with the exact ask + a form (input name=name) and its cue (data-cue-cta, default
+  data-cue-say) is after the last out; the "for <name>" pill (.vo-for) exists; js/video-overlays.js keeps the generic name
+  "Your name", the ?sfx=0 switch and the production images (the landing's runScan / fetchResult + /api/media/)
+- one take: the <video> plays jack.webm (an mp4 <source> only next to an existing file); no second take (jack-named), no
+  ?prefab= / CapCut clip mode (vo-solo, bg=green) left in the page, js, css or tools/video/
 - name bar (.vo-nb) under the stage, outside it: label "Your name", input name=name maxlength=40, button "Rebuild this
   video with my name", the "👇 type your name" hint pill (.vo-nb-hint, pulsing) + Change / Reset; the full screen pill
   (.vo-nb-pill in .vo-ui), no rebuild interstitial card (.vo-rb / rbCard gone); js: one rebuild() for both forms,
@@ -106,7 +107,7 @@ def stage_cue(p, k):
 def modes(html, p, last_out):
     """the two modes: named (say start / end, shift, pill) and generic (the end card + form at data-cue-cta / -say)"""
     bad = []
-    say, start, shift = stage_cue(p, "data-cue-say"), stage_cue(p, "data-cue-say-start"), stage_cue(p, "data-cue-named-shift")
+    say, start = stage_cue(p, "data-cue-say"), stage_cue(p, "data-cue-say-start")
     first_live = float(p.prefabs[0]["data-cue-live"]) if p.prefabs and "data-cue-live" in p.prefabs[0] and p.prefabs[0].get("data-cue-live", "").replace(".", "", 1).isdigit() else None
     if say is None:
         bad.append(f"video/index.html: .vo-stage needs a numeric data-cue-say (got {p.stage.get('data-cue-say')!r})")
@@ -116,8 +117,6 @@ def modes(html, p, last_out):
         bad.append(f"video/index.html: .vo-stage needs a numeric data-cue-say-start (got {p.stage.get('data-cue-say-start')!r})")
     elif first_live is not None and start + 2 > first_live:
         bad.append(f"video/index.html: data-cue-say-start {start} + 2 s pill overlaps the first prefab at {first_live}")
-    if shift is None or shift < 0:
-        bad.append(f"video/index.html: .vo-stage needs data-cue-named-shift >= 0 (got {p.stage.get('data-cue-named-shift')!r})")
     cta = stage_cue(p, "data-cue-cta") if "data-cue-cta" in p.stage else say
     if cta is None:
         bad.append(f"video/index.html: data-cue-cta {p.stage.get('data-cue-cta')!r} not numeric")
@@ -133,7 +132,8 @@ def modes(html, p, last_out):
         if not g:
             bad.append(f"video/index.html: prefab {pf.get('data-prefab')} has no .vo-kw (live + gone word card)")
     js = (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8")
-    for need, what in (("'Your name'", "the generic name"), ("'jack-named.mp4'", "the named-take probe"), ("q.get('sfx') !== '0'", "the ?sfx=0 switch")):
+    for need, what in (("'Your name'", "the generic name"), ("q.get('sfx') !== '0'", "the ?sfx=0 switch"), ("E.runScan({", "the name bar's scan (landing runScan)"),
+                       ("E.fetchResult(slug)", "the ?r= result read"), ("'/api/media/'", "her own photos (/api/media/)")):
         if need not in js:
             bad.append(f"js/video-overlays.js: {what} ({need}) missing")
     css = (SITE / "css" / "video.css").read_text(encoding="utf-8")
@@ -169,11 +169,8 @@ def steps_and_player(html, p):
     for s in ("This is what I'd clear for", "Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"):
         if s not in html:
             bad.append(f"video/index.html: the named end toast lacks {s!r}")
-    if "function steps(c, t)" not in js or "SOLO_CTA" not in js:
-        bad.append("js/video-overlays.js: cta-steps loop (steps()) / its solo clip (SOLO_CTA) missing")
-    rp = re.search(r"PREFABS = \(([^)]*)\)", (ROOT / "tools" / "video" / "render_prefabs.py").read_text(encoding="utf-8"))
-    if not rp or re.findall(r'"([\w-]+)"', rp[1]) != ORDER + [CTA_STEPS]:
-        bad.append(f"tools/video/render_prefabs.py: PREFABS must be the 6 {ORDER + [CTA_STEPS]}")
+    if "function steps(c, t)" not in js:
+        bad.append("js/video-overlays.js: cta-steps loop (steps()) missing")
     css = (SITE / "css" / "video.css").read_text(encoding="utf-8")
     if re.search(r"@media[^{]*max-width", css) or re.search(r"\.vo-over \{[^}]*position: relative", css):
         bad.append("css/video.css: a max-width media query / .vo-over in the flow: the cards must stay in the stage's right half at every width")
@@ -258,8 +255,13 @@ def main():
     for f in (PAGE, SITE / "js" / "video-overlays.js", SITE / "css" / "video.css"):
         for u in re.findall(r"[\w./-]+\.(?:mp3|wav|ogg|m4a|woff2?|ttf|otf)\b|@font-face|@import", f.read_text(encoding="utf-8"), re.I):
             bad.append(f"{f.relative_to(SITE)}: audio / font file or import {u} (sound is synthesized, fonts are the system stack)")
-    if not p.sources:
-        bad.append("video/index.html: <video> has no <source>")
+    if "jack.webm" not in p.sources:
+        bad.append(f"video/index.html: <video> must play jack.webm (Jack's one take), got {p.sources}")
+    for f in [PAGE, SITE / "js" / "video-overlays.js", SITE / "css" / "video.css"] + sorted((ROOT / "tools" / "video").glob("*.py")):
+        if f.name == "check_video.py":
+            continue
+        for k in re.findall(r"jack-named|named-shift|\?prefab=|vo-solo|bg=green|render_prefabs", f.read_text(encoding="utf-8")):
+            bad.append(f"{f.relative_to(ROOT)}: {k!r}: one take only, no CapCut clip mode")
     for s in p.sources:
         f = PAGE.parent / s
         if not f.is_file():

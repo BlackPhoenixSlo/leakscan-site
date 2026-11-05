@@ -5,7 +5,7 @@ seeked there, screenshot, and assert: only the cue's prefab is on screen, in the
 removed), the mode's name in it ("Your name" / NAME), html[data-vo-mode], at both widths (phone too: no stacking) it
 sits inside the stage's right half, vertically centred (left >= 50 %, centre within 5 % of the middle: Jack on the left stays uncovered), the rolling
 counters (google "About 4,120 results" → "About 3 results", mega "52 GB · 318 videos" → "0 GB · 0 videos"), no request
-leaves 127.0.0.1, no console error (named: the 404 of the jack-named.mp4 HEAD probe is expected, declared). Each prefab
+leaves 127.0.0.1, no console error, jack.webm is the playing source. Each prefab
 is shot live (settled; google-images after its tap + grid) and removed (removed + 2 s).
 After state (removed): google lists the name's site (<name>.com) + instagram.com and no leak host; google-images shows
 >= 4 loaded, unblurred photos of her own (not .rm-img), no "No results".
@@ -21,10 +21,19 @@ Plus:
 - speech (named only): speechSynthesis.speak stubbed (declared: no voice in headless); Space = the play gesture; spoken
   once at data-cue-say-start and once at data-cue-say with NAME, rate 0.95, video ducked to 0.25 then restored, "for
   NAME" pill (start; at data-cue-say = data-cue-cta the named flow instead); generic → never spoken; data-cue-say moved past the end (declared) → spoken + end card on `ended`
-- named take: jack-named.mp4 routed to jack.mp4's bytes (declared, wire boundary) → it plays and every cue moves by
-  data-cue-named-shift; generic never asks for it
+- the name bar's scan (declared, wire boundary, every context): POST /api/public-scan answers an SSE `failed` (serve.py has
+  no API), so a rebuild stays text only
 - personalized (tools/scan_stub.py, ?r=demoRemove1): named mode, texts from the scan result in every prefab; every
-  .rm-img = the scan's thumbs via <API>/api/thumb, loaded, still blurred; and ?name= keeps the default photos (img/removals)
+  .rm-img = the scan's thumbs via <API>/api/thumb, loaded, still blurred; the after photos = the stub's /api/media ones,
+  unblurred; shots drawn with the pure draw(t) (the stub has no Range); and ?name= keeps the default photos (img/removals)
+- prod (production images, PROD_HANDLE's already-scanned result PROD_SLUG, no new scan): declared bypasses at the wire
+  boundary (Playwright routes, outside service code): GET /api/scan-result|thumb|media on 127.0.0.1 → proxied read-only to
+  the production API (thumb: gstatic u= only, else a local 404); POST /api/public-scan → an SSE built from that same saved
+  result (progress + result + done), held until the loading state is shot. 1920x1080 + phone 390x844: the name bar
+  submit → the wait pill + the take held before the first card → ?r=<slug>; iPhone theater: ?r=<slug>. Asserts: real
+  counts (= report() / js/inline-scan.js, recomputed here) in the cta-steps report + Google count, real domains / titles;
+  img: every thumb loaded (naturalWidth > 0) via /api/thumb, blurred; her /api/media photos unblurred in the after state;
+  no leak URL in the DOM text, every request to 127.0.0.1, jack.webm the playing source
 - cta-steps (generic end card, one 10 s take in a phone replica of the landing; phases past the take's end drawn with the pure
   draw(t), declared): cta + 0.3 hero (logo loaded, the site's h1, empty onlyfans.com/ field, camera at rest), + 2.2 the
   camera zoomed onto the field (scale >= 2.2) typing a proper prefix, + 3.05 the field typed handle(DEMO) ("jakabasej")
@@ -49,6 +58,7 @@ Plus:
   half), scroll locked, Esc / back / X each close it; desktop: the button puts the STAGE in full screen, the card on the
   right half of the centred 16:9 picture
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
+--break-img serves video-overlays.js with report()'s image field wrong (it.title for it.src): only the "prod img:" checks go red.
 - name bar + in-place swap (phone 390x844, desktop 1440x900, frame 1920x1156 = a 1920x1080 stage + the bar), speech stubbed
   (declared): generic at 0 s the bar sits under the stage, in view, with the pulsing "type your name" pill (gone after the
   first focus); an invalid name is rejected inline (message, URL unchanged); phone: in theater (declared: Fullscreen API
@@ -69,14 +79,25 @@ Plus:
 --break-steps serves index.html without the cta-steps phone (.vo-steps): only the "cta-steps:" checks go red.
 --break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
 --break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the "cta-steps: typed … DEMO" check goes red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named]
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
-import argparse, pathlib, re, socket, subprocess, sys, time, urllib.parse
+import argparse, json, pathlib, re, socket, subprocess, sys, time, urllib.parse, urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from serve import serve
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+
+def take_len():   # the take's length (s): the end-of-take checks seek just before it
+    try:
+        return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                                     str(ROOT / "site/video/jack.webm")], capture_output=True, text=True, timeout=20).stdout)
+    except Exception:
+        return 40.0
+
+
+END = take_len()
 GENERIC = "Your name"
 CTA_TEXT = "Type your name in the link → this video rebuilds with YOUR leaks"
 VIEWPORTS = {"phone": dict(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True),
@@ -131,6 +152,7 @@ STEPS = """() => { const c = document.querySelector('.vo-cta'), s = c && c.query
           nmpx: +(Math.min(...[...s.querySelectorAll('.vo-end > .vo-nm')].map(fs)) * k).toFixed(1),
           chrome: [...c.querySelectorAll(':scope > .vo-cta-t, :scope > .vo-cta-f')].map(e => getComputedStyle(e).display)}; }"""
 DEMO, LEAKS = "Jaka Basej", 87
+TABS = [LEAKS, 12, 31]   # = js TABS: the placeholder report's Links / Images / Sites
 CONTACTS = ["Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"]   # = site/imprint.html
 def named_end(s, nm):   # the named toast: "This is what I'd clear for NAME" + the contact row, nothing generic, no title / form
     return (s and s["shown"] == ["This is what I'd clear for", nm, "".join(CONTACTS)] and s["contacts"] == CONTACTS and s["inbox"]
@@ -191,16 +213,20 @@ def guard(ctx, base_ok, seen=None):
 
 
 def console(pg, errs):
-    probe = lambda m: m.type == "error" and "404" in m.text and (m.location or {}).get("url", "").endswith("/video/jack-named.mp4")
-    pg.on("console", lambda m: errs.append(m.text) if m.type == "error" and not probe(m) else None)
+    pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
     pg.on("pageerror", lambda e: errs.append(str(e)))
 
 
 BREAK = {}   # --break-* routes, applied to every context
 
 
+SCAN_FAILED = "event: failed\ndata: no scan API in this test\n\n"
+
+
 def ctx_new(b, **kw):
     ctx = b.new_context(**kw)
+    # declared bypass, wire boundary: the name bar's POST /api/public-scan → an SSE `failed` (text only); prod() overrides it
+    ctx.route("**/api/public-scan", lambda r: r.fulfill(status=200, content_type="text/event-stream", body=SCAN_FAILED))
     for pat, body, ctype in BREAK.values():   # one-arg handler (playwright passes (route, request) to two-arg ones)
         ctx.route(pat, (lambda body, ctype: lambda r: r.fulfill(body=body, content_type=ctype))(body, ctype))
     return ctx
@@ -248,17 +274,21 @@ def personalized(b, out, break_thumbs):
         check("personalized ?r=demoRemove1: named mode", pg.evaluate("() => document.documentElement.dataset.voMode") == "named")
         im = pg.evaluate(IMGS)
         check(f"personalized ?r=demoRemove1: all {len(im)} .rm-img = scan thumbs via {api}/api/thumb, loaded, blurred",
-              len(im) == 13 and all(s.startswith(api + "/api/thumb?u=") and w > 0 and "blur(" in f for s, w, f in im), im[:3])
+              len(im) >= 13 and all(s.startswith(api + "/api/thumb?u=") and w > 0 and "blur(" in f for s, w, f in im), im[:3])
+        try:
+            pg.wait_for_function("() => [...document.querySelectorAll('.vo-own')].every(i => i.src.includes('/api/media/') && i.complete && i.naturalWidth > 0)", timeout=12000)
+        except Exception:
+            pass
         own = pg.evaluate(OWN)
-        check(f"personalized ?r=demoRemove1: the {len(own)} after photos stay the landing after-phone's (assets/phone), unblurred",
-              len(own) == 6 and all(s.startswith("../assets/phone/") and w > 0 and f == "none" for s, w, f in own), own[:3])
-        # evidence shots via the solo view (the stub has no Range, so the page's <video> can't seek to a cue)
+        check(f"personalized ?r=demoRemove1: the {len(own)} after photos = the scan's own photos ({api}/api/media/demoRemove1/<n>.jpg), unblurred",
+              len(own) == 6 and all(s.startswith(api + "/api/media/demoRemove1/") and w > 0 and f == "none" for s, w, f in own), own[:3])
+        # evidence shots drawn with the pure draw(t) (the stub has no Range, so the page's <video> can't seek to a cue)
+        cues = {m[1]: (float(m[2]), float(m[3]), float(m[5] or 0)) for m in re.finditer(
+            r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="[\d.]+"( data-cue-tap="([\d.]+)")?',
+            (ROOT / "site/video/index.html").read_text(encoding="utf-8"))}
         for pid, state in (("google-images", "live"), ("x", "live"), ("google", "removed"), ("google-images", "removed")):
-            pg.goto(f"{base}video/?prefab={pid}&state={state}&r=demoRemove1")
-            try:
-                pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete && i.naturalWidth > 0 && i.src.includes('/api/thumb'))", timeout=8000)
-            except Exception:
-                pass
+            live, rem, tap = cues[pid]
+            pg.evaluate(DRAW, (min(rem - 0.1, tap + 1.0) if tap else live + 1.0) if state == "live" else rem + 2.0)
             pg.wait_for_timeout(800)   # decode + paint of the blurred thumbs
             pg.screenshot(path=str(out / f"desktop-personalized-demoRemove1-{pid}-{state}.png"))
             if state == "removed":
@@ -269,6 +299,194 @@ def personalized(b, out, break_thumbs):
         ctx.close()
     finally:
         stub.terminate()
+
+
+# ---------- prod: production images from an already-scanned result (read-only, no new scan) ----------
+PROD = "https://scan.srv1395798.hstgr.cloud"   # = js/scan-engine.js's API on github.io
+PROD_SLUG, PROD_HANDLE = "MT4kpWQI3QXp", "sophieraiin"
+PROD_SLUG2 = "2_YPj7TbK4rm"   # an older scan of the same handle: other counts than the placeholder's (the ?r= / theater run)
+VIDEO_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|embed|clips?|vod)(?:[/?#.-]|$)", re.I)
+GSTATIC = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
+REAL = """() => { const q = s => [...document.querySelectorAll(s)], im = i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter];
+  return {g: q('.vo-pf[data-prefab="google"] .rm-live .rm-img').map(im), grows: q('.vo-pf[data-prefab="google"] .rm-live .m-site').map(e => e.textContent),
+          grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
+          own: q('.vo-own').map(im), count: (document.querySelector('[data-vo="g-count"]') || {}).textContent}; }"""
+
+
+def prod_expect(raw):
+    """= video-overlays.js report() (the landing card's counts, js/inline-scan.js), recomputed: links, images, sites, titled rows' domains, Google count"""
+    def dom(v):
+        d = re.sub(r"^www\.", "", v.strip().lower()) if isinstance(v, str) else ""
+        return d if len(d) <= 80 and re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", d) else None
+
+    def link(u):
+        if not isinstance(u, str) or len(u) > 600 or not re.fullmatch(r"https?://[^\s\"'<>\\]+", u, re.I):
+            return None
+        x = urllib.parse.urlsplit(u)
+        if x.username or x.password:
+            return None
+        return x, urllib.parse.urlunsplit((x.scheme.lower(), x.netloc.lower(), x.path or "/", x.query, x.fragment))
+
+    def txt(v):
+        if not isinstance(v, str):
+            return None
+        t = re.sub(r"\s+", " ", re.sub(r"[\u0000-\u001f\u007f​-‏ -‮]", " ", v)).strip()
+        return t if t and len(t) <= 200 and not re.search(r"[<>{}]|javascript:|data:|https?://|www\.", t, re.I) else None
+    seen, doms, rows, res = set(), [], [], []
+
+    def add(u, d, title):
+        x = link(u)
+        if not x or x[1] in seen:
+            return
+        d = dom(d) or dom(x[0].hostname or "")
+        if not d:
+            return
+        seen.add(x[1])
+        rows.append((d, txt(title)))
+        if d not in doms:
+            doms.append(d)
+    for h in (raw.get("hits") or [])[:1000]:
+        if h:
+            add(h.get("url"), h.get("domain"), h.get("title"))
+    for r in (raw.get("results") or [])[:200]:
+        if not r:
+            continue
+        add(r.get("link"), r.get("domain"), r.get("title"))
+        x = link(r.get("link"))
+        d = x and (dom(r.get("domain")) or dom(x[0].hostname or ""))
+        if d:
+            th = r.get("thumb")
+            res.append({"link": x[1], "thumb": th if isinstance(th, str) and len(th) <= 600 and GSTATIC.match(th) else None, "kind": r.get("kind")})
+    ok = lambda u: isinstance(u, str) and len(u) <= 600 and GSTATIC.match(u)
+    by, imgs = {}, []
+    for r in res:
+        if r["thumb"] and r["thumb"] not in by:
+            by[r["thumb"]] = r
+    vid = lambda r: bool(r) and (r["kind"] == "video" or bool(VIDEO_RE.search(r["link"] or "")))
+    for u, r in [(u, by.get(u)) for u in (raw.get("images") or [])[:200]] + [(r["thumb"], r) for r in res]:
+        if ok(u) and u not in imgs and not vid(r):
+            imgs.append(u)
+    g = raw.get("google_total")
+    return {"tabs": [len(rows), min(len(imgs), 60), len(doms)], "rows": [d for d, t in rows if t][:5],
+            "count": f"About {g:,} results" if isinstance(g, int) and 0 < g < 1e9 else None}
+
+
+def prod(b, base, out, cues, cta):
+    def stored(slug):   # read-only GET of a stored result → (raw, expected, its leak URL paths)
+        raw = json.load(urllib.request.urlopen(f"{PROD}/api/scan-result/{slug}", timeout=30))
+        (out / f"prod-scan-result-{slug}.json").write_text(json.dumps(raw, indent=1))
+        leaks = {u for u in [h.get("url") for h in raw.get("hits") or []] + [r.get("link") for r in raw.get("results") or []] if isinstance(u, str)}
+        paths = {urllib.parse.urlsplit(u).path for u in leaks} - {""}
+        want = prod_expect(raw)
+        print(f"prod: {raw.get('handle')} {slug} want {want}")
+        return raw, want, {x for x in paths if len(x) >= 8 and x.strip("/").lower() != PROD_HANDLE}   # onlyfans.com/<handle> is typed on screen
+    raw = stored(PROD_SLUG)[0]
+    sse = "".join(f"event: {e}\ndata: {d}\n\n" for e, d in [("progress", "Searching Google, step 1 of 9"), ("progress", "Searching Google, step 6 of 9"),
+                                                             ("result", json.dumps(raw)), ("done", "")])
+    proxied = []
+
+    def proxy(r):   # declared bypass: the page's same-origin API GETs → the production API, read-only
+        u = urllib.parse.urlsplit(r.request.url)
+        if r.request.method != "GET":
+            return r.abort()
+        if u.path == "/api/thumb" and not GSTATIC.match(urllib.parse.parse_qs(u.query).get("u", [""])[0]):
+            return r.fulfill(status=404, body="")   # never ask production for a non-gstatic thumb
+        proxied.append(u.path.split("/")[2])
+        r.fulfill(response=r.fetch(url=PROD + u.path + ("?" + u.query if u.query else ""), timeout=30000))
+
+    def run(label, opts, theater, slug):
+        _, want, paths = stored(slug)
+        ctx = ctx_new(b, **opts)
+        ctx.add_init_script(SAY_STUB)
+        if theater:
+            ctx.add_init_script(IPHONE_FS)
+        for pat in ("**/api/scan-result/**", "**/api/thumb?**", "**/api/media/**"):
+            ctx.route(pat, proxy)
+        held = []
+        ctx.route("**/api/public-scan", lambda r: held.append(r))   # answered below, after the loading state is shot
+        seen = []
+        ext = guard(ctx, (base,), seen)
+        pg = ctx.new_page()
+        errs = []
+        console(pg, errs)
+        if theater:   # the shared link: ?r=<slug> → GET /api/scan-result
+            pg.goto(f"{base}video/?r={slug}")
+            pg.wait_for_function("() => document.querySelector('video').readyState >= 3", timeout=15000)
+            pg.locator(".vo-fs").tap()
+            pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+        else:   # the name bar: the landing's scan, the loading state, then her result
+            pg.goto(f"{base}video/")
+            pg.wait_for_function("() => document.querySelector('video').readyState >= 3", timeout=15000)
+            gen = pg.evaluate(IMGS)
+            check(f"prod ({label}): generic before the submit: default photos (img/removals)", len(gen) == 13 and all(x[0].startswith("../img/removals/") for x in gen), gen[:2])
+            pg.fill("#vo-nb-in", PROD_HANDLE)
+            pg.press("#vo-nb-in", "Enter")
+            t0 = time.monotonic()
+            while not held and time.monotonic() - t0 < 5:
+                pg.wait_for_timeout(100)
+            hold = cues["google"][0] - 0.4
+            if label == "1920":   # the take plays its intro, then holds before the first card while the scan runs
+                try:
+                    pg.wait_for_function("() => document.querySelector('video').paused", timeout=(hold + 6) * 1000)
+                except Exception:
+                    pass
+            pg.wait_for_timeout(400)
+            w = pg.evaluate("() => [document.documentElement.hasAttribute('data-vo-wait'), document.querySelector('.vo-wait').textContent, getComputedStyle(document.querySelector('.vo-wait')).display, document.querySelector('video').paused, +document.querySelector('video').currentTime.toFixed(2)]")
+            pg.locator(".vo-stage").screenshot(path=str(out / f"prod-{label}-loading.png"))
+            ok = bool(held) and w[:3] == [True, f"Scanning @{PROD_HANDLE}…", "block"]
+            if label == "1920":
+                ok = ok and w[3] and abs(w[4] - hold) < 0.6
+            check(f"prod ({label}): submit '{PROD_HANDLE}' → one POST /api/public-scan, the wait pill"
+                  + (f", the take held at ~{hold:g} s (before the first card)" if label == "1920" else "") + f" -> prod-{label}-loading.png", ok, (len(held), w))
+            for r in held:
+                r.fulfill(status=200, content_type="text/event-stream", body=sse)
+        try:
+            pg.wait_for_function("s => location.search === '?r=' + s || document.documentElement.dataset.voMode === 'named'", arg=slug, timeout=15000)
+            pg.wait_for_function("""() => [...document.querySelectorAll('.rm-img, .vo-real')].every(i => i.complete)
+                && [...document.querySelectorAll('.vo-own')].every(i => i.src.includes('/api/media/') && i.complete)""", timeout=30000)
+        except Exception:
+            pass
+        pg.wait_for_timeout(600)
+        st = pg.evaluate("() => [location.search, document.documentElement.dataset.voMode, document.documentElement.hasAttribute('data-vo-wait'), document.querySelector('video').currentSrc, document.querySelector('[data-vo=name]').textContent]")
+        check(f"prod ({label}): her result → named ({st[4]!r}), ?r={slug}, no wait pill, jack.webm the source",
+              st[0] == f"?r={slug}" and st[1] == "named" and not st[2] and st[3].endswith("/video/jack.webm"), st)
+        if not theater and label == "1920":
+            v = pg.evaluate("() => [document.querySelector('video').paused, document.querySelector('video').currentTime]")
+            check(f"prod ({label}): the held take plays on after the result", v[0] is False, v)
+        real = pg.evaluate(REAL)
+        thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and "blur(" in x[2] for x in xs)
+        check(f"prod img ({label}): Google: 3 real thumbs on the first row, loaded, blurred", len(real["g"]) == 3 and thumb(real["g"], 3), real["g"])
+        check(f"prod img ({label}): Google Images: 6 real thumbs, loaded, blurred", len(real["grid"]) == 6 and thumb(real["grid"], 6), real["grid"][:2])
+        check(f"prod img ({label}): cta-steps report: 9 real thumbs (rows + strip), loaded, blurred", len(real["rep"]) == 9 and thumb(real["rep"], 9), real["rep"][:2])
+        check(f"prod img ({label}): every .rm-img = a real /api/thumb one, loaded, blurred", thumb(real["all"], 13), [x for x in real["all"] if not x[0].startswith("/api/thumb")][:2])
+        check(f"prod ({label}): Google rows = her real domains, count {want['count']!r}", real["grows"] == want["rows"][:4] and real["count"] == want["count"], (real["grows"], real["count"]))
+        own = real["own"]
+        check(f"prod ({label}): after photos = her own (/api/media/{slug}/<n>.jpg), loaded, unblurred",
+              len(own) == 6 and all(x[0].startswith(f"/api/media/{slug}/") and x[1] > 0 and x[2] == "none" for x in own), own[:2])
+        live, rem, _ = cues["google-images"]
+        for name, t in (("google-live", cues["google"][0] + 1.3), ("google-images-live", min(rem - 0.1, float(TAP or live + 0.6) + 1.0)), ("google-images-removed", rem + 2.0),
+                        ("x-live", cues["x"][0] + 1.0), ("report", cta + 8.6)):
+            pg.evaluate(DRAW, t)
+            pg.wait_for_timeout(500)
+            f = out / f"prod-{label}-{name}.png"
+            (pg if theater else pg.locator(".vo-stage")).screenshot(path=str(f))
+            if name == "report":
+                s2 = pg.evaluate(STEPS)
+                tabs = [int(re.sub(r"\D", "", x)) for x in s2["tabs"]]
+                check(f"prod ({label}): report = her real counts{' (not the placeholder ' + str(TABS) + ')' if want['tabs'] != TABS else ''} Links / Images / Sites {want['tabs']}, '+ {want['tabs'][0] - 5} more', her rows -> {f.name}",
+                      tabs == want["tabs"] and s2["more"] == f"+ {want['tabs'][0] - 5} more in the full report" and s2["rows"] == want["rows"], (tabs, s2["more"], s2["rows"]))
+        text = pg.evaluate("() => document.body.innerText + ' ' + document.querySelector('.vo').textContent")
+        bad = [x for x in paths if x in text][:3] + re.findall(r"https?://\S+", text)[:3]
+        check(f"prod ({label}): no leak URL in the DOM text ({len(paths)} paths checked, no http(s)://)", not bad, bad)
+        check(f"prod ({label}): every request to 127.0.0.1 (production only through the declared proxy), no console error",
+              not ext and all(u.startswith(base) for u in seen) and not errs, (ext[:3], errs[:3]))
+        ctx.close()
+    TAP = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', (ROOT / "site/video/index.html").read_text(encoding="utf-8"))
+    TAP = TAP and TAP[1]
+    run("1920", dict(viewport={"width": 1920, "height": 1080}), False, PROD_SLUG)
+    run("phone", VIEWPORTS["phone"], False, PROD_SLUG)
+    run("theater", VIEWPORTS["phone"], True, PROD_SLUG2)
+    print(f"prod: proxied read-only GETs: " + ", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))))
 
 
 def play(pg, until):
@@ -315,7 +533,7 @@ def speech(b, base, out, name, cues):
         ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
         ctx.add_init_script(SAY_STUB)
         pg = ctx.new_page()
-        goto(pg, base, query, 43.2)
+        goto(pg, base, query, round(END - 0.8, 2))
         pg.evaluate("() => document.querySelector('.vo-stage').setAttribute('data-cue-say', '99')")
         play(pg, 99)
         pg.wait_for_timeout(300)
@@ -341,22 +559,6 @@ def sfx(b, base, cues):
         ok = before == [0, 0] and len(got) == len(want) and all(k == w[0] and w[1] <= v < w[1] + 0.2 for (k, v), w in zip(got, want))
         check(f"sfx: {label} (no AudioContext before the play gesture; logged {got}, {n} context)", ok and n == (0 if not want else 1), (before, got, n))
         ctx.close()
-
-
-def named_take(b, base, name, cues, shift):
-    """jack-named.mp4 = jack.mp4's bytes via a route (declared): it must play and shift every cue by data-cue-named-shift"""
-    ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
-    ctx.route("**/video/jack-named.mp4", lambda r: r.continue_(url=r.request.url.replace("jack-named.mp4", "jack.mp4")))
-    pg = ctx.new_page()
-    g = cues["google"]
-    for t, want in ((round(g[0] + 0.8, 2), []), (round(g[2] + 0.9, 2), ["google"])):   # jack.mp4 time: google on / gone
-        pg.goto(f"{base}video/?name={name}&t={t:g}")
-        pg.wait_for_function("() => (document.querySelector('video').currentSrc || '').endsWith('/jack-named.mp4')", timeout=8000)
-        pg.wait_for_function(SEEKED, arg=t, timeout=15000)
-        pg.wait_for_timeout(300)
-        vis = [s[0] for s in pg.evaluate(VISIBLE)]
-        check(f"named take: jack-named.mp4 plays, cues + {shift} s: at {t:g} visible {want}", vis == want and pg.evaluate("() => document.querySelector('.vo').dataset.voTake") == "named", vis)
-    ctx.close()
 
 
 def cta_steps(pg, base, out, cta, name_q):
@@ -406,9 +608,9 @@ def cta_steps(pg, base, out, cta, name_q):
           all(m) and len({x[1] for x in m}) >= 4 and m[0][1] == "Google" and m[-1][1] == "Mega" and [int(x[2]) for x in m] == sorted(int(x[2]) for x in m)
           and roll and 0 < int(roll[1]) < LEAKS, walk)
     # past the end: the post-roll clock keeps the loop going (the real take ends ~3.5 s after the cue)
-    pg.goto(f"{base}video/?t=43.4")
-    pg.wait_for_function(SEEKED, arg=43.4, timeout=15000)
-    play(pg, 43.9)
+    pg.goto(f"{base}video/?t={END - 0.6:g}")
+    pg.wait_for_function(SEEKED, arg=round(END - 0.6, 3), timeout=15000)
+    play(pg, END - 0.1)
     pg.wait_for_function("() => document.querySelector('video').ended", timeout=8000)
     try:
         pg.wait_for_function("() => { const s = document.querySelectorAll('.vo-step'); return s.length === 3 && +getComputedStyle(s[2]).opacity > .9"
@@ -457,9 +659,9 @@ def named_flow(pg, base, out, cta, name_q):
     pg.evaluate(DRAW, cta + 15.3)
     s = pg.evaluate(STEPS)
     check("named flow: then it loops (cta + 15.3 = the hero again, toast off)", s and s["so"][0] > .9 and s["eo"] < .1 and s["typed"] == "", s and (s["so"], s["eo"]))
-    pg.goto(f"{base}video/?{name_q}&t=43.4")
-    pg.wait_for_function(SEEKED, arg=43.4, timeout=15000)
-    play(pg, 43.9)
+    pg.goto(f"{base}video/?{name_q}&t={END - 0.6:g}")
+    pg.wait_for_function(SEEKED, arg=round(END - 0.6, 3), timeout=15000)
+    play(pg, END - 0.1)
     pg.wait_for_function("() => document.querySelector('video').ended", timeout=8000)
     t0 = pg.evaluate("() => document.documentElement.dataset.voT")
     pg.wait_for_timeout(1500)
@@ -829,6 +1031,8 @@ def main():
     ap.add_argument("--break-demo", action="store_true")
     ap.add_argument("--break-full", action="store_true")
     ap.add_argument("--break-named", action="store_true")
+    ap.add_argument("--break-img", action="store_true")
+    ap.add_argument("--only", choices=["prod"], help="run only this part (iteration)")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -855,16 +1059,25 @@ def main():
         broken, k = re.subn(r"ctac = cta\(true\);", "ctac = null;", js)
         assert k == 1, "break: ctac = cta(true) not found"
         BREAK["named"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_img:   # wire boundary: video-overlays.js with report()'s image field wrong (it.title for it.src)
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"E\.thumb\(it\.src\)", "E.thumb(it.title)", js)
+        assert k == 1, "break: E.thumb(it.src) not found"
+        BREAK["img"] = ("**/js/video-overlays.js", broken, "application/javascript")
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     tap = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', html)
     cues = {p[0]: p[1:] for p in pf}
     cues["say-start"], cues["say"] = stage_attr(html, "data-cue-say-start"), stage_attr(html, "data-cue-say")
     cta = stage_attr(html, "data-cue-cta") or cues["say"]
-    shift = stage_attr(html, "data-cue-named-shift") or 0
     name_q = "name=" + urllib.parse.quote(a.name)
     with serve() as base, sync_playwright() as p:
         b = p.chromium.launch()
+        if a.only == "prod":
+            prod(b, base, out, cues, cta)
+            for f in fails:
+                print("FAIL", f)
+            return 1 if fails else 0
         for mode, query, who in (("generic", "", GENERIC), ("named", name_q, a.name)):
             for vp, opts in VIEWPORTS.items():
                 ctx = ctx_new(b, **opts)
@@ -918,14 +1131,12 @@ def main():
                 check(f"{vp} {mode}: html[data-vo-mode={mode}]", mode_attr == mode, mode_attr)
                 check(f"{vp} {mode}: no console errors", not errs, errs)
                 check(f"{vp} {mode}: no requests outside the local server", not ext, sorted(set(ext)))
-                if mode == "generic":
-                    check(f"{vp} generic: never asks for jack-named.mp4", not any("jack-named" in u for u in seen))
+                src = pg.evaluate("() => document.querySelector('video').currentSrc")
+                check(f"{vp} {mode}: jack.webm is the playing source", (src or "").endswith("/video/jack.webm"), src)
                 if vp == "desktop" and mode == "named":   # defaults stay for ?name= (no scan photos without a scan)
                     im = pg.evaluate(IMGS)
                     check(f"?name={a.name}: all {len(im)} .rm-img keep the default photos (img/removals), blurred",
                           len(im) == 13 and all(s.startswith("../img/removals/") and "blur(" in f for s, w, f in im), im[:3])
-                    src = pg.evaluate("() => document.querySelector('video').currentSrc")
-                    check(f"?name={a.name}: no jack-named.mp4 on the server → jack.mp4 / .webm plays", re.search(r"/jack\.(mp4|webm)$", src or "") is not None, src)
                 if vp == "desktop" and mode == "generic":
                     # the form: trimmed + collapsed name → ?name=; an invalid one stays
                     if check("end card form: #vo-name present", pg.locator("#vo-name").count() == 1):
@@ -999,8 +1210,8 @@ def main():
         ui_full(b, base, out, name_q)
         speech(b, base, out, a.name, cues)
         sfx(b, base, cues)
-        named_take(b, base, a.name, cues, shift)
         personalized(b, out, a.break_thumbs)
+        prod(b, base, out, cues, cta)
     for f in fails:
         print("FAIL", f)
     return 1 if fails else 0
