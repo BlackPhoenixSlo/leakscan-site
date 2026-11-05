@@ -163,7 +163,7 @@
       <div class="vo-pf vo-for" data-off aria-hidden="true"><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
 
       <!-- generic mode only (no ?name=, no scan): from data-cue-cta (default = data-cue-say) to the end, also after it; 3 steps on an
-           8 s loop (?prefab=cta-steps = the CapCut clip, without the form); the form reloads with ?name= -->
+           8 s loop (?prefab=cta-steps = the CapCut clip, without the form); its form = the name bar's in-place rebuild -->
       <div class="vo-pf vo-cta" data-prefab="cta-steps" data-off>
         <p class="vo-cta-t">Type your name in the link → this video rebuilds with YOUR leaks</p>
         <div class="vo-steps" aria-hidden="true">
@@ -191,14 +191,29 @@
         </form>
       </div>
 
+      <!-- the name bar's submit: a one-shot 1.2 s "REBUILDING FOR <NAME>…" card (glitch + scanlines) over the right half, then the restart -->
+      <div class="vo-rb" data-off aria-hidden="true"><p class="vo-rb-t">Rebuilding for <b class="vo-rb-n"></b>…</p></div>
+
     </div></div>
     <!-- player UI (not in the ?prefab= clips): full screen (the stage, so the cards stay; iPhone: rotated "theater"), touch play bar + hint -->
     <div class="vo-ui">
       <button class="vo-fs" type="button" aria-label="Full screen"><svg class="icon vo-fs-go"><use href="#i-full"/></svg><svg class="icon vo-fs-x"><use href="#i-x"/></svg><span class="vo-fs-t">Full screen</span><span class="vo-fs-r">Rotate</span></button>
       <button class="vo-hint" type="button">Rotate for full size</button>
+      <button class="vo-nb-pill" type="button">Your name</button>
       <span class="vo-big"><svg class="icon"><use href="#i-play"/></svg></span>
       <div class="vo-ctl"><button class="vo-pp" type="button" aria-label="Play"><svg class="icon vo-pp-play"><use href="#i-play"/></svg><svg class="icon vo-pp-pause"><use href="#i-pause"/></svg></button><input class="vo-seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek"></div>
     </div>
+  </div>
+  <!-- the name bar (not in the ?prefab= clips), always under the stage; full screen / theater: the .vo-nb-pill opens it. Submit
+       (here or the end card's form) = rebuild in place: named mode, ?name= via history.replaceState, restart from 0 -->
+  <div class="vo-nb">
+    <form class="vo-nb-f" action="" method="get" novalidate>
+      <label for="vo-nb-in">Your name</label>
+      <span class="vo-nb-w"><input id="vo-nb-in" name="name" type="text" required maxlength="40" autocomplete="off" spellcheck="false" placeholder="Type your name" aria-describedby="vo-nb-err"><span class="vo-nb-hint" aria-hidden="true">&#x1F447; type your name</span></span>
+      <button type="submit">Rebuild this video with my name</button>
+      <p class="vo-nb-err" id="vo-nb-err" role="alert" hidden></p>
+    </form>
+    <p class="vo-nb-on" role="status">Rebuilt for <b class="vo-nb-n"></b><button class="vo-nb-chg" type="button">Change</button><button class="vo-nb-rst" type="button">Reset</button></p>
   </div>
 </main>
 </body>

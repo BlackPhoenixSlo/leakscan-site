@@ -7,7 +7,10 @@
 // Two modes (html[data-vo-mode]): "named" (?name= or a scan result: her texts, the name spoken, "for <name>" pill, the
 // jack-named.mp4 take if the server has it) and "generic" (texts say "Your name", default blurred thumbs, no speech, at
 // data-cue-cta (default data-cue-say) the "Type your name" card = cta-steps: 3 steps on an 8 s loop, type your name → run the
-// free scan → rewatch this video with YOUR content, kept looping after the video ends; its form reloads the page with ?name=).
+// free scan → rewatch this video with YOUR content, kept looping after the video ends).
+// Name bar (.vo-nb, under the stage; full screen / theater: the .vo-nb-pill opens it) + the end card's form = rebuild(): in
+// place, no reload: named mode + texts, ?name= via history.replaceState, a 1.2 s "REBUILDING FOR <NAME>…" card + pop, then
+// the take (jack-named.mp4 if the server has it) restarts from 0, playing (the submit is the gesture). Reset = generic again.
 // Player UI (.vo-ui): full screen = the stage (Fullscreen API, + landscape lock on Android), else (iPhone) a CSS "theater":
 // the stage fixed + rotated 90deg (Esc / X / back closes); touch devices: no native controls, own play bar, a tap on the
 // stage plays / pauses, "Rotate for full size" hint after the first tap.
@@ -195,23 +198,26 @@
       im.setAttribute('src', src);
     });
   }
-  var seekTo = null;   // the pending ?t= (played-take seconds)
-  function namedTake() {   // named mode: play jack-named.mp4 when the server has it (HEAD), else keep jack.mp4
-    if (solo !== null || !video || !window.fetch || !video.canPlayType('video/mp4')) return;
-    fetch(NAMED_TAKE, { method: 'HEAD', cache: 'no-store' }).then(function (r) {
-      if (!r.ok || !/^video\//.test(r.headers.get('content-type') || '') || who === null) return;
-      var at = video.readyState >= 1 ? video.currentTime : seekTo || 0, go = !video.paused;
-      Array.prototype.forEach.call(video.querySelectorAll('source'), function (s) { s.remove(); });
-      shift = num(stage, 'data-cue-named-shift') || 0;
+  var seekTo = null, probe = null, noop = function () {};   // the pending ?t= (played-take seconds); the jack-named.mp4 HEAD
+  var sources = video ? Array.prototype.slice.call(video.querySelectorAll('source')) : [];   // jack.mp4 / .webm, for Reset
+  function named() {   // does the server have jack-named.mp4? (HEAD, once, named mode only) → Promise<bool>
+    if (!probe) probe = solo !== null || !video || !window.fetch || !video.canPlayType('video/mp4') ? Promise.resolve(false)
+      : fetch(NAMED_TAKE, { method: 'HEAD', cache: 'no-store' }).then(function (r) { return r.ok && /^video\//.test(r.headers.get('content-type') || ''); }, function () { return false; });
+    return probe;
+  }
+  function take(on, at, go) {   // play jack-named.mp4 (on) or jack.mp4 (its <source>s) from `at`, playing if go
+    if (on !== (root.getAttribute('data-vo-take') === 'named')) {
+      if (on) { sources.forEach(function (s) { s.remove(); }); video.src = NAMED_TAKE; root.setAttribute('data-vo-take', 'named'); }
+      else { video.removeAttribute('src'); sources.forEach(function (s) { video.appendChild(s); }); root.removeAttribute('data-vo-take'); }
+      shift = on ? num(stage, 'data-cue-named-shift') || 0 : 0;
       retime();
-      video.addEventListener('loadedmetadata', function () { video.currentTime = at; if (go) video.play().catch(function () {}); }, { once: true });
-      video.src = NAMED_TAKE;
+      video.addEventListener('loadedmetadata', function () { video.currentTime = at; if (go) video.play().catch(noop); }, { once: true });
       video.load();
-      root.setAttribute('data-vo-take', 'named');
-      draw(at);
-    }, function () { /* keep jack.mp4 */ });
+    } else { video.currentTime = at; if (go) video.play().catch(noop); }
+    draw(at);
   }
   function mode(m) { document.documentElement.setAttribute('data-vo-mode', m); }
+  var nb = root.querySelector('.vo-nb');
   function personal(n) {
     who = n;
     mode('named');
@@ -219,35 +225,51 @@
     pfs = pfs.filter(function (c) { return c.el !== ctaEl; });
     if (ctaEl) ctaEl.setAttribute('data-off', '');
     if (forEl) forc = { el: forEl, removed: Infinity, tap: Infinity };
-    namedTake();
+    if (nb) { nb.removeAttribute('data-edit'); setText(nb.querySelector('.vo-nb-n'), n); }
   }
-  mode('generic');
-  fill(values({ name: GENERIC }));
-  if (ctaEl) ctac = { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps'),
-    dots: ctaEl.querySelectorAll('.vo-dots i') };
+  function generic() {   // back to "Your name": the end card, no pill, no speech
+    who = null;
+    mode('generic');
+    forc = null;
+    if (forEl) forEl.setAttribute('data-off', '');
+    if (ctaEl) ctac = { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps'),
+      dots: ctaEl.querySelectorAll('.vo-dots i') };
+    if (nb) nb.removeAttribute('data-edit');
+  }
+  // the page's own texts / photos, so a rebuild or Reset starts from them (not from a scan's)
+  var slots = root.querySelectorAll('[data-vo]'), imgs = root.querySelectorAll('.rm-img');
+  Array.prototype.forEach.call(slots, function (el) { el.__def = el.textContent; });
+  Array.prototype.forEach.call(imgs, function (im) { im.__def = im.getAttribute('src'); });
+  function apply(v) {
+    Array.prototype.forEach.call(slots, function (el) { el.textContent = el.__def; if (el.classList.contains('vo-roll')) el.__src = el.__def; });
+    Array.prototype.forEach.call(imgs, function (im) { if (im.getAttribute('src') !== im.__def) im.setAttribute('src', im.__def); });
+    fill(v);
+  }
+  apply(values({ name: GENERIC }));
+  generic();
   var name = q.get('name');
   name = name === null ? null : name.replace(/\s+/g, ' ').trim();
-  if (name && NAME_RE.test(name)) { fill(values({ name: name })); personal(name); }
+  if (name && NAME_RE.test(name)) {
+    fill(values({ name: name }));
+    personal(name);
+    named().then(function (ok) { if (ok && who !== null) take(true, video.readyState >= 1 ? video.currentTime : seekTo || 0, !video.paused); });
+  }
   else {   // the shared scan result, same slug rule as js/removals.js (?r= → last scan → none = generic)
     var E = window.LeakScanEngine, R = window.LeakScanRemovals, slug = q.get('r');
     if (slug === null) { try { slug = (JSON.parse(localStorage.getItem('leakscan.last') || 'null') || {}).slug; } catch (e) { slug = null; } }
     if (E && E.fetchResult && R && typeof slug === 'string' && E.SLUG_RE.test(slug)) {
       E.fetchResult(slug).then(function (raw) {
         var m = R.model(raw);
-        if (m) { var o = mine(raw); m.site = o.site; m.ig = o.ig; m.tt = o.tt; fill(values(m)); thumbs(m.thumbs); personal(m.name); if (solo === null && video) draw(video.currentTime); }
+        if (!m || who !== null) return;   // (a name typed in meanwhile wins)
+        var o = mine(raw); m.site = o.site; m.ig = o.ig; m.tt = o.tt; fill(values(m)); thumbs(m.thumbs); personal(m.name);
+        if (solo === null && video) {
+          draw(video.currentTime);
+          named().then(function (ok) { if (ok && who === m.name) take(true, video.readyState >= 1 ? video.currentTime : seekTo || 0, !video.paused); });
+        }
       }, function () { /* generic */ });
     }
   }
-  // the generic end card's form: same page with ?name= (validated as above), nothing else carried over
-  var form = ctaEl && ctaEl.querySelector('form');
-  if (form) form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var inp = form.querySelector('input'), n = inp.value.replace(/\s+/g, ' ').trim();
-    inp.setCustomValidity(NAME_RE.test(n) ? '' : 'Use 1-40 letters, digits, spaces or . - _');
-    if (!inp.reportValidity()) return;
-    location.assign(location.pathname + '?name=' + encodeURIComponent(n));
-  });
-  if (form) form.querySelector('input').addEventListener('input', function (e) { e.target.setCustomValidity(''); });
+  var form = ctaEl && ctaEl.querySelector('form'), nbForm = nb && nb.querySelector('form');
 
   // ---------- clock ----------
   var api = { prefabs: pfs.map(function (c) { return c.id; }).concat(ctac ? [ctac.id] : []), SOLO: SOLO, SOLO_CTA: SOLO_CTA, draw: draw };
@@ -256,7 +278,7 @@
   if (solo !== null) {
     var one = pfs.concat(ctac ? [ctac] : []).filter(function (c) { return c.id === solo; })[0] || pfs[0], cfg = one === ctac ? SOLO_CTA : SOLO;
     pfs.forEach(function (c) { if (c !== one) c.el.remove(); });
-    [forEl, one === ctac ? one.el.querySelector('form') : ctaEl, root.querySelector('.vo-ui')].forEach(function (el) { if (el) el.remove(); });
+    [forEl, one === ctac ? one.el.querySelector('form') : ctaEl, root.querySelector('.vo-ui'), nb, root.querySelector('.vo-rb')].forEach(function (el) { if (el) el.remove(); });
     pfs = [one];
     if (one === ctac) { ctac = null; one.live = 0; } else { one.live = 0; one.removed = SOLO.wipe; one.out = SOLO.end; one.tap = TAP; }
     root.classList.add('vo-solo');
@@ -286,7 +308,7 @@
   function unduck() { if (ducked !== null) { video.volume = ducked; ducked = null; } }
   function hush() { if (SPEECH && ducked !== null) window.speechSynthesis.cancel(); unduck(); }
   function speak(t) {   // from the play loop / ended only, so never before the user's play gesture
-    if (!who || !SPEECH || !gesture()) return;
+    if (!who || !SPEECH || !gesture() || busy) return;   // (busy: the rebuild card is up, the restart comes after it)
     says.forEach(function (s) {
       var at = s.at();
       if (s.done || !isFinite(at) || t < at || t > at + 2 || ducked !== null) return;
@@ -436,7 +458,70 @@
   document.addEventListener('fullscreenchange', onFs);
   document.addEventListener('webkitfullscreenchange', onFs);
   window.addEventListener('popstate', function () { theater(false, true); });
-  if (form) form.querySelector('input').addEventListener('focus', function () { theater(false); });   // the keyboard comes up upright
+  // ---------- the name: bar + end card form → rebuild() in place; Change / Reset; the full screen pill ----------
+  var BAD = 'Use 1-40 letters, digits, spaces or . - _', RB = 1.2, rbEl = root.querySelector('.vo-rb'), rbRaf = null, rbTok = 0, busy = false;
+  var nbInp = nbForm && nbForm.querySelector('input'), nbErr = nb && nb.querySelector('.vo-nb-err'), nbPill = ui && ui.querySelector('.vo-nb-pill');
+  function rbCard(n) {   // the one-shot card, wall clock (the video is paused meanwhile)
+    if (!rbEl) return;
+    setText(rbEl.querySelector('.vo-rb-n'), n);
+    rbEl.removeAttribute('data-off');
+    cancelAnimationFrame(rbRaf);
+    var t0 = performance.now(), st = rbEl.style;
+    (function frame(now) {
+      var u = clamp((now - t0) / 1000 / RB), gl = u < 0.25 || (u > 0.5 && u < 0.58) || (u > 0.8 && u < 0.85);
+      st.setProperty('--o', Math.min(clamp(u / 0.06), clamp((1 - u) / 0.1)).toFixed(3));
+      st.setProperty('--sc', pop(clamp(u / 0.3)).toFixed(4));
+      st.setProperty('--gx', gl ? (Math.sin(now * 0.09) * 7).toFixed(2) : '0');
+      st.setProperty('--sl', ((now - t0) * 0.04 % 40).toFixed(1));
+      if (u < 1) rbRaf = requestAnimationFrame(frame); else rbEl.setAttribute('data-off', '');
+    })(t0);
+  }
+  function restart() { says.forEach(function (s) { s.done = false; }); endT = Infinity; post = null; lastT = null; }
+  function rebuild(n) {   // generic (or another name) → named for n, in place; called from a submit = a user gesture
+    var tok = ++rbTok;
+    busy = true;
+    if (video.paused) { var pr = video.play(); if (pr) pr.catch(noop); }   // unlocks the element for the delayed play (iOS)
+    video.pause();
+    var ac = audio();
+    if (ac) SOUND.pop(ac);
+    apply(values({ name: n }));
+    personal(n);
+    history.replaceState(history.state, '', location.pathname + '?name=' + encodeURIComponent(n));
+    rbCard(n);
+    restart();
+    setTimeout(function () { named().then(function (ok) { if (tok === rbTok && who === n) { busy = false; restart(); take(ok, 0, true); } }); }, RB * 1000);
+  }
+  function reset() {
+    rbTok++;
+    busy = false;
+    if (rbEl) { cancelAnimationFrame(rbRaf); rbEl.setAttribute('data-off', ''); }
+    apply(values({ name: GENERIC }));
+    generic();
+    if (nbInp) nbInp.value = '';
+    history.replaceState(history.state, '', location.pathname);
+    restart();
+    take(false, 0, true);
+  }
+  function onName(f, err) {   // the bar (inline message) and the end card's form (the browser's bubble) share the submit
+    if (!f) return;
+    var inp = f.querySelector('input'), say = function (m) { inp.setCustomValidity(m); inp.setAttribute('aria-invalid', m ? 'true' : 'false'); if (err) { err.textContent = m; err.hidden = !m; } };
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var n = inp.value.replace(/\s+/g, ' ').trim();
+      if (!NAME_RE.test(n)) { say(BAD); if (err) inp.focus(); else inp.reportValidity(); return; }
+      say('');
+      inp.blur();
+      rebuild(n);
+    });
+    inp.addEventListener('input', function () { say(''); });
+    inp.addEventListener('focus', function () { theater(false); html.setAttribute('data-vo-nb-seen', ''); });   // the keyboard comes up upright
+  }
+  onName(nbForm, nbErr);
+  onName(form, null);
+  var edit = function () { if (!nb) return; if (who) { nb.setAttribute('data-edit', ''); nbInp.value = who; } nbInp.focus(); nbInp.select(); };
+  if (nb) nb.querySelector('.vo-nb-chg').addEventListener('click', edit);
+  if (nb) nb.querySelector('.vo-nb-rst').addEventListener('click', reset);
+  if (nbPill) nbPill.addEventListener('click', own(function () { leave(); setTimeout(edit, 60); }));
   ['play', 'pause', 'ended', 'seeked', 'timeupdate', 'loadedmetadata'].forEach(function (ev) { video.addEventListener(ev, sync); });
   sync();
   document.addEventListener('keydown', function (e) {

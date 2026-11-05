@@ -13,7 +13,7 @@ snap is a removed cue** (the card shakes, flashes, then wipes to the after state
 6. "Reddit. Leaks. [snap] Nothing."
 7. "Mega folders. Fifty gigabytes of your videos. [snap] Gone in a day."
 8. "I do this every single day. That's enough for one video."
-9. "Type your name in the link below, and this exact video rebuilds itself with YOUR leaks. Go check it."
+9. "Type your name in the link below, or in the box under the video, and this exact video rebuilds itself with YOUR leaks. Go check it."
 
 ## Script B (named): `jack-named.mp4`
 

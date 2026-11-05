@@ -18,6 +18,9 @@
   the exact ask + a form (input name=name) and its cue (data-cue-cta, default data-cue-say) is after the last out; the
   "for <name>" pill (.vo-for) exists; js/video-overlays.js keeps the generic name "Your name", the jack-named.mp4 probe
   and the ?sfx=0 switch
+- name bar (.vo-nb) under the stage, outside it: label "Your name", input name=name maxlength=40, button "Rebuild this
+  video with my name", the "👇 type your name" hint pill (.vo-nb-hint, pulsing) + Change / Reset; the full screen pill
+  (.vo-nb-pill in .vo-ui) and the rebuild card (.vo-rb); js: one rebuild() for both forms, history.replaceState, no reload
 - css/video.css has a prefers-reduced-motion: reduce block that drops the particles (.vo-burst) and the shake
 - merged at every width: css/video.css has no max-width media query (the old < 900px "card below the video" stacking)
   and never puts .vo-over in the flow; full screen + theater CSS present (.vo-stage:fullscreen; [data-vo-full="theater"]
@@ -172,6 +175,26 @@ def steps_and_player(html, p):
     return bad
 
 
+def name_bar(html):
+    bad = []
+    m = re.search(r'<div class="vo-nb">(.*?)\n  </div>\n</main>', html, re.S)
+    stage_end = html.find('<div class="vo-nb">') > html.find('<div class="vo-ui">') >= 0
+    need = ('<label for="vo-nb-in">Your name</label>', 'name="name"', 'maxlength="40"', ">Rebuild this video with my name</button>",
+            'class="vo-nb-hint"', "&#x1F447; type your name", 'class="vo-nb-chg"', 'class="vo-nb-rst"')
+    if not m or not stage_end or not all(k in m[1] for k in need):
+        bad.append("video/index.html: the name bar .vo-nb (after the stage, before </main>) needs " + ", ".join(k for k in need if not m or k not in m[1]))
+    if 'class="vo-nb-pill"' not in html or 'class="vo-rb"' not in html:
+        bad.append("video/index.html: the full screen name pill (.vo-nb-pill) / the rebuild card (.vo-rb) missing")
+    css = (SITE / "css" / "video.css").read_text(encoding="utf-8")
+    if "@keyframes vo-nb-pulse" not in css or "[data-vo-full] .vo-nb-pill" not in css or "--nb-h" not in css:
+        bad.append("css/video.css: hint pulse (@keyframes vo-nb-pulse), [data-vo-full] .vo-nb-pill, the --nb-h room under the stage missing")
+    js = (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8")
+    if "function rebuild(n)" not in js or "history.replaceState" not in js or "location.assign" in js or js.count("rebuild(n);") != 1 \
+            or "onName(nbForm, nbErr)" not in js or "onName(form, null)" not in js:
+        bad.append("js/video-overlays.js: both name forms must share one in-place rebuild(n) (history.replaceState, no location.assign reload)")
+    return bad
+
+
 def main():
     bad = []
     p = P()
@@ -179,6 +202,7 @@ def main():
     p.feed(html)
     bad += after_state(html)
     bad += steps_and_player(html, p)
+    bad += name_bar(html)
     cued = [a for a in p.prefabs if "data-cue-live" in a]
     if [a.get("data-prefab") for a in cued] != ORDER:
         bad.append(f"video/index.html: cued prefabs {[a.get('data-prefab') for a in cued]}, want {ORDER}")
