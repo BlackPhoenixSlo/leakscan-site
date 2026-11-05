@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Render the 5 video overlay prefabs (site/video/?prefab=…) as CapCut-ready clips, 1920x1080, 30 fps, 6 s each:
-slide in (0-0.4 s) → live → compare wipe (2.4-3.6 s) → "Removed" stamp → slide out (5.6-6 s). The card sits in the
+pop in (0-0.45 s, + word card) → live → the snap at 2.4 s (shake + flash + "GONE." card, 0.25 s) → compare wipe
+(2.65-3.6 s, counters roll down) → "Removed" stamp slams in (3.6 s) + confetti → slide out (5.6-6 s). Silent: SFX are
+added in CapCut (site/video/CUES.md). No --name = the generic clips ("Your name"); --name X = named. The card sits in the
 right half of the frame (vertically centred, same place as on the web page), so the clip drops on top of Jack's video with no
 repositioning and needs no CapCut in / out animation.
 
@@ -10,7 +12,8 @@ Per prefab ID (google, google-images, x, reddit, mega) in OUT_DIR:
   ID-green.mp4    H.264 yuv420p on chroma #00FF00 (the same frames composited by ffmpeg) for CapCut's Chroma key
   ID-live.png / ID-removed.png   the settled states (1.6 s / 5.4 s) on green, screenshots of
                   ?prefab=ID&state=live|removed&bg=green (so the chroma mode itself is exercised too)
-  ID-in.png / ID-out.png   mid slide-in (0.1 s) / mid slide-out (5.8 s), stills from ID-green.mp4
+  ID-in.png / ID-snap.png / ID-burst.png / ID-out.png   mid pop-in (0.1 s) / mid shake (2.5 s) / confetti (4.0 s) /
+                  mid slide-out (5.8 s), stills from ID-green.mp4
 Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/render_prefabs.py OUT_DIR [--name X] [--keep-frames]
 Needs ffmpeg with prores_ks + libx264."""
 import argparse, pathlib, shutil, subprocess, sys, urllib.parse
@@ -58,7 +61,7 @@ def main():
             ff("-f", "lavfi", "-i", f"color=c=0x00FF00:s={W}x{H}:r={FPS}", *seq, "-filter_complex",
                "[0][1]overlay=shortest=1,format=yuv420p", "-c:v", "libx264", "-crf", "14", "-preset", "medium",
                "-movflags", "+faststart", str(out / f"{pid}-green.mp4"))
-            for t, name in ((0.1, "in"), (5.8, "out")):
+            for t, name in ((0.1, "in"), (2.5, "snap"), (4.0, "burst"), (5.8, "out")):
                 ff("-ss", str(t), "-i", str(out / f"{pid}-green.mp4"), "-frames:v", "1", str(out / f"{pid}-{name}.png"))
             if not a.keep_frames:
                 shutil.rmtree(frames)

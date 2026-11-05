@@ -23,21 +23,27 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   an aggregator page and is never shown), else a mega.nz hit's title; X poster + text, Reddit subreddit + title, the
   most-seen other host, `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
 - Video page `site/video/` (noindex, not in the sitemap; `css/video.css` + `js/video-overlays.js`, own files): Jack's
-  face video (`video/jack.mp4`, full frame, Jack on the left half; `jack.webm` = the Chromium fallback of the 30 s placeholder)
-  with 5 overlay prefabs filling the right half (640x720 box scaled to 960x1080, vertically centred; Google phone, Google
-  Images (tap "Images" → grid), X, Reddit, Mega: slide in → the #removals compare wipe → "Removed" → slide out; Google /
-  Images after = the landing after-phone: her `<name>.com` + Instagram + TikTok, her own unblurred photos),
-  driven by `video.currentTime` against `data-cue-live / -removed / -out` on each `.vo-pf`. Name from `?name=` (1-40
-  letters / digits / space . - _), else the shared scan result (`?r=` / last scan, via `LeakScanRemovals.model` from
-  `js/removals.js`: texts + its `/api/thumb` thumbs in every `.rm-img`, blurred; site / Instagram / TikTok from its
-  profile, as personalize.js), else Orla. `data-cue-say` on
-  `.vo-stage`: a personalized name is spoken (`speechSynthesis`, after the play gesture, video ducked) + "for <name>"
-  pill. `?t=<sec>` seeks; `?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none` = one prefab,
-  no video. Space = play / pause; under 900px the card sits below the video. Cue sheet + CapCut steps:
-  `site/video/CUES.md`. Gate: `tools/video/check_video.py` (CI). Proof: `tools/video/cue_shots.py OUT` (cue shots,
-  right-half geometry, after state, scan-stub texts + thumbs, speech); clips for CapCut (ProRes 4444 alpha .mov + green .mp4, own
-  in / out animation): `tools/video/render_prefabs.py OUT` (both via `cd ~/leakhunt && uv run python …`;
-  `tools/video/serve.py` = local server with Range, which `<video>` seeking needs).
+  face video (full frame, Jack on the left half; `jack.webm` = the Chromium fallback of the 44 s placeholder) with 5
+  overlay prefabs filling the right half (640x720 box scaled to 960x1080, vertically centred; Google phone, Google
+  Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → Jack's snap = shake + flash + "GONE." → the
+  #removals compare wipe with rolling counters → "Removed" slam + CSS confetti → slide out; reduced motion = fades;
+  WebAudio-synthesized pop / whoosh + thud after the play gesture, `?sfx=0` off; Google / Images after = the landing
+  after-phone: her `<name>.com` + Instagram + TikTok, her own unblurred photos), driven by `video.currentTime`
+  against `data-cue-live / -removed / -out` (+ google-images `-tap`) on each `.vo-pf`. Two modes: named = `?name=`
+  (1-40 letters / digits / space . - _) or the shared scan result (`?r=` / last scan, via `LeakScanRemovals.model`
+  from `js/removals.js`: texts + its `/api/thumb` thumbs in every `.rm-img`, blurred; site / Instagram / TikTok from
+  its profile, as personalize.js): plays `jack-named.mp4` if present (HEAD probe; cues + `data-cue-named-shift`) else
+  `jack.mp4`, speaks the name at `data-cue-say-start` + `data-cue-say` (`speechSynthesis`, video ducked) + "for
+  <name>" pill; generic = "Your name", `jack.mp4`, no speech, end card at `data-cue-cta` (default `-say`) with a
+  `?name=` form. `?t=<sec>` seeks; `?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none` = one
+  prefab, no video. Space = play / pause; under 900px the card sits below the video. Script (2 takes):
+  `site/video/SCRIPT.md`; cue sheet + CapCut steps + SFX: `site/video/CUES.md`. Gate: `tools/video/check_video.py`
+  (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry, after state, counters, end
+  card + form, snap, reduced motion, sfx, speech, named take, scan-stub texts + thumbs); clips for CapCut (ProRes 4444
+  alpha .mov + green .mp4, own in / out animation, silent): `tools/video/render_prefabs.py OUT`; cues from a take
+  (whisper / faster-whisper word timestamps → `data-cue-*` diff, untested on a real take):
+  `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
+  server with Range, which `<video>` seeking needs).
 - Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
   `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API

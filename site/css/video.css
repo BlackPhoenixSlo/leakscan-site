@@ -1,7 +1,8 @@
 /* site/video/: Jack's face video (he is on the left half) + cue-driven overlay prefabs filling the right half. Reuses styles.css (tokens, Google phone) and removals.css (Mega / X / Reddit panels, .rm-stage compare wipe);
    js/video-overlays.js sets every animated value as a custom property from the video time: --o (opacity), --x / --y
-   (slide in / out), --p (wipe, 100 = live, 0 = removed), --w (wipe progress 0..1), --h (handle), --s (stamp). No CSS
-   transitions, so a seek or a frame capture is exact. */
+   (slide in / out + the snap shake), --rot (shake), --sc (pop-in scale), --f (snap flash), --p (wipe, 100 = live, 0 =
+   removed), --w (wipe progress 0..1), --h (handle), --s (stamp slam), --b / --bo (confetti), --kls / --klo / --kgs /
+   --kgo (word cards). No CSS transitions, so a seek or a frame capture is exact. */
 .vo-page { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0c0e; }
 .vo-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .vo-stage { position: relative; width: min(100vw, 177.78vh); aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
@@ -19,8 +20,10 @@
 
 /* one prefab: caption pill, panel, "Removed" stamp */
 /* centred in the box (the right half), offset by the slide (--x / --y) */
-.vo-pf { --o: 0; --x: 0; --y: 0; --w: 0; --h: 0; --s: 0; position: absolute; left: 50%; top: 50%; width: 520px; display: grid; justify-items: center; gap: 14px;
-  opacity: var(--o); transform: translate(calc(-50% + var(--x) * 1px), calc(-50% + var(--y) * 1px)); font-family: var(--sans); }
+.vo-pf { --o: 0; --x: 0; --y: 0; --rot: 0; --sc: 1; --f: 0; --w: 0; --h: 0; --s: 0; --b: 0; --bo: 0; --klo: 0; --kgo: 0; --kls: 1; --kgs: 1;
+  position: absolute; left: 50%; top: 50%; width: 520px; display: grid; justify-items: center; gap: 14px; opacity: var(--o);
+  transform: translate(calc(-50% + var(--x) * 1px), calc(-50% + var(--y) * 1px)) rotate(calc(var(--rot) * 1deg)) scale(var(--sc)); font-family: var(--sans); }
+.vo-rs::after { content: ""; position: absolute; inset: 0; z-index: 4; background: #fff; opacity: var(--f); pointer-events: none; }   /* the snap flash, over the panel / phone screen */
 .vo-pf[data-off] { visibility: hidden; }
 .vo-cap { display: inline-flex; align-items: center; gap: 10px; margin: 0; padding: 8px 18px 8px 8px; border-radius: 999px; background: #fff; color: #1f1a15;
   box-shadow: 0 6px 22px rgb(0 0 0 / .22); font: 600 1.05rem/1.2 var(--sans); white-space: nowrap; }
@@ -36,8 +39,20 @@
 .vo .rm-handle { opacity: var(--h); }
 .vo-stamp { position: absolute; bottom: -16px; right: -10px; display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px 9px 14px; border-radius: 999px;
   background: #23704f; color: #fff; font: 800 1.1rem/1 var(--sans); box-shadow: 0 6px 20px rgb(0 0 0 / .25);
-  opacity: var(--s); transform: rotate(-6deg) scale(calc(.6 + var(--s) * .4)); }
+  opacity: min(1, calc(var(--s) * 4)); transform: rotate(-6deg) scale(calc(2 - var(--s))); }   /* slams in: 2 → 1 */
 .vo-stamp .icon { width: 20px; height: 20px; stroke-width: 3; }
+/* confetti: 12 pieces from the stamp (js), each flies to (--cx, --cy) px + gravity over --b, fading with --bo */
+.vo-burst { position: absolute; right: 80px; bottom: 6px; width: 0; height: 0; z-index: 4; pointer-events: none; }
+.vo-burst i { position: absolute; left: -5px; top: -7px; width: 10px; height: 14px; border-radius: 2px; background: var(--c); opacity: var(--bo);
+  transform: translate(calc(var(--cx) * var(--b) * 1px), calc((var(--cy) * var(--b) + var(--b) * var(--b) * 60) * 1px)) rotate(calc(var(--cr) * var(--b) * 1deg)); }
+/* kinetic word card, MrBeast style (black on #ffd400: 14:1), top-right over the panel: on live and on the snap, 0.6 s each */
+.vo-kw { position: absolute; top: 96px; right: -18px; z-index: 6; display: grid; justify-items: end; pointer-events: none; }
+.vo-kw > span { grid-area: 1 / 1; padding: 6px 16px 8px; border: 4px solid #000; border-radius: 10px; background: #ffd400; color: #000;
+  box-shadow: 6px 6px 0 #000; font: 900 2.6rem/1 var(--sans); letter-spacing: -.01em; text-transform: uppercase; white-space: nowrap; transform-origin: 70% 60%; }
+.vo-kw-live { opacity: var(--klo); transform: rotate(5deg) scale(var(--kls)); }
+.vo-kw-gone { opacity: var(--kgo); transform: rotate(-4deg) scale(var(--kgs)); }
+/* rolling counters (.vo-roll, js): Google's "About N results" line */
+.vo-count { flex: none; margin: -4px 0 6px; font-size: .68rem; color: #70757a; }
 
 /* Google prefab: the landing page's phone, results in a compare stage; after = her site + socials (the landing after-phone) */
 .vo-phone { width: 300px; aspect-ratio: 9 / 16; }   /* 300x533: the card stays ~600 of the 720 box */
@@ -70,8 +85,28 @@
 
 /* "for <name>" at data-cue-say: just the pill, same slot */
 
+/* generic end card (data-cue-cta): the ask + a tiny ?name= form; the only interactive overlay */
+.vo-cta { box-sizing: border-box; width: 520px; padding: 26px 26px 24px; border: 5px solid #000; border-radius: 18px; background: #ffd400; color: #000;
+  box-shadow: 10px 10px 0 #000; pointer-events: auto; }
+.vo-cta-t { margin: 0; font: 900 2.05rem/1.12 var(--sans); text-align: center; letter-spacing: -.01em; }
+.vo-cta-f { display: flex; gap: 10px; width: 100%; }
+.vo-cta-f input { flex: 1; min-width: 0; padding: 12px 16px; border: 3px solid #000; border-radius: 12px; background: #fff; color: #000; font: 700 1.15rem/1.2 var(--sans); }
+.vo-cta-f input::placeholder { color: #5c5248; }
+.vo-cta-f button { padding: 12px 18px; border: 3px solid #000; border-radius: 12px; background: #000; color: #ffd400; font: 900 1.15rem/1.2 var(--sans); cursor: pointer; }
+.vo-cta-f :focus-visible { outline: 3px solid #2f80ff; outline-offset: 2px; }
+
 /* ?prefab=…: one prefab alone in a 1920x1080 frame, still on the right half; bg=green → chroma #00FF00, bg=none → transparent */
 .vo-solo .vo-video { display: none; }
 .vo-solo .vo-stage { background: none; }
 html.vo-green, html.vo-green .vo-page { background: #00ff00; }
 html.vo-clear, html.vo-clear .vo-page { background: transparent; }
+
+/* reduced motion: no shake / pop / slam / particles / wipe sweep; plain fades on the same timeline */
+@media (prefers-reduced-motion: reduce) {
+  .vo-pf { transform: translate(-50%, -50%); }
+  .vo-rs::after, .vo-burst { display: none; }
+  .vo-stamp { transform: rotate(-6deg); }
+  .vo-kw > span { transform: none; }
+  .vo .vo-rs .rm-gone { clip-path: none; opacity: var(--w); }
+  .vo .vo-rs .rm-handle { display: none; }
+}
