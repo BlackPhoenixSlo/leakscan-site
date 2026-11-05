@@ -67,7 +67,7 @@ may go red.
 import base64
 import json, pathlib, re, socket, subprocess, sys, time, urllib.request
 from urllib.parse import parse_qs, quote, unquote, urlsplit
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PWTimeout, sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 FX = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())
@@ -136,7 +136,7 @@ ALSO = "Also found as " + ", ".join("@" + a for a in FX["aliases"]["discovered"]
 # leak-page socials on platforms the profile does not have (the discovered Instagram never replaces hers)
 FOUND = [s["url"] for s in FX["aliases"]["socials"] if s["platform"] not in {a["platform"] for a in FX["profile"]["accounts"]}]
 VIDEOS = [r for r in FX["results"] if r["kind"] == "video"]
-IMAGES = min(30, len(dict.fromkeys(FX["images"] + [r["thumb"] for r in FX["results"] if r["thumb"] and r["kind"] != "video"])))   # video stills: Videos tab only
+IMAGES = len(dict.fromkeys(FX["images"] + [r["thumb"] for r in FX["results"] if r["thumb"] and r["kind"] != "video"]))   # video stills: Videos tab only
 
 
 def check(name, ok, detail=""):
@@ -293,8 +293,7 @@ def scan_flow(browser, vp_name, vp):
         while page.locator("[data-more=videos]").count():
             page.locator("[data-more=videos]").click()
         nv = page.locator("#g-panel .g-v").count()
-        check(f"{vp_name}/{device} Videos tab count (phone: first look fitted, More reaches every video)",
-              nv == len(VIDEOS) and (1 <= nv0 <= 6 if device == "phone" else nv0 == nv), f"{nv0}→{nv} want {len(VIDEOS)}")
+        check(f"{vp_name}/{device} Videos tab count (every video at once)", nv0 == nv == len(VIDEOS), f"{nv0}→{nv} want {len(VIDEOS)}")
         page.wait_for_timeout(300)
         g.screenshot(path=str(out / f"{vp_name}-5-{device}-videos.png"))
 
@@ -400,6 +399,8 @@ for _u, _d in [(h["url"], h["domain"]) for h in HUGE["hits"]] + [(r["link"], r["
     HUGE_SITES.setdefault(_d, {})[_u] = 1
 HUGE_LINKS = sum(len(v) for v in HUGE_SITES.values())
 HUGE_TOP = max(HUGE_SITES, key=lambda d: len(HUGE_SITES[d]))
+HUGE_IMAGES = len(dict.fromkeys(HUGE["images"] + [r["thumb"] for r in HUGE["results"] if r.get("thumb") and r["kind"] != "video"]))
+HUGE_VIDEOS = sum(r["kind"] == "video" for r in HUGE["results"])
 NODE_BUDGET = 900   # whole page after the report renders (main before this change: ~3,800 at this size)
 IN_VIEW = """() => { const a = document.activeElement, r = a.getBoundingClientRect(), s = a.closest('.ph-scroll');
     let top = document.querySelector('.rnav').getBoundingClientRect().bottom, bot = innerHeight;   /* clear of the sticky nav, */
@@ -450,7 +451,7 @@ def huge_flow(browser, vp_name, vp):
     first = page.locator("#lx-list .lx-name").first.inner_text()
     check(f"{tag} biggest site first", first == HUGE_TOP, first)
     thumbs0 = len(thumbs)   # at load, before any scroll / tab / reopen
-    check(f"{tag} no thumbnail fetched beyond the first screen (lazy)", thumbs0 <= 8, thumbs0)
+    check(f"{tag} lazy thumbs: at load <= 24 of {HUGE_IMAGES} images fetched (strip + first screen only)", thumbs0 <= 24, thumbs0)
 
     # 2. the scroll story: summary → pinned phone (screen scrolls 1:1) → the sites
     if phone:
@@ -460,19 +461,21 @@ def huge_flow(browser, vp_name, vp):
         check(f"{tag} phone frame fits the screen under the nav", g["fh"] + g["pin"] <= g["vh"], g)
         check(f"{tag} phone frame ~80% of the screen (>= 78%)", g["fh"] >= 0.78 * g["vh"], [g["fh"], g["vh"]])
         check(f"{tag} track = frame + screen overflow", abs(g["h"] - g["fh"] - g["max"]) <= 2 and g["max"] > 400, g)
-        runs = {}   # each tab's first look: at most 1.5 screens of pinned scrolling before the sites, the rest behind More
+        runs = {}   # All: first look fitted (<= 1.5 screens, rest behind More); Images / Videos: everything (<= 60) in the screen's own scroll
         for t in ("images", "videos", "all"):
             page.locator(f"#g-tab-{t}").click()
             page.wait_for_timeout(300)
-            runs[t] = page.evaluate("""() => { const t = document.querySelector('.ph-track'), tl = [...document.querySelectorAll('#g-panel .g-tile')];
-                return [t.offsetHeight - t.firstElementChild.offsetHeight, !!document.querySelector('#g-panel [data-more]'), tl.length,
-                        tl.filter(e => e.offsetTop === (tl[0] && tl[0].offsetTop)).length]; }""")
+            runs[t] = page.evaluate("""() => { const t = document.querySelector('.ph-track'), s = t.querySelector('.ph-scroll'), tl = [...document.querySelectorAll('#g-panel .g-tile, #g-panel .g-v')];
+                const last = tl[tl.length - 1], sr = s.getBoundingClientRect();
+                return {run: t.offsetHeight - t.firstElementChild.offsetHeight, more: !!document.querySelector('#g-panel [data-more]'), n: tl.length,
+                        cols: tl.filter(e => e.offsetTop === (tl[0] && tl[0].offsetTop)).length, inner: tl.every(e => s.contains(e)),
+                        reach: !last || last.getBoundingClientRect().bottom - sr.top + s.scrollTop <= s.scrollHeight + 1}; }""")
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
-        check(f"{tag} pin: All / Videos scroll <= 1.5 screens, Images <= 2 (more behind More)",
-              all(v[0] <= (2 if k == "images" else 1.5) * g["vh"] and v[1] for k, v in runs.items()), [runs, g["vh"]])
-        check(f"{tag} pin: Images first look = 3 columns, 18-24 tiles in whole rows, over 1.5 screens only to reach 6 rows",
-              runs["images"][3] == 3 and 18 <= runs["images"][2] <= 24 and runs["images"][2] % 3 == 0
-              and (runs["images"][0] <= 1.5 * g["vh"] or runs["images"][2] == 18), runs["images"])
+        ri, rv = runs["images"], runs["videos"]
+        check(f"{tag} pin: All first look <= 1.5 screens, rest behind More", runs["all"]["run"] <= 1.5 * g["vh"] and runs["all"]["more"], [runs["all"], g["vh"]])
+        check(f"{tag} pin: Images = all {min(HUGE_IMAGES, 60)} of {HUGE_IMAGES} images as 3-column tiles inside the screen's own scroll, More only past 60",
+              ri["n"] == min(HUGE_IMAGES, 60) and ri["cols"] == 3 and ri["inner"] and ri["reach"] and ri["more"] == (HUGE_IMAGES > 60) and ri["run"] > 2 * g["vh"], [ri, g["vh"]])
+        check(f"{tag} pin: Videos = all {HUGE_VIDEOS} inside the screen's own scroll, no More", rv["n"] == min(HUGE_VIDEOS, 60) and rv["inner"] and rv["reach"] and not rv["more"], rv)
         page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
         page.wait_for_timeout(250)
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
@@ -505,6 +508,58 @@ def huge_flow(browser, vp_name, vp):
         check(f"{tag} keyboard More results → focus on the first new result, in view", nx == ["g-title", had, True], [nx, had])
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
         page.wait_for_timeout(150)
+    # the All tab's Images block: one row, every image, swipe sideways (snap), keyboard + desktop arrows; the page never scrolls sideways
+    page.locator("#g-tab-all").click()
+    page.wait_for_timeout(250)
+    STRIP = """() => { const s = document.querySelector('#g-panel .g-strip'); if (!s) return null; const b = [...s.querySelectorAll(':scope > .g-pack-b')], cs = getComputedStyle(s),
+        sl = s.getBoundingClientRect().left + parseFloat(cs.scrollPaddingLeft || 0), w = s.parentNode;
+        return {n: b.length, rows: new Set(b.map(e => e.offsetTop)).size, tile: [Math.round(b[0].offsetWidth), Math.round(b[0].offsetHeight)], sw: s.scrollWidth, cw: s.clientWidth,
+          left: Math.round(s.scrollLeft), snap: cs.scrollSnapType, ox: cs.overflowX, bar: s.offsetHeight - s.clientHeight, open: b.every(e => e.matches('a[target=_blank][href^=http], button[data-goto=images]')) && b.some(e => e.matches('a')),
+          snapped: b.some(e => Math.abs(e.getBoundingClientRect().left - sl) <= 2), start: w.classList.contains('at-start'), end: w.classList.contains('at-end'),
+          lazy: b.every(e => e.querySelector('img').loading === 'lazy'), showMore: /show more images/i.test(document.getElementById('g-panel').textContent),
+          pageX: document.documentElement.scrollWidth - innerWidth, inner: (document.querySelector('.ph-scroll') || {}).scrollTop || 0}; }"""
+    s0 = page.evaluate(STRIP)
+    check(f"{tag} strip: All tab Images = one row of all {HUGE_IMAGES} images, square {'~110px' if phone else '150px'} tiles, scrollWidth > clientWidth, snap x mandatory, no scrollbar, no 'Show more images', each tile opens its page (or the Images tab)",
+          s0 and s0["n"] == HUGE_IMAGES and s0["rows"] == 1 and abs(s0["tile"][0] - s0["tile"][1]) <= 1 and (95 <= s0["tile"][0] <= 125 if phone else s0["tile"][0] == 150)
+          and s0["sw"] > s0["cw"] and s0["snap"] == "x mandatory" and s0["ox"] == "auto" and s0["bar"] == 0 and not s0["showMore"] and s0["open"] and s0["lazy"] and s0["start"], s0)
+    sb = page.eval_on_selector("#g-panel .g-strip", "s => { const r = s.getBoundingClientRect(); return [r.left + r.width * .75, r.top + r.height / 2]; }")
+    if phone:   # a real touch swipe (right → left), momentum + snap settle
+        cdp.send("Input.synthesizeScrollGesture", {"x": int(sb[0]), "y": int(min(sb[1], vp["height"] - 10)), "xDistance": -260, "yDistance": 0, "gestureSourceType": "touch", "speed": 1200})
+    else:       # hover shows the arrows; the next arrow pages the strip
+        page.mouse.move(*sb)
+        page.wait_for_timeout(350)
+        arrows = page.evaluate("() => ['.g-strip-prev', '.g-strip-next'].map(c => { const b = document.querySelector('#g-panel ' + c); return [+getComputedStyle(b).opacity, b.disabled, b.getAttribute('aria-label')]; })")
+        try:
+            page.locator("#g-panel .g-strip-next").click(timeout=3000)
+        except PWTimeout:
+            arrows.append("next not clickable")
+    page.wait_for_timeout(1200)
+    s1 = page.evaluate(STRIP)
+    page.screenshot(path=str(out / f"{vp_name}-h2b-strip-swiped.png"))
+    if phone:
+        check(f"{tag} strip: a touch swipe left scrolls the strip and snaps to a tile; page and phone screen stay put", s1["left"] > 100 and s1["snapped"] and s1["pageX"] <= 0
+              and s1["inner"] == s0["inner"] and not s1["start"], [s0["left"], s1])
+    else:
+        prev_on = page.evaluate("() => !document.querySelector('#g-panel .g-strip-prev').disabled")
+        check(f"{tag} strip: desktop arrows on hover, named (prev hidden + disabled at the start), next pages the strip and snaps, then prev is enabled",
+              arrows[0][:2] == [0, True] and arrows[1][:2] == [1, False] and arrows[0][2] and arrows[1][2] and prev_on
+              and s1["left"] >= 0.6 * s1["cw"] and s1["snapped"] and not s1["start"] and s1["pageX"] <= 0, [arrows, prev_on, s1])
+        page.mouse.move(0, 0)
+    page.locator("#g-panel .g-strip > .g-pack-b").first.focus()
+    kk = []
+    for key in ("ArrowRight", "ArrowRight", "ArrowLeft", "End", "Home"):
+        page.keyboard.press(key)
+        page.wait_for_timeout(450)
+        kk.append(page.evaluate("() => { const a = document.activeElement, b = [...document.querySelectorAll('#g-panel .g-strip > .g-pack-b')]; return b.indexOf(a); }"))
+        if key == "End":
+            kk.append(page.evaluate("document.querySelector('#g-panel .g-strip-w').classList.contains('at-end')"))
+    page.keyboard.press("Tab")
+    kk.append(page.evaluate("() => [...document.querySelectorAll('#g-panel .g-strip > .g-pack-b')].indexOf(document.activeElement)"))
+    check(f"{tag} strip: keyboard → / ← / End / Home move focus along the tiles (End scrolls the strip to its end), Tab reaches the next one",
+          kk == [1, 2, 1, HUGE_IMAGES - 1, True, 0, 1], kk)
+    page.locator("#g-panel .g-strip").evaluate("s => s.scrollTo({left: 0, behavior: 'instant'})")
+    page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+    page.wait_for_timeout(200)
     page.mouse.move(vp["width"] / 2, vp["height"] / 2)
     steps = 0
     while page.evaluate("document.getElementById('sites-title').getBoundingClientRect().top") > vp["height"] * .4 and steps < 200:
@@ -645,11 +700,12 @@ def huge_flow(browser, vp_name, vp):
                 !!document.querySelector('#g-panel [data-more=all]')]; }""")
             sc = p2.evaluate(SCROLLERS)
             fh = {}
-            for t in ("images", "videos", "all"):
+            for t, item in (("images", ".g-tile"), ("videos", ".g-v"), ("all", ".g-r")):
                 p2.locator(f"#g-tab-{t}").click()
                 p2.wait_for_timeout(250)
-                fh[t] = p2.evaluate("document.querySelector('.frame-phone').offsetHeight")
-            check(f"{tag} short screen ({w}x{h}): every tab's static preview <= 1.5 screens tall", all(v <= 1.5 * h for v in fh.values()), [fh, 1.5 * h])
+                fh[t] = [p2.evaluate("document.querySelector('.frame-phone').offsetHeight"), p2.locator(f"#g-panel {item}").count()]
+            check(f"{tag} short screen ({w}x{h}): All's static preview <= 1.5 screens tall; Images / Videos show everything up to 60",
+                  fh["all"][0] <= 1.5 * h and fh["images"][1] == min(HUGE_IMAGES, 60) and fh["videos"][1] == min(HUGE_VIDEOS, 60), [fh, 1.5 * h])
             p2.locator("[data-more=all]").click()
             p2.wait_for_timeout(200)
             n2 = p2.locator("#g-panel .g-r").count()
@@ -662,7 +718,7 @@ def huge_flow(browser, vp_name, vp):
             check(f"{tag} short screen ({w}x{h}): Reveal pill label on one line, inside the phone screen", pl[0] == 1 and min(pl[1:]) >= 8, pl)
             # Show fewer: back to exactly the first look; focus on More, clear of the pinned header + section nav
             fl = {}
-            for t, item in (("all", ".g-r"), ("images", ".g-tile"), ("videos", ".g-v")):
+            for t, item in (("all", ".g-r"), ("images", ".g-tile")):   # (Videos: all 10 shown, no More)
                 p2.locator(f"#g-tab-{t}").click()
                 p2.wait_for_timeout(200)
                 n0 = r[1] if t == "all" else p2.locator(f"#g-panel {item}").count()   # All: grown above
@@ -684,9 +740,9 @@ def huge_flow(browser, vp_name, vp):
         p4 = ctx.new_page()
         p4.goto(base + "scan/?r=" + slug)
         p4.wait_for_selector("#report:not([hidden])", timeout=8000)
-        p4.locator("#g-tab-videos").click()
-        p4.locator("[data-more=videos]").click()
-        nv = p4.locator("#g-panel .g-v").count()
+        p4.locator("#g-tab-images").click()
+        p4.locator("[data-more=images]").click()
+        ni = p4.locator("#g-panel .g-tile").count()
         p4.locator("#g-tab-all").click()
         p4.wait_for_timeout(200)
         RUN = "() => { const t = document.querySelector('.ph-track'); return t.offsetHeight - t.firstElementChild.offsetHeight; }"
@@ -694,29 +750,28 @@ def huge_flow(browser, vp_name, vp):
         p4.set_viewport_size({"width": 360, "height": 640})
         p4.wait_for_timeout(700)
         rr["all"] = p4.evaluate(RUN)
-        p4.locator("#g-tab-images").click()
-        p4.wait_for_timeout(300)
-        rr["images"] = p4.evaluate(RUN)
-        rr["images_n"] = p4.locator("#g-panel .g-tile").count()
         rr["frame_pct"] = p4.evaluate("Math.round(100 * document.querySelector('.frame-phone').offsetHeight / innerHeight)")
         p4.locator("#g-tab-videos").click()
         p4.wait_for_timeout(300)
-        rr["videos_n"] = [nv, p4.locator("#g-panel .g-v").count()]
-        check(f"{tag} resize 390x844 → 360x640: untouched tabs refit (All <= 1.5 screens, Images <= 2 with >= 18 tiles), frame >= 78%, the tab grown by More keeps its items",
-              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["images"] <= 2 * 640 and rr["images_n"] >= 18 and rr["frame_pct"] >= 78
-              and rr["videos_n"][0] == rr["videos_n"][1] > 6, rr)
-        # a grown tab shrinks back: "Show fewer" refits it, the view lands on its More button
-        grown = p4.evaluate(RUN)
-        has_less = p4.locator("[data-less=videos]").count() == 1
+        rr["videos_n"] = p4.locator("#g-panel .g-v").count()
+        p4.locator("#g-tab-images").click()
+        p4.wait_for_timeout(300)
+        rr["images_n"] = [ni, p4.locator("#g-panel .g-tile").count()]
+        check(f"{tag} resize 390x844 → 360x640: All refits (<= 1.5 screens), frame >= 78%, Videos all, Images grown by More keeps its {HUGE_IMAGES}",
+              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["frame_pct"] >= 78 and rr["videos_n"] == HUGE_VIDEOS
+              and rr["images_n"][0] == rr["images_n"][1] == HUGE_IMAGES, rr)
+        # a grown tab shrinks back: "Show fewer" restores its first look (60), the view lands on its More button
+        grown = p4.locator("#g-panel .g-tile").count()
+        has_less = p4.locator("[data-less=images]").count() == 1
         if has_less:
-            p4.locator("[data-less=videos]").click()
+            p4.locator("[data-less=images]").click()
             p4.wait_for_timeout(300)
-        sf = p4.evaluate("""() => { const m = document.querySelector('#g-panel [data-more=videos]'), r = m && m.getBoundingClientRect(), t = document.querySelector('.ph-track');
-            return {run: t.offsetHeight - t.firstElementChild.offsetHeight, n: document.querySelectorAll('#g-panel .g-v').length, less: !!document.querySelector('[data-less]'),
+        sf = p4.evaluate("""() => { const m = document.querySelector('#g-panel [data-more=images]'), r = m && m.getBoundingClientRect();
+            return {n: document.querySelectorAll('#g-panel .g-tile').length, less: !!document.querySelector('[data-less]'),
               focus: document.activeElement === m, seen: !!r && r.top >= document.querySelector('.rnav').getBoundingClientRect().bottom && r.bottom <= innerHeight}; }""")
         sf["grown"], sf["has_less"] = grown, has_less
-        check(f"{tag} Show fewer: a grown tab goes back to a fitted first look (<= 1.5 screens), focus + view on its More button",
-              has_less and grown > 1.5 * 640 and sf["run"] <= 1.5 * 640 and 0 < sf["n"] < 10 and not sf["less"] and sf["focus"] and sf["seen"], sf)
+        check(f"{tag} Show fewer: grown Images goes back to its first 60, focus + view on its More button",
+              has_less and grown == HUGE_IMAGES and sf["n"] == min(HUGE_IMAGES, 60) and not sf["less"] and sf["focus"] and sf["seen"], sf)
         ctx.close()
         # keyboard: Enter on "Show more images" until all are shown; focus stays in the panel (new tile / More / Show fewer)
         ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
@@ -2285,7 +2340,7 @@ def tabs_flow(browser, vp_name, vp):
     if vp_name == "phone":   # pinned phone: a failed tile's slot goes to the next image (same size), nothing moves
         ctx = new_ctx()
         page = ctx.new_page()
-        held = []   # the 404 / blank thumbs answer late: after the Images tab is up (the All tab's pack would fail them first)
+        held = []   # the 404 / blank thumbs answer late: after the Images tab is up (the All tab's strip would fail them first)
         page.route(lambda u: "/api/thumb" in u and dead_thumb(unquote(u)), lambda r: held.append(r))
         page.goto(base + "scan/?r=demoBrokenT1", wait_until="load")
         page.wait_for_selector("#g-tab-images", timeout=8000)
@@ -2298,14 +2353,124 @@ def tabs_flow(browser, vp_name, vp):
         page.wait_for_timeout(1500)
         s1 = page.evaluate("""(t0) => [[...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16]),
             window.__ls.filter(x => x[0] > t0 + 200 && x[1] > 0 && !x[2]).map(x => x[3])]""", t0)
-        check(f"{tag} thumbs: pinned phone Images: failed tiles swapped in place for the next image (same count, all painted), no layout shift",
-              any(dead_thumb(u) for u in s0) and len(A) > len(s0) and len(s1[0]) == len(s0) and all(ok for _u, ok in s1[0])
-              and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(A), len(s1[0]), s1[1][:2]])
+        # every image already shown (phone Images: all up to 60): a failed slot is taken by the last tile, so the count is every live image
+        d0 = next(i for i, u in enumerate(s0) if dead_thumb(u)) if any(dead_thumb(u) for u in s0) else -1
+        check(f"{tag} thumbs: pinned phone Images: failed tiles' slots filled in place (spare image, else the last tile), every live image painted, tiles above untouched, no layout shift",
+              d0 >= 0 and len(s1[0]) == (len(s0) if len(A) > len(s0) else len(A)) and all(ok for _u, ok in s1[0]) and [u for u, _ok in s1[0][:d0]] == s0[:d0]
+              and not dead_thumb(s1[0][d0][0]) and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(A), len(s1[0]), d0, s1[1][:2]])
         page.locator("#device input[value=computer]").check(force=True)
         page.wait_for_timeout(300)
         back = page.evaluate("() => [...document.querySelectorAll('#g-stage img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1] || ''))")
         check(f"{tag} thumbs: a device switch keeps failed thumbs out (Computer view lists none of them)", back and not any(dead_thumb(u) for u in back), [u[-24:] for u in back if dead_thumb(u)])
         ctx.close()
+    # more than 80 Google results (the page list stops at 80): every result's thumb is still in the strip and the Images tab
+    ctx = new_ctx()
+    page = ctx.new_page()
+    def many(r, _q):
+        d = json.loads(r.fetch().text())
+        d["results"] = d["results"] + [{"title": f"Extra page {k}", "link": f"https://extra{k}.example/p/{k}", "domain": f"extra{k}.example", "snippet": "x",
+                                        "thumb": f"https://encrypted-tbn0.gstatic.com/images?q=tbn:EXTRA{k:04d}", "kind": "page"} for k in range(90)]
+        many.pages = sum(x.get("kind") != "video" for x in d["results"][:80])
+        many.n = len(dict.fromkeys(d["images"] + [x["thumb"] for x in d["results"] if x.get("thumb") and x.get("kind") != "video"]))
+        r.fulfill(json=d)
+    page.route("**/api/scan-result/demoR3port01", many)
+    page.goto(base + "scan/?r=demoR3port01", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    strip_n = page.locator("#g-panel .g-strip > .g-pack-b").count()
+    while page.locator("#g-panel [data-more=all]").count():
+        page.locator("#g-panel [data-more=all]").click()
+    pages_n = page.locator("#g-panel .g-r").count()
+    page.locator("#g-tab-images").click()
+    while page.locator("#g-panel [data-more=images]").count():
+        page.locator("#g-panel [data-more=images]").click()
+    tab_n = page.locator("#g-panel .g-tile").count()
+    check(f"{tag} thumbs: > 80 results: every result's thumb in the strip and the Images tab (pages stay capped at 80)", strip_n == tab_n == many.n > 80 and pages_n == many.pages, [strip_n, tab_n, many.n, pages_n, many.pages])
+    ctx.close()
+    # every thumb fails (late, after the report is up): the All strip keeps its height (visible slots stay as empty tiles), nothing below moves
+    ctx = new_ctx()
+    page = ctx.new_page()
+    held, hold = [], [True]
+    GIF1 = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==")   # 1x1: a "blank" thumb (drop path, no console 404)
+    page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] else r.fulfill(status=200, body=GIF1, content_type="image/gif"))
+    page.goto(base + "scan/?r=demoR3port01", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    page.wait_for_timeout(600)
+    POS = """() => { const s = document.querySelector('#g-panel .g-strip'), b = [...s.children];
+        return [s.offsetHeight, Math.round(document.querySelector('#g-panel .g-r').getBoundingClientRect().top + scrollY), b.length,
+                b.filter(e => e.querySelector('.g-img-none')).length, b.filter(e => { const i = e.querySelector('img'); return i && i.complete && i.naturalWidth >= 16; }).length]; }"""
+    a0, t0 = page.evaluate(POS), page.evaluate("performance.now()")
+    hold[0] = False
+    while held:
+        held.pop().fulfill(status=200, body=GIF1, content_type="image/gif")
+    page.wait_for_timeout(2000)
+    a1 = page.evaluate(POS)
+    ls = page.evaluate("(t0) => window.__ls.filter(x => x[0] > t0 && x[1] > 0 && !x[2]).map(x => x[3])", t0)
+    check(f"{tag} thumbs: every All-strip thumb comes back blank, late: strip keeps its height, results below stay put, failed visible slots stay as empty tiles, no layout shift",
+          a1[0] == a0[0] and a1[1] == a0[1] and a1[2] >= 1 and a1[3] >= 1 and a1[4] == 0 and not ls, [a0, a1, ls[:2]])
+    ctx.close()
+    STRIP_IN_VIEW = """() => { const t = document.querySelector('.ph-track');   /* the strip on screen: phone pinned at its top, desktop centred */
+        if (t && getComputedStyle(t.firstElementChild).position === 'sticky') window.scrollTo({top: t.getBoundingClientRect().top + scrollY - parseFloat(getComputedStyle(t.firstElementChild).top), behavior: 'instant'});
+        else document.querySelector('#g-panel .g-strip').scrollIntoView({block: 'center', behavior: 'instant'}); }"""
+    # failure order: the strip's last tile fails first (empty slot), then the first one: its slot gets a tile with an image, never the empty one
+    ctx = new_ctx()
+    page = ctx.new_page()
+    held, hold, pick = [], [True], []
+    page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] or any(r.request.url.endswith(x) for x in pick) else r.continue_())
+    page.goto(base + "scan/?r=demoR3port01", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    pick += page.evaluate("() => { const b = document.querySelector('#g-panel .g-strip').children; return [b[0], b[b.length - 1]].map(e => e.querySelector('img').getAttribute('src')); }")
+    hold[0] = False
+    for r in [r for r in held if not any(r.request.url.endswith(x) for x in pick)]:
+        held.remove(r)
+        r.continue_()
+    blank = lambda src: [r.fulfill(status=200, body=GIF1, content_type="image/gif") for r in [r for r in held if r.request.url.endswith(src)] if not held.remove(r)]
+    page.evaluate(STRIP_IN_VIEW)
+    page.evaluate("() => { const s = document.querySelector('#g-panel .g-strip'); s.scrollTo({left: s.scrollWidth, behavior: 'instant'}); }")
+    page.wait_for_timeout(800)
+    blank(pick[1])
+    page.wait_for_timeout(500)
+    page.evaluate("() => { const b = document.querySelector('#g-panel .g-strip').children; b[b.length - 2].focus({preventScroll: true}); }")   # the donor has focus
+    page.evaluate("document.querySelector('#g-panel .g-strip').scrollTo({left: 0, behavior: 'instant'})")
+    page.wait_for_timeout(800)
+    t0 = page.evaluate("performance.now()")
+    blank(pick[0])
+    page.wait_for_timeout(1200)
+    lf = page.evaluate("""() => { const b = [...document.querySelector('#g-panel .g-strip').children], i = b[0].querySelector('img'), e = b[b.length - 1];
+        return {first: !!i && !b[0].querySelector('.g-img-none'), painted: !!i && i.complete && i.naturalWidth >= 16, lastEmpty: !!e.querySelector('.g-img-none'),
+                lastName: (e.matches('a, button') ? e : e.querySelector('a, button')).getAttribute('aria-label') || '', n: b.length, focus: document.activeElement === b[0]}; }""")
+    lf["inView"] = page.evaluate("() => { const r = document.querySelector('#g-panel .g-strip').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }")
+    lf["shift"] = page.evaluate("(t0) => window.__ls.filter(x => x[0] > t0 && x[1] > 0 && !x[2]).map(x => x[3])", t0)
+    check(f"{tag} thumbs: last strip tile fails first (empty slot keeps a name), then the first: its slot gets a tile with an image (not the empty one), a focused donor keeps focus; no layout shift",
+          lf["inView"] and lf["first"] and lf["painted"] and lf["focus"] and lf["lastEmpty"] and lf["lastName"] and not lf["shift"], lf)
+    ctx.close()
+    # viewing the strip's end: its last 6 tiles fail (empty slots fill the view), then the first one: nothing at the end moves, no clamp
+    ctx = new_ctx()
+    page = ctx.new_page()
+    held, hold, pick = [], [True], []
+    page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] or any(r.request.url.endswith(x) for x in pick) else r.continue_())
+    page.goto(base + "scan/?r=demoR3port01", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    pick += page.evaluate("() => { const b = [...document.querySelector('#g-panel .g-strip').children]; return [b[0]].concat(b.slice(-6)).map(e => e.querySelector('img').getAttribute('src')); }")
+    hold[0] = False
+    for r in [r for r in held if not any(r.request.url.endswith(x) for x in pick)]:
+        held.remove(r)
+        r.continue_()
+    page.evaluate(STRIP_IN_VIEW)
+    page.evaluate("() => { const s = document.querySelector('#g-panel .g-strip'); s.scrollTo({left: s.scrollWidth, behavior: 'instant'}); }")
+    page.wait_for_timeout(800)
+    for src in pick[1:]:
+        blank(src)
+    page.wait_for_timeout(800)
+    END = """() => { const s = document.querySelector('#g-panel .g-strip'), b = [...s.children];
+        return [Math.round(s.scrollLeft), Math.round(b[b.length - 1].getBoundingClientRect().left), b.length, b.slice(-6).filter(e => e.querySelector('.g-img-none')).length]; }"""
+    e0, t0 = page.evaluate(END), page.evaluate("performance.now()")
+    blank(pick[0])
+    page.wait_for_timeout(1000)
+    e1 = page.evaluate(END)
+    ls = page.evaluate("(t0) => window.__ls.filter(x => x[0] > t0 && x[1] > 0 && !x[2]).map(x => x[3])", t0)
+    check(f"{tag} thumbs: viewing the strip's end, its last 6 fail then the first: the end stays put (scroll position, tiles), no layout shift",
+          e0[3] == 6 and e1[:3] == e0[:3] and not ls, [e0, e1, ls[:2]])
+    ctx.close()
 
     # ---------- (3) #free phone: tabs, illustration without a scan ----------
     ctx = new_ctx()

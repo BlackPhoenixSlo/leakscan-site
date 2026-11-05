@@ -141,14 +141,13 @@
 @media (hover: hover) { .g-tile-a:hover .g-img, .g-vthumb:hover .g-img { box-shadow: 0 0 0 2px var(--g-on); } }
 .g-tile-a:focus-visible, .g-vthumb:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; }
 @media (hover: hover) { .g-tile-a:hover + figcaption .g-ct { text-decoration: underline; } }
-.g-pack-b { display: block; width: 100%; padding: 0; border: 0; border-radius: 10px; background: none; cursor: pointer; }
+.g-pack-b { display: block; flex: none; width: 150px; padding: 0; border: 0; border-radius: 10px; background: none; cursor: pointer; scroll-snap-align: start; }
 @media (hover: hover) { .g-pack-b:hover .g-img { box-shadow: 0 0 0 2px var(--g-on); } }
 .g-pack-b:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; }
 .g-snip { margin: 0; color: var(--g-tab); font-size: 14px; line-height: 1.58; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .g-more { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 420px; min-height: 44px; margin: 8px auto 0; border: 1px solid var(--g-line); border-radius: 999px; background: var(--g-pill); color: var(--g-text); font: inherit; font-size: 14px; cursor: pointer; }
 @media (hover: hover) { .g-more:hover { background: #3c4043; } }
 .g-more:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; }
-.g-more-sm { max-width: 260px; margin: 10px 0 0; }
 .g-less { display: block; min-height: 44px; margin: 2px auto 0; padding: 0 16px; border: 0; background: none; color: var(--g-muted); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 @media (hover: hover) { .g-less:hover { color: var(--g-text); } }
 .g-less:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; border-radius: 999px; }
@@ -162,9 +161,21 @@
 /* Image pack in All */
 .g-pack { margin: 0 0 26px; padding-bottom: 18px; border-bottom: 1px solid var(--g-line); }
 .g-pack-h { margin: 0 0 10px; font-size: 18px; }
-.g-pack-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
-.g-pack-row .g-img { aspect-ratio: 1; min-height: 0; transition: box-shadow .15s; }
-.g-pack-row .g-img img { width: 100%; height: 100%; object-fit: cover; }
+/* one row that swipes / scrolls sideways (snap), the next tile peeking in at the edge; desktop: arrows on hover */
+.g-strip-w { position: relative; }
+.g-strip { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 4px;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; padding: 4px; margin: -4px; }   /* 4px: room for the focus ring (2px + 2px offset) */
+.g-strip::-webkit-scrollbar { display: none; }
+.g-strip .g-img { aspect-ratio: 1; min-height: 0; transition: box-shadow .15s; }
+.g-strip .g-img img { width: 100%; height: 100%; object-fit: cover; }
+.g-strip-nav { position: absolute; top: 50%; z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; margin-top: -20px; padding: 0;
+  border: 1px solid var(--g-line); border-radius: 50%; background: #303134; color: var(--g-text); box-shadow: 0 2px 8px rgb(0 0 0 / .5);
+  cursor: pointer; opacity: 0; transition: opacity .15s; }
+.g-strip-prev { left: -12px; } .g-strip-prev .icon { transform: scaleX(-1); }
+.g-strip-next { right: -12px; }
+@media (hover: hover) { .g-strip-w:hover .g-strip-nav { opacity: 1; } }
+.g-strip-w:focus-within .g-strip-nav { opacity: 1; }
+.g-strip-w.at-start .g-strip-prev, .g-strip-w.at-end .g-strip-next { opacity: 0; pointer-events: none; }
 
 /* Images tab */
 .g-safe { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; color: var(--g-muted); font-size: 13px; }   /* plain caption, no fake controls */
@@ -212,7 +223,8 @@
 .frame-phone .g-r:last-of-type { border-bottom: 0; }
 .frame-phone .g-title { font-size: 18px; }
 .frame-phone .g-snip { -webkit-line-clamp: 3; }
-.frame-phone .g-pack-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.frame-phone .g-strip { margin: -4px -14px; padding: 4px 14px; scroll-padding-inline: 14px; }   /* edge to edge in the screen */
+.frame-phone .g-pack-b { width: calc((100% - 16px) / 2.5); }   /* 2.5 tiles: the third peeks (~110px at 360) */
 .frame-phone .g-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 6px; }
 .frame-phone .g-tile figcaption { font-size: 11px; }
 .frame-phone .g-safe { gap: 6px; font-size: 12px; flex-wrap: wrap; }
