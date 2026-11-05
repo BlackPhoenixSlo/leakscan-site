@@ -35,7 +35,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   its profile, as personalize.js): plays `jack-named.mp4` if present (HEAD probe; cues + `data-cue-named-shift`) else
   `jack.mp4`, speaks the name at `data-cue-say-start` + `data-cue-say` (`speechSynthesis`, video ducked) + "for
   <name>" pill; generic = "Your name", `jack.mp4`, no speech, end card `cta-steps` at `data-cue-cta` (default `-say`):
-  3 steps on an 8 s loop (type your name → run the free scan → rewatch with YOUR content; keeps looping after the
+  a phone replica of the landing, one 10 s take (hero, camera zooms onto the onlyfans.com/ field and types the name
+  as a handle → scan card → report card → "Rewatch this video with YOUR content" + name flip; keeps looping after the
   take ends) over a name form. Name bar under the stage (theater / full screen: a pill opens it; pulsing "type your
   name" hint until focus): submit = in-place rebuild at once (named mode, `?name=` via replaceState, no
   interstitial, take restarts from 0 playing), then Change / Reset. `?t=<sec>` seeks; `?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none`
@@ -46,7 +47,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry at both widths, full frame: video box = stage box + transparent overlay (`--break-full`), after state,
   counters, end card + form + cta-steps, name bar + in-place swap (`--break-swap`), snap, reduced motion, sfx, speech, named take, player: tap / theater / full
   screen, scan-stub texts + thumbs); 6 clips for CapCut (ProRes 4444 alpha .mov + green .mp4, own in / out animation,
-  silent; `cta-steps` 8 s, generic only): `tools/video/render_prefabs.py OUT`; cues from a take
+  silent; `cta-steps` 10 s, generic only): `tools/video/render_prefabs.py OUT`; cues from a take
   (whisper / faster-whisper word timestamps → `data-cue-*` diff, untested on a real take):
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).

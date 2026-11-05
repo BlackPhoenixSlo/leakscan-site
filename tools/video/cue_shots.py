@@ -25,13 +25,16 @@ Plus:
   data-cue-named-shift; generic never asks for it
 - personalized (tools/scan_stub.py, ?r=demoRemove1): named mode, texts from the scan result in every prefab; every
   .rm-img = the scan's thumbs via <API>/api/thumb, loaded, still blurred; and ?name= keeps the default photos (img/removals)
-- cta-steps (generic end card): at cta + 0.9 step 1 typing (a proper prefix of the name typed in full at + 2.2), at + 2.2
-  the landing-style scan box typed DEMO ("Jaka Basej") in full + "Scan now" pressed (frame-1920-generic-cta-steps-step1.png,
-  phone-portrait-generic-cta-step1.png, phone-theater-generic-cta-step1.png; on-screen glyph size >= 10 px portrait,
-  >= 20 px theater), + 3.3 step 2 mid-scan (bar 10-90 %, "Searching <place>, step N of 9…", "N links found" rolling) =
-  frame-1920-generic-cta-steps-step2.png, through step 2 the places walk Google → … → Mega with N rising to "87 links
-  found"; after the take ends the post-roll clock keeps it looping: step 3 with the typed name flipped in
-  (frame-1920-generic-cta-steps-step3-postroll.png); named mode never shows it, its "for NAME" pill stays from
+- cta-steps (generic end card, one 10 s take in a phone replica of the landing; phases past the take's end drawn with the pure
+  draw(t), declared): cta + 0.3 hero (logo loaded, the site's h1, empty onlyfans.com/ field, camera at rest), + 2.2 the
+  camera zoomed onto the field (scale >= 2.2) typing a proper prefix, + 3.05 the field typed handle(DEMO) ("jakabasej")
+  in full, + 3.75 "Scan now" pressed (camera pulled back), + 5.6 the scan card mid-scan (bar 10-90 %, "Searching <place>,
+  step N of 9…", "@<handle>"), the places walk Google → … → Mega with N rising, + 7.4 "N links found" rolling, + 8.3
+  the report ("87 links found", tabs Links 87 / Images 12 / Sites 31, 5 *.example rows, "+ 82 more"), + 9.65 the toast
+  "Rewatch this video with YOUR content" + the name flipped in (frame-1920-generic-cta-<n>-<phase>.png); after the take
+  ends the post-roll clock keeps it looping to the flip (frame-1920-generic-cta-flip-postroll.png); phone portrait +
+  iPhone theater: every phase shot (phone-{portrait,theater}-generic-cta-<n>-<phase>.png), typed handle on screen >= 11 px
+  portrait / >= 20 px theater, the toast's letters >= 11 px portrait; named mode never shows it, its "for NAME" pill stays from
   data-cue-say to the end and after the take ends (desktop-named-pill-after-end.png)
 - player: phone (touch): no native controls, own play bar, a tap on the stage plays + "Rotate for full size" hint;
   proof-phone-portrait-generic-google-live.png = the whole 390x844 screen, card inside the stage's right half;
@@ -57,9 +60,9 @@ Plus:
 --break-full serves css/video.css with the old split layout appended (the video in the left half, an opaque panel behind
   the cards): only the "full frame:" checks go red.
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
---break-steps serves index.html without the cta-steps animation (.vo-steps): only the "cta-steps:" checks go red.
+--break-steps serves index.html without the cta-steps phone (.vo-steps): only the "cta-steps:" checks go red.
 --break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
---break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the "cta-steps: step 1 … DEMO" check goes red.
+--break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the "cta-steps: typed … DEMO" check goes red.
 Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, pathlib, re, socket, subprocess, sys, time, urllib.parse
@@ -104,14 +107,23 @@ SFX_STUB = """window.__sfx = []; window.__actx = 0; { const A = window.AudioCont
   constructor(...a) { super(...a); __actx++; }
   createOscillator() { __sfx.push(['osc', +document.querySelector('video').currentTime.toFixed(2)]); return super.createOscillator(); }
   createBufferSource() { __sfx.push(['noise', +document.querySelector('video').currentTime.toFixed(2)]); return super.createBufferSource(); } }; }"""
-# cta-steps state: {off, so: [opacity per step], typed, bar, count, mini} or null without the animation
+# cta-steps state (null without the phone): scene opacities, camera scales (--cz per scene page), hero, typed handle + its
+# on-screen px (font x --k x camera), scan line, report, the end toast (+ its smallest on-screen px) and the flipped name
 STEPS = """() => { const c = document.querySelector('.vo-cta'), s = c && c.querySelector('.vo-steps'); if (!s) return null;
-  const mi = s.querySelector('.vo-mi-t'), k = +document.querySelector('.vo-box').style.getPropertyValue('--k');
-  return {off: c.hasAttribute('data-off'), so: [...s.querySelectorAll('.vo-step')].map(e => +getComputedStyle(e).opacity), typed: mi.textContent,
-          px: +(parseFloat(getComputedStyle(mi).fontSize) * k).toFixed(1), btn: s.querySelector('.vo-mbtn').textContent.trim(), press: +s.style.getPropertyValue('--press'),
-          ms: (s.querySelector('.vo-ms') || {}).textContent, bar: +s.style.getPropertyValue('--bar'), count: s.querySelector('.vo-mc').textContent.replace(/\\s+/g, ' ').trim(),
-          mini: s.querySelector('.vo-mini-n').textContent}; }"""
+  const q = x => s.querySelector(x), mi = q('.vo-mi-t'), k = +document.querySelector('.vo-box').style.getPropertyValue('--k'), logo = q('.vo-hd img'),
+        cz = [...s.querySelectorAll('.vo-pg')].map(e => +e.style.getPropertyValue('--cz')), fs = e => parseFloat(getComputedStyle(e).fontSize), sp = x => x.replace(/\\s+/g, ' ').trim();
+  return {off: c.hasAttribute('data-off'), so: [...s.querySelectorAll('.vo-step')].map(e => +getComputedStyle(e).opacity), cz,
+          h1: sp(q('.vo-h1').textContent), logo: logo.complete && logo.naturalWidth > 0, typed: mi.textContent, px: +(fs(mi) * k * cz[0]).toFixed(1),
+          btn: q('.vo-mbtn').textContent.trim(), press: +s.style.getPropertyValue('--press'), ms: q('.vo-ms').textContent, bar: +s.style.getPropertyValue('--bar'),
+          at: q('.vo-sc-scan .vo-at').textContent, count: sp(q('.vo-mc').textContent), tabs: [...s.querySelectorAll('.vo-tabs2 > span')].map(e => sp(e.textContent)),
+          rows: [...s.querySelectorAll('.vo-dom')].map(e => e.textContent), more: q('.vo-more').textContent, end: sp(q('.vo-end-h').textContent),
+          eo: +getComputedStyle(q('.vo-end')).opacity, endpx: +(Math.min(fs(q('.vo-end-h')), fs(q('.vo-end-f'))) * k).toFixed(1), mini: q('.vo-mini-n').textContent}; }"""
 DEMO, LEAKS = "Jaka Basej", 87
+HERO_H1 = "Leaked content, taken down by a real person. Me."
+handle = lambda n: re.sub(r"[^\w.]", "", n.lower()) or "creator"   # = js handle(): "Jaka Basej" → "jakabasej"
+# the phases (s into the loop) shot on every viewport
+PHASES = (("1-hero", 0.3), ("2-zoom", 1.6), ("3-typed", 3.05), ("4-press", 3.75), ("5-scanning", 5.6), ("6-report", 8.3), ("7-flip", 9.65))
+DRAW = "t => { document.querySelector('video').pause(); window.VideoOverlays.draw(t); }"
 PROGRESS = re.compile(r"Searching (Google|Google Images|X|Reddit|Mega), step ([1-9]) of 9…")
 # [stage rect, .vo-over rect, visible card rect, stage transform, data-vo-full, html overflow, video.controls]
 GEOM = """() => { const r = e => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; }, st = document.querySelector('.vo-stage'),
@@ -328,36 +340,52 @@ def named_take(b, base, name, cues, shift):
 
 
 def cta_steps(pg, base, out, cta, name_q):
-    """the generic end card's 3-step loop, on the 1920x1080 page (pg); returns the name step 1 typed in full"""
-    goto(pg, base, "", round(cta + 0.9, 2))
-    s0 = pg.evaluate(STEPS)
-    goto(pg, base, "", round(cta + 2.2, 2))
-    f = out / "frame-1920-generic-cta-steps-step1.png"
-    pg.locator(".vo-stage").screenshot(path=str(f))
+    """the generic end card's 10 s take, on the 1920x1080 page (pg); returns the handle the hero typed in full"""
+    shot = lambda ph: pg.locator(".vo-stage").screenshot(path=str(out / f"frame-1920-generic-cta-{ph}.png"))
+    goto(pg, base, "", round(cta + 0.3, 2))
+    shot("1-hero")
+    s = pg.evaluate(STEPS)
+    check("cta-steps: cta + 0.3 = the hero in the phone (logo, the site's h1, empty field, camera at rest) -> frame-1920-generic-cta-1-hero.png",
+          s and s["so"][0] > .9 and s["so"][1:] == [0, 0] and s["h1"] == HERO_H1 and s["logo"] and s["typed"] == "" and s["cz"][0] < 1, s)
+    goto(pg, base, "", round(cta + 3.05, 2))
+    shot("3-typed")
     s = pg.evaluate(STEPS)
     full = s["typed"] if s else ""
-    check("cta-steps: cta + 0.9 = step 1, the name typing (a proper prefix of the name typed in full at + 2.2)",
-          s0 and s0["so"][0] > .9 and s0["so"][1] == 0 and 0 < len(s0["typed"]) < len(full) and full.startswith(s0["typed"]), (s0, full))
-    check(f"cta-steps: step 1 at cta + 2.2: the scan box typed DEMO {DEMO!r} in full, the 'Scan now' pill pressed -> {f.name}",
-          s and s["so"][0] > .9 and s["typed"] == DEMO and s["btn"] == "Scan now" and s["press"] > .5, s)
-    goto(pg, base, "", round(cta + 3.3, 2))
-    f = out / "frame-1920-generic-cta-steps-step2.png"
-    pg.locator(".vo-stage").screenshot(path=str(f))
-    s = pg.evaluate(STEPS)
-    n = re.fullmatch(r"(\d+) links found", s["count"]) if s else None
-    check(f"cta-steps: cta + 3.3 = step 2 mid-scan (bar 10-90 %, 'Searching <place>, step N of 9…', 'N links found' rolling to {LEAKS}), steps 1 / 3 off -> {f.name}",
-          s and s["so"] == [0, 1, 0] and .1 < s["bar"] < .9 and PROGRESS.fullmatch(s["ms"] or "") and n and 0 < int(n[1]) < LEAKS, s)
+    check(f"cta-steps: typed at cta + 3.05: the onlyfans.com/ field holds handle(DEMO) {handle(DEMO)!r} in full, camera zoomed on it -> frame-1920-generic-cta-3-typed.png",
+          s and s["so"][0] > .9 and s["typed"] == handle(DEMO) and s["cz"][0] >= 2.2, s)
+    goto(pg, base, "", round(cta + 2.2, 2))
+    s0 = pg.evaluate(STEPS)
+    check("cta-steps: cta + 2.2 = the camera zoomed onto the field (scale >= 2.2), typing a proper prefix of the handle",
+          s0 and s0["so"][0] > .9 and s0["cz"][0] >= 2.2 and 0 < len(s0["typed"]) < len(full) and full.startswith(s0["typed"]), (s0, full))
+    ph = dict(PHASES)
+    for name in ("2-zoom", "4-press", "5-scanning", "6-report", "7-flip"):   # past the take's end: the pure draw(t) (declared)
+        pg.evaluate(DRAW, cta + ph[name])
+        shot(name)
+        s = pg.evaluate(STEPS)
+        if name == "4-press":
+            check("cta-steps: cta + 3.75 'Scan now' pressed, the camera pulled back to the form -> frame-1920-generic-cta-4-press.png",
+                  s and s["so"][0] > .9 and s["btn"] == "Scan now" and s["press"] > .5 and s["cz"][0] < 1.2, s)
+        if name == "5-scanning":
+            check(f"cta-steps: cta + 5.6 = the scan card (hero / report off): '@{full}', bar 10-90 %, 'Searching <place>, step N of 9…' -> frame-1920-generic-cta-5-scanning.png",
+                  s and s["so"] == [0, 1, 0] and s["at"] == "@" + full and .1 < s["bar"] < .9 and PROGRESS.fullmatch(s["ms"] or ""), s)
+        if name == "6-report":
+            check(f"cta-steps: cta + 8.3 = the report: '{LEAKS} links found', tabs Links 87 / Images 12 / Sites 31, 5 *.example rows, '+ 82 more' -> frame-1920-generic-cta-6-report.png",
+                  s and s["so"][2] > .9 and s["so"][:2] == [0, 0] and s["count"] == f"{LEAKS} links found" and s["tabs"] == ["Links 87", "Images 12", "Sites 31"]
+                  and len(s["rows"]) == 5 and all(r.endswith(".example") for r in s["rows"]) and s["more"] == "+ 82 more in the full report", s)
+        if name == "7-flip":
+            check(f"cta-steps: cta + 9.65 = 'Rewatch this video with YOUR content' + the name flipped in (its handle = {full!r}) -> frame-1920-generic-cta-7-flip.png",
+                  s and s["so"][2] > .9 and s["eo"] > .9 and s["end"] == "Rewatch this video with YOUR content" and s["mini"] != GENERIC and handle(s["mini"]) == full, s)
     walk = []
-    for dt in (2.9, 3.3, 3.7, 4.1, 4.5, 5.0):
-        pg.evaluate("t => window.VideoOverlays.draw(t)", cta + dt)   # pure draw(t) of the loop (no seek needed)
+    for dt in (4.5, 5.0, 5.5, 6.0, 6.4, 7.4):
+        pg.evaluate(DRAW, cta + dt)
         s = pg.evaluate(STEPS)
         walk.append((s["ms"], s["count"]))
     m = [PROGRESS.fullmatch(w[0] or "") for w in walk[:-1]]
-    nums = [int(re.match(r"\d+", w[1])[0]) for w in walk]
-    check(f"cta-steps: step 2 walks Google → … → Mega, step N rising, ends at '{LEAKS} links found'",
+    roll = re.fullmatch(r"(\d+) links found", walk[-1][1])
+    check(f"cta-steps: the scan walks Google → … → Mega, step N rising; at + 7.4 'N links found' rolling to {LEAKS}",
           all(m) and len({x[1] for x in m}) >= 4 and m[0][1] == "Google" and m[-1][1] == "Mega" and [int(x[2]) for x in m] == sorted(int(x[2]) for x in m)
-          and nums == sorted(nums) and walk[-1][1] == f"{LEAKS} links found", walk)
-    # past the end: the post-roll clock keeps the loop going (the real take ends ~2 s after the cue)
+          and roll and 0 < int(roll[1]) < LEAKS, walk)
+    # past the end: the post-roll clock keeps the loop going (the real take ends ~3.5 s after the cue)
     pg.goto(f"{base}video/?t=43.4")
     pg.wait_for_function(SEEKED, arg=43.4, timeout=15000)
     play(pg, 43.9)
@@ -365,15 +393,15 @@ def cta_steps(pg, base, out, cta, name_q):
     try:
         pg.wait_for_function("() => { const s = document.querySelectorAll('.vo-step'); return s.length === 3 && +getComputedStyle(s[2]).opacity > .9"
                              " && document.querySelector('.vo-mini-n').textContent !== 'Your name'"
-                             " && document.querySelector('.vo-steps').style.getPropertyValue('--fp') === '1.000'; }", timeout=9000)
+                             " && document.querySelector('.vo-steps').style.getPropertyValue('--fp') === '1.000'; }", timeout=12000)
     except Exception:
         pass
-    f = out / "frame-1920-generic-cta-steps-step3-postroll.png"
+    f = out / "frame-1920-generic-cta-flip-postroll.png"
     pg.locator(".vo-stage").screenshot(path=str(f))
     s = pg.evaluate(STEPS)
-    check(f"cta-steps: after the video ends it keeps looping: step 3, the mini page flipped to the typed name {full!r} -> {f.name}",
-          s and full and s["so"][2] > .9 and s["mini"] == full and pg.evaluate("() => document.querySelector('video').ended"), s)
-    for t in (round(cta + 0.9, 2), round(cta + 3.3, 2)):
+    check(f"cta-steps: after the video ends it keeps looping to the end: the toast + the name flipped in (handle {full!r}) -> {f.name}",
+          s and full and s["so"][2] > .9 and s["eo"] > .5 and handle(s["mini"]) == full and pg.evaluate("() => document.querySelector('video').ended"), s)
+    for t in (round(cta + 0.9, 2), round(cta + 3.05, 2)):
         goto(pg, base, name_q, t)
         s = pg.evaluate(STEPS)
         check(f"cta-steps: named mode never shows it (t={t:g})", s and s["off"] and pg.evaluate("() => document.documentElement.dataset.voMode") == "named", s)
@@ -396,24 +424,25 @@ def cta_steps(pg, base, out, cta, name_q):
 
 
 def cta_phone(b, base, out, cta, full):
-    """step 1 on an iPhone: portrait (the stage = the top 390x219) and the rotated theater; the typed name readable"""
+    """every phase on an iPhone: portrait (the stage = the top 390x219) and the rotated theater; the typed handle readable"""
     ctx = ctx_new(b, **VIEWPORTS["phone"])
     ctx.add_init_script(IPHONE_FS)
     pg = ctx.new_page()
-    goto(pg, base, "", round(cta + 2.2, 2))
-    f = out / "phone-portrait-generic-cta-step1.png"
-    pg.screenshot(path=str(f))
-    s = pg.evaluate(STEPS)
-    check(f"cta-steps (phone portrait): step 1 shows the typed name {full!r} in full, on-screen glyphs >= 10 px -> {f.name}",
-          s and full and s["so"][0] > .9 and s["typed"] == full and s["px"] >= 10, s)
-    pg.locator(".vo-fs").tap()
-    pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
-    pg.wait_for_timeout(400)
-    f = out / "phone-theater-generic-cta-step1.png"
-    pg.screenshot(path=str(f))
-    s = pg.evaluate(STEPS)
-    check(f"cta-steps (phone theater): step 1 shows {full!r}, on-screen glyphs >= 20 px -> {f.name}",
-          s and full and s["so"][0] > .9 and s["typed"] == full and s["px"] >= 20, s)
+    goto(pg, base, "", round(cta + 3.05, 2))
+    for view in ("portrait", "theater"):
+        if view == "theater":
+            pg.locator(".vo-fs").tap()
+            pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+            pg.wait_for_timeout(400)
+        for name, u in PHASES:
+            pg.evaluate(DRAW, cta + u)
+            pg.screenshot(path=str(out / f"phone-{view}-generic-cta-{name}.png"))
+        pg.evaluate(DRAW, cta + 3.05)
+        s = pg.evaluate(STEPS)
+        lo = 11 if view == "portrait" else 20
+        check(f"cta-steps (phone {view}): typed {full!r} in full, on-screen glyphs >= {lo} px" + (", the toast's >= 11 px" if view == "portrait" else "")
+              + f" -> phone-{view}-generic-cta-*.png", s and full and s["so"][0] > .9 and s["typed"] == full and s["px"] >= lo
+              and (view == "theater" or s["endpx"] >= 11), s)
     ctx.close()
 
 
@@ -694,7 +723,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     html = (ROOT / "site/video/index.html").read_text(encoding="utf-8")
     if a.break_steps:   # wire boundary: index.html minus the cta-steps animation (the end card + form stay)
-        broken, k = re.subn(r'\n        <div class="vo-steps".*?\n        </div>\n(?=        <p class="vo-dots")', "\n", html, flags=re.S)
+        broken, k = re.subn(r'\n        <div class="vo-steps".*?\n        </div>\n(?=        <form class="vo-cta-f")', "\n", html, flags=re.S)
         assert k == 1, "break: .vo-steps block not found"
         BREAK["steps"] = (lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), broken, "text/html")
     if a.break_swap:   # wire boundary: video-overlays.js minus the submit's in-place rebuild (validation stays)

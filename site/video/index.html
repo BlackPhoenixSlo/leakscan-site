@@ -20,12 +20,12 @@
 <script src="../js/video-overlays.js" defer></script>
 </head>
 <body class="vo-page">
-<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="i-full" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></symbol><symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol><symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol><symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol></svg>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol><symbol id="i-scan-search" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="i-full" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></symbol><symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol><symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol><symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol></svg>
 <!-- Cues: seconds into jack.mp4 (the generic take; SCRIPT.md). live = the card pops in (right half), removed = Jack's snap (shake,
      then the wipe), out = it has slid out again; google-images data-cue-tap = the "Images" tap. Stage: data-cue-say-start /
      data-cue-say = the browser says the personalized name + "for <name>" (named mode only; -say is shifted by
      data-cue-named-shift when jack-named.mp4 plays, as every prefab cue); data-cue-cta (default -say) = the generic end card
-     (cta-steps: its 3-step loop + the name form). The video fills the whole stage; at every width the cards are drawn on its right half (no panel); .vo-ui = full screen /
+     (cta-steps: the landing in a phone, one 10 s take, + the name form). The video fills the whole stage; at every width the cards are drawn on its right half (no panel); .vo-ui = full screen /
      theater button, touch play bar, "Rotate" hint.
      Edit them to the real timestamps after recording (site/video/CUES.md); tools/video/check_video.py keeps them sane. -->
 <main class="vo" id="vo">
@@ -163,29 +163,40 @@
            too (no-voice browsers). Personalized names only. -->
       <div class="vo-pf vo-for" data-off aria-hidden="true"><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
 
-      <!-- generic mode only (no ?name=, no scan): from data-cue-cta (default = data-cue-say) to the end, also after it; 3 steps on an
-           8 s loop: 1 the landing's scan box types "Jaka Basej" (or the viewer's name) + "Scan now" pressed, 2 "Searching Google, step N
-           of 9…" + "87 links found", 3 the rewatch (?prefab=cta-steps = the CapCut clip, without the form); its form = the name bar's in-place rebuild -->
+      <!-- generic mode only (no ?name=, no scan): from data-cue-cta (default = data-cue-say) to the end, also after it. One 10 s take
+           in a phone-shaped replica of the landing (site tokens, dark): 1 the hero, the camera zooms onto the onlyfans.com/ field,
+           types "Jaka Basej" as a handle (or the viewer's typed name) + "Scan now" pressed, 2 the scan card ("Searching Google,
+           step N of 9…", bar, skeleton rows), 3 the report card ("87 links found" rolling, tabs, rows, blurred strip) + "Rewatch
+           this video with YOUR content" with the name flip (?prefab=cta-steps = the CapCut clip, without the form); its form =
+           the name bar's in-place rebuild. Placeholder sites only (*.example), texts by textContent (js) -->
       <div class="vo-pf vo-cta" data-prefab="cta-steps" data-off>
         <p class="vo-cta-t">Type your name in the link → this video rebuilds with YOUR leaks</p>
         <div class="vo-steps" aria-hidden="true">
-          <div class="vo-step">
-            <p class="vo-step-h"><span class="vo-step-n">1</span>Type your name</p>
-            <span class="vo-mi"><span class="vo-mi-t"></span><span class="vo-mi-c"></span></span>
-            <span class="vo-mbtn"><svg class="icon"><use href="#i-search"/></svg>Scan now</span>
+          <div class="vo-scr">
+            <div class="vo-step vo-sc-hero"><div class="vo-pg"><span class="vo-hd"><img src="../assets/logo.svg" alt="" width="32" height="32"><b>Abolita</b><i class="vo-burger"><i></i></i></span><span class="vo-hero">
+              <span class="vo-eyebrow">Leak removal for OnlyFans, Fansly and Patreon creators</span>
+              <span class="vo-h1">Leaked content, taken down by a real person. <em>Me.</em></span>
+              <span class="vo-lead">Hi, I'm Jaka. Software finds the links. I open every single one, make sure it's really yours, and file every takedown myself. Nothing goes out in your name until a human has checked it.</span>
+              <span class="vo-fld vo-mi"><span class="vo-pre">onlyfans.com/</span><span class="vo-mi-t"></span><span class="vo-mi-c"></span></span>
+              <span class="vo-fld"><span class="vo-pre">@</span><span class="vo-ph-t">Instagram or X (optional)</span></span>
+              <span class="vo-mbtn"><svg class="icon"><use href="#i-scan-search"/></svg>Scan now</span>
+              <span class="vo-note">Free. No account. You see every link it finds.</span></span></div></div>
+            <div class="vo-step vo-sc-scan"><div class="vo-pg"><span class="vo-hd"><img src="../assets/logo.svg" alt="" width="32" height="32"><b>Abolita</b><i class="vo-burger"><i></i></i></span><span class="vo-card">
+              <span class="vo-kick">Free scan · OnlyFans</span><span class="vo-ttl-h vo-at"></span>
+              <span class="vo-hr"></span><span class="vo-ms">Searching Google, step 1 of 9…</span><span class="vo-mb"><i></i></span>
+              <span class="vo-sk"><span class="vo-sk-tabs"><b></b><b></b><b></b></span><span class="vo-sk-row"><i></i><b></b></span><span class="vo-sk-row"><i></i><b></b></span><span class="vo-sk-row"><i></i><b></b></span><span class="vo-sk-row"><i></i><b></b></span><span class="vo-sk-row"><i></i><b></b></span><span class="vo-sk-strip"><b></b><span><i></i><i></i><i></i><i></i></span></span></span></span></div></div>
+            <div class="vo-step vo-sc-rep"><div class="vo-pg"><span class="vo-hd"><img src="../assets/logo.svg" alt="" width="32" height="32"><b>Abolita</b><i class="vo-burger"><i></i></i></span><span class="vo-card">
+              <span class="vo-kick">Free scan report · OnlyFans</span><span class="vo-ttl-h vo-at"></span>
+              <span class="vo-head"><span class="vo-chip vo-live vo-mc"><b class="vo-mc-n">0</b><span class="vo-mc-u"> links found</span></span><span class="vo-open">Open full report →</span></span>
+              <span class="vo-tabs2"><span class="on">Links <b>87</b></span><span>Images <b>12</b></span><span>Sites <b>31</b></span></span>
+              <span class="vo-rows"><span class="vo-row"><i class="vo-th vo-th0"></i><span class="vo-rt"><b class="vo-dom">mirror-tube.example</b><span class="vo-ttl"></span></span><span class="vo-chip vo-live">Live</span><i class="vo-go"></i></span><span class="vo-row"><i class="vo-th vo-th1"></i><span class="vo-rt"><b class="vo-dom">fan-dump.example</b><span class="vo-ttl"></span></span><span class="vo-chip vo-live">Live</span><i class="vo-go"></i></span><span class="vo-row"><i class="vo-th vo-th2"></i><span class="vo-rt"><b class="vo-dom">pics-board.example</b><span class="vo-ttl"></span></span><span class="vo-chip vo-live">Live</span><i class="vo-go"></i></span><span class="vo-row"><i class="vo-th vo-th3"></i><span class="vo-rt"><b class="vo-dom">free-vault.example</b><span class="vo-ttl"></span></span><span class="vo-chip vo-live">Live</span><i class="vo-go"></i></span><span class="vo-row"><i class="vo-th vo-th4"></i><span class="vo-rt"><b class="vo-dom">cloud-drop.example</b><span class="vo-ttl"></span></span><span class="vo-chip vo-live">Live</span><i class="vo-go"></i></span></span>
+              <span class="vo-more">+ 82 more in the full report</span>
+              <span class="vo-strip-h">What Google Images shows for <span class="vo-at"></span></span>
+              <span class="vo-reveal">Reveal images</span>
+              <span class="vo-strip"><i class="vo-th0"></i><i class="vo-th1"></i><i class="vo-th2"></i><i class="vo-th3"></i></span></span></div></div>
           </div>
-          <div class="vo-step">
-            <p class="vo-step-h"><span class="vo-step-n">2</span>Run the free scan</p>
-            <span class="vo-mb"><i></i></span>
-            <p class="vo-ms">Searching Google, step 1 of 9…</p>
-            <p class="vo-mc"><b class="vo-mc-n">0</b><span class="vo-mc-u"> links found</span></p>
-          </div>
-          <div class="vo-step">
-            <p class="vo-step-h"><span class="vo-step-n">3</span>Rewatch this video with YOUR content</p>
-            <span class="vo-mini"><span class="vo-mini-l"></span><span class="vo-mini-r"><span class="vo-mini-card"><span class="vo-mini-q"><span class="vo-mini-n">Your name</span></span><i></i><i></i><i></i></span></span><span class="vo-mini-bar"></span></span>
-          </div>
+          <span class="vo-end"><span class="vo-end-h">Rewatch this video with <em>YOUR</em> content</span><span class="vo-end-f">for <span class="vo-mini-n">Your name</span></span></span>
         </div>
-        <p class="vo-dots" aria-hidden="true"><i></i><i></i><i></i></p>
         <form class="vo-cta-f" action="" method="get">
           <label class="vo-sr" for="vo-name">Your name</label>
           <input id="vo-name" name="name" type="text" required maxlength="40" autocomplete="off" spellcheck="false" placeholder="Your name">

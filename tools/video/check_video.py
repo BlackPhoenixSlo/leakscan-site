@@ -2,8 +2,9 @@
 """Gate for site/video/ (Jack's video page). Silent + exit 0 when green; prints each problem + exit 1.
 
 - exactly 6 prefabs: the 5 cued ones google, google-images, x, reddit, mega (in script order) + cta-steps (the generic
-  end card .vo-cta, no cues of its own: data-cue-cta; 3 .vo-step "Type your name" / "Run the free scan" / "Rewatch this
-  video with YOUR content" + the real form inside it; js hides it in named mode); tools/video/render_prefabs.py renders
+  end card .vo-cta, no cues of its own: data-cue-cta; a phone replica of the landing: 3 .vo-step scenes (hero with the
+  site's h1 + the onlyfans.com/ field + "Scan now", scan card, report card with tabs + *.example placeholder rows only) +
+  the "Rewatch this video with YOUR content" toast with the name flip + the real form inside it; js hides it in named mode); tools/video/render_prefabs.py renders
   the same 6. The 5 cued ones each have numeric data-cue-live <
   data-cue-removed < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending);
   room for the animations (js/video-overlays.js): removed - live >= 0.45 s pop-in (google-images: >= 1.2 s, its tap +
@@ -41,7 +42,10 @@ SITE = ROOT / "site"
 PAGE = SITE / "video" / "index.html"
 ORDER = ["google", "google-images", "x", "reddit", "mega"]
 CTA_STEPS = "cta-steps"
-STEP_TEXT = ["Type your name", "Run the free scan", "Rewatch this video with YOUR content"]
+SCENES = ["vo-sc-hero", "vo-sc-scan", "vo-sc-rep"]
+SCENE_SLOTS = ("vo-mi-t", "vo-mbtn", "vo-ms", "vo-mb", "vo-mc-n", "vo-tabs2", "vo-mini-n")
+HERO_H1 = "Leaked content, taken down by a real person. <em>Me.</em>"
+END_TEXT = "Rewatch this video with <em>YOUR</em> content"
 MIN_LIVE = {"google-images": 1.2}   # seconds from live to removed (default: the 0.45 s pop-in)
 IN = 0.45
 CTA_TEXT = "Type your name in the link → this video rebuilds with YOUR leaks"
@@ -149,9 +153,12 @@ def steps_and_player(html, p):
     if not m:
         bad.append("video/index.html: cta-steps must be the generic end card (.vo-cta data-prefab=cta-steps) with the form inside")
     else:
-        heads = [re.sub(r"<[^>]+>|\d", "", h).strip() for h in re.findall(r'<p class="vo-step-h">(.*?)</p>', m[1], re.S)]
-        if m[1].count('class="vo-step"') != 3 or heads != STEP_TEXT or not all(k in m[1] for k in ("vo-mi-t", "vo-mb", "vo-mc-n", "vo-mini-n")):
-            bad.append(f"video/index.html: cta-steps needs 3 .vo-step {STEP_TEXT} (mock input, scan bar, counter, mini page), got {heads}")
+        scenes = re.findall(r'<div class="vo-step (vo-sc-[\w-]+)"', m[1])
+        doms = re.findall(r'<b class="vo-dom">([^<]*)</b>', m[1])
+        if scenes != SCENES or not all(k in m[1] for k in SCENE_SLOTS) or HERO_H1 not in m[1] or END_TEXT not in m[1] or "onlyfans.com/" not in m[1]:
+            bad.append(f"video/index.html: cta-steps needs the 3 scenes {SCENES} (hero h1 + onlyfans.com/ field, scan, report) + slots {SCENE_SLOTS} + the rewatch toast, got {scenes}")
+        if not doms or not all(d.endswith(".example") for d in doms):
+            bad.append(f"video/index.html: cta-steps report rows must be *.example placeholders, got {doms}")
     cta_tag = re.search(r'<div class="vo-pf vo-cta"[^>]*>', html)
     if cta_tag and "data-cue-" in cta_tag[0]:
         bad.append("video/index.html: cta-steps has its own data-cue-* (its cue is the stage's data-cue-cta)")

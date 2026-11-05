@@ -6,8 +6,8 @@ added in CapCut (site/video/CUES.md). No --name = the generic clips ("Your name"
 right half of the frame (vertically centred, same place as on the web page), so the clip drops on top of Jack's video with no
 repositioning and needs no CapCut in / out animation.
 
-cta-steps (generic only, skipped with --name): the end card's 3 steps (type your name → run the free scan → rewatch
-with YOUR content), 8 s = one loop, pops in at 0 s and stays (no form: the clip is for the generic YouTube upload).
+cta-steps (generic only, skipped with --name): the end card's phone replica of the landing (hero zoom + typed handle →
+scan card → report + "Rewatch this video with YOUR content" + the name flip), 10 s = one loop, pops in at 0 s and stays (no form: the clip is for the generic YouTube upload).
 
 Per prefab ID (google, google-images, x, reddit, mega, cta-steps) in OUT_DIR:
   ID.mov          ProRes 4444 with real alpha (yuva444p10le): frames = page.screenshot(omit_background=True) of
@@ -17,7 +17,8 @@ Per prefab ID (google, google-images, x, reddit, mega, cta-steps) in OUT_DIR:
                   ?prefab=ID&state=live|removed&bg=green (so the chroma mode itself is exercised too)
   ID-in.png / ID-snap.png / ID-burst.png / ID-out.png   mid pop-in (0.1 s) / mid shake (2.5 s) / confetti (4.0 s) /
                   mid slide-out (5.8 s), stills from ID-green.mp4
-  cta-steps: cta-steps-step1/2/3.png (state=, 2.2 / 3.9 / 7.2 s) + -in / -typing / -scanning / -flip.png (0.1 / 1.0 / 3.6 / 6.2 s)
+  cta-steps: cta-steps-step1/2/3.png (state=, 3.05 / 5.6 / 9.65 s) + -in / -zoom / -typed / -scanning / -report / -flip.png
+             (0.3 / 1.6 / 3.05 / 5.6 / 8.3 / 9.65 s)
 Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/render_prefabs.py OUT_DIR [--name X] [--only ID] [--keep-frames]
 Needs ffmpeg with prores_ks + libx264."""
 import argparse, pathlib, shutil, subprocess, sys, urllib.parse
@@ -27,9 +28,9 @@ from playwright.sync_api import sync_playwright
 
 PREFABS = ("google", "google-images", "x", "reddit", "mega", "cta-steps")
 FPS, W, H = 30, 1920, 1080
-SECONDS = {"cta-steps": 8}                                # default 6
+SECONDS = {"cta-steps": 10}                                # default 6
 STATES = {"cta-steps": ("step1", "step2", "step3")}       # ?state= stills; default live / removed
-STILLS = {"cta-steps": ((0.1, "in"), (1.0, "typing"), (3.6, "scanning"), (6.2, "flip"))}
+STILLS = {"cta-steps": ((0.3, "in"), (1.6, "zoom"), (3.05, "typed"), (5.6, "scanning"), (8.3, "report"), (9.65, "flip"))}
 GENERIC_ONLY = {"cta-steps"}
 
 

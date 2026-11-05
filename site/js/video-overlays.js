@@ -3,13 +3,14 @@
 // transitions), so seeking, ?t= and frame-by-frame capture (tools/video/render_prefabs.py) all show the exact frame.
 // URL: ?name=<1-40 letters/digits/space . - _> (else the shared scan result: ?r= or the last scan, like #removals)
 //      ?t=<sec> seek · ?sfx=0 no sound · ?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none: one prefab, no video
-//      (?prefab=cta-steps&state=step1|step2|step3: the generic end card's 3 steps, 8 s, no form: the 6th CapCut clip).
+//      (?prefab=cta-steps&state=step1|step2|step3: the generic end card's phone take, 10 s, no form: the 6th CapCut clip).
 // Two modes (html[data-vo-mode]): "named" (?name= or a scan result: her texts, the name spoken, "for <name>" pill: 2 s at
 // data-cue-say-start, from data-cue-say on it stays to the end + after it; the jack-named.mp4 take if the server has it) and
 // "generic" (texts say "Your name", default blurred thumbs, no speech, at data-cue-cta (default data-cue-say) the "Type your
-// name" card = cta-steps: 3 steps on an 8 s loop, the landing's scan box types "Jaka Basej" (or the viewer's typed name) +
-// "Scan now" → "Searching Google, step N of 9…" + "87 links found" → rewatch this video with YOUR content, kept looping
-// after the video ends). Name bar (.vo-nb, under the stage; full screen / theater: the .vo-nb-pill opens it) + the end
+// name" card = cta-steps: a phone replica of the landing, one 10 s take: the camera zooms onto the onlyfans.com/ field,
+// types "Jaka Basej" as a handle (or the viewer's typed name), "Scan now" → the scan card "Searching Google, step N of 9…"
+// → the report "87 links found" + tabs + placeholder rows → "Rewatch this video with YOUR content" + the name flip, kept
+// looping after the video ends). Name bar (.vo-nb, under the stage; full screen / theater: the .vo-nb-pill opens it) + the end
 // card's form = rebuild(): in place, no reload, no interstitial: pop, named mode + texts, ?name= via history.replaceState,
 // the take (jack-named.mp4 if the server has it) restarts from 0, playing (the submit is the gesture). Reset = generic again.
 // Player UI (.vo-ui): full screen = the stage (Fullscreen API, + landscape lock on Android), else (iPhone) a CSS "theater":
@@ -31,11 +32,14 @@
   var IN = 0.45, OUT = 0.4, SHAKE = 0.25, WIPE = 0.95, STAMP = 0.2, BURST = 0.6, KW = 0.6, SLIDE = 160;   // seconds; px
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
   var GENERIC = 'Your name', NAMED_TAKE = 'jack-named.mp4';
-  // cta-steps: step windows (s into its 8 s loop), the name it types (or what the viewer typed in the form), the count it
-  // rolls to, the scan's progress line (the landing's "Searching Google, step N of 9…", js/scan-engine.js progressInfo)
-  var STEPS = [[0, 2.6], [2.6, 5.3], [5.3, 8]], CYCLE = 8, DEMO = 'Jaka Basej', LEAKS = 87, NSTEP = 9;
+  // cta-steps: one 10 s take (s into its loop) in a phone replica of the landing: the hero, the camera zooms onto the
+  // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form), "Scan now"; the scan card
+  // ("Searching <place>, step N of 9…", js/scan-engine.js progressInfo); the report card (LEAKS links rolling, tabs, rows)
+  // + "Rewatch this video with YOUR content" with the name flip. SCENES = [in, out] per scene (0.2 s fades; the hero fades
+  // back in over the loop's last 0.2 s)
+  var CYCLE = 10, DEMO = 'Jaka Basej', LEAKS = 87, NSTEP = 9, SCENES = [[0, 4.1], [4.1, 6.8], [6.8, 9.8]];
   var WHERE = ['Google', 'Google Images', 'X', 'Reddit', 'Mega'];
-  var SOLO_CTA = { end: 8, step1: 2.2, step2: 3.9, step3: 7.2 };   // ?prefab=cta-steps: clip length, state= stills
+  var SOLO_CTA = { end: 10, step1: 3.05, step2: 5.6, step3: 9.65 };   // ?prefab=cta-steps: clip length, state= stills
   // ?prefab= timeline = the CapCut clip: in 0-0.45, snap at 2.4, wipe 2.65-3.6, stamp 3.6, out 5.6-6; state=live / removed = these stills
   var SOLO = { wipe: 2.4, end: 6, live: 1.6, removed: 5.4 };
   var q = new URLSearchParams(location.search), solo = q.get('prefab');
@@ -80,33 +84,73 @@
   }
   var bump = function (k) { return k > 0 && k < 1 ? Math.sin(Math.PI * k) : 0; };
   var setText = function (el, s) { if (el && el.textContent !== s) el.textContent = s; };
-  function demoName() {   // what step 1 types: the form's name once the viewer typed a valid one, else the demo name
+  function demoName() {   // what the hero types: the form's name once the viewer typed a valid one, else the demo name
     var inp = ctaEl && ctaEl.querySelector('input'), v = inp ? inp.value.replace(/\s+/g, ' ').trim() : '';
     return v && NAME_RE.test(v) ? v : DEMO;
   }
+  var handle = function (n) { return n.toLowerCase().replace(/[^\p{L}\p{N}._]/gu, '') || 'creator'; };   // "Jaka Basej" → jakabasej
+  var RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
+  function lay(el, pg) {   // el's layout box in its page's px (offsets up to the .vo-pg, untransformed)
+    var x = 0, y = 0, w = el.offsetWidth, h = el.offsetHeight;
+    for (; el && el !== pg; el = el.offsetParent) { x += el.offsetLeft; y += el.offsetTop; }
+    return { x: x, y: y, w: w, h: h };
+  }
+  function camera(pg, keys, u) {   // keys: [s, [focus x, focus y, scale]] eased between; reduced motion = cuts at the midpoints
+    var i = 0, f;
+    while (i < keys.length - 1 && u >= keys[i + 1][0]) i++;
+    if (i === keys.length - 1 || u < keys[0][0]) f = keys[u < keys[0][0] ? 0 : i][1];
+    else {
+      var a = keys[i], b = keys[i + 1], w = clamp((u - a[0]) / (b[0] - a[0]));
+      w = RM && RM.matches ? (w < 0.5 ? 0 : 1) : ease(w);
+      f = [0, 1, 2].map(function (k) { return a[1][k] + (b[1][k] - a[1][k]) * w; });
+    }
+    var sc = pg.parentNode.parentNode, W = sc.clientWidth, H = sc.clientHeight, T = f[2], pw = pg.offsetWidth * T, ph = pg.offsetHeight * T;
+    var x = pw <= W ? (W - pw) / 2 : Math.min(0, Math.max(W - pw, W / 2 - f[0] * T)), y = Math.min(0, Math.max(Math.min(0, H - ph), H / 2 - f[1] * T));
+    pg.style.setProperty('--cx', x.toFixed(1));
+    pg.style.setProperty('--cy', y.toFixed(1));
+    pg.style.setProperty('--cz', T.toFixed(4));
+  }
   function steps(c, t) {   // cta-steps at t: u = seconds into its loop (from the card's live cue, = the clip's 0 s)
-    var box = c.steps, u = Math.max(0, t - c.live) % CYCLE, name = demoName(), bs = box.style;
-    Array.prototype.forEach.call(box.querySelectorAll('.vo-step'), function (el, i) {
-      var a = u - STEPS[i][0], d = STEPS[i][1] - STEPS[i][0], on = a >= 0 && a < d;
-      el.style.setProperty('--so', (on ? Math.min(clamp(a / 0.15), clamp((d - a) / 0.2)) : 0).toFixed(3));
-      el.style.setProperty('--ss', (on ? pop(clamp(a / 0.35)) : 1).toFixed(4));
-      var dot = c.dots[i];
-      if (dot) dot.style.setProperty('--d', on ? '1' : '.3');
+    var box = c.steps, u = Math.max(0, t - c.live) % CYCLE, name = demoName(), h = handle(name), bs = box.style, q1 = function (s) { return box.querySelector(s); };
+    var sc = box.querySelectorAll('.vo-step'), pgs = box.querySelectorAll('.vo-pg'), W = q1('.vo-scr').clientWidth, T0 = W / 390;
+    Array.prototype.forEach.call(sc, function (el, i) {
+      var a = u - SCENES[i][0], d = SCENES[i][1] - SCENES[i][0], o = i === 0 && u >= SCENES[2][1] ? clamp((u - SCENES[2][1]) / 0.2) : a >= 0 && a < d + 0.2 ? Math.min(i ? clamp(a / 0.2) : 1, clamp((d + 0.2 - a) / 0.2)) : 0;
+      el.style.setProperty('--so', o.toFixed(3));
     });
-    var n = Math.round(clamp((u - 0.35) / 1.4) * name.length), p = 1 - Math.pow(1 - clamp((u - 2.8) / 1.8), 2), f = clamp((u - 6.1) / 0.3);
-    setText(box.querySelector('.vo-mi-t'), name.slice(0, n));
-    bs.setProperty('--caret', u < STEPS[0][1] && (n < name.length || Math.floor(u * 2.5) % 2 === 0) ? '1' : '0');
-    bs.setProperty('--press', bump((u - 2.0) / 0.3).toFixed(3));
+    // 1 the hero: rest → zoom onto the field (caret kept in view) → type → pull back to "Scan now" → press
+    var n = Math.round(clamp((u - 1.4) / 1.6) * h.length), typed = h.slice(0, n), pg = pgs[0], fld = lay(q1('.vo-mi'), pg);
+    setText(q1('.vo-mi-t'), typed);
+    var car = lay(q1('.vo-mi-c'), pg), btn = lay(q1('.vo-mbtn'), pg), TZ = 2.25, vw = W / TZ;
+    var rest = [195, 0, T0], field = [Math.max(fld.x + vw / 2 - 10, car.x + 34 - vw / 2), fld.y + fld.h / 2, TZ], press = [195, (fld.y + btn.y + btn.h) / 2, T0];
+    camera(pg, u >= SCENES[2][1] ? [[0, rest]] : [[0.6, rest], [1.4, field], [3.1, field], [3.5, press]], u);
+    bs.setProperty('--foc', u > 1.2 && u < 3.6 ? '1' : '0');
+    bs.setProperty('--caret', u > 1.2 && u < 3.5 && (n < h.length || Math.floor(u * 2.5) % 2 === 0) ? '1' : '0');
+    bs.setProperty('--press', bump((u - 3.55) / 0.4).toFixed(3));
+    // 2 the scan card: "Searching <place>, step N of 9…", the bar, shimmering skeleton rows
+    var p = 1 - Math.pow(1 - clamp((u - 4.4) / 2.2), 2), k = Math.max(1, Math.ceil(p * NSTEP));
+    Array.prototype.forEach.call(box.querySelectorAll('.vo-at'), function (el) { setText(el, '@' + h); });
+    var card = lay(pgs[1].querySelector('.vo-card'), pgs[1]), top = function (T) { return [card.x - 6 + W / T / 2, card.y - 8 + q1('.vo-scr').clientHeight / T / 2, T]; };
+    camera(pgs[1], [[4.1, top(1.3)], [6.8, top(1.42)]], u);
+    setText(q1('.vo-ms'), p >= 1 ? 'Done: ' + NSTEP + ' of ' + NSTEP + ' steps' : 'Searching ' + WHERE[Math.min(WHERE.length - 1, Math.floor(p * WHERE.length))] + ', step ' + k + ' of ' + NSTEP + '…');
     bs.setProperty('--bar', p.toFixed(3));
-    var k = Math.max(1, Math.ceil(p * NSTEP)), m = Math.round(LEAKS * p);
-    setText(box.querySelector('.vo-ms'), p >= 1 ? 'Done: ' + NSTEP + ' of ' + NSTEP + ' steps' : 'Searching ' + WHERE[Math.min(WHERE.length - 1, Math.floor(p * WHERE.length))] + ', step ' + k + ' of ' + NSTEP + '…');
-    setText(box.querySelector('.vo-mc-n'), String(m));
-    setText(box.querySelector('.vo-mc-u'), m === 1 ? ' link found' : ' links found');
-    bs.setProperty('--cp', (1 + 0.25 * bump((u - 4.6) / 0.4)).toFixed(3));
+    bs.setProperty('--shim', (1 - (u * 0.8) % 1).toFixed(3));
+    // 3 the report card: zoom onto "N links found" while it rolls to LEAKS, pull back over the tabs + rows; the end toast + flip
+    var chip = lay(q1('.vo-mc'), pgs[2]), m = Math.round(LEAKS * (1 - Math.pow(1 - clamp((u - 7.2) / 0.75), 3))), f = clamp((u - 9.05) / 0.25);
+    camera(pgs[2], [[7, top(1.42)], [7.5, [chip.x + chip.w / 2, chip.y + chip.h / 2 - 16, 2.4]], [8.1, [chip.x + chip.w / 2, chip.y + chip.h / 2 - 16, 2.4]], [8.6, top(0.8)]], u);
+    setText(q1('.vo-mc-n'), String(m));
+    setText(q1('.vo-mc-u'), m === 1 ? ' link found' : ' links found');
+    bs.setProperty('--cp', (1 + 0.2 * bump((u - 7.95) / 0.3)).toFixed(3));
+    var ttl = [' full set', ' PPV pack', '', ' video bundle', ' photo set'];
+    Array.prototype.forEach.call(box.querySelectorAll('.vo-row'), function (el, i) {
+      setText(el.querySelector('.vo-ttl'), i === 2 ? 'Search results for ' + h : h + ttl[i]);
+      el.style.setProperty('--ro', (u < 7 ? 1 : clamp((u - 8.15 - i * 0.08) / 0.2)).toFixed(3));
+    });
+    var eo = u < SCENES[2][1] ? clamp((u - 8.75) / 0.3) : clamp((SCENES[2][1] + 0.2 - u) / 0.2);
+    bs.setProperty('--eo', eo.toFixed(3));
+    bs.setProperty('--es', (0.9 + 0.1 * back(clamp((u - 8.75) / 0.35))).toFixed(4));
     bs.setProperty('--fl', ((f < 0.5 ? f : f - 1) * 180).toFixed(1));   // 0 → 90deg, swap the text, -90 → 0
-    setText(box.querySelector('.vo-mini-n'), f >= 0.5 ? name : GENERIC);
-    bs.setProperty('--fp', (1 + 0.3 * bump((u - 6.4) / 0.4)).toFixed(3));
-    bs.setProperty('--mp', clamp((u - 5.3) / 2.7).toFixed(3));
+    setText(q1('.vo-mini-n'), f >= 0.5 ? name : GENERIC);
+    bs.setProperty('--fp', (1 + 0.3 * bump((u - 9.3) / 0.3)).toFixed(3));
   }
   var cueAt = function (k) { return num(stage, k); };
   var sayStart = function () { return cueAt('data-cue-say-start'); };
@@ -241,8 +285,7 @@
     mode('generic');
     forc = null;
     if (forEl) forEl.setAttribute('data-off', '');
-    if (ctaEl) ctac = { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps'),
-      dots: ctaEl.querySelectorAll('.vo-dots i') };
+    if (ctaEl) ctac = { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps') };
     if (nb) nb.removeAttribute('data-edit');
   }
   // the page's own texts / photos, so a rebuild or Reset starts from them (not from a scan's)
