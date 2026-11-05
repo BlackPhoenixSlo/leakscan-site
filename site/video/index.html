@@ -21,23 +21,26 @@
 </head>
 <body class="vo-page">
 <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol></svg>
-<!-- Cues: seconds into jack.mp4. live = the card slides in (right half), removed = the compare wipe starts, out = it has
-     slid out again. data-cue-say (stage) = the browser says the personalized name + shows "for <name>" (never for the default).
+<!-- Cues: seconds into jack.mp4 (the generic take; SCRIPT.md). live = the card pops in (right half), removed = Jack's snap (shake,
+     then the wipe), out = it has slid out again; google-images data-cue-tap = the "Images" tap. Stage: data-cue-say-start /
+     data-cue-say = the browser says the personalized name + "for <name>" (named mode only; -say is shifted by
+     data-cue-named-shift when jack-named.mp4 plays, as every prefab cue); data-cue-cta (default -say) = the generic end card.
      Edit them to the real timestamps after recording (site/video/CUES.md); tools/video/check_video.py keeps them sane. -->
 <main class="vo" id="vo">
   <h1 class="vo-sr">Jack: leaks on Google, X, Reddit and Mega, before and after the removal</h1>
-  <div class="vo-stage" data-cue-say="31">
+  <div class="vo-stage" data-cue-say-start="0.3" data-cue-say="40.5" data-cue-named-shift="1.5">
     <video class="vo-video" controls playsinline preload="auto" width="1920" height="1080">
       <source src="jack.mp4" type="video/mp4">
       <source src="jack.webm" type="video/webm">
     </video>
-    <div class="vo-over" aria-hidden="true"><div class="vo-box">
+    <div class="vo-over"><div class="vo-box">
 
-      <div class="vo-pf" data-prefab="google" data-cue-live="7" data-cue-removed="8.4" data-cue-out="10.4">
+      <div class="vo-pf" data-prefab="google" data-cue-live="6.7" data-cue-removed="10" data-cue-out="13.5" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><b>Google</b><span class="vo-st"><span class="vo-st-live">Leaks for <span data-vo="name">Orla Brennick</span></span><span class="vo-st-gone">A few days later: no leaks</span></span></p>
         <div class="phone vo-phone"><div class="phone-screen">
           <div class="m-search"><span data-vo="name">Orla Brennick</span><svg class="icon"><use href="#i-search"/></svg></div>
           <div class="m-tabs vo-tabs"><span class="on">All</span><span>Images</span><span>Videos</span></div>
+          <p class="vo-count vo-roll" data-roll-to="3">About 4,120 results</p>
           <div class="rm-stage vo-rs">
             <div class="rm-layer rm-live vo-g">
               <div class="m-result bad"><span class="fav fav-l" style="background:#4285f4">L</span><div><span class="m-site" data-vo="host">leak-mirror.example</span><span class="m-title"><span data-vo="name">Orla Brennick</span> leaked: full gallery</span><span class="m-thumbs"><span class="thumb t1"><img class="rm-img" src="../img/removals/behind-the-scenes.webp" alt="" width="240" height="240" decoding="async"></span><span class="thumb t2"><img class="rm-img" src="../img/removals/editorial-02.webp" alt="" width="240" height="240" decoding="async"></span><span class="thumb t3"><img class="rm-img" src="../img/removals/outdoors.webp" alt="" width="240" height="240" decoding="async"></span></span></div></div>
@@ -55,9 +58,10 @@
           </div>
         </div></div>
         <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
+        <span class="vo-kw"><span class="vo-kw-live">GOOGLE</span><span class="vo-kw-gone">GONE.</span></span>
       </div>
 
-      <div class="vo-pf vo-gi" data-prefab="google-images" data-cue-live="10.4" data-cue-removed="11.8" data-cue-out="14">
+      <div class="vo-pf vo-gi" data-prefab="google-images" data-cue-live="13.5" data-cue-removed="17" data-cue-out="19.2" data-cue-tap="15.6" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><b>Google Images</b><span class="vo-st"><span class="vo-st-live">Leaked photos of <span data-vo="name">Orla Brennick</span></span><span class="vo-st-gone">No leaks: only her own photos</span></span></p>
         <div class="phone vo-phone"><div class="phone-screen">
           <div class="m-search"><span data-vo="name">Orla Brennick</span><svg class="icon"><use href="#i-search"/></svg></div>
@@ -77,9 +81,10 @@
           </div>
         </div></div>
         <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
+        <span class="vo-kw"><span class="vo-kw-live">IMAGES</span><span class="vo-kw-gone">CLEAN.</span></span>
       </div>
 
-      <div class="vo-pf" data-prefab="x" data-cue-live="14" data-cue-removed="15.8" data-cue-out="18">
+      <div class="vo-pf" data-prefab="x" data-cue-live="19.2" data-cue-removed="20.6" data-cue-out="22.8" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico rm-ico-x">X</span><b>X</b><span class="vo-st"><span class="vo-st-live">A leak, posted 2 hours ago</span><span class="vo-st-gone">A few hours later: no leaks</span></span></p>
         <div class="vo-panel"><div class="rm-stage vo-rs">
           <div class="rm-layer rm-live xp">
@@ -97,9 +102,10 @@
           <span class="rm-handle"><span class="rm-knob"></span></span>
         </div></div>
         <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
+        <span class="vo-kw"><span class="vo-kw-live">X</span><span class="vo-kw-gone">NOTHING.</span></span>
       </div>
 
-      <div class="vo-pf" data-prefab="reddit" data-cue-live="18" data-cue-removed="20.2" data-cue-out="22.5">
+      <div class="vo-pf" data-prefab="reddit" data-cue-live="22.8" data-cue-removed="24.2" data-cue-out="26.2" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico rm-ico-rd">r/</span><b>Reddit</b><span class="vo-st"><span class="vo-st-live">A few leaks on Reddit</span><span class="vo-st-gone">No leaks on Reddit</span></span></p>
         <div class="vo-panel"><div class="rm-stage vo-rs">
           <div class="rm-layer rm-live rd">
@@ -118,22 +124,23 @@
           <span class="rm-handle"><span class="rm-knob"></span></span>
         </div></div>
         <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
+        <span class="vo-kw"><span class="vo-kw-live">REDDIT</span><span class="vo-kw-gone">NOTHING.</span></span>
       </div>
 
-      <div class="vo-pf" data-prefab="mega" data-cue-live="22.5" data-cue-removed="26" data-cue-out="29">
+      <div class="vo-pf" data-prefab="mega" data-cue-live="26.2" data-cue-removed="29.6" data-cue-out="31.8" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico rm-ico-mega">M</span><b>Mega</b><span class="vo-st"><span class="vo-st-live">50+ GB of videos</span><span class="vo-st-gone">Gone in a day</span></span></p>
         <div class="vo-panel"><div class="rm-stage vo-rs">
           <div class="rm-layer rm-live mg">
             <div class="agg">
               <span class="agg-th"><img class="rm-img" src="../img/removals/portrait.webp" alt="" width="240" height="240" decoding="async"></span>
-              <span class="agg-b"><span class="agg-pill">Trending</span><span class="agg-name" data-vo="name">Orla Brennick</span><span class="agg-meta" data-vo="mega-meta">52 GB · 318 videos</span></span>
+              <span class="agg-b"><span class="agg-pill">Trending</span><span class="agg-name" data-vo="name">Orla Brennick</span><span class="agg-meta vo-roll" data-roll-to="0" data-vo="mega-meta">52 GB · 318 videos</span></span>
               <span class="agg-open"><span class="mg-m">M</span>Open link</span>
             </div>
             <div class="mg-win">
               <div class="mg-bar"><span class="mg-logo">M</span><span class="mg-title" data-vo="mega-title">Orla Brennick – pack</span></div>
               <ul class="mg-list">
-                <li><span class="mg-fold"></span><span class="mg-n">VIDS</span><span class="mg-c" data-vo="mega-vid">318 files</span></li>
-                <li><span class="mg-fold"></span><span class="mg-n">IMAGES</span><span class="mg-c" data-vo="mega-img">640 files</span></li>
+                <li><span class="mg-fold"></span><span class="mg-n">VIDS</span><span class="mg-c vo-roll" data-roll-to="0" data-vo="mega-vid">318 files</span></li>
+                <li><span class="mg-fold"></span><span class="mg-n">IMAGES</span><span class="mg-c vo-roll" data-roll-to="0" data-vo="mega-img">640 files</span></li>
                 <li><span class="mg-txt">TXT</span><span class="mg-n">READ THIS.txt</span><span class="mg-c">1 KB</span></li>
               </ul>
             </div>
@@ -147,10 +154,21 @@
           <span class="rm-handle"><span class="rm-knob"></span></span>
         </div></div>
         <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
+        <span class="vo-kw"><span class="vo-kw-live">MEGA <span data-vo="mega-gb">52 GB</span></span><span class="vo-kw-gone">GONE.</span></span>
       </div>
 
       <!-- data-cue-say: the browser says the name; this card shows it too (no-voice browsers). Personalized names only. -->
-      <div class="vo-pf vo-for" data-off><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
+      <div class="vo-pf vo-for" data-off aria-hidden="true"><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
+
+      <!-- generic mode only (no ?name=, no scan): from data-cue-cta (default = data-cue-say) to the end; the form reloads with ?name= -->
+      <div class="vo-pf vo-cta" data-off>
+        <p class="vo-cta-t">Type your name in the link → this video rebuilds with YOUR leaks</p>
+        <form class="vo-cta-f" action="" method="get">
+          <label class="vo-sr" for="vo-name">Your name</label>
+          <input id="vo-name" name="name" type="text" required maxlength="40" autocomplete="off" spellcheck="false" placeholder="Your name">
+          <button type="submit">Rebuild it</button>
+        </form>
+      </div>
 
     </div></div>
   </div>
