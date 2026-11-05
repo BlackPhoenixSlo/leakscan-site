@@ -7,11 +7,10 @@ site/video/index.html with the new data-cue-* values (`git apply`-able; --apply 
 Rules (SCRIPT.md): live = 0.3 s before the platform word ("Google" / "X" / "Reddit" followed by "Leaks", "Images" after
 "Google", "Mega"); removed = the word after Jack's [snap] ("Gone" / "Now" / "Hours" / "Nothing" / "Gone"); out = the
 next platform word - 0.2 s (mega: its sentence end + 0.5), never < removed + 1.95 (the next live never before it);
-google-images data-cue-tap = "Tap"; data-cue-say (= the generic end card) = the last word's end + 0.5.
---named (jack-named.mp4, Script B): data-cue-named-shift = its google live - index.html's, data-cue-say = its last word
-end + 0.5 - shift (jack.mp4 time), and data-cue-cta pins the generic end card at the old data-cue-say.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cues_from_take.py TAKE.mp4 [--named] [--model base]
-       [--words WORDS.json] [--apply]
+google-images data-cue-tap = "Tap"; data-cue-cta (the end card) = line 9's "Type" - 0.2 (else the mega out);
+data-cue-say (named: the name spoken in the 2 s end hold) = the last word's end + 0.3.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cues_from_take.py site/video/jack.webm [--model base]
+       [--words WORDS.json] [--apply]       (any ffmpeg-readable take: .webm, .mp4, .mov)
 WORDS.json = [{"word": "Google.", "start": 7.0, "end": 7.4}, ...] skips the transcription.
 Exit: 0 patch printed (empty = cues already match), 1 take / words unusable, 2 no whisper installed."""
 import argparse, difflib, json, pathlib, re, shutil, subprocess, sys
@@ -70,7 +69,7 @@ def find(words, i, pid):
 
 
 def cues(words):
-    """{pid: {live, removed, out[, tap]}}, say, notes"""
+    """{pid: {live, removed, out[, tap]}}, cta, say, notes"""
     n = [norm(w["word"]) for w in words]
     got, notes, i = {}, [], 0
     for pid in ORDER:
@@ -106,25 +105,21 @@ def cues(words):
             c["tap"] = min(max(c["tap"], c["live"] + IN), c["removed"] - 0.7)
             notes.append(f"{pid}: data-cue-tap clamped to {c['tap']:.2f}")
         prev_out = c["out"]
-    return got, words[-1]["end"] + 0.5, notes
+    t9 = next((k for k in range(got["mega"]["r"] + 1, len(words)) if n[k] == "type"), None)
+    cta = max(prev_out, words[t9]["start"] - 0.2) if t9 is not None else prev_out
+    if t9 is None:
+        notes.append("line 9: no 'Type' after the mega snap: data-cue-cta = the mega out")
+    return got, cta, max(cta, words[-1]["end"] + 0.3), notes
 
 
 def fmt(x):
     return f"{round(x, 2):g}"
 
 
-def patch(html, got, say, named):
+def patch(html, got, cta, say):
     def stage(h, k, v):
         h2, n = re.subn(r'(<div class="vo-stage"[^>]*?)\s%s="[^"]*"' % k, r'\1 %s="%s"' % (k, v), h, count=1)
         return h2 if n else re.sub(r'<div class="vo-stage"', f'<div class="vo-stage" {k}="{v}"', h, count=1)
-    if named:   # only the stage: the shift (from google live) + the named say; the generic end card keeps the old say
-        live0 = float(re.search(r'data-prefab="google" data-cue-live="([\d.]+)"', html)[1])
-        shift = max(0, got["google"]["live"] - live0)
-        old_say = re.search(r'class="vo-stage"[^>]*\bdata-cue-say="([\d.]+)"', html)
-        if old_say and 'data-cue-cta="' not in html:
-            html = stage(html, "data-cue-cta", old_say[1])
-        html = stage(html, "data-cue-named-shift", fmt(shift))
-        return stage(html, "data-cue-say", fmt(say - shift))
     for pid in ORDER:
         c = got[pid]
         html = re.sub(r'(data-prefab="%s") data-cue-live="[^"]*" data-cue-removed="[^"]*" data-cue-out="[^"]*"' % re.escape(pid),
@@ -133,13 +128,12 @@ def patch(html, got, say, named):
             html = re.sub(r'(data-prefab="google-images"[^>]*?) data-cue-tap="[^"]*"', r"\1", html, count=1)
             if "tap" in c:
                 html = re.sub(r'(data-prefab="google-images" [^>]*?data-cue-out="[^"]*")', r'\1 data-cue-tap="%s"' % fmt(c["tap"]), html, count=1)
-    return stage(html, "data-cue-say", fmt(say))
+    return stage(stage(html, "data-cue-cta", fmt(cta)), "data-cue-say", fmt(say))
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("take")
-    ap.add_argument("--named", action="store_true", help="the Script B take (jack-named.mp4)")
     ap.add_argument("--model", default="base")
     ap.add_argument("--words", help="word timestamps JSON instead of transcribing")
     ap.add_argument("--apply", action="store_true", help="write site/video/index.html")
@@ -166,14 +160,14 @@ def main():
         print("no words in the take", file=sys.stderr)
         return 1
     try:
-        got, say, notes = cues(words)
+        got, cta, say, notes = cues(words)
     except ValueError as e:
         print(f"script key word missing: {e} (SCRIPT.md wording?)", file=sys.stderr)
         return 1
     for nt in notes:
         print("note:", nt, file=sys.stderr)
     old = PAGE.read_text(encoding="utf-8")
-    new = patch(old, got, say, a.named)
+    new = patch(old, got, cta, say)
     rel = str(PAGE.relative_to(ROOT))
     sys.stdout.writelines(difflib.unified_diff(old.splitlines(True), new.splitlines(True), "a/" + rel, "b/" + rel))
     if a.apply and new != old:

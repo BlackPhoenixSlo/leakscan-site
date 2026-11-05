@@ -22,9 +22,10 @@ class TestSiteRoutes(unittest.TestCase):
         site = os.path.join(root, "site")
         os.makedirs(os.path.join(site, "scan"))
         os.makedirs(os.path.join(site, "css"))
+        os.makedirs(os.path.join(site, "video"))
         for rel, body in {"index.html": "<h1>landing LeakScan</h1>", "scan/index.html": "scan page",
                           "404.html": "custom 404", "css/a.css": "b{}", ".env": "SECRET=1",
-                          "scan/v.mp4": "0123456789"}.items():
+                          "scan/v.mp4": "0123456789", "video/jack.webm": "abcdefghij"}.items():
             with open(os.path.join(site, rel), "w") as f:
                 f.write(body)
         with open(os.path.join(root, "outside.txt"), "w") as f:
@@ -79,6 +80,10 @@ class TestSiteRoutes(unittest.TestCase):
         self.assertEqual((r.status, r.getheader("Content-Range")), (416, "bytes */10"))
         r, b = self.req("/scan/v.mp4", headers={"Range": "bytes=1-2,4-5"})   # multi-range: full body
         self.assertEqual((r.status, b), (200, b"0123456789"))
+        r, b = self.req("/video/jack.webm")   # the video page's take (WebM only)
+        self.assertEqual((r.status, b, r.getheader("Content-Type"), r.getheader("Accept-Ranges")), (200, b"abcdefghij", "video/webm", "bytes"))
+        r, b = self.req("/video/jack.webm", headers={"Range": "bytes=3-5"})
+        self.assertEqual((r.status, b, r.getheader("Content-Type"), r.getheader("Content-Range")), (206, b"def", "video/webm", "bytes 3-5/10"))
         r, b = self.req("/nope.mp4", headers={"Range": "bytes=0-1"})          # 404 page ignores Range
         self.assertEqual((r.status, b), (404, b"custom 404"))
 

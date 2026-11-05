@@ -9,13 +9,14 @@ stage, not the `<video>`, so the cards stay; Android also locks landscape), iPho
 "theater": the stage fixed, rotated 90deg over the portrait screen, scroll locked; Esc / the X / back closes it. Touch
 devices: native controls off (iOS's would cover the card), own play / pause + seek bar across the full stage width (thin, bottom; the cards draw over it), the full screen button top right (icon only on touch), the first tap on
 the stage plays and shows a "Rotate for full size" pill (6 s). The script, line by line with its prefab and
-default cue: `SCRIPT.md`. Default cues = `data-cue-*` in `index.html` (seconds into `jack.mp4`, guessed for a ~40 s
-take until the real recording exists; the placeholder is 44 s: one room across the whole frame, a silhouette on the left).
+default cue: `SCRIPT.md`. Default cues = `data-cue-*` in `index.html` (seconds into `jack.webm`, Jack's one take for both
+modes, guessed for 40 s until the real recording exists; the placeholder `jack.webm` is 40 s: one room across the whole
+frame, a silhouette on the left, a burned-in timecode).
 
 **Removed cue = the snap.** Jack snaps his fingers on every removal; the removed cue sits on the word right after it
 ("Gone" / "Now" / "Hours" / "Nothing" / "Gone").
 
-## What a prefab does (web page and clips: same code, `js/video-overlays.js`)
+## What a prefab does (`js/video-overlays.js`)
 
 - live: pops in from the right (0.45 s, scale 0.6 → 1.08 → 1) + a yellow / black word card top-right for 0.6 s
   (`GOOGLE`, `IMAGES`, `X`, `REDDIT`, `MEGA 52 GB`).
@@ -26,7 +27,7 @@ take until the real recording exists; the placeholder is 44 s: one room across t
 - out: slides out down / right (0.4 s, gone at the out cue).
 - `google-images` taps "Images" at `data-cue-tap` (default live + 0.6) and shows the leak grid 0.3 s later.
 - prefers-reduced-motion: no shake / pop / slam / particles; the wipe becomes a fade (`css/video.css`).
-- Sound (web page only): a synthesized pop at live and whoosh + thud at removed (WebAudio, no files), only while playing
+- Sound: a synthesized pop at live and whoosh + thud at removed (WebAudio, no files), only while playing
   after the viewer's play gesture, low volume; `?sfx=0` turns it off.
 
 Room rules (`tools/video/check_video.py` checks them): prefabs never overlap; removed − live >= 0.45 s
@@ -38,62 +39,47 @@ After states ("Removed" stamp kept on all 5): `google` = the landing after-phone
 after-phone's `assets/phone/photo-*.jpg`, also for a scan), captioned with her site / Instagram. X / Reddit / Mega: the
 leak is gone.
 
-## Two modes, two takes (web page)
+## Two modes, one take
 
-| | generic (no `?name=`, no scan result) | named (`?name=` or a scan result) |
+| | generic (no `?name=`, no scan result) | named (`?name=`, `?r=<slug>`, the last scan, or the name bar) |
 |---|---|---|
-| take | `jack.mp4` (Script A) | `jack-named.mp4` (Script B) if the server has it (HEAD probe), else `jack.mp4` |
-| texts | "Your name" (search box, posts, after state `yourname.com`) | her name / scan texts + scan thumbs |
-| speech | none | her name at `data-cue-say-start` (0.3 s, in Script B's 1.5 s opening gap) and at `data-cue-say` (end), each once, + "for <name>" pill (2 s at the start; from `data-cue-say` to `data-cue-cta`, then the named cta-steps take carries the name) |
+| take | `jack.webm` | `jack.webm` (the same take) |
+| texts | "Your name" (search box, posts, after state `yourname.com`) | her name / scan texts |
+| images | default blurred thumbs | after a scan result: her real ones (below); `?name=` alone: the defaults |
+| speech | none | her name at `data-cue-say-start` (0.2 s, in the take's 1.5 s silent start) and at `data-cue-say` (the 2 s end hold), each once, + "for <name>" pill (2 s at the start) |
 | end | `cta-steps`: the "Type your name in the link → this video rebuilds with YOUR leaks" card at `data-cue-cta` (default `data-cue-say`), stays: a phone-shaped replica of the landing (dark, the site's tokens / fonts / logo), one 10 s take from its cue (0-4.1 s the hero: the camera zooms onto the `onlyfans.com/` field, types "Jaka Basej" as the handle `jakabasej` (the viewer's own once typed in the form), pulls back, "Scan now" pressed; 4.1-6.8 s the scan card "FREE SCAN · ONLYFANS @handle", "Searching Google, step N of 9…" walking Google → Google Images → X → Reddit → Mega, bar, skeleton rows; 6.8-9.8 s the report card: zoom onto "N links found" rolling to 87, pull back over tabs Links 87 / Images 12 / Sites 31, 5 placeholder `*.example` rows with grey blurred thumbs + Live pills, "+ 82 more in the full report", the blurred Google Images strip; from 8.75 s "Rewatch this video with YOUR content" + "for Your name" flipping to the name), still looping after the take ends; under it the real form = the name bar's rebuild (below) | the same take with HER handle typed, no title / form / flip, ending on "This is what I'd clear for <name>" + Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev (text, no links: the page loads / links nothing external), held 5 s per loop (15 s), still looping after the take ends |
+
+**Production images** (named, from a scan result: `?r=<slug>` → `GET <API>/api/scan-result/<slug>`, or the name bar's scan
+→ the landing's own `POST <API>/api/public-scan` for `onlyfans.com/<handle>`; `<API>` = js/scan-engine.js's host): the
+cards are filled like the landing hero card (js/inline-scan.js): Google = her real result domains + titles (letter
+favicons, the first row with 3 thumbs), "About N results" = the scan's Google total; Google Images = 6 of her real Google
+thumbs with their domains, every X / Reddit / Mega photo too: `<API>/api/thumb?u=<gstatic>` only, always blurred
+(`.rm-img`, `.vo-real`); the cta-steps report = her real counts (Links = hits + results by URL, Images, Sites, "+ N more")
++ 5 titled rows + thumbs. After state: her own SFW photos (`GET <API>/api/media/<slug>` → `<API>/api/media/<slug>/<n>.jpg`,
+unblurred `.vo-own`), else the default photos. Leak URLs are read for their host only, never rendered. A failed scan /
+read = text only. While the name bar's scan runs: a yellow status pill ("Searching Google, step N of 9…"); the take plays
+its intro and holds just before the first card (at most 45 s) until the result lands, then the URL becomes `?r=<slug>`.
 
 **Name bar** (both modes, under the stage; full screen / theater: a "Your name" pill top right, next to the X, opens it): generic =
 "Your name" input (1-40 letters / digits / space . - _, textContent only) + "Rebuild this video with my name", a pulsing
-yellow "👇 type your name" pill on it from 0 s until the first focus (Script A line 9 points at it). Submit (or the end
+yellow "👇 type your name" pill on it from 0 s until the first focus (SCRIPT.md line 9 points at it). Submit (or the end
 card's form, same function) = in place, no reload: named mode, every prefab re-personalized, cta-steps with her name, "for <name>"
 pill + both say cues armed, `?name=` via `history.replaceState`, a pop, and at once (no interstitial card)
-`jack-named.mp4` (else `jack.mp4`) restarts from 0, playing (the submit is the gesture). Then the bar reads "Rebuilt for <name>" + Change (the input again) / Reset (generic,
+the take restarts from 0, playing (the submit is the gesture), + the scan above. Then the bar reads "Rebuilt for <name>" + Change (the input again) / Reset (generic,
 URL without query, restart). `?name=` on load works as before.
 
-Script B is Script A with a 1.5 s silent gap before line 1 and its own line 9, so while `jack-named.mp4` plays every
-prefab cue and `data-cue-say` move by `data-cue-named-shift` (1.5). If the take ends before a say / end-card cue,
-they come on `ended`. Speech: `speechSynthesis`, rate 0.95, page language, only after the play gesture, video ducked to
-25 % meanwhile, pause / seek cancels it. Not in the CapCut clips (CapCut has no per-viewer name).
+If the take ends before a say / end-card cue, they come on `ended`. Speech: `speechSynthesis`, rate 0.95, page language,
+only after the play gesture, video ducked to 25 % meanwhile, pause / seek cancels it.
 
 ## After recording
 
-1. Export both raw takes as H.264 MP4 (1920x1080, "faststart"): `site/video/jack.mp4` (A), `site/video/jack-named.mp4`
-   (B); delete the placeholder `jack.webm` and its `<source>` line in `index.html`.
-2. Cues: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cues_from_take.py site/video/jack.mp4 --apply`,
-   then the same with `jack-named.mp4 --named --apply` (shift, named say; pins the end card). Needs `openai-whisper` or
-   `faster-whisper` in that env (it prints the install line and exits 2 otherwise). Untested on a real take: check the
-   diff, or read the timestamps off the CapCut playhead and edit `data-cue-*` by hand (rules above, `SCRIPT.md`).
+1. Drop Jack's take in as `site/video/jack.webm` (1920x1080, VP9 + Opus, <= 60 MB), replacing the placeholder. (Old
+   iPhones without WebM: also export `jack.mp4` and add `<source src="jack.mp4" type="video/mp4">` after the webm one.)
+2. Cues, one line: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cues_from_take.py site/video/jack.webm --apply`
+   (whisper word timestamps → every `data-cue-*`; needs `openai-whisper` or `faster-whisper` in that env, it prints the
+   install line and exits 2 otherwise). Or read them off any player and edit `data-cue-*` by hand (rules above, `SCRIPT.md`).
 3. `python3 tools/video/check_video.py` and `cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT
-   --name Tessa` (both modes at every cue, right-half geometry, counters, end card + form, snap, reduced motion, sfx,
-   speech, the named take, scan-stub texts + photos).
+   --name Tessa` (both modes at every cue, geometry, counters, end card + form, snap, reduced motion, sfx, speech, scan-stub
+   texts + photos, production images).
 
-Test any moment: `?t=12.5`; one prefab alone: `?prefab=mega&state=removed&bg=green`.
-
-## CapCut
-
-1. Render the clips: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/render_prefabs.py OUT [--name X]`
-   (no `--name` = generic "Your name", for the Script A video; 6 clips, `cta-steps` below) → per prefab `ID.mov` (ProRes 4444, real alpha),
-   `ID-green.mp4` (#00FF00), stills `ID-live.png` / `ID-removed.png` (settled) and `ID-in.png` / `ID-snap.png` /
-   `ID-burst.png` / `ID-out.png` (0.1 / 2.5 / 4.0 / 5.8 s). Each clip: 1920x1080, 6 s, silent: pops in 0-0.45 s, the
-   **snap at 2.4 s** (shake + flash), wipe 2.65-3.6 s, "Removed" stamp at 3.6 s + confetti, slides out 5.6-6 s.
-2. Track 1: Jack's take. Track 2 (overlay): drop `ID.mov` (alpha, nothing to key). With `ID-green.mp4` instead:
-   select it → Cutout → Chroma key → pick the green → Intensity ~10-20, Shadow ~10.
-3. Keep it full frame (Scale 100 %, Position 0 / 0): the card is already on the right half.
-4. Place the clip so its 2.4 s mark sits on Jack's snap (clip start = snap − 2.4 s). If the platform word comes earlier
-   than 2.4 s before it, extend the live part (split at ~1.6 s, Freeze frame there); if later, trim the head after the
-   0.45 s pop-in instead (`google-images` taps at 0.6 s: for a later "Tap Images", split at 0.5 s and freeze there).
-5. Let the clip run to its end (the slide-out is in the clip). **No CapCut In / Out animation needed**; if the line
-   ends earlier, cut at the "out" mark and add CapCut Out: Fade out 0.3 s for that one.
-6. Repeat for `google-images`, `x`, `reddit`, `mega`. Lines 1, 2 and 8 have no clip.
-6b. Line 9 (generic upload only): `cta-steps.mov` / `cta-steps-green.mp4`, 10 s = one loop of the phone take (pops in at
-   0 s, hero zoom + typing 0-4.1 s, scan card 4.1-6.8 s, report + rewatch toast + name flip 6.8-9.8 s), no form, no slide-out: start
-   it on the line 9 cue and loop / freeze its last frame to the end. Stills: `cta-steps-step1/2/3.png`,
-   `-in / -zoom / -typed / -scanning / -report / -flip.png`. Not rendered with `--name` (named never shows it).
-7. Sound effects (CapCut → Audio → Sound effects, free; search these names, pick by ear, volume ~30 %): **"Pop"** on
-   each clip's pop-in (0 s), **"Whoosh"** on the snap (2.4 s), **"Impact"** as the stamp lands (3.6-3.8 s), **"Ding"**
-   (or "Cash register") on the confetti (3.8 s). Keep Jack's real finger snap audible; the SFX sit under it.
+Test any moment: `?t=12.5`.

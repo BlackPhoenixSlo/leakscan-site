@@ -1,5 +1,5 @@
 """Local static server for site/ with HTTP Range support (python's http.server has none, so <video> can't seek).
-Used by render_prefabs.py and cue_shots.py:  with serve(SITE) as base: ...  (base = "http://127.0.0.1:<port>/")."""
+Used by cue_shots.py:  with serve(SITE) as base: ...  (base = "http://127.0.0.1:<port>/")."""
 import contextlib, functools, http.server, os, re, threading
 
 SITE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "site")
