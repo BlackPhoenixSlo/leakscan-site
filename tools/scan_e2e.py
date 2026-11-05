@@ -469,7 +469,9 @@ def huge_flow(browser, vp_name, vp):
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
         check(f"{tag} pin: All / Videos scroll <= 1.5 screens, Images <= 2 (more behind More)",
               all(v[0] <= (2 if k == "images" else 1.5) * g["vh"] and v[1] for k, v in runs.items()), [runs, g["vh"]])
-        check(f"{tag} pin: Images first look = 3 columns, >= 18 tiles", runs["images"][3] == 3 and runs["images"][2] >= 18, runs["images"])
+        check(f"{tag} pin: Images first look = 3 columns, 18-24 tiles in whole rows, over 1.5 screens only to reach 6 rows",
+              runs["images"][3] == 3 and 18 <= runs["images"][2] <= 24 and runs["images"][2] % 3 == 0
+              and (runs["images"][0] <= 1.5 * g["vh"] or runs["images"][2] == 18), runs["images"])
         page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
         page.wait_for_timeout(250)
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
