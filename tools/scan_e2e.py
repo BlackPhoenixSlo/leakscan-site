@@ -499,28 +499,30 @@ def huge_flow(browser, vp_name, vp):
     cls0 = page.evaluate(CLS)   # report built + the whole scroll story, no clicks yet
 
     # 3. show more sites, open a site, its links in steps, close = gone
-    page.locator("#lx-more").evaluate("b => { b.scrollIntoView({block: 'center', behavior: 'instant'}); b.focus(); }")   # as Tab would bring it
-    page.keyboard.press("Enter")
-    page.wait_for_timeout(400)
-    nx = page.evaluate("() => { const a = document.activeElement, rows = [...document.querySelectorAll('#lx-list .lx-site')]; return [a.tagName, rows.indexOf(a.closest('.lx-site'))]; }")
-    nx.append(page.evaluate(IN_VIEW))
-    check(f"{tag} incremental: keyboard Show more sites → focus on the first new site, in view", nx == ["SUMMARY", 10, True], nx)
-    page.keyboard.press("Enter")   # open that site from the keyboard
-    page.wait_for_timeout(100)
-    lm = page.locator("#lx-list .lx-site").nth(10).locator(".lx-lmore")
-    if lm.count():
-        lm.evaluate("b => { b.scrollIntoView({block: 'center', behavior: 'instant'}); b.focus(); }")
+    nx, nl = None, None   # (no Show more when everything is already shown: --break-incremental)
+    if page.locator("#lx-more").is_visible():
+        page.locator("#lx-more").evaluate("b => { b.scrollIntoView({block: 'center', behavior: 'instant'}); b.focus(); }")   # as Tab would bring it
         page.keyboard.press("Enter")
         page.wait_for_timeout(400)
-        nx = page.evaluate("() => { const a = document.activeElement, l = a.closest('.lx-links'); return [a.tagName, l ? [...l.children].indexOf(a.parentNode) : -1]; }")
+        nx = page.evaluate("() => { const a = document.activeElement, rows = [...document.querySelectorAll('#lx-list .lx-site')]; return [a.tagName, rows.indexOf(a.closest('.lx-site'))]; }")
         nx.append(page.evaluate(IN_VIEW))
-    else:
-        nx = None
-    check(f"{tag} incremental: keyboard Show more links → focus on the first new link, in view", nx == ["A", 10, True], nx)
-    page.locator("#lx-list .lx-site").nth(10).locator("summary").click()
+        page.keyboard.press("Enter")   # open that site from the keyboard
+        page.wait_for_timeout(100)
+        lm = page.locator("#lx-list .lx-site").nth(10).locator(".lx-lmore")
+        if lm.count():
+            lm.evaluate("b => { b.scrollIntoView({block: 'center', behavior: 'instant'}); b.focus(); }")
+            page.keyboard.press("Enter")
+            page.wait_for_timeout(400)
+            nl = page.evaluate("() => { const a = document.activeElement, l = a.closest('.lx-links'); return [a.tagName, l ? [...l.children].indexOf(a.parentNode) : -1]; }")
+            nl.append(page.evaluate(IN_VIEW))
+    check(f"{tag} incremental: keyboard Show more sites → focus on the first new site, in view", nx == ["SUMMARY", 10, True], nx)
+    check(f"{tag} incremental: keyboard Show more links → focus on the first new link, in view", nl == ["A", 10, True], nl)
+    if nx:
+        page.locator("#lx-list .lx-site").nth(10).locator("summary").click()   # close it again
     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
     page.wait_for_timeout(100)
-    page.locator("#lx-more").click()
+    if page.locator("#lx-more").is_visible():
+        page.locator("#lx-more").click()
     check(f"{tag} incremental: each Show more adds 25 sites", rows() == 60 and page.locator("#lx-more").inner_text() == "Show 25 more sites · 40 left", rows())
     top = page.locator("#lx-list .lx-site").first
     top.locator("summary").click()
