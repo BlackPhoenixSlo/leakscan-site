@@ -34,8 +34,8 @@ def main():
             pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
             pg.on("pageerror", lambda e: errs.append(str(e)))
             pg.on("request", lambda r: ext.append(r.url) if not r.url.startswith(base) else None)
-            for pid, live, rem, out in cues:
-                for state, t in (("live", live + 0.8), ("removed", min(rem + 2.0, out - 0.4))):
+            for pid, live, rem, off in cues:
+                for state, t in (("live", live + 0.8), ("removed", min(rem + 2.0, off - 0.4))):
                     pg.goto(f"{base}video/?name={a.name}&t={t:g}")
                     pg.wait_for_function("t => { const v = document.querySelector('video'); return v.readyState >= 3"
                                          " && !v.seeking && Math.abs(v.currentTime - t) < 0.05 }", arg=t, timeout=15000)
