@@ -54,6 +54,12 @@ else if (ribbon) {
   try {
     if (sessionStorage.getItem('demo-ribbon') === 'off') ribbon.classList.add('is-hidden');
   } catch (e) { /* storage blocked: the ribbon just stays */ }
+  // Publish the space the fixed ribbon takes at the bottom (its height wraps with
+  // width and the personalized name) so the hero CTAs and footer can clear it.
+  const clear = () => document.documentElement.style.setProperty('--ribbon-clear',
+    ribbon.offsetHeight + parseFloat(getComputedStyle(ribbon).bottom) + 'px');
+  clear();
+  if ('ResizeObserver' in window) new ResizeObserver(clear).observe(ribbon);
   ribbon.querySelector('.demo-ribbon__close')?.addEventListener('click', () => {
     ribbon.classList.add('is-hidden');
     try { sessionStorage.setItem('demo-ribbon', 'off'); } catch (e) { /* ignore */ }
