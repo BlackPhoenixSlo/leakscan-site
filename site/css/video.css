@@ -27,8 +27,8 @@
 .vo-cap .rm-ico-x { background: #0f1419; color: #fff; }
 .vo-st { display: grid; color: #5c5248; font-weight: 500; }
 .vo-st > span { grid-area: 1 / 1; }
-.vo-st-live { opacity: calc(1 - var(--w)); }
-.vo-st-gone { opacity: var(--w); color: #23704f; font-weight: 700; }
+.vo-st-live { opacity: calc(1 - var(--w) * 2); }   /* out over the first half of the wipe, the new line in over the second: never both */
+.vo-st-gone { opacity: calc(var(--w) * 2 - 1); color: #23704f; font-weight: 700; }
 .vo-panel { width: 100%; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 10px 40px rgb(0 0 0 / .28); }
 .vo-rs { height: 350px; border: 0; border-radius: 0; cursor: auto; touch-action: auto; }
 .vo .rm-handle { opacity: var(--h); }
