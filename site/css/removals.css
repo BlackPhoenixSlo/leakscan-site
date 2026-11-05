@@ -36,11 +36,18 @@ html:not(.js) .rm-stage { cursor: auto; }
 .rm-knob::before { left: 9px; transform: rotate(45deg); }
 .rm-knob::after { right: 9px; transform: rotate(-135deg); }
 .rm-handle:focus-visible { outline: none; }
+/* at rest on either end the line only doubles the stage border and the knob covers edge content ("369 files", photos):
+   hide the line; with a mouse also the knob, until the pointer is on the stage or the slider has keyboard focus.
+   Touch keeps the knob: no hover, it is the drag hint there. */
+.rm-stage:is([data-end="r"], [data-end="l"]) .rm-handle::before { opacity: 0; }
+@media (hover: hover) {
+  .rm-stage:is([data-end="r"], [data-end="l"]):not(:hover) .rm-handle:not(:focus-visible) .rm-knob { opacity: 0; }
+}
 .rm-handle:focus-visible .rm-knob { outline: 2px solid var(--ink); outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) {
   .rm-anim .rm-gone { transition: clip-path .7s cubic-bezier(.6, 0, .25, 1); }
   .rm-anim .rm-handle { transition: transform .7s cubic-bezier(.6, 0, .25, 1); }
-  .rm-knob { transition: transform .2s; }
+  .rm-knob { transition: transform .2s, opacity .2s; }
 }
 .rm-act { margin: 0; }
 .rm-btn { min-width: 9.5em; justify-content: center; }
