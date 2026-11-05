@@ -86,7 +86,8 @@
     return el;
   }
   // A video result (kind: 'video' from the API, or a link that looks like one): its thumb is a video still; the landing
-  // card's image views skip it, the scan page shows it with a play badge (and lists it in its Videos tab).
+  // card's image views put it after the real images (no badge), the scan page shows it with a play badge (and lists it in
+  // its Videos tab).
   var VIDEO_RE = /\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|\/(?:videos?|watch|embed|clips?|vod)(?:[\/?#.-]|$)/i;
   function isVideo(r) { return !!r && (r.kind === 'video' || VIDEO_RE.test(r.link || '')); }
   // ---------- people photos only ----------
@@ -131,7 +132,7 @@
   }
   // images[] first (with the result that has the same thumb, if any), then the results' own thumbs; deduped, ok(src)
   // filters. → [{src, title, domain, link, video}] (title/domain/link '' when no result matches; video: its result is one).
-  // videos false (landing card): video results' stills are skipped, images[] ones too. videos true (scan page, like Google
+  // videos false (landing card's real images): video results' stills are skipped, images[] ones too. videos true (scan page, like Google
   // Images): every images[] entry is an image result, and video results' thumbs count too (tile gets a play badge).
   function imageItems(images, results, ok, max, videos) {
     var by = {}, seen = {}, out = [];
