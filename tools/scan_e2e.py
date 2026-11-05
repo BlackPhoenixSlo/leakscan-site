@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline]
-        [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs]
+        [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs three scenarios.
@@ -40,6 +40,15 @@ band's mini Google Images frame with her tiles; errors, reload, reset; a shared 
 request and (phone) scrolls the card under the nav, not with #website. --break-drift serves inline-scan.js with the
 drift speed 0: only `drift:` checks may go red. --break-phones serves personalize.js without the phone links: only
 `phones:` checks may go red.
+
+tabs (the owner's three asks): (1) report card ?r=demoBrokenT1 (stub: three page-result thumbs answer 404 / a 1×1
+blank, a video still leads images[]): failed / blank tiles leave the strip, the Images grid and the #free phone, the
+next image takes the slot, the label / tab / "+N more" / phone counts say what shows, every tile is painted, no video
+still; (2) #website copy → demo iframe → Before / After phones (in #showcase), their All / Images / Videos tabs switch
+on click and keys without moving anything, the demo pops out to a full-screen layer (Esc / button / backdrop close,
+focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the #free phone: same
+tabs, the illustration without a scan, her handle / rows / tiles / videos + Reveal with ?r=; no horizontal overflow.
+Screenshots: <vp>-t*.png. --break-thumbs serves inline-scan.js with the drop disabled: only `thumbs:` checks may go red.
 """
 import base64
 import json, pathlib, re, socket, subprocess, sys, time, urllib.request
@@ -52,17 +61,24 @@ out = pathlib.Path(sys.argv[1]).expanduser()
 out.mkdir(parents=True, exist_ok=True)
 omit = "--omit-results" in sys.argv
 omit_profile = "--omit-profile" in sys.argv
-SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai", "inline"]
+SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai", "inline", "tabs"]
 BREAK_ALLOWLIST = "--break-allowlist" in sys.argv
 BREAK_DRIFT = "--break-drift" in sys.argv
 BREAK_PHONES = "--break-phones" in sys.argv
+BREAK_THUMBS = "--break-thumbs" in sys.argv
 GS_RE = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 PEOPLE = {"imgs/portrait.webp", "imgs/hero-wide.webp", "imgs/studio-portrait.webp"}   # showcase hero defaults: Pexels people photos (tools/showcase/CREDITS.md)
 
 
-def _images(fx):
+VIDEO_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|embed|clips?|vod)(?:[/?#.-]|$)", re.I)
+is_video = lambda r: bool(r) and (r.get("kind") == "video" or bool(VIDEO_RE.search(r.get("link") or "")))
+dead_thumb = lambda u, extra=(): "DEAD" in u or "BLANK" in u or any(x in u for x in extra)
+
+
+def _images(fx, alive=False, extra=()):
     """Mirror of inline-scan.js model().images: images[] (with the result that has that thumb) then results' thumbs,
-    gstatic only, deduped, max 60; the ones with a link first. → [(src, link, domain)]"""
+    gstatic only, deduped, video results' stills skipped, max 60; the ones with a link first. alive: minus the thumbs
+    the stub answers 404 or blank, plus `extra` (route-level 404s; gallery() drops them all). → [(src, link, domain)]"""
     ok = lambda u: isinstance(u, str) and len(u) <= 600 and GS_RE.match(u)
     res = [r for r in fx.get("results", []) if r.get("link")]
     by, seen, out = {}, set(), []
@@ -71,7 +87,7 @@ def _images(fx):
             by[r["thumb"]] = r
 
     def add(u, r):
-        if ok(u) and u not in seen:
+        if ok(u) and u not in seen and not is_video(r):
             seen.add(u)
             out.append((u, r["link"] if r else "", r["domain"] if r else ""))
     for u in fx.get("images", [])[:200]:
@@ -79,13 +95,15 @@ def _images(fx):
     for r in res:
         add(r.get("thumb"), r)
     out = out[:60]
-    return [o for o in out if o[1]] + [o for o in out if not o[1]]
+    out = [o for o in out if o[1]] + [o for o in out if not o[1]]
+    return [o for o in out if not dead_thumb(o[0], extra)] if alive else out
 
 
 def break_routes(ctx):
     """--break-drift / --break-phones: serve the script with the feature disabled (wire boundary, same bytes otherwise)."""
     for flag, name, old, new in ((BREAK_DRIFT, "inline-scan.js", "DRIFT_SPEED = 24", "DRIFT_SPEED = 0"),
-                                 (BREAK_PHONES, "personalize.js", "    phones(m, d);\n", "\n")):
+                                 (BREAK_PHONES, "personalize.js", "    phones(m, d);\n", "\n"),
+                                 (BREAK_THUMBS, "inline-scan.js", "      if (g.dead[src]) return;\n", "      return;\n")):
         if not flag:
             continue
         body = (ROOT / "site" / "js" / name).read_text(encoding="utf-8")
@@ -93,13 +111,14 @@ def break_routes(ctx):
         ctx.route(f"**/js/{name}", lambda r, _q, b=body.replace(old, new, 1): r.fulfill(body=b, content_type="application/javascript"))
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 fails = []
+MEASURED = {}
 
 PAGES = [r for r in FX["results"] if r["kind"] != "video"]
 ALSO = "Also found as " + ", ".join("@" + a for a in FX["aliases"]["discovered"])
 # leak-page socials on platforms the profile does not have (the discovered Instagram never replaces hers)
 FOUND = [s["url"] for s in FX["aliases"]["socials"] if s["platform"] not in {a["platform"] for a in FX["profile"]["accounts"]}]
 VIDEOS = [r for r in FX["results"] if r["kind"] == "video"]
-IMAGES = min(30, len(dict.fromkeys(FX["images"] + [r["thumb"] for r in FX["results"] if r["thumb"]])))
+IMAGES = min(30, len(dict.fromkeys(FX["images"] + [r["thumb"] for r in FX["results"] if r["thumb"] and r["kind"] != "video"])))   # video stills: Videos tab only
 
 
 def check(name, ok, detail=""):
@@ -437,14 +456,14 @@ def personalize_flow(browser, vp_name, vp):
     check(f"{tag} no slug: visible text identical to the page without the scripts", now == then, f"{len(now)} vs {len(then)} chars")
     check(f"{tag} no slug: no API call", not no_api, no_api)
     static = page.evaluate("""() => ({links: document.querySelectorAll('.ba a').length,
-        roles: [...document.querySelectorAll('.ba .phone')].map(p => p.getAttribute('role')),
+        roles: [...document.querySelectorAll('.ba .phone')].map(p => p.getAttribute('role') + ':' + /^Illustration/.test(p.getAttribute('aria-label'))),
         hidden: [...document.querySelectorAll('.ba .phone-screen')].map(s => s.getAttribute('aria-hidden')), hint: !!document.querySelector('.ba-hint'),
-        band: [document.querySelector('.gmini').getAttribute('role'), document.querySelectorAll('.gmini a').length, document.querySelectorAll('.gmini-grid .gi-card').length],
+        band: [document.querySelector('.phone-free').getAttribute('role'), document.querySelectorAll('.phone-free a').length, document.querySelectorAll('#mp-free-images .m-illus .gi-card').length],
         lav: [...document.querySelectorAll('.report-card .report-rows .lav')].map(e => e.textContent)})""")
-    check(f"{tag} no slug: phones = one image each, rows not links, no tap hint", static["links"] == 0 and static["roles"] == ["img", "img"]
-          and static["hidden"] == ["true", "true"] and not static["hint"], static)
-    check(f"{tag} no slug: #free band = static Google Images illustration, hero rows = letter avatars",
-          static["band"] == ["img", 0, 10] and static["lav"] == ["L", "F", "P", "F"], static)
+    check(f"{tag} no slug: phones = labelled illustrations (groups: their tabs are buttons), rows not links, no tap hint", static["links"] == 0
+          and static["roles"] == ["group:true", "group:true"] and static["hidden"] == [None, None] and not static["hint"], static)
+    check(f"{tag} no slug: #free phone = static illustration (9 blurred tiles, no links), hero rows = letter avatars",
+          static["band"] == ["group", 0, 9] and static["lav"] == ["L", "F", "P", "F"], static)
     page.locator("#showcase").scroll_into_view_if_needed()
     try:
         page.wait_for_function("() => { const f = document.querySelector('iframe[data-p=demo]'); const i = f && f.contentDocument && f.contentDocument.querySelector('img.hero__bg'); return i && i.complete && i.naturalWidth > 0; }", timeout=9000)
@@ -488,7 +507,7 @@ def personalize_flow(browser, vp_name, vp):
     lav = page.eval_on_selector_all('.ba [data-p^="leak-"] .fav', "els => els.map(e => [e.textContent, getComputedStyle(e).backgroundColor])")
     check(f"{tag} before phone: leak rows get letter avatars like the hero card", [l[0] for l in lav] == [d[0].upper() for d in TOP]
           and all(l[1] != "rgb(215, 210, 204)" for l in lav), lav)
-    page.locator("#website").screenshot(path=str(out / f"{vp_name}-p2-your-website.png"))
+    page.locator("#showcase .ba").screenshot(path=str(out / f"{vp_name}-p2-before-after.png"))
     ph = page.evaluate("""() => {
         const r = k => [...document.querySelectorAll(`.ba [data-p="${k}"] > a.m-link`)].map(a => [a.getAttribute('href'), a.target, a.rel]);
         return {rows: Object.fromEntries(['leak-1', 'leak-2', 'leak-3', 'leak-4', 'ig', 'tt', 'own', 'blog', 'gone'].map(k => [k, r(k)])),
@@ -1237,10 +1256,10 @@ def inline_flow(browser, vp_name, vp):
           msgs: L ? [...L.querySelectorAll('[data-msg]')].map(a => a.href) : [], role: c.getAttribute('role')};
     }""")
     ill = lambda page: page.evaluate("""() => {
-        const s = document.querySelector('.gmini'), n = s.querySelector('[data-live] .gmini-n'), send = document.querySelector('[data-free-send]');
+        const s = document.querySelector('.phone-free'), n = s.querySelector('[data-live=band-images] .m-n'), send = document.querySelector('[data-free-send]');
         return {live: s.classList.contains('is-live'), pill: n && n.textContent, label: s.getAttribute('aria-label'), role: s.getAttribute('role'),
-          tiles: [...s.querySelectorAll('[data-live=band-grid] a.gi-card')].map(a => [a.href, a.target, a.rel, a.querySelector('img') ? a.querySelector('img').src : null]),
-          visible_illus: [...s.querySelectorAll('.gmini-grid:not(.live-grid) .gi-card')].filter(e => e.offsetParent !== null).length,
+          tiles: [...s.querySelectorAll('[data-live=band-images] a.gi-card')].map(a => [a.href, a.target, a.rel, a.querySelector('img') ? a.querySelector('img').src : null]),
+          visible_illus: [...s.querySelectorAll('.m-illus .gi-card')].filter(e => e.offsetParent !== null).length,
           send: send.getAttribute('href'), h: Math.round(s.getBoundingClientRect().height)};
     }""")
     strip = lambda page: page.evaluate("""() => {
@@ -1267,7 +1286,7 @@ def inline_flow(browser, vp_name, vp):
     shot(page, "1-band-before", "#free")
     band_h0 = ill(page)["h"]
     fh = page.evaluate("Math.round(document.getElementById('free').getBoundingClientRect().height)")
-    check(f"{tag} band: #free compact (<= 420 px desktop / 560 px phone)", fh <= (560 if vp_name == "phone" else 420), fh)
+    check(f"{tag} band: #free compact (<= 640 px desktop: the phone beside the copy / 1240 px phone: stacked)", fh <= (1240 if vp_name == "phone" else 640), fh)
     page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
     page.wait_for_timeout(300)
     net["nav"].clear()
@@ -1353,15 +1372,15 @@ def inline_flow(browser, vp_name, vp):
         check(f"{tag} hero: settled at 1440x800: card top not under the sticky nav, whole card + Send buttons above the fold", st[0] >= st[4] - 1 and st[1] <= st[3] and st[2] <= st[3], st)
         lp.screenshot(path=str(out / f"{vp_name}-i2s-settled-1440x800.png"))
         lctx.close()
-    IM = _images(FX)
+    IM = _images(FX, alive=True, extra=(DEAD_THUMB,))   # the 404 thumb (DEAD_THUMB) is dropped by gallery(): not a tile, not counted
     NI = len(IM)
     tile_href = lambda it: it[1] or base + "scan/?r=" + slug
     want_tiles = lambda k: [[tile_href(it), "_blank" if it[1] else "", "noopener noreferrer nofollow" if it[1] else "",
                              API + "/api/thumb?u=" + quote(it[0], safe="")] for it in IM[:k]]
     i = ill(page)
-    check(f"{tag} band: #free mini Google Images = her first 10 image results (link → result in a new tab, else the report)",
-          i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] is None
-          and [t[:3] + [t[3]] for t in i["tiles"]] == want_tiles(10), i)
+    check(f"{tag} thumbs: band: #free phone Images tab = her first 9 image results (link → result in a new tab, else the report)",
+          i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] == "group"
+          and [t[:3] + [t[3]] for t in i["tiles"]] == want_tiles(9), i)
     check(f"{tag} band: same height before/after results (row reserved, no shift)", abs(i["h"] - band_h0) <= 1, [band_h0, i["h"]])
     check(f"{tag} band: 'Send me the report' = Telegram with the report link", (i["send"] or "").startswith("https://t.me/jakabasej?text=")
           and quote(base + "scan/?r=" + slug, safe="") in i["send"], i["send"])
@@ -1376,11 +1395,11 @@ def inline_flow(browser, vp_name, vp):
           sites: q('.live-sites li:not([hidden]) a.live-link').map(a => [a.href, a.target, a.rel])};
     }""")
     sites = _sites(rows)
-    check(f"{tag} hero: tabs Links / Images / Sites with the fixture's counts, Links selected",
+    check(f"{tag} thumbs: hero: tabs Links / Images / Sites with the fixture's counts, Links selected",
           hero["tabs"] == [["lt-links", f"Links{N}", "true", 0], ["lt-images", f"Images{NI}", "false", -1], ["lt-sites", f"Sites{FX['domain_count']}", "false", -1]]
           and [p[1:] for p in hero["panels"]] == [[True, "visible"], [False, "hidden"], [False, "hidden"]], hero["tabs"])
     check(f"{tag} hero: rows >= 44px with a letter avatar / blurred site thumb each", hero["rowH"] >= 44 and hero["ico"] == 5, hero["rowH"])
-    check(f"{tag} hero: strip 'What Google Images shows for @demo.creator' = first 24 images, blurred, link → result / report",
+    check(f"{tag} thumbs: hero: strip 'What Google Images shows for @demo.creator' = first 24 images, blurred, link → result / report",
           hero["stripH"] == "What Google Images shows for @demo.creator" and hero["strip"] == want_tiles(24) and "blur" in hero["blur"], hero["strip"][:3])
     by_dom = {}
     for d, _t, u, _b in rows:
@@ -1407,7 +1426,7 @@ def inline_flow(browser, vp_name, vp):
     gi = page.evaluate("() => [document.querySelector('#lp-images').classList.contains('on'), getComputedStyle(document.querySelector('#lp-links')).visibility, document.querySelectorAll('#lp-images .live-grid a.gi-card').length, (document.querySelector('#lp-images .live-more') || {}).textContent]")
     card1 = cbox()
     G = 12 if vp_name == "phone" else 16
-    check(f"{tag} hero: Images tab shows the image grid (phone 12, else 16) in place (card box unchanged)", gi == [True, "hidden", G, f"+ {NI - G} more in the full report"]
+    check(f"{tag} thumbs: hero: Images tab shows the image grid (phone 12, else 16) in place (card box unchanged)", gi == [True, "hidden", G, f"+ {NI - G} more in the full report"]
           and card0 == card1, (gi, card0, card1))
     shot(page, "3b-card-images", ".report-card")
     page.locator("#lp-images .live-reveal").click()
@@ -1465,11 +1484,11 @@ def inline_flow(browser, vp_name, vp):
     # tiles: a light placeholder in the light theme (no black flash), faded in once loaded; the #free frame stays Google-dark
     tl = page.evaluate("""() => { const lum = e => { const m = getComputedStyle(e).backgroundImage.match(/rgba?\\(([^)]+)\\)/); if (!m) return null;
         const [r, g, b] = m[1].split(',').map(parseFloat); return Math.round(.2126 * r + .7152 * g + .0722 * b); };
-        return {card: lum(document.querySelector('.report-card .gi-box')), band: lum(document.querySelector('.gmini .gi-box')),
+        return {card: lum(document.querySelector('.report-card .gi-box')), band: lum(document.querySelector('.phone-free .gi-box')),
           waiting: [...document.querySelectorAll('.report-card .live-strip .gi-wait img')].filter(i => i.complete && i.naturalWidth).length,
           loaded: [...document.querySelectorAll('.report-card .live-strip .gi-box:not(.gi-wait) img')].filter(i => i.complete && i.naturalWidth).length, fade: getComputedStyle(document.querySelector('.report-card .gi-img')).transitionProperty}; }""")
-    check(f"{tag} tiles: light placeholder in the light theme, Google-dark in #free, images fade in on load", tl["card"] is not None and tl["card"] > 150
-          and tl["band"] is not None and tl["band"] < 90 and tl["waiting"] == 0 and tl["loaded"] >= 3 and "opacity" in tl["fade"], tl)
+    check(f"{tag} tiles: light placeholder in the light theme (the #free phone's screen too), images fade in on load", tl["card"] is not None and tl["card"] > 150
+          and tl["band"] is not None and tl["band"] > 150 and tl["waiting"] == 0 and tl["loaded"] >= 3 and "opacity" in tl["fade"], tl)
     # a row whose thumb failed: neutral letter on the theme surface (no bright hue among the blurred thumbs)
     fb = page.evaluate("""() => { const s2 = getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim(), probe = document.createElement('i');
         probe.style.background = s2; document.body.appendChild(probe); const want = getComputedStyle(probe).backgroundColor; probe.remove();
@@ -1531,9 +1550,9 @@ def inline_flow(browser, vp_name, vp):
     page.locator("#free").scroll_into_view_if_needed()
     page.wait_for_timeout(700)
     shot(page, "4-band", "#free")
-    page.locator("#website").scroll_into_view_if_needed()
+    page.locator("#showcase .ba").scroll_into_view_if_needed()
     page.wait_for_timeout(700)
-    shot(page, "5-phones", "#website")
+    shot(page, "5-phones", "#showcase .ba")
 
     # 3. reload with ?r= restores the hero card, no new scan
     n_posts = len(net["bodies"])
@@ -1543,7 +1562,7 @@ def inline_flow(browser, vp_name, vp):
     except Exception:
         pass
     c2 = card(page)
-    check(f"{tag} reload ?r= restores hero card (rows, count, socials), no new scan", c2["rows"] == c["rows"] and c2["count"] == c["count"]
+    check(f"{tag} thumbs: reload ?r= restores hero card (rows, count, socials), no new scan", c2["rows"] == c["rows"] and c2["count"] == c["count"]
           and c2["socials"] == "Instagram @demo.ig" and ill(page)["pill"] == f"{NI} images" and len(net["bodies"]) == n_posts, c2["count"])
 
     # 4. second scan resets, badges only from data (stub-mixed: live true / false / missing, then Google results)
@@ -1709,6 +1728,244 @@ def inline_flow(browser, vp_name, vp):
     check(f"{tag} no JS errors, no console errors", not net["errors"] and not net["console"], net["errors"] + net["console"])
 
 
+def tabs_flow(browser, vp_name, vp):
+    tag = f"{vp_name} tabs"
+    net = {"outside": [], "errors": [], "console": []}
+    sys.path.insert(0, str(ROOT / "tools"))
+    import importlib
+    stubmod = importlib.import_module("scan_stub")
+    BROKEN = stubmod.broken_thumbs(FX)
+    m = MEASURED.setdefault(vp_name, {})
+
+    def new_ctx(motion="no-preference"):
+        ctx = browser.new_context(viewport=vp, device_scale_factor=2 if vp_name == "phone" else 1, is_mobile=vp_name == "phone",
+                                  has_touch=vp_name == "phone", reduced_motion=motion)
+        ctx.add_init_script("window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value, e.hadRecentInput, (e.sources || []).map(s => s.node && s.node.nodeType === 1 ? s.node.tagName + '.' + s.node.className + ' ' + [s.previousRect.y, s.currentRect.y, s.previousRect.height, s.currentRect.height].map(Math.round) : '#text')]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}")
+
+        def route(r, _req):
+            if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost"):
+                r.continue_()
+            else:
+                net["outside"].append(r.request.url)
+                r.abort()
+        ctx.route("**/*", route)
+        break_routes(ctx)
+
+        def on_page(pg):
+            pg.on("pageerror", lambda e: net["errors"].append(str(e)))
+            pg.on("console", lambda msg: msg.type == "error" and urlsplit(msg.location.get("url") or "").hostname not in FONT_HOSTS
+                  and not (msg.text.startswith("Failed to load resource") and "DEAD" in unquote(msg.location.get("url") or ""))
+                  and net["console"].append(msg.text + " @ " + (msg.location.get("url") or "")))
+        ctx.on("page", on_page)
+        return ctx
+
+    shot = lambda page, name, el=None: (page.locator(el) if el else page).screenshot(path=str(out / f"{vp_name}-t{name}.png"))
+    overflow = lambda page: page.evaluate("""() => ({doc: document.documentElement.scrollWidth, vw: innerWidth,
+        wide: [...document.querySelectorAll('.phone, .browser-demo, .report-card, .free-band, .ba')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.left < -0.5 || r.right > innerWidth + 0.5); }).map(e => e.className)})""")
+
+    # ---------- (1) report card: broken thumbs leave, counts follow ----------
+    E = _images(BROKEN)                # what the client lists before any probe (video still already skipped)
+    A = _images(BROKEN, alive=True)    # what shows once the 404 / blank ones are dropped
+    vids = {r["thumb"] for r in BROKEN["results"] if r.get("kind") == "video" and r.get("thumb")}
+    G = 12 if vp_name == "phone" else 16
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.goto(base + "?r=demoBrokenT1", wait_until="load")
+    page.wait_for_selector(".report-card #lt-images", timeout=8000)
+    page.wait_for_timeout(1500)   # probes answered
+    page.evaluate("document.querySelector('.report-card').scrollIntoView({block: 'start', behavior: 'instant'})")
+    page.locator("#lt-images").click()
+    page.wait_for_timeout(1200)
+    st = page.evaluate("""() => { const c = document.querySelector('.report-card'), src = a => decodeURIComponent((a.querySelector('img').getAttribute('src').split('u=')[1]) || '');
+        const tiles = sel => [...c.querySelectorAll(sel)].map(src);
+        return {grid: tiles('#lp-images .live-grid a.gi-card'), strip: tiles('.live-strip a.gi-card'), label: c.querySelector('.live-imgs-head p').textContent,
+          tab: c.querySelector('#lt-images .live-tab-n').textContent, more: (m => m && !m.hidden ? m.textContent : null)(c.querySelector('#lp-images .live-more')),
+          painted: [...c.querySelectorAll('#lp-images .live-grid img')].map(i => i.complete && i.naturalWidth >= 16 && getComputedStyle(i).opacity === '1'),
+          gaps: (g => { const r = [...g.children].map(e => e.getBoundingClientRect()); return r.length ? [new Set(r.map(x => Math.round(x.left))).size, r.length] : null; })(c.querySelector('#lp-images .live-grid'))}; }""")
+    m["report_images_listed"], m["report_images_shown"] = len(E), len(A)
+    m["report_grid_tiles"] = len(st["grid"])
+    check(f"{tag} thumbs: failed / blank thumbs dropped from the Images grid, next ones fill in (grid = first {G} that load)",
+          st["grid"] == [x[0] for x in A[:G]] and not any(dead_thumb(u) for u in st["grid"] + st["strip"]), (len(E), len(A), st["grid"][:4]))
+    check(f"{tag} thumbs: label / tab / '+N more' count what shows ({len(E)} listed → {len(A)} shown)",
+          st["label"] == f"{len(A)} images on Google Images" and st["tab"] == str(len(A)) and st["more"] == (f"+ {len(A) - G} more in the full report" if len(A) > G else None), st)
+    check(f"{tag} thumbs: every grid tile painted (loaded, >= 16 px, opacity 1), no empty square", len(st["painted"]) == min(G, len(A)) and all(st["painted"]), st["painted"])
+    check(f"{tag} thumbs: strip = first 24 that load", st["strip"] == [x[0] for x in A[:24]], st["strip"][:3])
+    check(f"{tag} videos: no video still among the image tiles (grid, strip)", not (set(st["grid"] + st["strip"]) & vids) and any(u in vids for u in BROKEN["images"][:1]), sorted(vids)[:2])
+    shot(page, "1-card-images-broken-removed", ".report-card")
+    # the same report on the scan page: failed tiles leave its Images grid too
+    ctx.close()
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.goto(base + "scan/?r=demoBrokenT1", wait_until="load")
+    page.wait_for_selector("#g-tab-images", timeout=8000)
+    page.locator("#g-tab-images").click()
+    page.wait_for_timeout(1500)
+    sp = page.evaluate("() => [...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16])")
+    check(f"{tag} thumbs: scan page Images grid: failed / blank tiles removed, the rest painted", sp and all(ok for _u, ok in sp) and not any(dead_thumb(u) for u, _ok in sp), [u[-24:] for u, ok in sp if not ok][:4])
+    ctx.close()
+
+    # ---------- (3) #free phone: tabs, illustration without a scan ----------
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.goto(base, wait_until="load")
+    page.locator("#free").scroll_into_view_if_needed()
+    page.wait_for_timeout(900)
+    PH = """(sel) => { const ph = document.querySelector(sel), r = ph.getBoundingClientRect();
+        return {box: [Math.round(r.x), Math.round(r.y + scrollY), Math.round(r.width), Math.round(r.height)],
+          sel: [...ph.querySelectorAll('[role=tab]')].map(b => [b.textContent, b.getAttribute('aria-selected'), b.tabIndex]),
+          shown: [...ph.querySelectorAll('[role=tabpanel]')].filter(p => !p.hidden && p.offsetParent !== null).map(p => p.id),
+          shifts: window.__ls.filter(x => x[1] > 0).length, focus: document.activeElement && document.activeElement.id}; }"""
+    s0 = page.evaluate(PH, ".phone-free")
+    check(f"{tag} free: no scan → Images tab selected, illustration tiles", s0["shown"] == ["mp-free-images"] and s0["sel"][1] == ["Images", "true", 0], s0)
+    boxes, seen, shifts = [s0["box"]], [], []
+    for k, label in (("all", "All"), ("images", "Images"), ("videos", "Videos")):
+        # per click, before shot() (its light/dark flip is not a tab switch); the fixed Ask-AI pill's own height
+        # animation (pre-existing, main) is not the tab's doing either
+        t0 = page.evaluate("performance.now()")
+        page.locator(f"#mt-free-{k}").click()
+        page.wait_for_timeout(250)
+        shifts += page.evaluate("t0 => window.__ls.filter(x => x[0] >= t0 && x[1] > 0 && !x[3].every(n => n.startsWith('BUTTON.askai-launcher'))).map(x => [x[1], x[3]])", t0)
+        sk = page.evaluate(PH, ".phone-free")
+        boxes.append(sk["box"])
+        seen.append(sk["shown"] == [f"mp-free-{k}"] and [x[1] for x in sk["sel"]] == ["true" if x[0] == label else "false" for x in sk["sel"]])
+        shot(page, f"3-free-{k}-demo", "#free .free-phone")
+    check(f"{tag} free: tabs switch on click (All / Images / Videos), the phone never moves or resizes, zero layout shift",
+          all(seen) and len({tuple(b) for b in boxes}) == 1 and not shifts, (seen, boxes, shifts))
+    page.locator("#mt-free-videos").focus()
+    page.keyboard.press("ArrowRight")
+    k1 = page.evaluate(PH, ".phone-free")
+    page.keyboard.press("End")
+    k2 = page.evaluate(PH, ".phone-free")
+    check(f"{tag} free: keyboard: → wraps to All, End = Videos (roving tabindex)", k1["focus"] == "mt-free-all" and k1["shown"] == ["mp-free-all"]
+          and k2["focus"] == "mt-free-videos" and k2["shown"] == ["mp-free-videos"] and [x[2] for x in k2["sel"]] == [-1, -1, 0], (k1, k2))
+    m["free_phone_box"] = s0["box"]
+    m["overflow_no_scan"] = overflow(page)
+    ctx.close()
+
+    # with a report: her handle, rows, tiles (Reveal), videos
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.goto(base + "?r=" + FX["slug"] + "#free", wait_until="load")
+    page.wait_for_selector(".phone-free.is-live", timeout=8000)
+    page.wait_for_timeout(1500)
+    page.locator("#free").scroll_into_view_if_needed()
+    rows = _rows(FX)
+    IMs = _images(FX, alive=True)
+    VID = [r for r in FX["results"] if is_video(r)]
+    lv = page.evaluate("""() => { const ph = document.querySelector('.phone-free'), q = s => [...ph.querySelectorAll(s)];
+        return {search: ph.querySelector('[data-p=scan-handle]').textContent, label: ph.getAttribute('aria-label'),
+          all: q('[data-live=band-all] a.m-link').map(a => [a.href, a.target, a.querySelector('.m-site').textContent]),
+          tiles: q('[data-live=band-images] a.gi-card').map(a => decodeURIComponent(a.querySelector('img').getAttribute('src').split('u=')[1])),
+          n: (ph.querySelector('[data-live=band-images] .m-n') || {}).textContent,
+          vids: q('[data-live=band-videos] a.m-link').map(a => a.href), illus: q('.m-illus').filter(e => e.offsetParent !== null).length}; }""")
+    check(f"{tag} free: report → search = @handle, All = her first 4 rows (new tab), Images = first 9 that load + count, Videos = her video results",
+          lv["search"] == "@demo.creator" and lv["label"] == "Google results for @demo.creator" and [x[0] for x in lv["all"]] == [r[2] for r in rows[:4]]
+          and all(x[1] == "_blank" for x in lv["all"]) and lv["tiles"] == [x[0] for x in IMs[:9]] and lv["n"] == f"{len(IMs)} images"
+          and lv["vids"] == [r["link"] for r in VID[:3]] and lv["illus"] == 0, lv)
+    for k in ("all", "images", "videos"):
+        page.locator(f"#mt-free-{k}").click()
+        page.wait_for_timeout(500 if k == "images" else 250)
+        if k == "images":
+            b0 = page.evaluate("getComputedStyle(document.querySelector('#mp-free-images .gi-img')).filter")
+            page.locator("#mp-free-images .live-reveal").click()
+            page.wait_for_timeout(400)
+            b1 = page.evaluate("[getComputedStyle(document.querySelector('#mp-free-images .gi-img')).filter, document.querySelector('#mp-free-images .live-reveal').getAttribute('aria-pressed')]")
+            shot(page, "3-free-images-revealed", "#free .free-phone")
+            page.locator("#mp-free-images .live-reveal").click()
+            page.wait_for_timeout(300)
+            check(f"{tag} free: report → blurred by default, Reveal unblurs, Blur again", "blur" in b0 and b1 == ["none", "true"], (b0, b1))
+        shot(page, f"3-free-{k}", "#free .free-phone")
+    m["overflow_report"] = overflow(page)
+    ctx.close()
+
+    # ---------- (2) order, Before / After tabs, pop-out ----------
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.goto(base, wait_until="load")
+    order = page.evaluate("""() => { const y = e => e.getBoundingClientRect().top + scrollY, b = e => e.getBoundingClientRect().bottom + scrollY;
+        const w = document.getElementById('website'), sc = document.getElementById('showcase'), fr = sc.querySelector('.browser-demo'), ba = document.querySelector('.ba');
+        return {website: Math.round(y(w)), showcase: Math.round(y(sc)), frameBottom: Math.round(b(fr)), ba: Math.round(y(ba)), inShowcase: sc.contains(ba),
+          link: (a => a && a.getAttribute('href'))(sc.querySelector('a.btn[data-p=demo]'))}; }""")
+    check(f"{tag} order: #website copy → demo iframe (#showcase) → Before / After phones below it; 'Open the demo site' link kept",
+          order["website"] < order["showcase"] < order["frameBottom"] <= order["ba"] and order["inShowcase"] and order["link"] == "showcase/", order)
+    page.locator("#showcase .ba").scroll_into_view_if_needed()
+    page.wait_for_timeout(900)
+    ok, shifts = [], []
+    for side in ("before", "after"):
+        for k in ("images", "videos", "all"):
+            t0 = page.evaluate("performance.now()")
+            page.locator(f"#mt-{side}-{k}").click()
+            page.wait_for_timeout(300)
+            shifts += page.evaluate("t0 => window.__ls.filter(x => x[0] >= t0 && x[1] > 0 && !x[3].every(n => n.startsWith('BUTTON.askai-launcher'))).map(x => [x[1], x[3]])", t0)
+            r = page.evaluate("(id) => document.getElementById(id).closest('.phone').getBoundingClientRect().height", f"mp-{side}-{k}")
+            vis = page.evaluate(f"[...document.querySelectorAll('[id^=mp-{side}-]')].filter(p => !p.hidden).map(p => p.id)")
+            imgs = page.evaluate(f"[...document.querySelectorAll('#mp-{side}-{k} img')].map(i => i.complete && i.naturalWidth > 0)")
+            ok.append([side, k, vis == [f"mp-{side}-{k}"], all(imgs), round(r)])
+            if k != "all":
+                shot(page, f"2-ba-{side}-{k}", "#showcase .ba")
+    hs = {x[4] for x in ok}
+    check(f"{tag} before/after: All / Images / Videos switch in both phones, their photos load, phone height fixed (no CLS)",
+          all(x[2] and x[3] for x in ok) and len(hs) == 1 and not shifts, (ok, shifts))
+    shot(page, "2-before-after", "#showcase .ba")
+    m["overflow_before_after"] = overflow(page)
+    # pop-out
+    page.evaluate("document.querySelector('#showcase .browser-demo').scrollIntoView({block: 'center', behavior: 'instant'})")
+    page.wait_for_timeout(1200)
+    LAY = """() => { const r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top + scrollY), Math.round(b.width), Math.round(b.height)]; };
+        const f = document.querySelector('#showcase .browser-demo');
+        return {y: Math.round(scrollY), ba: r(document.querySelector('.ba')), head: r(document.querySelector('#showcase .section-head')), link: r(document.querySelector('#showcase a.btn[data-p=demo]')),
+          pop: f.classList.contains('is-pop'), fig: (b => [Math.round(b.left), Math.round(b.top), Math.round(b.right), Math.round(b.bottom)])(f.getBoundingClientRect()),
+          vw: innerWidth, vh: innerHeight, role: f.getAttribute('role'), modal: f.getAttribute('aria-modal'), lock: document.documentElement.classList.contains('pop-lock'),
+          focus: document.activeElement.className, inert: document.querySelector('.site-header, header').inert && document.getElementById('pricing').inert,
+          btn: document.querySelector('.demo-pop').getAttribute('aria-label'), iframeTab: f.querySelector('iframe').tabIndex}; }"""
+    l0 = page.evaluate(LAY)
+    page.locator(".demo-pop").click()
+    page.wait_for_timeout(400)
+    l1 = page.evaluate(LAY)
+    page.mouse.move(vp["width"] // 2, 20)
+    page.mouse.wheel(0, 600)
+    page.wait_for_timeout(400)
+    l1b = page.evaluate(LAY)
+    shot(page, "2-popout-open")
+    covers = l1["fig"][0] <= 24 and l1["fig"][1] <= 24 and l1["fig"][2] >= l1["vw"] - 24 and l1["fig"][3] >= l1["vh"] - 24
+    check(f"{tag} popout: opens a full-screen layer (role=dialog, aria-modal, rest of the page inert, focus on Close, iframe keyboard-reachable)",
+          l1["pop"] and covers and l1["role"] == "dialog" and l1["modal"] == "true" and l1["inert"] and "demo-pop" in l1["focus"]
+          and l1["btn"] == "Close full screen" and l1["iframeTab"] == 0, l1)
+    check(f"{tag} popout: page behind is scroll-locked and does not move (scrollY, phones, heading, link: same page coords)",
+          l1["lock"] and l1b["y"] == l0["y"] == l1["y"] and l1["ba"] == l0["ba"] and l1["head"] == l0["head"] and l1["link"] == l0["link"], (l0, l1, l1b["y"]))
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(300)
+    l2 = page.evaluate(LAY)
+    check(f"{tag} popout: Esc closes, focus back on the button, nothing moved, page unlocked",
+          not l2["pop"] and not l2["lock"] and "demo-pop" in l2["focus"] and l2["role"] is None and not l2["inert"] and l2["iframeTab"] == -1
+          and [l2[k] for k in ("y", "ba", "head", "link")] == [l0[k] for k in ("y", "ba", "head", "link")], (l0, l2))
+    page.locator(".demo-pop").click()
+    page.wait_for_timeout(300)
+    page.evaluate("document.querySelector('#showcase iframe').contentWindow.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))")
+    page.wait_for_timeout(200)
+    in_frame = page.evaluate(LAY)["pop"]
+    page.locator(".demo-pop").click()
+    page.wait_for_timeout(200)
+    page.locator(".demo-pop").click()
+    page.wait_for_timeout(200)
+    by_btn = page.evaluate(LAY)["pop"]
+    page.locator(".demo-pop").click()
+    page.wait_for_timeout(200)
+    page.mouse.click(2, vp["height"] - 2) if vp_name == "desktop" else page.evaluate("document.querySelector('.demo-backdrop').click()")
+    page.wait_for_timeout(200)
+    by_bd = page.evaluate(LAY)
+    check(f"{tag} popout: Esc inside the demo, the Close button and the backdrop close it too", in_frame is False and by_btn is False and by_bd["pop"] is False and by_bd["y"] == l0["y"],
+          (in_frame, by_btn, by_bd["pop"]))
+    shot(page, "2-popout-closed")
+    m["popout"] = {"before": l0, "open": l1, "after_close": l2}
+    ov = [m.get("overflow_no_scan"), m.get("overflow_report"), m["overflow_before_after"]]
+    check(f"{tag} layout: no horizontal overflow at {vp['width']} px (document, phones, demo frame, card)",
+          all(o and o["doc"] <= o["vw"] and not o["wide"] for o in ov), ov)
+    ctx.close()
+    hosts = {urlsplit(u).hostname for u in net["outside"]}
+    check(f"{tag} no request left loopback but the demo's aborted Google Fonts", hosts <= FONT_HOSTS, sorted(hosts))
+    check(f"{tag} no JS errors, no console errors (the stub's 404 thumbs aside)", not net["errors"] and not net["console"], net["errors"] + net["console"])
+
 with socket.socket() as s:
     s.bind(("127.0.0.1", 0))
     port = s.getsockname()[1]
@@ -1755,10 +2012,13 @@ try:
             if "inline" in SCENARIOS:
                 inline_flow(browser, vp_name, vp)
                 thumb_paint(pw, vp_name, vp)
+            if "tabs" in SCENARIOS:
+                tabs_flow(browser, vp_name, vp)
         browser.close()
 finally:
     stub.terminate()
 
 (out / "e2e-summary.json").write_text(json.dumps({"fails": fails, "omit_results": omit, "omit_profile": omit_profile,
-                                                  "scenarios": SCENARIOS, "break_allowlist": BREAK_ALLOWLIST}, indent=1))
+                                                  "scenarios": SCENARIOS, "break_allowlist": BREAK_ALLOWLIST, "break_thumbs": BREAK_THUMBS,
+                                                  "measured": MEASURED}, indent=1))
 sys.exit(1 if fails else 0)

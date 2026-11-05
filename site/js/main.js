@@ -20,6 +20,89 @@
     });
   }
 
+  // Phone mockups: All / Images / Videos are real tabs (click, ←/→, Home / End). The screen has a fixed height, so a
+  // switch never moves the page.
+  document.querySelectorAll('.m-tabs[role=tablist]').forEach(function (bar) {
+    var tabs = Array.prototype.slice.call(bar.querySelectorAll('[role=tab]'));
+    var pick = function (t, focus) {
+      tabs.forEach(function (b) {
+        var on = b === t, panel = document.getElementById(b.getAttribute('aria-controls'));
+        b.setAttribute('aria-selected', String(on));
+        b.tabIndex = on ? 0 : -1;
+        if (panel) panel.hidden = !on;
+      });
+      if (focus) t.focus();
+    };
+    tabs.forEach(function (b, i) {
+      b.addEventListener('click', function () { pick(b); });
+      b.addEventListener('keydown', function (e) {
+        var k = ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key);
+        if (k < 0) return;
+        e.preventDefault();
+        pick(tabs[k === 2 ? 0 : k === 3 ? tabs.length - 1 : (i + (k ? 1 : tabs.length - 1)) % tabs.length], true);
+      });
+    });
+  });
+
+  // Demo site: "Full screen" pops the frame out to a layer over the page (same iframe, no reload: it keeps its scroll).
+  // Its slot keeps its height and the scrollbar gutter stays, so nothing behind it moves. Esc / the button / the
+  // backdrop close it; focus goes back to the button; the rest of the page is inert meanwhile.
+  var demoFig = document.querySelector('#showcase .browser-demo'), popBtn = demoFig && demoFig.querySelector('.demo-pop');
+  if (popBtn) {
+    var frame = demoFig.querySelector('iframe'), backdrop = null, inerted = [], slot = demoFig.parentNode;
+    var popOpen = function () { return demoFig.classList.contains('is-pop'); };
+    var onKey = function (e) { if (e.key === 'Escape' && popOpen()) { e.preventDefault(); setPop(false); } };
+    var setPop = function (on) {
+      if (on === popOpen()) return;
+      if (on) {
+        var h = demoFig.offsetHeight, cs = getComputedStyle(demoFig);
+        var hold = document.createElement('div');
+        hold.className = 'demo-hold';
+        hold.style.height = h + 'px';
+        hold.style.marginTop = cs.marginTop;
+        slot.insertBefore(hold, demoFig);
+        backdrop = document.createElement('div');
+        backdrop.className = 'demo-backdrop';
+        backdrop.addEventListener('click', function () { setPop(false); });
+        document.body.appendChild(backdrop);
+        // everything but the frame is inert: each ancestor's other children, up to <body>
+        for (var el = demoFig; el && el !== document.body; el = el.parentElement) {
+          Array.prototype.forEach.call(el.parentElement.children, function (sib) {
+            if (sib !== el && sib !== backdrop && !sib.inert && sib.tagName !== 'SCRIPT') { sib.inert = true; inerted.push(sib); }
+          });
+        }
+      }
+      document.documentElement.classList.toggle('pop-lock', on);
+      demoFig.classList.toggle('is-pop', on);
+      if (on) {
+        demoFig.setAttribute('role', 'dialog');
+        demoFig.setAttribute('aria-modal', 'true');
+        demoFig.setAttribute('aria-label', 'Demo site, full screen');
+      } else {
+        ['role', 'aria-modal', 'aria-label'].forEach(function (a) { demoFig.removeAttribute(a); });
+        inerted.forEach(function (sib) { sib.inert = false; });
+        inerted = [];
+        if (backdrop) backdrop.remove();
+        backdrop = null;
+        var hold0 = slot.querySelector('.demo-hold');
+        if (hold0) hold0.remove();
+      }
+      frame.tabIndex = on ? 0 : -1;   // full screen: the keyboard can go in and scroll it
+      popBtn.setAttribute('aria-label', on ? 'Close full screen' : 'Open the demo full screen');
+      popBtn.setAttribute('aria-expanded', String(on));
+      popBtn.lastChild.textContent = on ? 'Close' : 'Full screen';
+      try { frame.contentWindow[on ? 'addEventListener' : 'removeEventListener']('keydown', onKey); } catch (e) { /* not loaded yet */ }
+      popBtn.focus({ preventScroll: true });
+    };
+    popBtn.hidden = false;
+    popBtn.setAttribute('aria-expanded', 'false');
+    popBtn.addEventListener('click', function () { setPop(!popOpen()); });
+    document.addEventListener('keydown', onKey);
+    frame.addEventListener('load', function () {   // a popped frame that navigates keeps Esc
+      if (popOpen()) try { frame.contentWindow.addEventListener('keydown', onKey); } catch (e) { /* ignore */ }
+    });
+  }
+
   var items = document.querySelectorAll('.reveal');
   if (!('IntersectionObserver' in window)) {
     items.forEach(function (el) { el.classList.add('is-in'); });

@@ -23,7 +23,10 @@ Serves site/ and the API routes of the contract the scan page talks to:
   showcase people photos in site/showcase/imgs, served as webp; the e2e checks the swap by src). evilR3port01
   also lists off-origin / javascript: srcs (must be dropped). --media none → {status:"none", images:[]}; --media 404 → 404.
   POST /__stub/media?slug=<slug>[&mode=normal|relative|scanhost|none|404] resets that slug's poll counter (and mode) for a test.
-- GET /api/thumb?u=<https url> → one of those photos (picked by a hash of u, webp), never fetches u.
+- GET /api/thumb?u=<https url> → one of those photos (picked by a hash of u, webp), never fetches u. A u containing
+  DEAD → 404 (a thumb Google no longer serves); BLANK → a 1×1 GIF (what a hotlink-blocked thumb comes back as).
+- demoBrokenT1: the fixture with three page-result thumbs swapped for DEAD / BLANK ones (images[] too) and a video
+  result's still put first in images[] (the image views must skip it): the broken-thumb removal check.
 - POST /api/chat  {kb: "landing", messages: [{role, content}], slug?} → SSE: `token` events (data = JSON-encoded text
   chunk) streaming CHAT_ANSWER (markdown with an anchor, allowed + forbidden links, bold, bullets), then `done`. A last
   user message containing stub-fail → some tokens then `failed`; stub-429 → 429 rate_limited. Each request body is
@@ -87,6 +90,22 @@ MEDIA_FILES = [ROOT / "site" / "showcase" / "imgs" / f"{n}.webp" for n in (   # 
 
 # Google thumbs: every showcase photo (not the og card / favicons), so a 16-tile grid shows 16 different pictures
 THUMB_FILES = sorted(f for f in (ROOT / "site" / "showcase" / "imgs").glob("*.webp") if f.stem != "og")
+
+
+BLANK_GIF = bytes.fromhex("47494638396101000100800000000000ffffff21f90401000000002c00000000010001000002024401003b")
+
+
+def broken_thumbs(fx):
+    """demoBrokenT1: page results #2, #3, #5 (with a thumb) get DEAD / BLANK / DEAD thumbs, in images[] too; the first
+    video result's still goes first in images[]."""
+    r = json.loads(json.dumps(fx))
+    pages = [x for x in r["results"] if x.get("thumb") and x.get("kind") != "video"]
+    for x, tag in zip((pages[1], pages[2], pages[4]), ("DEAD0901", "BLANK0902", "DEAD0903")):
+        u = f"https://encrypted-tbn0.gstatic.com/images?q=tbn:{tag}placeholder"
+        r["images"] = [u if i == x["thumb"] else i for i in r["images"]]
+        x["thumb"] = u
+    r["images"].insert(0, next(x["thumb"] for x in r["results"] if x.get("kind") == "video" and x.get("thumb")))
+    return r
 
 
 def stand_in(key, pool=MEDIA_FILES):
@@ -195,10 +214,13 @@ class Handler(SimpleHTTPRequestHandler):
             src = parse_qs(u.query).get("u", [""])[0]
             if not src.startswith("https://"):
                 return self.send_json(400, {"error": "bad_url"})
-            body = stand_in(src, THUMB_FILES)
+            if "DEAD" in src:
+                return self.send_json(404, {"error": "not_found"})
+            blank = "BLANK" in src
+            body = BLANK_GIF if blank else stand_in(src, THUMB_FILES)
             self.send_response(200)
             self.cors()
-            self.send_header("Content-Type", "image/webp")
+            self.send_header("Content-Type", "image/gif" if blank else "image/webp")
             self.send_header("Cache-Control", "max-age=3600")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -317,7 +339,7 @@ def main():
     ap.parse_args(namespace=OPTS)
     no_ig = {**FIXTURE["aliases"], "socials": [x for x in FIXTURE["aliases"]["socials"] if x["platform"] != "instagram"]}
     for slug, overlay in (("demoR3port01", {}), ("demoNoProf01", {"profile": None, "aliases": no_ig}),
-                          ("demoFoundIG1", {"profile": None}), (EVIL["slug"], EVIL)):
+                          ("demoFoundIG1", {"profile": None}), (EVIL["slug"], EVIL), ("demoBrokenT1", broken_thumbs(FIXTURE))):
         seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
         if OPTS.omit_results:
             seed.pop("results", None)

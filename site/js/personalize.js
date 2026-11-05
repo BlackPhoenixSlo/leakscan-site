@@ -292,7 +292,8 @@
         }
       });
     };
-    each($$('[data-p="search"]'), function (el) { text(el, name); });
+    each($$('[data-p="search"], [data-p="name"]'), function (el) { text(el, name); });
+    each($$('[data-p="site"]'), function (el) { text(el, d.site); });
     if (m.leaks.length) {
       LEAK_TITLES.forEach(function (t, i) { row('leak-' + (i + 1), m.leaks[i] || null, t.replace('{n}', name)); });
       row('gone', m.leaks[0]);
@@ -339,20 +340,15 @@
     }
   }
 
-  // Before / after phones: after a scan every row is a real link (leak rows → her leak pages, Instagram / TikTok → her
-  // accounts, her site / blog → the demo site below, Removed → pricing); the phones stop being one image for screen
-  // readers and become labelled groups of links. Without a scan they stay the illustration.
+  // Before / after phones: after a scan every row of their All tab is a real link (leak rows → her leak pages,
+  // Instagram / TikTok → her accounts, her site / blog → the demo site above, Removed → pricing) and the label drops
+  // "Illustration:". The phones are labelled groups either way (their All / Images / Videos tabs are real buttons).
   var PHONES = null;
   function phones(m, d) {
     var ba = document.querySelector('.ba');
     if (!ba) return;
     if (!PHONES) PHONES = Array.prototype.map.call($$('.phone', ba), function (ph) { return [ph, ph.getAttribute('aria-label')]; });
-    PHONES.forEach(function (p) { // back to the illustration first (apply() can run again with another result)
-      p[0].setAttribute('role', 'img');
-      p[0].setAttribute('aria-label', p[1]);
-      var scr = p[0].querySelector('.phone-screen');
-      if (scr) scr.setAttribute('aria-hidden', 'true');
-    });
+    PHONES.forEach(function (p) { p[0].setAttribute('aria-label', p[1]); }); // back to the illustration first (apply() can run again)
     ba.classList.remove('is-live');
     var hint = document.querySelector('.ba-hint');
     if (hint) hint.remove();
@@ -377,11 +373,7 @@
     });
     if (!n) return;
     PHONES.forEach(function (p) {
-      p[0].setAttribute('role', 'group');
       p[0].setAttribute('aria-label', p[1].replace(/^Illustration: /, '').replace(/^./, function (c) { return c.toUpperCase(); }));
-      var scr = p[0].querySelector('.phone-screen');
-      if (scr) scr.removeAttribute('aria-hidden');
-      each($$('.m-search, .m-tabs', p[0]), function (x) { x.setAttribute('aria-hidden', 'true'); });
     });
     ba.classList.add('is-live');
     if (!document.querySelector('.ba-hint')) ba.parentNode.insertBefore(make('p', { 'class': 'ba-hint' }, ['Tap a result to open it']), ba.nextSibling);
