@@ -1,6 +1,7 @@
 # Video cue sheet
 
-Jack is on the **left half**; every overlay fills the **right half** (a 640x720 design box scaled to 960x1080 of the
+The video is **full frame** (the whole 16:9 stage); Jack sits in its **left half** and leaves the right half empty: every
+overlay is drawn **on the video's right half** (transparent layer, no panel; a 640x720 design box scaled to 960x1080 of the
 1920x1080 frame, card vertically centred), so his face stays uncovered. Same at **every width**: on a phone in
 portrait the small 16:9 video carries the card in its right half (no stacking). Bigger: rotate the phone (the stage
 fills the landscape screen) or the stage's full screen button: desktop / Android = `stage.requestFullscreen()` (the
@@ -9,7 +10,7 @@ stage, not the `<video>`, so the cards stay; Android also locks landscape), iPho
 devices: native controls off (iOS's would cover the card), own play / pause + seek bar on Jack's half, the first tap on
 the stage plays and shows a "Rotate for full size" pill (6 s). The script, line by line with its prefab and
 default cue: `SCRIPT.md`. Default cues = `data-cue-*` in `index.html` (seconds into `jack.mp4`, guessed for a ~40 s
-take until the real recording exists; the placeholder is 44 s).
+take until the real recording exists; the placeholder is 44 s: one room across the whole frame, a silhouette on the left).
 
 **Removed cue = the snap.** Jack snaps his fingers on every removal; the removed cue sits on the word right after it
 ("Gone" / "Now" / "Hours" / "Nothing" / "Gone").

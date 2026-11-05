@@ -24,7 +24,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   most-seen other host, `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
 - Video page `site/video/` (noindex, not in the sitemap; `css/video.css` + `js/video-overlays.js`, own files): Jack's
   face video (full frame, Jack on the left half; `jack.webm` = the Chromium fallback of the 44 s placeholder) with 5
-  overlay prefabs filling the right half (640x720 box scaled to 960x1080, vertically centred; Google phone, Google
+  overlay prefabs drawn on the video's right half, no panel of their own (640x720 box scaled to 960x1080, vertically centred; Google phone, Google
   Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → Jack's snap = shake + flash + "GONE." → the
   #removals compare wipe with rolling counters → "Removed" slam + CSS confetti → slide out; reduced motion = fades;
   WebAudio-synthesized pop / whoosh + thud after the play gesture, `?sfx=0` off; Google / Images after = the landing
@@ -43,7 +43,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   stage's right half (phones too, no stacking); full screen button = the stage (Fullscreen API), iPhone = rotated CSS
   theater (Esc / X / back closes); touch: own play bar, tap-to-play + "Rotate for full size" hint. Script (2 takes):
   `site/video/SCRIPT.md`; cue sheet + CapCut steps + SFX: `site/video/CUES.md`. Gate: `tools/video/check_video.py`
-  (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry at both widths, after state,
+  (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry at both widths, full frame: video box = stage box + transparent overlay (`--break-full`), after state,
   counters, end card + form + cta-steps, name bar + in-place swap (`--break-swap`), snap, reduced motion, sfx, speech, named take, player: tap / theater / full
   screen, scan-stub texts + thumbs); 6 clips for CapCut (ProRes 4444 alpha .mov + green .mp4, own in / out animation,
   silent; `cta-steps` 8 s, generic only): `tools/video/render_prefabs.py OUT`; cues from a take

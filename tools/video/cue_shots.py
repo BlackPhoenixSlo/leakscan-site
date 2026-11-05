@@ -49,11 +49,18 @@ Plus:
   shows SWAP_NAME; cta-steps never shown (MutationObserver); Change re-opens the input prefilled; Reset → generic, URL
   without query, restarted, end card back. Proof PNGs: frame-1920-swap-bar-generic-0s.png (page), frame-1920-swap-settled.png,
   frame-1920-swap-google-live.png (1920x1080 stage).
+- full frame (1920x1080, 1280x800, phone 390x844, iPhone theater, desktop full screen): the <video> box == the stage box,
+  the drawn picture (object-fit + videoWidth / Height) covers the whole stage (full screen: the centred 16:9 picture, the
+  overlay = its right half); .vo-over / .vo-box = the stage's right half, transparent (no background, no shadow: the
+  cards are drawn straight on the video); at a card-free time (3 s) the screen's right half = the video frame's right half
+  (screenshot, native controls off (declared), vs drawImage(video), 8x8 grid, every cell |diff| < 8) -> full-frame-<vp>.png
+--break-full serves css/video.css with the old split layout appended (the video in the left half, an opaque panel behind
+  the cards): only the "full frame:" checks go red.
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
 --break-steps serves index.html without the cta-steps animation (.vo-steps): only the "cta-steps:" checks go red.
 --break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
 --break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the "cta-steps: step 1 … DEMO" check goes red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo]
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, pathlib, re, socket, subprocess, sys, time, urllib.parse
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -614,6 +621,65 @@ def player(b, base, out, cues):
     ctx.close()
 
 
+# layout box (offset*, so the theater's rotation does not matter) of the stage / video / .vo-over, the drawn picture's size
+# (object-fit), the overlay layers' paint, the screen rects of the stage + .vo-over, data-vo-full
+FULL = """() => { const st = document.querySelector('.vo-stage'), v = document.querySelector('.vo-video'), ov = document.querySelector('.vo-over'),
+  bx = document.querySelector('.vo-box'), lay = e => [e.offsetLeft, e.offsetTop, e.offsetWidth, e.offsetHeight], fit = getComputedStyle(v).objectFit,
+  sc = fit === 'cover' ? Math.max(v.offsetWidth / v.videoWidth, v.offsetHeight / v.videoHeight) : fit === 'contain' || fit === 'scale-down'
+     ? Math.min(v.offsetWidth / v.videoWidth, v.offsetHeight / v.videoHeight) : NaN, r = e => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; },
+  paint = e => { const c = getComputedStyle(e); return [c.backgroundColor, c.backgroundImage, c.boxShadow, c.filter, c.backdropFilter || 'none']; };
+  return [lay(st), lay(v), fit === 'fill' ? [v.offsetWidth, v.offsetHeight] : [v.videoWidth * sc, v.videoHeight * sc], lay(ov), paint(ov), paint(bx),
+          r(st), r(ov), document.documentElement.dataset.voFull || null]; }"""
+# the stage region x0..x1, y0..y1 (fractions) as an 8x8 RGB grid, on the screenshot vs the same region of the video frame drawn alone
+PIX = """async ([png, box]) => { const v = document.querySelector('.vo-video'), st = document.querySelector('.vo-stage').getBoundingClientRect(), dpr = devicePixelRatio;
+  const mean = (src, sx, sy, sw, sh) => { const c = document.createElement('canvas'); c.width = 8; c.height = 8; const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high'; g.drawImage(src, sx, sy, sw, sh, 0, 0, 8, 8); return [...g.getImageData(0, 0, 8, 8).data].filter((x, i) => i % 4 < 3); };
+  const img = await createImageBitmap(await (await fetch('data:image/png;base64,' + png)).blob());
+  const [x0, y0, x1, y1] = box;
+  return [mean(img, (st.left + x0 * st.width) * dpr, (st.top + y0 * st.height) * dpr, (x1 - x0) * st.width * dpr, (y1 - y0) * st.height * dpr),
+          mean(v, x0 * v.videoWidth, y0 * v.videoHeight, (x1 - x0) * v.videoWidth, (y1 - y0) * v.videoHeight)]; }"""
+
+
+def full_frame(b, base, out):
+    """the video fills the whole stage, the cards are drawn on its right half (transparent overlay layer)"""
+    import base64
+    near = lambda a, b, tol=1.5: abs(a - b) <= tol
+    clear = lambda p: p[0] in ("rgba(0, 0, 0, 0)", "transparent") and p[1] == "none" and p[2] == "none" and p[3] == "none" and p[4] == "none"
+    for vp, opts, how in (("1920", dict(viewport={"width": 1920, "height": 1156}), None), ("1280", dict(viewport={"width": 1280, "height": 800}), None),
+                          ("phone", VIEWPORTS["phone"], None), ("theater", VIEWPORTS["phone"], "theater"), ("fullscreen", VIEWPORTS["desktop"], "fs")):
+        ctx = ctx_new(b, **opts)
+        if how == "theater":
+            ctx.add_init_script(IPHONE_FS)
+        pg = ctx.new_page()
+        goto(pg, base, "", 3)   # card-free: before google's live cue
+        if how:
+            pg.locator(".vo-fs").click()
+            pg.wait_for_function("w => document.documentElement.dataset.voFull === w", arg=how, timeout=4000)
+            pg.wait_for_timeout(500)
+        shot = out / f"full-frame-{vp}.png"
+        pg.screenshot(path=str(shot))
+        if how is None:   # declared: native controls off for the pixel probe (their gradient darkens the bottom of the frame)
+            pg.evaluate("() => { document.querySelector('.vo-video').controls = false; }")
+            pg.wait_for_timeout(300)
+            png = pg.screenshot()
+        st, vb, pic, ov, pov, pbx, sr, orr, full = pg.evaluate(FULL)
+        check(f"full frame: {vp}: the <video> box == the stage box -> {shot.name}", all(near(x, y) for x, y in zip(vb, [0, 0, st[2], st[3]])), (st, vb))
+        if how == "fs":   # the whole take, centred: the overlay = the right half of that picture
+            check(f"full frame: {vp}: the 16:9 picture centred in the full-screen stage, .vo-over = its right half, transparent",
+                  near(pic[0] / pic[1], 16 / 9, .02) and near(orr[0], sr[0] + (st[2] - pic[0]) / 2 + pic[0] / 2) and near(orr[2], pic[0] / 2) and near(orr[3], pic[1])
+                  and clear(pov) and clear(pbx), (st, pic, orr, pov, pbx))
+            ctx.close()
+            continue
+        check(f"full frame: {vp}: the drawn picture covers the whole stage (object-fit)", pic[0] >= st[2] - 1.5 and pic[1] >= st[3] - 1.5, (st, pic))
+        check(f"full frame: {vp}: .vo-over / .vo-box = the stage's right half, transparent (no background / shadow / filter)",
+              near(ov[0], st[2] / 2) and near(ov[1], 0) and near(ov[2], st[2] / 2) and near(ov[3], st[3]) and clear(pov) and clear(pbx), (st, ov, pov, pbx))
+        if how is None:   # the theater is rotated on screen: its geometry above is enough
+            a_, v_ = pg.evaluate(PIX, [base64.b64encode(png).decode(), [.56, .1, .96, .9]])
+            check(f"full frame: {vp}: the screen's right half (no card at 3 s) = the video frame's right half", max(abs(x - y) for x, y in zip(a_, v_)) < 8,
+                  max(abs(x - y) for x, y in zip(a_, v_)))
+        ctx.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
@@ -622,6 +688,7 @@ def main():
     ap.add_argument("--break-steps", action="store_true")
     ap.add_argument("--break-swap", action="store_true")
     ap.add_argument("--break-demo", action="store_true")
+    ap.add_argument("--break-full", action="store_true")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -640,6 +707,9 @@ def main():
         broken, k = re.subn(r"DEMO = '[^']*'", "DEMO = 'Orla Brennick'", js)
         assert k == 1, "break: DEMO not found"
         BREAK["demo"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_full:   # wire boundary: css/video.css + the old split layout (video in the left half, an opaque panel behind the cards)
+        css = (ROOT / "site/css/video.css").read_text(encoding="utf-8") + "\n.vo-video { width: 50%; object-fit: contain; } .vo-over { background: #353b43; }\n"
+        BREAK["full"] = ("**/css/video.css", css, "text/css")
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     tap = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', html)
@@ -760,6 +830,7 @@ def main():
         check("reduced motion, stamp: no particles (burst display none), stamp unscaled", fx[6] == "none" and fx[7] == 1, (fx[6], fx[7]))
         ctx.close()
         player(b, base, out, cues)
+        full_frame(b, base, out)
         for vp, opts in SWAP_VIEWPORTS.items():
             swap(b, base, out, cues, cta, vp, opts)
         for f in ("bar-generic-0s", "settled", "google-live"):
