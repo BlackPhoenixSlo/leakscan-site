@@ -645,6 +645,30 @@ def huge_flow(browser, vp_name, vp):
             check(f"{tag} short screen ({w}x{h}): frame not pinned, short preview, no inner scroll box; More results expands it",
                   r[0] == "static" and 0 < r[1] < 10 and r[2] and not sc and not sc2 and n2 > r[1], [r, sc, n2, sc2])
             ctx.close()
+        # rotation / resize: each tab not grown by More refits to the new screen; a tab grown by More keeps its items
+        ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        p4 = ctx.new_page()
+        p4.goto(base + "scan/?r=" + slug)
+        p4.wait_for_selector("#report:not([hidden])", timeout=8000)
+        p4.locator("#g-tab-videos").click()
+        p4.locator("[data-more=videos]").click()
+        nv = p4.locator("#g-panel .g-v").count()
+        p4.locator("#g-tab-all").click()
+        p4.wait_for_timeout(200)
+        RUN = "() => { const t = document.querySelector('.ph-track'); return t.offsetHeight - t.firstElementChild.offsetHeight; }"
+        rr = {"all@844": p4.evaluate(RUN)}
+        p4.set_viewport_size({"width": 360, "height": 640})
+        p4.wait_for_timeout(700)
+        rr["all"] = p4.evaluate(RUN)
+        p4.locator("#g-tab-images").click()
+        p4.wait_for_timeout(300)
+        rr["images"] = p4.evaluate(RUN)
+        p4.locator("#g-tab-videos").click()
+        p4.wait_for_timeout(300)
+        rr["videos_n"] = [nv, p4.locator("#g-panel .g-v").count()]
+        check(f"{tag} resize 390x844 → 360x640: untouched tabs refit (<= 1.5 screens), the tab grown by More keeps its items",
+              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["images"] <= 1.5 * 640 and rr["videos_n"][0] == rr["videos_n"][1] > 6, rr)
+        ctx.close()
         wide = {}   # narrow phones: nothing sticks out sideways (summary numbers, section nav, controls, filter)
         for w in (320, 360):
             ctx = browser.new_context(viewport={"width": w, "height": 700}, device_scale_factor=2, is_mobile=True, has_touch=True)
@@ -2103,6 +2127,26 @@ def tabs_flow(browser, vp_name, vp):
     sp = page.evaluate("() => [...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16])")
     check(f"{tag} thumbs: scan page Images grid: failed / blank tiles removed, the rest painted", sp and all(ok for _u, ok in sp) and not any(dead_thumb(u) for u, _ok in sp), [u[-24:] for u, ok in sp if not ok][:4])
     ctx.close()
+    if vp_name == "phone":   # pinned phone: a failed tile's slot goes to the next image (same size), nothing moves
+        ctx = new_ctx()
+        page = ctx.new_page()
+        held = []   # the 404 / blank thumbs answer late: after the Images tab is up (the All tab's pack would fail them first)
+        page.route(lambda u: "/api/thumb" in u and dead_thumb(unquote(u)), lambda r: held.append(r))
+        page.goto(base + "scan/?r=demoBrokenT1", wait_until="load")
+        page.wait_for_selector("#g-tab-images", timeout=8000)
+        page.wait_for_timeout(800)
+        t0, s0 = page.evaluate("""() => { document.querySelector('#g-tab-images').click();
+            return [performance.now(), [...document.querySelectorAll('.g-grid .g-tile img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1]))]; }""")
+        page.wait_for_timeout(800)
+        for r in held:
+            r.continue_()
+        page.wait_for_timeout(1500)
+        s1 = page.evaluate("""(t0) => [[...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16]),
+            window.__ls.filter(x => x[0] > t0 + 200 && x[1] > 0 && !x[2]).map(x => x[3])]""", t0)
+        check(f"{tag} thumbs: pinned phone Images: failed tiles swapped in place for the next image (same count, all painted), no layout shift",
+              any(dead_thumb(u) for u in s0) and len(A) > len(s0) and len(s1[0]) == len(s0) and all(ok for _u, ok in s1[0])
+              and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(A), len(s1[0]), s1[1][:2]])
+        ctx.close()
 
     # ---------- (3) #free phone: tabs, illustration without a scan ----------
     ctx = new_ctx()
