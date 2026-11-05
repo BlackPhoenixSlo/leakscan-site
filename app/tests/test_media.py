@@ -109,6 +109,20 @@ class _Env(unittest.TestCase):
             shutil.rmtree(os.path.join(self.tmp.name, d), ignore_errors=True)
 
 
+class TestNoneTTL(_Env):
+    def test_empty_cache_entry_expires_after_none_ttl(self):
+        key = mg.cache_key("onlyfans.com", "demo_creator")
+        mg._cache_save(key, "cachedslug01", [])
+        self.assertIsNotNone(mg._cache_load(key))                                 # fresh empty entry is honoured
+        c = json.load(open(mg._cache_path(key)))
+        c["ts"] = time.time() - mg.NONE_TTL - 5
+        open(mg._cache_path(key), "w").write(json.dumps(c))
+        self.assertIsNone(mg._cache_load(key))                                    # stale empty entry is retried
+        c["images"] = [{"src": "x", "w": 1, "h": 1, "source": "instagram"}]
+        open(mg._cache_path(key), "w").write(json.dumps(c))
+        self.assertIsNotNone(mg._cache_load(key))                                 # same age with images still cached
+
+
 class TestNormalize(unittest.TestCase):
     def test_caps_and_format(self):
         jpeg, w, h = mg.normalize(stub.synth(2400, 1800, 2, noise=True))
