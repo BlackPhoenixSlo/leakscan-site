@@ -16,6 +16,9 @@ Serves site/ and the API routes of the contract the scan page talks to:
   (fixture overlaid with tools/fixtures/scan-evil.json: script tags, javascript: urls, oversized strings).
   `aliases` {declared, discovered, socials} (alias enrichment) comes from the fixture: discovered handles + the
   socials read off leak pages; stub-mixed / stub-empty carry none.
+  Every result carries a top-level `mega` list (mega.nz folders shared via an aggregator: url / host / via / title / size
+  bytes / images / videos / age ISO UTC / status; synthetic, [] when none); demoRemove1 = demoR3port01 + one x.com / reddit.com / mega.nz hit (the #removals panels); evilR3port01's
+  `mega` is hostile (markup, javascript: url, oversized size). demoNoProf01 / demoFoundIG1 have [] (demo fallback).
 - GET /api/profile/<slug> → {slug, profile}; GET /api/avatar/<slug> → a generated PNG when profile.avatar is true, else 404.
 - GET /api/media/<slug> (demo photos, arrive after the scan) → polls 1-2: {status:"pending", images:[2]}, then
   {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (mode relative: /api/media/…;
@@ -62,6 +65,26 @@ CHAT_ANSWER = (
     "Questions about your case? See #contact.")
 
 
+# `mega` (top-level, added by the backend for mega.nz folders) + one hit each on x.com / reddit.com / mega.nz, so the
+# #removals panels have something to personalize from. Synthetic: fake folder ids / paths, the url is never rendered.
+# Contract (backend PR #36): always present, [] when none; host = the aggregator that shares the (captcha-gated) mega.nz
+# folder, url = its share page (here a fake .example path), size in bytes, age = ISO UTC timestamp, status "live".
+MEGA = [{"url": "https://leakshaven.example/share/DEMOfake0", "host": "leakshaven.com", "via": "leakvault.example",
+         "title": "demo.creator MEGA pack 2026", "size": 6657199309, "images": 412, "videos": 88,
+         "age": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3 * 86400 - 600)), "status": "live"}]
+SOCIAL_HITS = [
+    {"domain": "x.com", "url": "https://x.com/demo_reposter/status/1000000000000000001", "occurrences": 2, "method": "google",
+     "alias": None, "live": True, "title": "Mira Example leaked full set / X"},
+    {"domain": "reddit.com", "url": "https://www.reddit.com/r/demo_leaksub/comments/abc123/mira_example/", "occurrences": 1,
+     "method": "google", "alias": None, "live": True, "title": "Mira Example new pack in comments : r/demo_leaksub"},
+    {"domain": "mega.nz", "url": "https://mega.nz/folder/DEMOfake0#synthetic", "occurrences": 1, "method": "google",
+     "alias": None, "live": True, "title": "demo.creator pack - MEGA"}]
+
+
+EVIL_MEGA = [{"url": "javascript:alert(1)", "host": "mega.nz", "title": "<img src=x onerror=alert(1)>", "size": "x" * 500,
+              "images": "<b>", "videos": -5, "age": "https://evil.example/age", "status": "live"}]
+
+
 def make_result(handle, platform, empty=False):
     r = json.loads(json.dumps(FIXTURE))
     r.update(handle=handle, platform=platform,
@@ -73,7 +96,9 @@ def make_result(handle, platform, empty=False):
         r["hits"][1]["live"] = False
         r["hits"][2].pop("live")
         r["hit_count"] = 3
+    r["mega"] = json.loads(json.dumps(MEGA))
     if empty:
+        r["mega"] = []
         r.update(status="empty", hit_count=0, domain_count=0, google_total=0, images=[], hits=[], results=[],
                  aliases={"declared": [handle], "discovered": [], "socials": []})
     if OPTS.omit_results:
@@ -338,8 +363,10 @@ def main():
     ap.add_argument("--delay", type=float, default=0.15)
     ap.parse_args(namespace=OPTS)
     no_ig = {**FIXTURE["aliases"], "socials": [x for x in FIXTURE["aliases"]["socials"] if x["platform"] != "instagram"]}
-    for slug, overlay in (("demoR3port01", {}), ("demoNoProf01", {"profile": None, "aliases": no_ig}),
-                          ("demoFoundIG1", {"profile": None}), (EVIL["slug"], EVIL), ("demoBrokenT1", broken_thumbs(FIXTURE))):
+    for slug, overlay in (("demoR3port01", {"mega": MEGA}), ("demoNoProf01", {"profile": None, "aliases": no_ig, "mega": []}),
+                          ("demoFoundIG1", {"profile": None, "mega": []}), (EVIL["slug"], {**EVIL, "mega": EVIL_MEGA}),
+                          ("demoBrokenT1", {**broken_thumbs(FIXTURE), "mega": []}),
+                          ("demoRemove1", {"mega": MEGA, "hits": FIXTURE["hits"] + SOCIAL_HITS})):
         seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
         if OPTS.omit_results:
             seed.pop("results", None)
