@@ -41,9 +41,15 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
   (same origin, except on `*.github.io` → `https://scan.srv1395798.hstgr.cloud`; set once at the top of `js/scan-engine.js`
   and `js/personalize.js`, overridden by `<body data-api>`), reads the
-  SSE stream (progress → result → done), then renders the report: summary, a Google look-alike (All / Images / Videos,
-  Phone / Computer, thumbnails via `/api/thumb`, blurred until Reveal), per-site table, all links (copy / .txt) and the
-  prefilled message CTAs. The URL becomes `scan/?r=<slug>`, which reopens the report via `GET /api/scan-result/<slug>`;
+  SSE stream (progress → result → done), then renders the report: summary, a sticky section nav (Google / Sites N /
+  Send report), a Google look-alike (All / Images / Videos, Phone / Computer, thumbnails via `/api/thumb`, blurred until
+  Reveal; the Phone frame is pinned while page scroll scrolls its screen 1:1, then the page moves on; each tab's first
+  look is fitted to <= 1.5 screens of that scrolling, More adds the rest; screens < 600 px tall get a short static
+  preview, no inner scroll box), "Where the copies are" (every site, most links first: 10 sites, +25 per click; a
+  site's links built only when opened, 10 then +50, removed again on close; one filter over domains + URLs; Copy all /
+  .txt always carry every link) and the prefilled message CTAs. Built incrementally so 1,000 links on 100 sites stay
+  ~580 elements; `performance.measure('leakscan:report')` = result event → first frame of the report. The URL becomes
+  `scan/?r=<slug>`, which reopens the report via `GET /api/scan-result/<slug>`;
   the report link in the messages is `scan/?r=<slug>` on the host serving the page (resolved from `js/scan-engine.js`'s URL).
   Without JS it links to https://jackbase.me/scan.
 - Personalization (`js/personalize.js`): after a scan the landing page and the demo site (`showcase/`) show her data.
@@ -63,16 +69,21 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   Privacy: the slug lives only in this browser (localStorage, plus the cached result in sessionStorage); "Reset page"
   clears it. Nothing is sent anywhere except the API reads above.
 - Scan stub: `python3 tools/scan_stub.py [--port 8930]` serves `site/` plus the API routes from the synthetic fixture
-  `tools/fixtures/scan-sample.json` (magic handles `stub-fail`, `stub-429`, `stub-busy`, `stub-empty`, `stub-mixed` (live true / false / missing);
+  `tools/fixtures/scan-sample.json` (magic handles `stub-fail`, `stub-429`, `stub-busy`, `stub-empty`, `stub-mixed` (live true / false / missing),
+  `stub-huge` (1,000 links on 100 sites, deterministic; preloaded as `demoHuge0001`);
   echoes `instagram` / `x` as `socials`; `--omit-results`
   for break-it runs; `--omit-profile` drops `profile`; `--media normal|relative|scanhost|none|404`, or per slug
   `POST /__stub/media?slug=&mode=`; preloaded slugs `demoR3port01`, `demoNoProf01` (no profile), `evilR3port01`
   (malicious values); `/api/profile`, `/api/avatar`, `/api/media` routes). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
   E2E: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR` (starts its own stub; phone + desktop;
-  form → progress → report, tab counts, device toggle, Reveal, CTAs, `?r=` reopen, error paths; never calls prod).
+  form → progress → report, tab counts, device toggle, Reveal, CTAs, `?r=` reopen, error paths; `stub-huge` at CPU x4:
+  render < 1.5 s, DOM budget, show more / open / filter / export, pinned phone → sites scroll (<= 1.5 screens per tab), short screens, section nav (no history entries),
+  keyboard focus, CLS 0 over the whole flow,
+  no sideways scroll at 320 / 360 px, no 5xx / console errors; never calls prod).
   `--only scan|personalize|askai|inline|tabs|removals` (`tabs`: phone tabs + demo pop-out; `removals`: the panels,
   toggle, drag, keys, `mega[]` / hit personalization). Break-it flags (each turns only its own checks red):
-  `--break-allowlist`, `--break-drift`, `--break-phones`, `--break-thumbs`, `--break-remove`. `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
+  `--break-allowlist`, `--break-drift`, `--break-phones`, `--break-thumbs`, `--break-remove`, `--break-incremental`
+  (every explorer step 1e9: only `incremental:` checks). `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.
 - Ask-AI popup: `js/chat.js` + `css/chat.css`, markup at the end of `index.html` (launcher + `<dialog id="askai">`; also

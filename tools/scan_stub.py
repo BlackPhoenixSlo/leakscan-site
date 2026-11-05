@@ -9,9 +9,10 @@ Serves site/ and the API routes of the contract the scan page talks to:
   `result` (tools/fixtures/scan-sample.json with handle/platform/slug swapped in, plus `socials: {instagram?, x?}` echoed
   when sent; a bad instagram / x value → 400 bad_handle), `done`. Magic handles drive the error paths:
   stub-fail → `failed` + `done`; stub-429 → 429 rate_limited; stub-busy → 429 busy; stub-empty → status empty;
-  stub-mixed → 3 hits (live true / false / missing) + the results.
+  stub-mixed → 3 hits (live true / false / missing) + the results; stub-huge → huge_result(): 1000 hit links on 100
+  domains (deterministic, long-tail counts), 80 Google results, 30 images (report-view scale test).
 - GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise. Preloaded: demoR3port01 (the
-  fixture, with its synthetic `profile`), demoNoProf01 (same, `profile` null: scan-only personalization, no leak-page
+  fixture, with its synthetic `profile`), demoHuge0001 (huge_result()), demoNoProf01 (same, `profile` null: scan-only personalization, no leak-page
   Instagram), demoFoundIG1 (`profile` null, leak-page Instagram fills the IG rows) and evilR3port01
   (fixture overlaid with tools/fixtures/scan-evil.json: script tags, javascript: urls, oversized strings).
   `aliases` {declared, discovered, socials} (alias enrichment) comes from the fixture: discovered handles + the
@@ -85,6 +86,38 @@ EVIL_MEGA = [{"url": "javascript:alert(1)", "host": "mega.nz", "title": "<img sr
               "images": "<b>", "videos": -5, "age": "https://evil.example/age", "status": "live"}]
 
 
+LONG = "free-full-gallery-all-photos-and-videos-download/"   # some huge-fixture links are long: the handle sits in the tail
+
+
+def huge_result(handle, n_links=1000, n_domains=100):
+    """1000 links on 100 domains, same every run: long-tail counts (domain i ~ 1/(i+1)^0.9, each >= 1, sum exact),
+    every 3rd link long (handle in its tail), 80 Google results on the top domains (every 8th a video), 30 images. Report-view scale fixture (stub-huge)."""
+    pre = ["leak", "fan", "only", "nude", "pic", "vid", "clip", "mirror", "dump", "thot"]
+    suf = ["vault", "zone", "base", "stash", "hoard", "drop", "rip", "bay", "flood", "board"]
+    doms = [f"{pre[i % 10]}{suf[(i // 10 + i) % 10]}.example" for i in range(n_domains)]
+    w = [1 / (i + 1) ** 0.9 for i in range(n_domains)]
+    cnt = [1 + int((n_links - n_domains) * x / sum(w)) for x in w]
+    for i in range(n_links - sum(cnt)):
+        cnt[i % n_domains] += 1
+    kinds = ["gallery", "model", "album", "thread", "set", "video", "post", "tag"]
+    hits = [{"domain": d, "url": f"https://{'www.' if i % 7 == 3 else ''}{d}/{kinds[(i + k) % 8]}/{1000 + i * 37 + k}/{LONG if k % 3 == 1 else ''}{handle}-{k + 1}",
+             "occurrences": max(1, 12 - k // 3 - i // 10), "method": "google", "alias": None, "live": k % 5 != 4,
+             "title": f"{handle} {kinds[(i + k) % 8]} {k + 1} - {d.split('.')[0].title()}"}
+            for i, (d, c) in enumerate(zip(doms, cnt)) for k in range(c)]
+    results = []
+    for j in range(80):
+        d = doms[j % 25]
+        video = j % 8 == 7
+        results.append({"title": f"{handle} {'Video' if video else 'Gallery'} {j + 1} - {d.split('.')[0].title()}",
+                        "link": f"https://{d}/{'watch' if video else 'free'}/{5000 + j}/{handle}",
+                        "snippet": f"{handle} on {d.split('.')[0].title()}. Browse {10 + j} posts uploaded by fans. Synthetic fixture text.",
+                        "thumb": f"https://encrypted-tbn0.gstatic.com/images?q=tbn:DEMO{j + 1:04d}huge",
+                        "domain": d, "kind": "video" if video else "page"})
+    images = [f"https://encrypted-tbn0.gstatic.com/images?q=tbn:DEMO{200 + j:04d}huge" for j in range(30)]
+    return {"hits": hits, "results": results, "images": images, "hit_count": len(hits), "domain_count": n_domains,
+            "google_total": 48200, "status": "complete"}
+
+
 def make_result(handle, platform, empty=False):
     r = json.loads(json.dumps(FIXTURE))
     r.update(handle=handle, platform=platform,
@@ -97,6 +130,8 @@ def make_result(handle, platform, empty=False):
         r["hits"][2].pop("live")
         r["hit_count"] = 3
     r["mega"] = json.loads(json.dumps(MEGA))
+    if handle == "stub-huge":
+        r.update(huge_result(handle))
     if empty:
         r["mega"] = []
         r.update(status="empty", hit_count=0, domain_count=0, google_total=0, images=[], hits=[], results=[],
@@ -366,7 +401,8 @@ def main():
     for slug, overlay in (("demoR3port01", {"mega": MEGA}), ("demoNoProf01", {"profile": None, "aliases": no_ig, "mega": []}),
                           ("demoFoundIG1", {"profile": None, "mega": []}), (EVIL["slug"], {**EVIL, "mega": EVIL_MEGA}),
                           ("demoBrokenT1", {**broken_thumbs(FIXTURE), "mega": []}),
-                          ("demoRemove1", {"mega": MEGA, "hits": FIXTURE["hits"] + SOCIAL_HITS})):
+                          ("demoRemove1", {"mega": MEGA, "hits": FIXTURE["hits"] + SOCIAL_HITS}),
+                          ("demoHuge0001", {**huge_result(FIXTURE["handle"]), "mega": []})):
         seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
         if OPTS.omit_results:
             seed.pop("results", None)

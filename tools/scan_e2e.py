@@ -3,6 +3,7 @@
 
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-remove]
+        [--break-incremental]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs three scenarios.
@@ -10,7 +11,10 @@ for phone (390x844) and desktop (1440x900) runs three scenarios.
 scan: home → fill the hero form → submit → scan/?p=&h= → progress → report. Asserts summary numbers
 equal the fixture, tab item counts (All 10 → all pages after "More results", Images ≤ 30, Videos), device toggle swaps
 frames, Reveal unblurs, CTA hrefs carry the report link + handle, every hit URL is listed, `?r=<slug>` reopens without
-a new scan, and the stub `failed` / 429 / busy / empty / not-found paths show their UI. Every non-loopback request is
+a new scan, and the stub `failed` / 429 / busy / empty / not-found paths show their UI. Then `stub-huge` (1000 links on
+100 sites, CPU x4): render time, DOM budget, sites / links shown in steps, filter, export, the pinned phone scrolling
+into the sites, CLS 0 (whole flow), no 5xx / console errors; --break-incremental (scan.js with every step 1e9) turns only the
+`incremental:` checks red. Every non-loopback request is
 aborted and must not happen at all. Screenshots of each state go to OUT_DIR. One PASS/FAIL line per check; exit 1 on
 any FAIL.
 
@@ -76,6 +80,7 @@ BREAK_DRIFT = "--break-drift" in sys.argv
 BREAK_PHONES = "--break-phones" in sys.argv
 BREAK_THUMBS = "--break-thumbs" in sys.argv
 BREAK_REMOVE = "--break-remove" in sys.argv
+BREAK_INCREMENTAL = "--break-incremental" in sys.argv
 GS_RE = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 PEOPLE = {"imgs/portrait.webp", "imgs/hero-wide.webp", "imgs/studio-portrait.webp"}   # showcase hero defaults: Pexels people photos (tools/showcase/CREDITS.md)
 
@@ -113,7 +118,9 @@ def break_routes(ctx):
     """--break-drift / --break-phones: serve the script with the feature disabled (wire boundary, same bytes otherwise)."""
     for flag, name, old, new in ((BREAK_DRIFT, "inline-scan.js", "DRIFT_SPEED = 24", "DRIFT_SPEED = 0"),
                                  (BREAK_PHONES, "personalize.js", "    phones(m, d);\n", "\n"),
-                                 (BREAK_THUMBS, "inline-scan.js", "      if (g.dead[src]) return;\n", "      return;\n")):
+                                 (BREAK_THUMBS, "inline-scan.js", "      if (g.dead[src]) return;\n", "      return;\n"),
+                                 (BREAK_INCREMENTAL, "scan.js", "SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50",
+                                  "SITES_STEP = 1e9, MORE_SITES = 1e9, LINKS_STEP = 1e9, MORE_LINKS = 1e9")):
         if not flag:
             continue
         body = (ROOT / "site" / "js" / name).read_text(encoding="utf-8")
@@ -154,6 +161,7 @@ def scan_flow(browser, vp_name, vp):
             r.abort()
 
     ctx.route("**/*", route)
+    break_routes(ctx)
     page = ctx.new_page()
     page.on("request", lambda q, posts=posts: q.method == "POST" and posts.append(q.url))
     page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
@@ -165,7 +173,7 @@ def scan_flow(browser, vp_name, vp):
     page.goto(base + "scan/?p=fansly.com&h=%40demo.creator", wait_until="load")
 
     # 2. progress
-    page.wait_for_selector("#progress-log li", timeout=5000)
+    page.wait_for_selector("#progress-log li:not(:empty)", timeout=5000)
     check(f"{vp_name} progress visible", page.locator("#progress").is_visible()
           and "demo.creator" in page.locator("#scan-title").inner_text())
     check(f"{vp_name} scan/?p=&h= posts platform + clean handle, no socials",
@@ -239,7 +247,8 @@ def scan_flow(browser, vp_name, vp):
                 break
             page.locator("[data-more=all]").click()
         n1 = page.locator("#g-panel .g-r").count()
-        check(f"{vp_name}/{device} All tab count", (n0, n1) == (min(10, len(PAGES)), len(PAGES)), f"{n0}→{n1} want 10→{len(PAGES)}")
+        first = (1 <= n0 <= min(10, len(PAGES))) if device == "phone" else n0 == min(10, len(PAGES))   # phone: first look fitted to ~1.5 screens
+        check(f"{vp_name}/{device} All tab count (More reaches every result)", first and n1 == len(PAGES), f"{n0}→{n1} want {'≤' if device == 'phone' else ''}10→{len(PAGES)}")
         check(f"{vp_name}/{device} every result title carries open ↗", page.locator("#g-panel .g-r a.g-title .g-go").count() == n1)
         alone = page.evaluate(GO_ALONE)
         check(f"{vp_name}/{device} open ↗ never sits alone on a line (it rides on the title's last word)", not alone, alone[:3])
@@ -279,8 +288,12 @@ def scan_flow(browser, vp_name, vp):
         g.screenshot(path=str(out / f"{vp_name}-4-{device}-images.png"))
         # Videos
         page.locator("#g-tab-videos").click()
+        nv0 = page.locator("#g-panel .g-v").count()
+        while page.locator("[data-more=videos]").count():
+            page.locator("[data-more=videos]").click()
         nv = page.locator("#g-panel .g-v").count()
-        check(f"{vp_name}/{device} Videos tab count", nv == len(VIDEOS), f"{nv} want {len(VIDEOS)}")
+        check(f"{vp_name}/{device} Videos tab count (phone: first look fitted, More reaches every video)",
+              nv == len(VIDEOS) and (1 <= nv0 <= 6 if device == "phone" else nv0 == nv), f"{nv0}→{nv} want {len(VIDEOS)}")
         page.wait_for_timeout(300)
         g.screenshot(path=str(out / f"{vp_name}-5-{device}-videos.png"))
 
@@ -310,10 +323,10 @@ def scan_flow(browser, vp_name, vp):
           and hrefs[2].startswith("mailto:me@jackbase.dev?") and "body=" in hrefs[2], hrefs)
     deep = page.locator("#deep-link").get_attribute("href")
     check(f"{vp_name} deep-scan link", deep == "https://jackbase.me/scan?p=fansly.com&h=demo.creator&l=deep&go=1", deep)
-    listed = set(page.eval_on_selector_all("#links-list a", "els => els.map(e => e.href)"))
+    listed = open_all_sites(page)
     check(f"{vp_name} every hit url listed", all(h["url"] in listed for h in FX["hits"]),
           f"{sum(h['url'] in listed for h in FX['hits'])}/{len(FX['hits'])}")
-    check(f"{vp_name} per-site rows == domain_count", page.locator("#sites-body tr").count() == FX["domain_count"])
+    check(f"{vp_name} per-site rows == domain_count", page.locator("#lx-list .lx-site").count() == FX["domain_count"])
     page.locator("#send").scroll_into_view_if_needed()
     page.locator("#send").screenshot(path=str(out / f"{vp_name}-7-cta.png"))
 
@@ -366,6 +379,378 @@ def scan_flow(browser, vp_name, vp):
     ctx.close()
 
 
+
+def open_all_sites(page):
+    """Show every site row, open each, press every "Show N more" → every link href in the list."""
+    while page.locator("#lx-more").is_visible():
+        page.locator("#lx-more").click()
+    page.evaluate("document.querySelectorAll('#lx-list details').forEach(d => d.open = true)")
+    page.wait_for_timeout(100)
+    while page.locator(".lx-lmore").count():
+        page.evaluate("document.querySelectorAll('.lx-lmore').forEach(b => b.click())")
+    return set(page.eval_on_selector_all("#lx-list a", "els => els.map(e => e.href)"))
+
+
+sys.path.insert(0, str(ROOT / "tools"))
+from scan_stub import huge_result   # noqa: E402  (the stub's own generator: the e2e expects what it serves)
+HUGE = huge_result("stub-huge")
+HUGE_SITES = {}
+for _u, _d in [(h["url"], h["domain"]) for h in HUGE["hits"]] + [(r["link"], r["domain"]) for r in HUGE["results"]]:
+    HUGE_SITES.setdefault(_d, {})[_u] = 1
+HUGE_LINKS = sum(len(v) for v in HUGE_SITES.values())
+HUGE_TOP = max(HUGE_SITES, key=lambda d: len(HUGE_SITES[d]))
+NODE_BUDGET = 900   # whole page after the report renders (main before this change: ~3,800 at this size)
+IN_VIEW = """() => { const a = document.activeElement, r = a.getBoundingClientRect(), s = a.closest('.ph-scroll');
+    let top = document.querySelector('.rnav').getBoundingClientRect().bottom, bot = innerHeight;   /* clear of the sticky nav, */
+    if (s) { const sr = s.getBoundingClientRect(), t = s.querySelector('.g-tabs');                 /* inside the phone screen, */
+        top = Math.max(top, sr.top, t ? t.getBoundingClientRect().bottom : 0); bot = Math.min(bot, sr.bottom); }   /* under its tabs */
+    return r.top >= top - 1 && r.bottom <= bot + 1 ? true : [Math.round(r.top), Math.round(r.bottom), Math.round(top), Math.round(bot)]; }"""
+
+
+def huge_flow(browser, vp_name, vp):
+    """stub-huge (1000 hit links on 100 sites): render time, DOM size, incremental sites / links, filter, the pinned
+    phone scroll story, CLS, lazy thumbs, export, no 5xx / console errors. Checks named "incremental: …" are the ones
+    --break-incremental (scan.js with every step = 1e9, everything rendered) must turn red; nothing else may."""
+    phone = vp_name == "phone"
+    tag = f"{vp_name} huge:"
+    ctx = browser.new_context(viewport=vp, device_scale_factor=2 if phone else 1, is_mobile=phone, has_touch=phone, accept_downloads=True)
+    outside, errors, bad, thumbs = [], [], [], []
+    ctx.route("**/*", lambda r, _q: r.continue_() if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost") else (outside.append(r.request.url), r.abort()))
+    break_routes(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+    page.on("response", lambda r: r.status >= 500 and bad.append(f"{r.status} {r.url}"))
+    page.on("request", lambda q: "/api/thumb" in q.url and thumbs.append(q.url))
+    # layout shifts over the whole flow: form → progress (log fills) → report → scroll story
+    page.add_init_script("""window.__ls = []; new PerformanceObserver(l => l.getEntries().forEach(e => { if (!e.hadRecentInput) window.__ls.push(e); }))
+      .observe({type: 'layout-shift', buffered: true});""")
+    CLS = """() => { const ls = window.__ls;
+      return [+ls.reduce((a, e) => a + e.value, 0).toFixed(4), ls.slice(0, 3).map(e => e.sources.map(s => s.node && s.node.nodeType === 1 ? s.node.tagName + '.' + s.node.className : '?').join(','))]; }"""
+    cdp = ctx.new_cdp_session(page)
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})   # a mid-range phone, not this machine
+
+    # 1. a fresh scan: result event → painted report
+    page.goto(base + "scan/?h=stub-huge", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=20000)
+    page.wait_for_function("performance.getEntriesByName('leakscan:report').length > 0", timeout=5000)
+    ms = page.evaluate("performance.getEntriesByName('leakscan:report')[0].duration")
+    check(f"{tag} report painted < 1500 ms after the result event (CPU x4)", ms < 1500, f"{ms:.0f} ms")
+    nodes = page.evaluate("document.getElementsByTagName('*').length")
+    check(f"{tag} incremental: page DOM <= {NODE_BUDGET} elements after render", nodes <= NODE_BUDGET, nodes)
+    check(f"{tag} summary + section nav say 100 sites / 1,000 pages", (digits(page.locator("[data-stat=domains]").inner_text()),
+          digits(page.locator("[data-stat=pages]").inner_text()), page.locator("#rnav-n").inner_text()) == (100, 1000, "100"))
+    check(f"{tag} heading line: every site + link counted", page.locator("#lx-sub").inner_text() == f"100 sites · {HUGE_LINKS:,} links (1,000 indexed pages + {HUGE_LINKS - 1000} more Google results) · most copies first",
+          page.locator("#lx-sub").inner_text())
+    rows = lambda: page.locator("#lx-list .lx-site").count()
+    check(f"{tag} incremental: 10 sites, no link rows until a site is opened, 'Show 25 more sites · 90 left'",
+          (rows(), page.locator("#lx-list a").count(), page.locator("#lx-more").inner_text()) == (10, 0, "Show 25 more sites · 90 left"),
+          (rows(), page.locator("#lx-list a").count(), page.locator("#lx-more").inner_text()))
+    first = page.locator("#lx-list .lx-name").first.inner_text()
+    check(f"{tag} biggest site first", first == HUGE_TOP, first)
+    thumbs0 = len(thumbs)   # at load, before any scroll / tab / reopen
+    check(f"{tag} no thumbnail fetched beyond the first screen (lazy)", thumbs0 <= 8, thumbs0)
+
+    # 2. the scroll story: summary → pinned phone (screen scrolls 1:1) → the sites
+    if phone:
+        g = page.evaluate("""() => { const t = document.querySelector('.ph-track'), f = t.firstElementChild, s = t.querySelector('.ph-scroll');
+            return {top: t.getBoundingClientRect().top + scrollY, pin: parseFloat(getComputedStyle(f).top), h: t.offsetHeight, fh: f.offsetHeight,
+                    max: s.scrollHeight - s.clientHeight, vh: innerHeight}; }""")
+        check(f"{tag} phone frame fits the screen under the nav", g["fh"] + g["pin"] <= g["vh"], g)
+        check(f"{tag} track = frame + screen overflow", abs(g["h"] - g["fh"] - g["max"]) <= 2 and g["max"] > 400, g)
+        runs = {}   # each tab's first look: at most 1.5 screens of pinned scrolling before the sites, the rest behind More
+        for t in ("images", "videos", "all"):
+            page.locator(f"#g-tab-{t}").click()
+            page.wait_for_timeout(300)
+            runs[t] = page.evaluate("""() => { const t = document.querySelector('.ph-track');
+                return [t.offsetHeight - t.firstElementChild.offsetHeight, !!document.querySelector('#g-panel [data-more]')]; }""")
+        page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+        check(f"{tag} pin: every tab scrolls <= 1.5 screens before the sites (more behind More)",
+              all(v[0] <= 1.5 * g["vh"] and v[1] for v in runs.values()), [runs, g["vh"]])
+        page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
+        page.wait_for_timeout(250)
+        st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
+        check(f"{tag} pin: mid-scroll the frame stays put and its screen scrolls 1:1", abs(st[0] - g["pin"]) <= 1 and abs(st[1] - 400) <= 2, st)
+        page.screenshot(path=str(out / f"{vp_name}-h2-pinned.png"))
+        pb = page.evaluate("() => [document.querySelector('.ph-reveal').getBoundingClientRect().top, document.querySelector('.ph-scroll').getBoundingClientRect().bottom]")
+        check(f"{tag} pin: the Reveal pill sits in its own bar, under the results (covers no line)", pb[0] >= pb[1] - 1, pb)
+        pill = page.locator(".ph-reveal")
+        blur = lambda: page.eval_on_selector(".ph-scroll .g-img img", "e => getComputedStyle(e).filter")
+        b0 = blur()
+        pill.click()
+        page.wait_for_timeout(350)
+        b1 = [blur(), page.locator("#reveal").get_attribute("aria-pressed"), page.locator(".ph-reveal").get_attribute("aria-pressed"), page.locator(".ph-reveal").inner_text()]
+        page.locator(".ph-reveal").click()
+        page.wait_for_timeout(350)
+        check(f"{tag} pin: Reveal / Blur on the pinned phone = the button above (state shared)", "blur" in b0 and b1 == ["none", "true", "true", "Blur images"]
+              and "blur" in blur() and page.locator("#reveal").get_attribute("aria-pressed") == "false", [b0, b1])
+        page.locator("#g-tab-images").click()
+        page.wait_for_timeout(250)
+        st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop, document.querySelectorAll('#g-panel .g-tile').length]")
+        check(f"{tag} pin: a tab switched mid-scroll opens at its top, frame stays put", abs(st[0] - g["pin"]) <= 1 and st[1] == 0 and st[2] > 0, st)
+        page.locator("#g-tab-all").click()
+        had = page.locator("#g-panel .g-r").count()
+        page.locator("[data-more=all]").evaluate("b => b.focus()")   # as Tab would: the screen scrolls to it, the page follows
+        page.wait_for_timeout(300)
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(400)
+        nx = page.evaluate("() => { const a = document.activeElement, r = a.closest('.g-r'); return [a.className, [...document.querySelectorAll('#g-panel .g-r')].indexOf(r)]; }")
+        nx.append(page.evaluate(IN_VIEW))
+        check(f"{tag} keyboard More results → focus on the first new result, in view", nx == ["g-title", had, True], [nx, had])
+        page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+        page.wait_for_timeout(150)
+    page.mouse.move(vp["width"] / 2, vp["height"] / 2)
+    steps = 0
+    while page.evaluate("document.getElementById('sites-title').getBoundingClientRect().top") > vp["height"] * .4 and steps < 200:
+        page.mouse.wheel(0, 240)
+        page.wait_for_timeout(30)
+        steps += 1
+    page.wait_for_timeout(300)
+    end = page.evaluate("() => { const s = document.querySelector('.ph-scroll'); return s ? s.scrollHeight - s.clientHeight - s.scrollTop : 0; }")
+    sec = page.evaluate("document.querySelector('.rnav-a[aria-current]') && document.querySelector('.rnav-a[aria-current]').dataset.sec")
+    check(f"{tag} scroll: wheeling down past the Google frame reaches the sites ({steps} steps), frame scrolled to its end, nav on Sites",
+          steps < 200 and end <= 2 and sec == "sites", [steps, end, sec])
+    page.evaluate("window.scrollBy({top: -Math.round(innerHeight * .3), behavior: 'instant'})")   # just past the mock
+    page.wait_for_timeout(300)
+    page.screenshot(path=str(out / f"{vp_name}-h3-past-mock.png"))
+    cls0 = page.evaluate(CLS)   # report built + the whole scroll story, no clicks yet
+
+    # 3. show more sites, open a site, its links in steps, close = gone
+    nx, nl = None, None   # (no Show more when everything is already shown: --break-incremental)
+    if page.locator("#lx-more").is_visible():
+        page.locator("#lx-more").evaluate("b => { b.scrollIntoView({block: 'center', behavior: 'instant'}); b.focus(); }")   # as Tab would bring it
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(400)
+        nx = page.evaluate("() => { const a = document.activeElement, rows = [...document.querySelectorAll('#lx-list .lx-site')]; return [a.tagName, rows.indexOf(a.closest('.lx-site'))]; }")
+        nx.append(page.evaluate(IN_VIEW))
+        page.keyboard.press("Enter")   # open that site from the keyboard
+        page.wait_for_timeout(100)
+        lm = page.locator("#lx-list .lx-site").nth(10).locator(".lx-lmore")
+        if lm.count():
+            lm.evaluate("b => { b.scrollIntoView({block: 'center', behavior: 'instant'}); b.focus(); }")
+            page.keyboard.press("Enter")
+            page.wait_for_timeout(400)
+            nl = page.evaluate("() => { const a = document.activeElement, l = a.closest('.lx-links'); return [a.tagName, l ? [...l.children].indexOf(a.parentNode) : -1]; }")
+            nl.append(page.evaluate(IN_VIEW))
+    check(f"{tag} incremental: keyboard Show more sites → focus on the first new site, in view", nx == ["SUMMARY", 10, True], nx)
+    check(f"{tag} incremental: keyboard Show more links → focus on the first new link, in view", nl == ["A", 10, True], nl)
+    if nx:
+        page.locator("#lx-list .lx-site").nth(10).locator("summary").click()   # close it again
+    page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+    page.wait_for_timeout(100)
+    if page.locator("#lx-more").is_visible():
+        page.locator("#lx-more").click()
+    check(f"{tag} incremental: each Show more adds 25 sites", rows() == 60 and page.locator("#lx-more").inner_text() == "Show 25 more sites · 40 left", rows())
+    top = page.locator("#lx-list .lx-site").first
+    top.locator("summary").click()
+    n_top = len(HUGE_SITES[HUGE_TOP])
+    page.wait_for_timeout(150)
+    lm = top.locator(".lx-lmore")
+    got = (top.locator("a").count(), lm.inner_text() if lm.count() else None)
+    check(f"{tag} incremental: an opened site shows 10 links + 'Show 50 more links · {n_top - 10} left'", got == (10, f"Show 50 more links · {n_top - 10} left"), got)
+    hrefs = top.locator("a").evaluate_all("els => els.map(e => e.href)")
+    check(f"{tag} opened site lists its own links, external + safe", set(hrefs) <= set(HUGE_SITES[HUGE_TOP]) and top.locator("a").first.get_attribute("rel") == "noopener noreferrer nofollow"
+          and top.locator("a").first.get_attribute("target") == "_blank", hrefs[:2])
+    while top.locator(".lx-lmore").count():
+        top.locator(".lx-lmore").click()
+    check(f"{tag} every link of the site reachable", top.locator("a").count() == n_top, top.locator("a").count())
+    top.locator("summary").scroll_into_view_if_needed()
+    page.screenshot(path=str(out / f"{vp_name}-h4-open-site.png"))
+    top.locator("summary").click()
+    page.wait_for_timeout(100)
+    check(f"{tag} closing a site drops its links from the DOM", top.locator("a").count() == 0)
+
+    # 4. filter: by site, by URL part, nothing; clear
+    def filt(q):
+        page.locator("#lx-q").fill(q)
+        page.wait_for_timeout(350)
+        return page.locator("#lx-status").inner_text()
+    q = "thread/1"
+    want = {d: [u for u in us if q in u.lower()] for d, us in HUGE_SITES.items()}
+    want = {d: v for d, v in want.items() if v}
+    st = filt(q)
+    check(f"{tag} filter by URL part: status counts sites + links", st == f"{len(want)} sites · {sum(map(len, want.values()))} links match “{q}”", st)
+    shown = page.locator("#lx-list a").evaluate_all("els => els.map(e => e.href)")
+    check(f"{tag} filter: only matching links shown, highlighted", shown and all(q in u.lower() for u in shown)
+          and page.locator("#lx-list a mark").count() == len(shown), len(shown))
+    check(f"{tag} incremental: filter shows 10 sites + Show more, opens only the first", rows() == min(10, len(want))
+          and page.locator("#lx-list details[open]").count() == 1, [rows(), page.locator("#lx-list details[open]").count()])
+    prev = page.locator("#lx-list .lx-top").evaluate_all("els => els.map(e => e.textContent)")
+    check(f"{tag} filter: each site's preview is its first matching link", prev and all(q in t.lower() for t in prev), prev[:3])
+    page.screenshot(path=str(out / f"{vp_name}-h5-filter.png"))
+    filt("huge-2")   # matches the tail of long links: the preview starts just before the match
+    vis = page.evaluate("""() => [...document.querySelectorAll('#lx-list .lx-top')].filter(e => e.offsetWidth).map(e => {
+        const m = e.querySelector('mark'); return !!m && m.getBoundingClientRect().right <= e.getBoundingClientRect().right + 1; })""")
+    check(f"{tag} filter: a match in a link's tail is in view in its preview", vis and all(vis), vis)
+    st = filt("FANZONE")
+    check(f"{tag} filter by site name (any case)", st.startswith("1 site · ") and page.locator("#lx-list .lx-name").all_inner_texts() == ["fanzone.example"], st)
+    st = filt("zzqx")
+    check(f"{tag} filter: nothing → says so, empty list hidden", st == "No site or link contains “zzqx”." and rows() == 0 and page.locator("#lx-more").is_hidden(), st)
+    filt("")
+    check(f"{tag} incremental: clearing the filter → first 10 sites again", rows() == 10 and page.locator("#lx-status").inner_text() == "")
+
+    # 5. export carries everything, whatever is shown
+    with page.expect_download() as dl:
+        page.locator("#download").click()
+    txt = pathlib.Path(dl.value.path()).read_text()
+    got = {ln for ln in txt.splitlines() if ln.startswith("https://") and "/scan/?r=" not in ln}
+    check(f"{tag} Download .txt carries every link ({HUGE_LINKS})", got == {u for us in HUGE_SITES.values() for u in us}, len(got))
+
+    # 5b. section nav: scrolls to the section, no history entry, no #hash in the report URL
+    hl, url0 = page.evaluate("history.length"), page.url
+    page.locator(".rnav-a[data-sec=sites]").click()
+    page.wait_for_timeout(900)
+    nav = page.evaluate("""() => [history.length, location.hash, Math.round(document.getElementById('sites').getBoundingClientRect().top),
+        document.activeElement.id, document.querySelector('.rnav-a[aria-current]') && document.querySelector('.rnav-a[aria-current]').dataset.sec]""")
+    page.locator(".rnav-a[data-sec=google]").click()
+    page.wait_for_timeout(900)
+    nav2 = page.evaluate("[history.length, location.hash, Math.round(document.getElementById('google').getBoundingClientRect().top)]")
+    check(f"{tag} section nav: scrolls to Sites / Google, focus on the heading, no history entry or #hash",
+          nav[0] == hl and nav[1] == "" and 0 <= nav[2] <= 200 and nav[3] == "sites-title" and nav[4] == "sites"
+          and nav2[0] == hl and nav2[1] == "" and 0 <= nav2[2] <= 200 and page.url == url0, [hl, nav, nav2])
+
+    # 6. reopen ?r= (stored huge report) renders the same way
+    slug = parse_qs(urlsplit(page.url).query).get("r", [""])[0]
+    page.goto(base + "scan/?r=" + slug)
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    page.wait_for_function("performance.getEntriesByName('leakscan:report').length > 0", timeout=5000)
+    ms2 = page.evaluate("performance.getEntriesByName('leakscan:report')[0].duration")
+    check(f"{tag} ?r= reopen: built + painted < 1500 ms (CPU x4)", ms2 < 1500, f"{ms2:.0f} ms")
+    check(f"{tag} incremental: ?r= reopen shows the first 10 sites", rows() == 10, rows())
+    page.screenshot(path=str(out / f"{vp_name}-h1-top.png"))
+    cls = [cls0, page.evaluate(CLS)]
+    check(f"{tag} no layout shift without input over the whole flow (CLS 0: form → progress → report → scroll story; ?r= reopen)", cls[0][0] == 0 and cls[1][0] == 0, cls)
+    check(f"{tag} no 5xx", not bad, bad)
+    check(f"{tag} no request left loopback", not outside, outside)
+    check(f"{tag} no JS / console errors", not errors, errors)
+    (out / f"{vp_name}-huge-metrics.json").write_text(json.dumps({"render_ms": round(ms), "reopen_ms": round(ms2), "dom_elements": nodes,
+                                                                  "wheel_steps_to_sites": steps, "cls": [cls[0][0], cls[1][0]], "thumbs_at_load": thumbs0, "thumbs_total": len(thumbs)}))
+    ctx.close()
+    if phone:   # screens too short to pin the phone: a shorter static preview, no scroll box inside the page; More expands it
+        for w, h in ((320, 568), (390, 560)):
+            ctx = browser.new_context(viewport={"width": w, "height": h}, device_scale_factor=2, is_mobile=True, has_touch=True)
+            p2 = ctx.new_page()
+            p2.goto(base + "scan/?r=" + slug)
+            p2.wait_for_selector("#report:not([hidden])", timeout=8000)
+            p2.wait_for_timeout(300)
+            SCROLLERS = """() => [...document.querySelectorAll('#report *')].filter(e => ['auto', 'scroll'].includes(getComputedStyle(e).overflowY)
+                && e.scrollHeight > e.clientHeight + 1).map(e => e.className)"""
+            r = p2.evaluate("""() => { const f = document.querySelector('.frame-phone'); return [getComputedStyle(f).position, document.querySelectorAll('#g-panel .g-r').length,
+                !!document.querySelector('#g-panel [data-more=all]')]; }""")
+            sc = p2.evaluate(SCROLLERS)
+            fh = {}
+            for t in ("images", "videos", "all"):
+                p2.locator(f"#g-tab-{t}").click()
+                p2.wait_for_timeout(250)
+                fh[t] = p2.evaluate("document.querySelector('.frame-phone').offsetHeight")
+            check(f"{tag} short screen ({w}x{h}): every tab's static preview <= 1.5 screens tall", all(v <= 1.5 * h for v in fh.values()), [fh, 1.5 * h])
+            p2.locator("[data-more=all]").click()
+            p2.wait_for_timeout(200)
+            n2 = p2.locator("#g-panel .g-r").count()
+            sc2 = p2.evaluate(SCROLLERS)
+            check(f"{tag} short screen ({w}x{h}): frame not pinned, short preview, no inner scroll box; More results expands it",
+                  r[0] == "static" and 0 < r[1] < 10 and r[2] and not sc and not sc2 and n2 > r[1], [r, sc, n2, sc2])
+            pl = p2.evaluate("""() => { const b = document.querySelector('.ph-reveal'), r = b.getBoundingClientRect(), s = document.querySelector('.ph-screen').getBoundingClientRect();
+                const g = document.createRange(); g.selectNodeContents(b.querySelector('span'));
+                return [new Set([...g.getClientRects()].map(x => Math.round(x.top))).size, Math.round(r.left - s.left), Math.round(s.right - r.right)]; }""")
+            check(f"{tag} short screen ({w}x{h}): Reveal pill label on one line, inside the phone screen", pl[0] == 1 and min(pl[1:]) >= 8, pl)
+            # Show fewer: back to exactly the first look; focus on More, clear of the pinned header + section nav
+            fl = {}
+            for t, item in (("all", ".g-r"), ("images", ".g-tile"), ("videos", ".g-v")):
+                p2.locator(f"#g-tab-{t}").click()
+                p2.wait_for_timeout(200)
+                n0 = r[1] if t == "all" else p2.locator(f"#g-panel {item}").count()   # All: grown above
+                if t != "all":
+                    p2.locator(f"[data-more={t}]").click()
+                    p2.wait_for_timeout(200)
+                n1 = p2.locator(f"#g-panel {item}").count()
+                if p2.locator(f"[data-less={t}]").count():
+                    p2.locator(f"[data-less={t}]").click()
+                    p2.wait_for_timeout(300)
+                fl[t] = p2.evaluate("""([t, item]) => { const a = document.activeElement, r = a.getBoundingClientRect(), bar = document.querySelector('.rnav').getBoundingClientRect().bottom;
+                    return {n: document.querySelectorAll('#g-panel ' + item).length, more: a.matches('[data-more=' + t + ']'), top: Math.round(r.top), bar: Math.round(bar), inView: r.bottom <= innerHeight}; }""", [t, item])
+                fl[t].update(first=n0, grown=n1)
+            check(f"{tag} short screen ({w}x{h}): Show fewer restores each tab's first look exactly; focus on More, below the pinned bar, in view",
+                  all(v["n"] == v["first"] < v["grown"] and v["more"] and v["top"] >= v["bar"] and v["inView"] for v in fl.values()), fl)
+            ctx.close()
+        # rotation / resize: each tab not grown by More refits to the new screen; a tab grown by More keeps its items
+        ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        p4 = ctx.new_page()
+        p4.goto(base + "scan/?r=" + slug)
+        p4.wait_for_selector("#report:not([hidden])", timeout=8000)
+        p4.locator("#g-tab-videos").click()
+        p4.locator("[data-more=videos]").click()
+        nv = p4.locator("#g-panel .g-v").count()
+        p4.locator("#g-tab-all").click()
+        p4.wait_for_timeout(200)
+        RUN = "() => { const t = document.querySelector('.ph-track'); return t.offsetHeight - t.firstElementChild.offsetHeight; }"
+        rr = {"all@844": p4.evaluate(RUN)}
+        p4.set_viewport_size({"width": 360, "height": 640})
+        p4.wait_for_timeout(700)
+        rr["all"] = p4.evaluate(RUN)
+        p4.locator("#g-tab-images").click()
+        p4.wait_for_timeout(300)
+        rr["images"] = p4.evaluate(RUN)
+        p4.locator("#g-tab-videos").click()
+        p4.wait_for_timeout(300)
+        rr["videos_n"] = [nv, p4.locator("#g-panel .g-v").count()]
+        check(f"{tag} resize 390x844 → 360x640: untouched tabs refit (<= 1.5 screens), the tab grown by More keeps its items",
+              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["images"] <= 1.5 * 640 and rr["videos_n"][0] == rr["videos_n"][1] > 6, rr)
+        # a grown tab shrinks back: "Show fewer" refits it, the view lands on its More button
+        grown = p4.evaluate(RUN)
+        has_less = p4.locator("[data-less=videos]").count() == 1
+        if has_less:
+            p4.locator("[data-less=videos]").click()
+            p4.wait_for_timeout(300)
+        sf = p4.evaluate("""() => { const m = document.querySelector('#g-panel [data-more=videos]'), r = m && m.getBoundingClientRect(), t = document.querySelector('.ph-track');
+            return {run: t.offsetHeight - t.firstElementChild.offsetHeight, n: document.querySelectorAll('#g-panel .g-v').length, less: !!document.querySelector('[data-less]'),
+              focus: document.activeElement === m, seen: !!r && r.top >= document.querySelector('.rnav').getBoundingClientRect().bottom && r.bottom <= innerHeight}; }""")
+        sf["grown"], sf["has_less"] = grown, has_less
+        check(f"{tag} Show fewer: a grown tab goes back to a fitted first look (<= 1.5 screens), focus + view on its More button",
+              has_less and grown > 1.5 * 640 and sf["run"] <= 1.5 * 640 and 0 < sf["n"] < 10 and not sf["less"] and sf["focus"] and sf["seen"], sf)
+        ctx.close()
+        # keyboard: Enter on "Show more images" until all are shown; focus stays in the panel (new tile / More / Show fewer)
+        ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        p6 = ctx.new_page()
+        p6.goto(base + "scan/?r=" + slug)
+        p6.wait_for_selector("#report:not([hidden])", timeout=8000)
+        p6.locator("#g-tab-images").click()
+        p6.wait_for_timeout(300)
+        kb = []
+        for _ in range(12):
+            m = p6.locator("#g-panel [data-more=images]")
+            if not m.count():
+                break
+            m.focus()
+            p6.keyboard.press("Enter")
+            p6.wait_for_timeout(150)
+            kb.append(p6.evaluate("() => { const a = document.activeElement; return [!!a.closest('#g-panel'), a.className, document.querySelectorAll('#g-panel .g-tile').length]; }"))
+        check(f"{tag} keyboard: Enter on More until every image shows, focus never leaves the panel (ends on Show fewer / a tile)",
+              kb and all(k[0] for k in kb) and not p6.locator("#g-panel [data-more=images]").count(), kb)
+        ctx.close()
+        # landscape phone: pinned chrome (site header + section nav) <= 15% of the screen height
+        ctx = browser.new_context(viewport={"width": 844, "height": 390}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        p5 = ctx.new_page()
+        p5.goto(base + "scan/?r=" + slug)
+        p5.wait_for_selector("#report:not([hidden])", timeout=8000)
+        p5.evaluate("document.getElementById('sites').scrollIntoView({behavior: 'instant'}); window.scrollBy(0, 400)")
+        p5.wait_for_timeout(200)
+        ch = p5.evaluate("""() => { const b = e => e.getBoundingClientRect(), h = b(document.querySelector('.site-header')), n = b(document.querySelector('.rnav'));
+            return {header: Math.max(0, Math.round(h.bottom)), nav: [Math.round(n.top), Math.round(n.bottom)], chrome: Math.round(Math.max(0, h.bottom, n.bottom)), vh: innerHeight}; }""")
+        p5.screenshot(path=str(out / f"{vp_name}-h6-landscape.png"))
+        check(f"{tag} landscape 844x390: pinned chrome (header + section nav) <= 15% of the screen", ch["nav"][0] >= -1 and ch["chrome"] <= 0.15 * ch["vh"], ch)
+        ctx.close()
+        wide = {}   # narrow phones: nothing sticks out sideways (summary numbers, section nav, controls, filter)
+        for w in (320, 360):
+            ctx = browser.new_context(viewport={"width": w, "height": 700}, device_scale_factor=2, is_mobile=True, has_touch=True)
+            p3 = ctx.new_page()
+            p3.goto(base + "scan/?r=" + slug)
+            p3.wait_for_selector("#report:not([hidden])", timeout=8000)
+            p3.fill("#lx-q", "thread/1")
+            p3.wait_for_timeout(400)
+            wide[w] = p3.evaluate("document.documentElement.scrollWidth")
+            ctx.close()
+        check(f"{tag} no sideways scroll at 320 / 360 px", all(v <= w for w, v in wide.items()), wide)
 
 # ---------------------------------------------------------------- personalize
 # Checks named "profile: ..." need the scan result's `profile` (and the media it unlocks); every other check must stay
@@ -1813,6 +2198,51 @@ def tabs_flow(browser, vp_name, vp):
     sp = page.evaluate("() => [...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16])")
     check(f"{tag} thumbs: scan page Images grid: failed / blank tiles removed, the rest painted", sp and all(ok for _u, ok in sp) and not any(dead_thumb(u) for u, _ok in sp), [u[-24:] for u, ok in sp if not ok][:4])
     ctx.close()
+    if vp_name == "desktop":   # desktop Images: every thumb answers late (after the tab is up): same-size tiles, nothing moves
+        ctx = new_ctx()
+        page = ctx.new_page()
+        held, hold = [], [True]   # held until the tab is up; later requests (spare tiles) pass
+        page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] else r.continue_())
+        page.goto(base + "scan/?r=demoBrokenT1", wait_until="load")
+        page.wait_for_selector("#g-tab-images", timeout=8000)
+        page.evaluate("document.getElementById('g-stage').scrollIntoView({block: 'start', behavior: 'instant'})")
+        page.wait_for_timeout(300)
+        t0, y0 = page.evaluate("() => { document.querySelector('#g-tab-images').click(); return [performance.now(), document.getElementById('sites').getBoundingClientRect().top]; }")
+        page.wait_for_timeout(600)
+        hold[0] = False
+        while held:
+            held.pop().continue_()
+        page.wait_for_timeout(1800)
+        d1 = page.evaluate("""(t0) => [document.getElementById('sites').getBoundingClientRect().top, document.querySelectorAll('.g-grid .g-tile img').length,
+            [...document.querySelectorAll('.g-grid .g-tile img')].filter(i => i.complete && i.naturalWidth >= 16).length,
+            window.__ls.filter(x => x[0] > t0 + 200 && x[1] > 0 && !x[2]).map(x => x[3])]""", t0)
+        check(f"{tag} thumbs: desktop Images, thumbs answering late: tiles keep their size, the sections below stay put, no layout shift",
+              d1[1] > 8 and d1[2] == d1[1] and abs(d1[0] - y0) < 1 and not d1[3], [y0] + d1[:3] + [d1[3][:2]])
+        ctx.close()
+    if vp_name == "phone":   # pinned phone: a failed tile's slot goes to the next image (same size), nothing moves
+        ctx = new_ctx()
+        page = ctx.new_page()
+        held = []   # the 404 / blank thumbs answer late: after the Images tab is up (the All tab's pack would fail them first)
+        page.route(lambda u: "/api/thumb" in u and dead_thumb(unquote(u)), lambda r: held.append(r))
+        page.goto(base + "scan/?r=demoBrokenT1", wait_until="load")
+        page.wait_for_selector("#g-tab-images", timeout=8000)
+        page.wait_for_timeout(800)
+        t0, s0 = page.evaluate("""() => { document.querySelector('#g-tab-images').click();
+            return [performance.now(), [...document.querySelectorAll('.g-grid .g-tile img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1]))]; }""")
+        page.wait_for_timeout(800)
+        for r in held:
+            r.continue_()
+        page.wait_for_timeout(1500)
+        s1 = page.evaluate("""(t0) => [[...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16]),
+            window.__ls.filter(x => x[0] > t0 + 200 && x[1] > 0 && !x[2]).map(x => x[3])]""", t0)
+        check(f"{tag} thumbs: pinned phone Images: failed tiles swapped in place for the next image (same count, all painted), no layout shift",
+              any(dead_thumb(u) for u in s0) and len(A) > len(s0) and len(s1[0]) == len(s0) and all(ok for _u, ok in s1[0])
+              and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(A), len(s1[0]), s1[1][:2]])
+        page.locator("#device input[value=computer]").check(force=True)
+        page.wait_for_timeout(300)
+        back = page.evaluate("() => [...document.querySelectorAll('#g-stage img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1] || ''))")
+        check(f"{tag} thumbs: a device switch keeps failed thumbs out (Computer view lists none of them)", back and not any(dead_thumb(u) for u in back), [u[-24:] for u in back if dead_thumb(u)])
+        ctx.close()
 
     # ---------- (3) #free phone: tabs, illustration without a scan ----------
     ctx = new_ctx()
@@ -2209,6 +2639,7 @@ try:
         for vp_name, vp in VIEWPORTS:
             if "scan" in SCENARIOS:
                 scan_flow(browser, vp_name, vp)
+                huge_flow(browser, vp_name, vp)
             if "personalize" in SCENARIOS:
                 personalize_flow(browser, vp_name, vp)
             if "askai" in SCENARIOS:
@@ -2226,5 +2657,6 @@ finally:
 
 (out / "e2e-summary.json").write_text(json.dumps({"fails": fails, "omit_results": omit, "omit_profile": omit_profile,
                                                   "scenarios": SCENARIOS, "break_allowlist": BREAK_ALLOWLIST, "break_thumbs": BREAK_THUMBS,
+                                                  "break_incremental": BREAK_INCREMENTAL,
                                                   "measured": MEASURED}, indent=1))
 sys.exit(1 if fails else 0)

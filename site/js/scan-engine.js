@@ -167,7 +167,8 @@
     if (o.social) body[o.social.net] = o.social.handle;
     return streamScan(body, function (ev, data) {
       if (ev === 'progress') { if (o.onProgress) o.onProgress(data); }
-      else if (ev === 'result') { try { result = JSON.parse(data); } catch (e) { failed = 'The scan result could not be read'; } }
+      else if (ev === 'result') { if (window.performance && performance.mark) performance.mark('leakscan:result');
+        try { result = JSON.parse(data); } catch (e) { failed = 'The scan result could not be read'; } }
       else if (ev === 'failed') failed = data || 'The scan stopped';
       else if (ev === 'done') return false;
     }).then(function () {

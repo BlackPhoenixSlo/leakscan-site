@@ -35,6 +35,7 @@
 <symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
 <symbol id="i-scan-search" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol>
 <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></symbol>
 <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
 <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
 <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
@@ -77,7 +78,8 @@
         <p id="progress-stage">Starting the scan…</p>
       </div>
       <div class="bar" role="progressbar" aria-label="Scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar"><i></i></div>
-      <ol class="progress-log" id="progress-log" aria-live="polite"></ol>
+      <ol class="progress-log" id="progress-log" aria-hidden="true"></ol>
+      <p class="sr-only" id="progress-sr" aria-live="polite"></p>
       <p class="progress-note">Usually under a minute. Keep this tab open. Your handle goes only to my own scan server.</p>
     </div>
 
@@ -102,11 +104,19 @@
 </section>
 
 <div id="report" hidden>
+  <nav class="rnav" id="rnav" aria-label="Report sections">
+    <div class="container rnav-row">
+      <span class="rnav-who" id="rnav-who"></span>
+      <a class="rnav-a" href="#google" data-sec="google">Google</a>
+      <a class="rnav-a" href="#sites" data-sec="sites">Sites <span class="rnav-n" id="rnav-n"></span></a>
+      <a class="rnav-a rnav-cta" href="#send" data-sec="send">Send report</a>
+    </div>
+  </nav>
   <section class="scan-section" id="google" aria-labelledby="google-title">
     <div class="container">
       <div class="section-head">
         <h2 id="google-title">What Google shows</h2>
-        <p>What someone sees when they search your name with “leaks”. Images and videos are blurred until you reveal them.</p>
+        <p>What anyone searching your name with “leaks” sees. Images stay blurred until you reveal them.</p>
       </div>
       <div class="g-controls">
         <fieldset class="seg" id="device">
@@ -114,18 +124,33 @@
           <label><input type="radio" name="device" value="phone"><span><svg class="icon" aria-hidden="true"><use href="#i-smartphone"/></svg>Phone</span></label>
           <label><input type="radio" name="device" value="computer"><span><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg>Computer</span></label>
         </fieldset>
-        <button class="btn btn-ghost btn-sm" type="button" id="reveal" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span>Reveal images</span></button>
+        <button class="btn btn-ghost btn-sm" type="button" id="reveal" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="rv-t">Reveal</span><span class="rv-w"> images</span></button>
       </div>
       <p class="g-hint" id="g-hint"><svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg><span class="g-hint-tap">Tap All · Images · Videos to switch, tap any result to open it.</span><span class="g-hint-click">Click All · Images · Videos to switch, click any result to open it.</span><span class="g-hint-small">Shrunk to fit this screen. <button class="linkish" type="button" data-device-go="phone">Switch to Phone</button> to tap results.</span></p>
       <div id="g-stage" class="g-stage"></div>
       <p class="g-note" id="g-note">Rendered from Google's index. Not a live screenshot.</p>
-      <div class="after-card" id="after-card">
-        <p class="after-kicker">Your website</p>
-        <p class="after-title"><a id="after-link" href="../#website">See how it looks after cleanup — your name, your pages on top</a></p>
-        <p class="after-text">The Abolita homepage and the demo site now show your name, your accounts and the leak sites from this scan.</p>
-        <a class="btn btn-ghost btn-sm" id="demo-link" href="../showcase/">Open your demo site<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a>
-        <p class="after-media" id="after-media" role="status" hidden></p>
+    </div>
+  </section>
+
+  <section class="scan-section" id="sites" aria-labelledby="sites-title">
+    <div class="container">
+      <div class="links-head">
+        <div>
+          <h2 id="sites-title">Where the copies are</h2>
+          <p class="lx-sub" id="lx-sub"></p>
+        </div>
+        <p class="links-actions">
+          <button class="btn btn-ghost btn-sm" type="button" id="copy-all"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy all</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="download"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download .txt</button>
+          <span class="copy-status" id="copy-status" role="status"></span>
+        </p>
       </div>
+      <div class="lx-tools">
+        <label class="lx-search"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">Filter sites and links</span><input id="lx-q" type="search" placeholder="Filter sites or links" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-controls="lx-list" aria-describedby="lx-status"></label>
+        <p class="lx-status" id="lx-status" role="status" aria-live="polite"></p>
+      </div>
+      <ol class="lx-list" id="lx-list"></ol>
+      <p class="lx-foot"><button class="btn btn-ghost" type="button" id="lx-more" hidden></button></p>
     </div>
   </section>
 
@@ -152,34 +177,16 @@
         <p class="price-line">Then €250/month or €500 one-time, only if you continue.</p>
         <p class="deep"><a id="deep-link" href="https://jackbase.me/scan">Run a deep scan (takes minutes)<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a></p>
       </div>
-    </div>
-  </section>
-
-  <section class="scan-section" id="sites" aria-labelledby="sites-title">
-    <div class="container">
-      <h2 id="sites-title">Where the copies are</h2>
-      <div class="sites-wrap">
-        <table class="sites">
-          <thead><tr><th scope="col">Site</th><th scope="col">Links</th><th scope="col">Top link</th></tr></thead>
-          <tbody id="sites-body"></tbody>
-        </table>
+      <div class="after-card" id="after-card">
+        <p class="after-kicker">Your website</p>
+        <p class="after-title"><a id="after-link" href="../#website">See how it looks after cleanup — your name, your pages on top</a></p>
+        <p class="after-text">The Abolita homepage and the demo site now show your name, your accounts and the leak sites from this scan.</p>
+        <a class="btn btn-ghost btn-sm" id="demo-link" href="../showcase/">Open your demo site<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a>
+        <p class="after-media" id="after-media" role="status" hidden></p>
       </div>
     </div>
   </section>
 
-  <section class="scan-section" id="links" aria-labelledby="links-title">
-    <div class="container">
-      <div class="links-head">
-        <h2 id="links-title">All detected links</h2>
-        <p class="links-actions">
-          <button class="btn btn-ghost btn-sm" type="button" id="copy-all"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy all</button>
-          <button class="btn btn-ghost btn-sm" type="button" id="download"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download .txt</button>
-          <span class="copy-status" id="copy-status" role="status"></span>
-        </p>
-      </div>
-      <div id="links-list" class="links-list"></div>
-    </div>
-  </section>
 </div>
 </main>
 
