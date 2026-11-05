@@ -77,6 +77,7 @@ def check(name, ok, detail=""):
     print(("ok   " if ok else "FAIL ") + name + ("" if ok else f": {detail}"))
     if not ok:
         fails.append(name)
+    return ok
 
 
 def after_ok(pid, name, txt, imgs):
@@ -206,7 +207,7 @@ def speech(b, base, out, name, cues):
     pg = ctx.new_page()
     goto(pg, base, "", say - 0.6)
     play(pg, say + 0.6)
-    got = pg.evaluate("() => [__said, document.querySelector('.vo-for').hasAttribute('data-off'), document.querySelector('.vo-cta').hasAttribute('data-off')]")
+    got = pg.evaluate("() => [__said, document.querySelector('.vo-for').hasAttribute('data-off'), (document.querySelector('.vo-cta')?.hasAttribute('data-off') ?? 'missing')]")
     check("speech, generic (no ?name, no scan): never spoken, no pill, end card shown", got == [[], True, False], got)
     ctx.close()
     # data-cue-say past the end of the take (declared: moved to 99): the video's `ended` brings the name / the end card
@@ -218,7 +219,7 @@ def speech(b, base, out, name, cues):
         pg.evaluate("() => document.querySelector('.vo-stage').setAttribute('data-cue-say', '99')")
         play(pg, 99)
         pg.wait_for_timeout(300)
-        got = pg.evaluate("() => [__said.map(s => s[0]), document.querySelector('.vo-for').hasAttribute('data-off'), document.querySelector('.vo-cta').hasAttribute('data-off')]")
+        got = pg.evaluate("() => [__said.map(s => s[0]), document.querySelector('.vo-for').hasAttribute('data-off'), (document.querySelector('.vo-cta')?.hasAttribute('data-off') ?? 'missing')]")
         want = [[name], False, True] if query else [[], True, False]
         check(f"ended before data-cue-say ({'named' if query else 'generic'}): {'name spoken + pill' if query else 'end card'} at the end", got == want, got)
         ctx.close()
@@ -341,19 +342,20 @@ def main():
                     check(f"?name={a.name}: no jack-named.mp4 on the server → jack.mp4 / .webm plays", re.search(r"/jack\.(mp4|webm)$", src or "") is not None, src)
                 if vp == "desktop" and mode == "generic":
                     # the form: trimmed + collapsed name → ?name=; an invalid one stays
-                    pg.fill("#vo-name", "<b>")
-                    pg.press("#vo-name", "Enter")
-                    pg.wait_for_timeout(300)
-                    msg = pg.evaluate("() => document.querySelector('#vo-name').validationMessage")
-                    check("end card form: invalid name '<b>' → no navigation, a message", "name=" not in pg.url and bool(msg), (pg.url, msg))
-                    pg.fill("#vo-name", f"  {a.name}   Q ")
-                    pg.screenshot(path=str(out / "desktop-generic-end-form-typed.png"))
-                    with pg.expect_navigation():
+                    if check("end card form: #vo-name present", pg.locator("#vo-name").count() == 1):
+                        pg.fill("#vo-name", "<b>")
                         pg.press("#vo-name", "Enter")
-                    pg.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=8000)
-                    nm = pg.evaluate("() => document.querySelector('[data-vo=name]').textContent")
-                    check(f"end card form: '{a.name} Q' → ?name={urllib.parse.quote(a.name + ' Q')}, named mode, texts", pg.url.endswith(f"/video/?name={urllib.parse.quote(a.name + ' Q')}") and nm == f"{a.name} Q", (pg.url, nm))
-                    pg.screenshot(path=str(out / "desktop-generic-end-form-submitted.png"))
+                        pg.wait_for_timeout(300)
+                        msg = pg.evaluate("() => document.querySelector('#vo-name').validationMessage")
+                        check("end card form: invalid name '<b>' → no navigation, a message", "name=" not in pg.url and bool(msg), (pg.url, msg))
+                        pg.fill("#vo-name", f"  {a.name}   Q ")
+                        pg.screenshot(path=str(out / "desktop-generic-end-form-typed.png"))
+                        with pg.expect_navigation():
+                            pg.press("#vo-name", "Enter")
+                        pg.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=8000)
+                        nm = pg.evaluate("() => document.querySelector('[data-vo=name]').textContent")
+                        check(f"end card form: '{a.name} Q' → ?name={urllib.parse.quote(a.name + ' Q')}, named mode, texts", pg.url.endswith(f"/video/?name={urllib.parse.quote(a.name + ' Q')}") and nm == f"{a.name} Q", (pg.url, nm))
+                        pg.screenshot(path=str(out / "desktop-generic-end-form-submitted.png"))
                     # the snap: word cards, shake, flash
                     g = cues["google"]
                     goto(pg, base, "", round(g[0] + 0.25, 2))
