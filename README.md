@@ -35,7 +35,7 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
 - Scan stub: `python3 tools/scan_stub.py [--port 8930]` serves `site/` plus the API routes from the synthetic fixture
   `tools/fixtures/scan-sample.json` (magic handles `stub-fail`, `stub-429`, `stub-busy`, `stub-empty`, `stub-mixed` (live true / false / missing);
   echoes `instagram` / `x` as `socials`; `--omit-results`
-  for break-it runs; `--omit-profile` drops `profile`; `--media normal|relative|none|404`, or per slug
+  for break-it runs; `--omit-profile` drops `profile`; `--media normal|relative|scanhost|none|404`, or per slug
   `POST /__stub/media?slug=&mode=`; preloaded slugs `demoR3port01`, `demoNoProf01` (no profile), `evilR3port01`
   (malicious values); `/api/profile`, `/api/avatar`, `/api/media` routes). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
   E2E: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR` (starts its own stub; phone + desktop;

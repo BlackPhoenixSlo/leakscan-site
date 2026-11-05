@@ -629,7 +629,37 @@ def personalize_flow(browser, vp_name, vp):
     except Exception:
         pass
     rel = page.eval_on_selector("img.hero__bg", "e => [e.getAttribute('src'), e.naturalWidth]")
-    check(f"{tag} profile: same-origin relative media srcs accepted", rel == [f"/api/media/{FX['slug']}/0.jpg", 1067], rel)
+    check(f"{tag} profile: same-origin relative media srcs accepted, loaded via the API base", rel == [f"{API}/api/media/{FX['slug']}/0.jpg", 1067], rel)
+    ctx.close()
+    # VPS layout: site served by the API container (no data-api → API = ''), backend emits srcs on the production scan
+    # host (its PUBLIC_ORIGIN). They must pass and load from the page's own origin; the scan host is never requested.
+    # Bypass (declared): the showcase HTML's injected data-api is stripped on the wire, so the page runs with API = ''.
+    stub_media(FX["slug"], "scanhost")
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.route(re.compile(r"/showcase/(\?.*)?$"), lambda r: r.fulfill(response=(res := r.fetch()),
+               body=re.sub(r' data-api="[^"]*"', "", res.text(), count=1)))
+    n_out = len(net["outside"])
+    page.goto(base + "showcase/?r=" + FX["slug"], wait_until="load")
+    try:
+        page.wait_for_function("() => [...document.querySelectorAll('img[data-p-media]')].every(e => /\\/api\\/media\\//.test(e.getAttribute('src')))", timeout=12000)
+        page.locator("[data-p-gallery]").scroll_into_view_if_needed()
+        page.wait_for_function("() => [...document.querySelectorAll('img[data-p-media]')].every(e => e.complete && e.naturalWidth > 0)", timeout=6000)
+    except Exception:
+        pass
+    sh = page.evaluate("""() => ({api: document.body.getAttribute('data-api'), origin: location.origin,
+      hero: [document.querySelector('img.hero__bg').getAttribute('src'), document.querySelector('img.hero__bg').src, document.querySelector('img.hero__bg').naturalWidth],
+      slots: [...document.querySelectorAll('img[data-p-media]')].map(e => [e.getAttribute('src'), e.naturalWidth])})""")
+    rx = re.escape(f"/api/media/{FX['slug']}/") + r"\d+\.jpg"
+    check(f"{tag} profile: scan-host media srcs (VPS, API ''): page runs same-origin (no data-api)", sh["api"] is None, sh["api"])
+    check(f"{tag} profile: scan-host media srcs: all 6 slots swapped, loaded", len(sh["slots"]) == 6
+          and all(re.fullmatch(rx, s[0]) and s[1] > 0 for s in sh["slots"]), sh["slots"])
+    check(f"{tag} profile: scan-host media srcs: hero = <API>/api/media/<slug>/<n>.jpg on the local stub",
+          re.fullmatch(rx, sh["hero"][0]) is not None and sh["hero"][1] == sh["origin"] + sh["hero"][0] and sh["hero"][2] == 1067, sh["hero"])
+    scan_reqs = [u for u in net["outside"][n_out:] if urlsplit(u).hostname == "scan.srv1395798.hstgr.cloud"]
+    check(f"{tag} profile: scan-host media srcs: 0 requests to the scan host", not scan_reqs, scan_reqs)
+    page.wait_for_timeout(700)
+    page.screenshot(path=str(out / f"{vp_name}-p5b-demo-media-scanhost.png"))
     ctx.close()
     stub_media(FX["slug"])
 

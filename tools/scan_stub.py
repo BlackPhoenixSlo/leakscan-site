@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Local stand-in for Jaka's scan API + a static server for site/. Stdlib only; for tests and previews.
 
-    python3 tools/scan_stub.py [--port 8930] [--omit-results] [--omit-profile] [--media normal|none|404] [--delay 0.15]
+    python3 tools/scan_stub.py [--port 8930] [--omit-results] [--omit-profile] [--media normal|relative|scanhost|none|404] [--delay 0.15]
     → open http://127.0.0.1:8930/  (or http://127.0.0.1:8930/scan/?r=demoR3port01, /?r=demoR3port01, /showcase/?r=demoR3port01)
 
 Serves site/ and the API routes of the contract the scan page talks to:
@@ -18,10 +18,11 @@ Serves site/ and the API routes of the contract the scan page talks to:
   socials read off leak pages; stub-mixed / stub-empty carry none.
 - GET /api/profile/<slug> → {slug, profile}; GET /api/avatar/<slug> → a generated PNG when profile.avatar is true, else 404.
 - GET /api/media/<slug> (demo photos, arrive after the scan) → polls 1-2: {status:"pending", images:[2]}, then
-  {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (the portrait
+  {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (mode relative: /api/media/…;
+  scanhost: https://scan.srv1395798.hstgr.cloud/api/media/…, the VPS layout; the page must load it from its own API) (the portrait
   showcase people photos in site/showcase/imgs, served as webp; the e2e checks the swap by src). evilR3port01
   also lists off-origin / javascript: srcs (must be dropped). --media none → {status:"none", images:[]}; --media 404 → 404.
-  POST /__stub/media?slug=<slug>[&mode=normal|relative|none|404] resets that slug's poll counter (and mode) for a test.
+  POST /__stub/media?slug=<slug>[&mode=normal|relative|scanhost|none|404] resets that slug's poll counter (and mode) for a test.
 - GET /api/thumb?u=<https url> → one of those photos (picked by a hash of u, webp), never fetches u.
 - POST /api/chat  {kb: "landing", messages: [{role, content}], slug?} → SSE: `token` events (data = JSON-encoded text
   chunk) streaming CHAT_ANSWER (markdown with an anchor, allowed + forbidden links, bold, bullets), then `done`. A last
@@ -47,6 +48,7 @@ PLATFORMS = {"onlyfans.com", "instagram.com", "fansly.com", "tiktok.com", "patre
 STORE = {}
 OPTS = argparse.Namespace(omit_results=False, omit_profile=False, delay=0.15, media="normal")
 MEDIA_POLLS, MEDIA_MODE = {}, {}
+SCAN_HOST = "https://scan.srv1395798.hstgr.cloud"   # only ever a string in JSON; the stub never contacts it
 CHAT_LOG = []
 CHAT_ANSWER = (
     "Short answer: it's **€250/month** or **€500 one-time**, and the scan plus one removal come first, free. "
@@ -113,7 +115,9 @@ def media_answer(slug, origin):
         return {"slug": slug, "status": "none", "images": []}
     n = MEDIA_POLLS[slug] = MEDIA_POLLS.get(slug, 0) + 1
     count, status = (2, "pending") if n <= 2 else (6, "ready")
-    pre = "" if mode == "relative" else origin   # relative = same-origin "/api/media/..." srcs (site served by the API host)
+    # relative = same-origin "/api/media/..." srcs (site served by the API host); scanhost = srcs on the production scan
+    # host, as its backend emits them (PUBLIC_ORIGIN) while the VPS serves the site on another name: never fetched as is
+    pre = {"relative": "", "scanhost": SCAN_HOST}.get(mode, origin)
     imgs = [{"src": f"{pre}/api/media/{slug}/{i}.jpg", "w": 300, "h": 400, "source": "google"} for i in range(count)]
     if slug == EVIL["slug"]:
         imgs = [{"src": "javascript:alert(1)"}, {"src": "https://evil.example/api/media/x/1.jpg"},
@@ -308,7 +312,7 @@ def main():
     ap.add_argument("--port", type=int, default=8930)
     ap.add_argument("--omit-results", action="store_true")
     ap.add_argument("--omit-profile", action="store_true")
-    ap.add_argument("--media", choices=("normal", "relative", "none", "404"), default="normal")
+    ap.add_argument("--media", choices=("normal", "relative", "scanhost", "none", "404"), default="normal")
     ap.add_argument("--delay", type=float, default=0.15)
     ap.parse_args(namespace=OPTS)
     no_ig = {**FIXTURE["aliases"], "socials": [x for x in FIXTURE["aliases"]["socials"] if x["platform"] != "instagram"]}

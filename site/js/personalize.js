@@ -5,7 +5,8 @@
 // Every API value is validated in clean(); rendering uses textContent / createElement only, never innerHTML.
 (function () {
   'use strict';
-  var API = ((document.body && document.body.getAttribute('data-api')) || (location.hostname.slice(-9) === 'github.io' ? 'https://scan.srv1395798.hstgr.cloud' : '')).replace(/\/+$/, ''); // '' = same origin (VPS)
+  var SCAN_API = 'https://scan.srv1395798.hstgr.cloud'; // the scan server's public origin (also serves this site on the VPS)
+  var API = ((document.body && document.body.getAttribute('data-api')) || (location.hostname.slice(-9) === 'github.io' ? SCAN_API : '')).replace(/\/+$/, ''); // '' = same origin (VPS)
   var LAST = 'leakscan.last', CACHE = 'leakscan.r.', MEDIA = 'leakscan.media.';
   var SLUG_RE = /^[A-Za-z0-9_-]{4,64}$/, HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/, DOMAIN_RE = /^[a-z0-9.-]+$/;
   var GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
@@ -160,13 +161,16 @@
   // ---------- demo photos: they arrive after the scan, so poll ----------
   // GET <API>/api/media/<slug> every 3s for up to 90s; stop on "ready" / "none" / a second 404 (or network error).
   // cb(images, phase) on every answer; phase = 'pending' | 'ready' | 'none' | 'stopped'. Only API-hosted media srcs pass:
-  // absolute on the API origin, or same-origin relative "/api/media/...".
-  var MEDIA_RE = new RegExp('^(?:' + (API || location.origin).replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&') +
-    ')?\\/api\\/media\\/[A-Za-z0-9_-]{4,64}\\/[A-Za-z0-9_-]{1,40}\\.(jpe?g|png|webp)$');
+  // "/api/media/<slug>/<file>", relative or absolute on the API origin, this page's origin or SCAN_API (the backend
+  // emits its public origin, which differs from the page host on the VPS). The emitted origin is dropped: photos always
+  // load from API + path.
+  var MEDIA_RE = new RegExp('^(?:' + [API, location.origin, SCAN_API].filter(Boolean).map(function (o) {
+    return o.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&');
+  }).join('|') + ')?(\\/api\\/media\\/[A-Za-z0-9_-]{4,64}\\/[A-Za-z0-9_-]{1,40}\\.(?:jpe?g|png|webp))$');
   function cleanMedia(j) {
     return (j && Array.isArray(j.images) ? j.images : []).slice(0, 12).filter(function (it) {
       return it && typeof it.src === 'string' && it.src.length <= 300 && MEDIA_RE.test(it.src);
-    }).map(function (it) { return { src: it.src }; });
+    }).map(function (it) { return { src: API + MEDIA_RE.exec(it.src)[1] }; });
   }
   function pollMedia(slug, cb) {
     if (!SLUG_RE.test(slug || '') || !window.fetch) return;
