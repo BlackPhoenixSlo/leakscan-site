@@ -25,6 +25,8 @@ Checks every HTML file under site/ (except site/showcase/**):
   demo, so its loads are the landing site's too); privacy.html names no host the demo no longer loads
 - every outside host named in site/js/*.js (scan API, deep-scan link, chat links) is named in privacy.html, so moving
   the scan server can't leave the policy pointing at the old one
+- privacy.html names the VPS host the site is also served from (SITE_HOST in deploy/.env.example), so the
+  abolita.com cut-over can't leave the policy naming only the old host
 """
 import json, pathlib, re, sys
 from html.parser import HTMLParser
@@ -322,6 +324,13 @@ def main():
         for host in sorted(set(re.findall(r"https?://([A-Za-z0-9.-]+)", js.read_text(encoding="utf-8"))) - {site_host}):
             if host not in privacy:
                 bad(f"js/{js.name} talks to {host} but privacy.html does not name it")
+
+    env = (ROOT / "deploy" / ".env.example").read_text(encoding="utf-8")
+    vps = re.search(r"^SITE_HOST=(\S+)", env, re.M)
+    if not vps:
+        bad("deploy/.env.example has no SITE_HOST= line: can't check privacy.html names the VPS host")
+    elif vps[1] not in privacy:
+        bad(f"site is served from {vps[1]} but privacy.html does not name it")
 
     for p in problems:
         print(p)

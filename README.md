@@ -167,6 +167,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 3. Rewrite absolute URLs (canonicals, OG, JSON-LD, sitemap, robots, 404):
    `grep -rl 'https://blackphoenixslo.github.io/leakscan-site/' site tools | xargs sed -i '' 's#https://blackphoenixslo.github.io/leakscan-site/#https://leakscan.example/#g'`
 4. `python3 tools/check.py` must stay silent. Internal links are relative, so nothing else changes.
+5. VPS host change (`SITE_HOST` in `deploy/.env.example`, e.g. abolita.com): name the new host in `site/privacy.html`
+   (hosting item); `tools/check.py` fails until it does.
 
 Note: noindex pages (`showcase/**`, `scan/`, `404.html`) are kept out of search by their own
 `<meta name="robots" content="noindex…">`, never by `robots.txt`: a Disallow stops crawlers from reading the noindex, so
