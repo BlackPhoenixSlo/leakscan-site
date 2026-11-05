@@ -311,7 +311,7 @@
       h = '<div class="ph-track"><div class="frame-phone" data-device="phone"><div class="ph-screen g-dark g-' + state.tab + '">' +
         '<div class="ph-status" aria-hidden="true"><span>9:41</span><span class="ph-icons"><i class="ph-sig"></i><i class="ph-wifi"></i><i class="ph-bat"></i></span></div>' +
         '<div class="ph-scroll"><div class="ph-page"><div class="gm-head" aria-hidden="true"><span class="gm-burger"><i></i><i></i><i></i></span>' + gLogo() + '<span class="g-av"></span></div>' +
-        search + tabRow() + body + '</div></div><span class="ph-fade" aria-hidden="true"></span><div class="ph-home" aria-hidden="true"></div></div></div></div>';
+        search + tabRow() + body + '</div></div><span class="ph-fade" aria-hidden="true"></span>' + revealPill() + '<div class="ph-home" aria-hidden="true"></div></div></div></div>';
     } else {
       var path = 'google.com/search?q=' + encodeURIComponent(d.handle).replace(/%20/g, '+') + '+leaks' +
         (state.tab === 'images' ? '&udm=2' : state.tab === 'videos' ? '&tbm=vid' : '');
@@ -433,11 +433,24 @@
     r.checked = r.value === state.device;
     r.addEventListener('change', function () { if (r.checked) { state.device = r.value; state.more = { all: 10, images: 12 }; renderGoogle(false); } });
   });
+  // Reveal / Blur: the button above the frame + the same switch on the pinned phone (the one above scrolls away)
+  function revealPill() {
+    return '<button type="button" class="ph-reveal" data-reveal aria-pressed="' + state.revealed + '"><svg class="icon" aria-hidden="true"><use href="#' +
+      (state.revealed ? 'i-eye-off' : 'i-eye') + '"/></svg><span>' + (state.revealed ? 'Blur images' : 'Reveal images') + '</span></button>';
+  }
+  $('g-stage').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-reveal]');
+    if (!b) return;
+    $('reveal').click();
+    var nb = $('g-stage').querySelector('[data-reveal]');
+    if (nb) nb.focus({ preventScroll: true });
+  });
   $('reveal').addEventListener('click', function () {
     state.revealed = !state.revealed;
-    var b = $('reveal');
+    var b = $('reveal'), p = $('g-stage').querySelector('[data-reveal]');
     b.setAttribute('aria-pressed', String(state.revealed));
-    b.querySelector('span').textContent = state.revealed ? 'Blur images' : 'Reveal images';
+    b.querySelector('.rv-t').textContent = state.revealed ? 'Blur' : 'Reveal';
+    if (p) p.outerHTML = revealPill();
     $('g-stage').classList.toggle('revealed', state.revealed);
   });
 
@@ -445,7 +458,7 @@
   // 1000 links on 100 sites must not mean 1000 rows on load: SITES_STEP sites first (then MORE_SITES per click), a
   // site's links only once it is opened (LINKS_STEP, then MORE_LINKS per click), one filter over domains + URLs.
   // Copy / .txt always carry everything. Built with elements + textContent only.
-  var SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50, AUTO_OPEN = 3;
+  var SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50, AUTO_OPEN = 1;
   var lx = { groups: [], view: [], q: '', shown: 0, timer: 0 };
   function groups(d) {
     var by = {}, order = [];
@@ -489,7 +502,10 @@
     $('lx-q').value = '';
     var n = lx.groups.length, links = lx.groups.reduce(function (t, g) { return t + g.links.length; }, 0);
     lx.max = lx.groups.length ? lx.groups[0].links.length : 1;
-    $('lx-sub').textContent = num(n) + ' ' + plural(n, 'site', 'sites') + ' · ' + num(links) + ' ' + plural(links, 'link', 'links') + (n > 1 ? ' · most copies first' : '');
+    var seen = {}, found = 0;   // the summary counts the scan's pages; the list also holds Google results that are not among them
+    state.data.hits.forEach(function (h) { if (!seen[h.url]) { seen[h.url] = 1; found++; } });
+    $('lx-sub').textContent = num(n) + ' ' + plural(n, 'site', 'sites') + ' · ' + num(links) + ' ' + plural(links, 'link', 'links') +
+      (found && links > found ? ' (' + num(found) + ' indexed pages + ' + num(links - found) + ' more Google results)' : '') + (n > 1 ? ' · most copies first' : '');
     $('lx-q').closest('.lx-tools').hidden = links < 8;   // nothing to filter on a short report
     filterSites();
   }
@@ -528,7 +544,7 @@
     var bar = el('span', 'lx-bar');
     bar.setAttribute('aria-hidden', 'true');
     bar.appendChild(el('i')).style.width = Math.max(2, Math.round(100 * g.links.length / lx.max)) + '%';
-    sum.append(name, cnt, el('span', 'lx-top mono', shortUrl(g.top, g.domain)), bar);
+    sum.append(name, cnt, marked(el('span', 'lx-top mono'), shortUrl(it.links[0], g.domain), it.inside ? q : ''), bar);
     det.appendChild(sum);
     det.addEventListener('toggle', function () {
       if (det.open && !det.querySelector('.lx-links')) { var ul = el('ul', 'lx-links'); det.appendChild(ul); showLinks(det, it, LINKS_STEP); }
@@ -552,7 +568,12 @@
     if (!mb) {
       mb = el('button', 'lx-lmore');
       mb.type = 'button';
-      mb.addEventListener('click', function () { showLinks(det, it, MORE_LINKS); });
+      mb.addEventListener('click', function () {   // keyboard: carry on at the first new link (the button may be gone now)
+        var had = document.activeElement === mb, first = det.querySelector('.lx-links').children.length;
+        showLinks(det, it, MORE_LINKS);
+        var nx = det.querySelector('.lx-links').children[first];
+        if (had && nx) nx.firstChild.focus({ preventScroll: true });
+      });
       det.appendChild(mb);
     }
     mb.textContent = 'Show ' + Math.min(MORE_LINKS, left) + ' more of ' + num(it.links.length) + ' on ' + it.g.domain;

@@ -60,6 +60,15 @@
 .seg input:checked + span { background: var(--accent); color: var(--on-accent); }
 .seg input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
 #reveal[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 479px) {   /* phone: the controls on one row, so the phone frame starts on the first screen */
+  #google { padding-top: 24px; }
+  #google .section-head { margin-bottom: 16px; }
+  #google .section-head p { font-size: 1rem; }
+  .g-controls { gap: 8px; margin-bottom: 12px; flex-wrap: nowrap; }
+  .seg span { padding: 0 12px; gap: 6px; }
+  .g-controls .btn { padding-inline: 14px; }
+  .rv-w { display: none; }
+}
 .g-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 14px; color: var(--muted); font-size: .92rem; }
 @media (max-width: 559px) { .g-hint { justify-content: flex-start; align-items: flex-start; font-size: .88rem; line-height: 1.4; } .g-hint .icon { margin-top: 2px; } }
 .g-hint .icon { width: 16px; height: 16px; flex: none; color: var(--accent); }
@@ -252,9 +261,17 @@
   height: clamp(420px, calc(100vh - var(--pin-top) - 44px), 760px); height: clamp(420px, calc(100svh - var(--pin-top) - 44px), 760px); }
 .ph-track .ph-status { flex: none; }
 .ph-scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.ph-page { padding-bottom: 52px; }   /* the end of the page clears the Reveal pill */
 .ph-scroll .g-tabs { position: sticky; top: 0; z-index: 3; background: var(--g-bg); }
 .ph-fade { position: absolute; left: 0; right: 0; bottom: 26px; height: 64px; background: linear-gradient(rgb(0 0 0 / 0), var(--g-bg)); pointer-events: none; transition: opacity .2s; }
 .ph-end .ph-fade { opacity: 0; }
+/* Reveal / Blur on the phone itself: the button above the frame scrolls away while the frame is pinned */
+.ph-reveal { position: absolute; right: 14px; bottom: 36px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
+  border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 600 13px/1 var(--sans); box-shadow: 0 4px 14px rgb(0 0 0 / .45); cursor: pointer; }
+.ph-reveal .icon { width: 16px; height: 16px; }
+.ph-reveal[aria-pressed="true"] { background: #e8eaed; color: #202124; }
+.ph-reveal:focus-visible { outline: 3px solid #8ab4f8; outline-offset: 2px; }
+@media (hover: hover) { .ph-reveal:hover { filter: brightness(1.08); } }
 /* screens too short to pin a usable phone: the screen scrolls by itself */
 @media (max-height: 599px) {
   .ph-track .frame-phone { position: static; }
@@ -291,7 +308,7 @@ details[open] > .lx-sum .lx-n::after { margin-top: 3px; transform: rotate(-135de
 .lx-top { display: none; }
 .lx-links { list-style: none; margin: 0; padding: 0 16px 6px 38px; }
 .lx-links li + li { border-top: 1px dashed var(--line); }
-.lx-a { display: block; padding: 11px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; color: var(--ink); text-decoration: none; }
+.lx-a { display: block; padding: 10px 0; overflow-wrap: anywhere; color: var(--ink); text-decoration: none; }   /* whole path, wrapped: the tail is what tells links apart */
 .lx-a::after { content: " ↗"; color: var(--muted); }
 @media (hover: hover) { .lx-a:hover { color: var(--accent); text-decoration: underline; } }
 .lx-a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }

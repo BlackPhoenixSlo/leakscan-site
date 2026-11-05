@@ -3,6 +3,7 @@
 
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-remove]
+        [--break-incremental]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs three scenarios.
@@ -10,7 +11,10 @@ for phone (390x844) and desktop (1440x900) runs three scenarios.
 scan: home → fill the hero form → submit → scan/?p=&h= → progress → report. Asserts summary numbers
 equal the fixture, tab item counts (All 10 → all pages after "More results", Images ≤ 30, Videos), device toggle swaps
 frames, Reveal unblurs, CTA hrefs carry the report link + handle, every hit URL is listed, `?r=<slug>` reopens without
-a new scan, and the stub `failed` / 429 / busy / empty / not-found paths show their UI. Every non-loopback request is
+a new scan, and the stub `failed` / 429 / busy / empty / not-found paths show their UI. Then `stub-huge` (1000 links on
+100 sites, CPU x4): render time, DOM budget, sites / links shown in steps, filter, export, the pinned phone scrolling
+into the sites, CLS 0, no 5xx / console errors; --break-incremental (scan.js with every step 1e9) turns only the
+`incremental:` checks red. Every non-loopback request is
 aborted and must not happen at all. Screenshots of each state go to OUT_DIR. One PASS/FAIL line per check; exit 1 on
 any FAIL.
 
@@ -427,7 +431,7 @@ def huge_flow(browser, vp_name, vp):
     check(f"{tag} incremental: page DOM <= {NODE_BUDGET} elements after render", nodes <= NODE_BUDGET, nodes)
     check(f"{tag} summary + section nav say 100 sites / 1,000 pages", (digits(page.locator("[data-stat=domains]").inner_text()),
           digits(page.locator("[data-stat=pages]").inner_text()), page.locator("#rnav-n").inner_text()) == (100, 1000, "100"))
-    check(f"{tag} heading line: every site + link counted", page.locator("#lx-sub").inner_text() == f"100 sites · {HUGE_LINKS:,} links · most copies first",
+    check(f"{tag} heading line: every site + link counted", page.locator("#lx-sub").inner_text() == f"100 sites · {HUGE_LINKS:,} links (1,000 indexed pages + {HUGE_LINKS - 1000} more Google results) · most copies first",
           page.locator("#lx-sub").inner_text())
     rows = lambda: page.locator("#lx-list .lx-site").count()
     check(f"{tag} incremental: 10 sites, no link rows until a site is opened, 'Show 25 more sites · 90 left'",
@@ -449,6 +453,21 @@ def huge_flow(browser, vp_name, vp):
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
         check(f"{tag} pin: mid-scroll the frame stays put and its screen scrolls 1:1", abs(st[0] - g["pin"]) <= 1 and abs(st[1] - 400) <= 2, st)
         page.screenshot(path=str(out / f"{vp_name}-h2-pinned.png"))
+        pill = page.locator(".ph-reveal")
+        blur = lambda: page.eval_on_selector(".ph-scroll .g-img img", "e => getComputedStyle(e).filter")
+        b0 = blur()
+        pill.click()
+        page.wait_for_timeout(350)
+        b1 = [blur(), page.locator("#reveal").get_attribute("aria-pressed"), page.locator(".ph-reveal").get_attribute("aria-pressed"), page.locator(".ph-reveal").inner_text()]
+        page.locator(".ph-reveal").click()
+        page.wait_for_timeout(350)
+        check(f"{tag} pin: Reveal / Blur on the pinned phone = the button above (state shared)", "blur" in b0 and b1 == ["none", "true", "true", "Blur images"]
+              and "blur" in blur() and page.locator("#reveal").get_attribute("aria-pressed") == "false", [b0, b1])
+        page.locator("#g-tab-images").click()
+        page.wait_for_timeout(250)
+        st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop, document.querySelectorAll('#g-panel .g-tile').length]")
+        check(f"{tag} pin: a tab switched mid-scroll opens at its top, frame stays put", abs(st[0] - g["pin"]) <= 1 and st[1] == 0 and st[2] > 0, st)
+        page.locator("#g-tab-all").click()
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
         page.wait_for_timeout(150)
     page.mouse.move(vp["width"] / 2, vp["height"] / 2)
@@ -468,9 +487,25 @@ def huge_flow(browser, vp_name, vp):
     cls0 = page.evaluate(CLS)   # report built + the whole scroll story, no clicks yet
 
     # 3. show more sites, open a site, its links in steps, close = gone
-    if page.locator("#lx-more").is_visible():
-        page.locator("#lx-more").click()
-    check(f"{tag} incremental: Show more adds 25 sites", rows() == 35 and page.locator("#lx-more").inner_text() == "Show 25 more sites · 65 left", rows())
+    page.locator("#lx-more").focus()
+    page.keyboard.press("Enter")
+    nx = page.evaluate("() => { const a = document.activeElement, rows = [...document.querySelectorAll('#lx-list .lx-site')]; return [a.tagName, rows.indexOf(a.closest('.lx-site'))]; }")
+    check(f"{tag} incremental: keyboard Show more sites → focus on the first new site", nx == ["SUMMARY", 10], nx)
+    page.keyboard.press("Enter")   # open that site from the keyboard
+    page.wait_for_timeout(100)
+    lm = page.locator("#lx-list .lx-site").nth(10).locator(".lx-lmore")
+    if lm.count():
+        lm.focus()
+        page.keyboard.press("Enter")
+        nx = page.evaluate("() => { const a = document.activeElement, l = a.closest('.lx-links'); return [a.tagName, l ? [...l.children].indexOf(a.parentNode) : -1]; }")
+    else:
+        nx = None
+    check(f"{tag} incremental: keyboard Show more links → focus on the first new link", nx == ["A", 10], nx)
+    page.locator("#lx-list .lx-site").nth(10).locator("summary").click()
+    page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+    page.wait_for_timeout(100)
+    page.locator("#lx-more").click()
+    check(f"{tag} incremental: each Show more adds 25 sites", rows() == 60 and page.locator("#lx-more").inner_text() == "Show 25 more sites · 40 left", rows())
     top = page.locator("#lx-list .lx-site").first
     top.locator("summary").click()
     n_top = len(HUGE_SITES[HUGE_TOP])
@@ -503,8 +538,10 @@ def huge_flow(browser, vp_name, vp):
     shown = page.locator("#lx-list a").evaluate_all("els => els.map(e => e.href)")
     check(f"{tag} filter: only matching links shown, highlighted", shown and all(q in u.lower() for u in shown)
           and page.locator("#lx-list a mark").count() == len(shown), len(shown))
-    check(f"{tag} incremental: filter shows 10 sites + Show more, opens the first 3", rows() == min(10, len(want))
-          and page.locator("#lx-list details[open]").count() == min(3, len(want)), [rows(), page.locator("#lx-list details[open]").count()])
+    check(f"{tag} incremental: filter shows 10 sites + Show more, opens only the first", rows() == min(10, len(want))
+          and page.locator("#lx-list details[open]").count() == 1, [rows(), page.locator("#lx-list details[open]").count()])
+    prev = page.locator("#lx-list .lx-top").evaluate_all("els => els.map(e => e.textContent)")
+    check(f"{tag} filter: each site's preview is its first matching link", prev and all(q in t.lower() for t in prev), prev[:3])
     page.screenshot(path=str(out / f"{vp_name}-h5-filter.png"))
     st = filt("FANZONE")
     check(f"{tag} filter by site name (any case)", st.startswith("1 site · ") and page.locator("#lx-list .lx-name").all_inner_texts() == ["fanzone.example"], st)
@@ -537,6 +574,18 @@ def huge_flow(browser, vp_name, vp):
     (out / f"{vp_name}-huge-metrics.json").write_text(json.dumps({"render_ms": round(ms), "reopen_ms": round(ms2), "dom_elements": nodes,
                                                                   "wheel_steps_to_sites": steps, "cls": [cls[0][0], cls[1][0]], "thumbs_at_load": len(thumbs)}))
     ctx.close()
+    if phone:   # a screen too short to pin the phone (landscape): the frame scrolls with the page, its screen by itself
+        ctx = browser.new_context(viewport={"width": 390, "height": 560}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        p2 = ctx.new_page()
+        p2.goto(base + "scan/?r=" + slug)
+        p2.wait_for_selector("#report:not([hidden])", timeout=8000)
+        p2.wait_for_timeout(300)
+        r = p2.evaluate("""() => { const t = document.querySelector('.ph-track'), f = t.firstElementChild, s = t.querySelector('.ph-scroll');
+            const y = scrollY; s.scrollTop = 300; return [getComputedStyle(f).position, getComputedStyle(s).overflowY, t.style.height, f.getBoundingClientRect().height <= innerHeight, s.scrollTop, scrollY - y]; }""")
+        p2.wait_for_timeout(200)
+        check(f"{tag} short screen (390x560): frame not pinned, fits, its screen scrolls by itself", r[:4] == ["static", "auto", "", True] and r[4] == 300 and r[5] == 0
+              and p2.evaluate("scrollY") == 0, r)
+        ctx.close()
 
 # ---------------------------------------------------------------- personalize
 # Checks named "profile: ..." need the scan result's `profile` (and the media it unlocks); every other check must stay

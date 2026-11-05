@@ -35,6 +35,7 @@
 <symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
 <symbol id="i-scan-search" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol>
 <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></symbol>
 <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
 <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
 <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
@@ -114,7 +115,7 @@
     <div class="container">
       <div class="section-head">
         <h2 id="google-title">What Google shows</h2>
-        <p>What someone sees when they search your name with “leaks”. Images and videos are blurred until you reveal them.</p>
+        <p>What anyone searching your name with “leaks” sees. Images stay blurred until you reveal them.</p>
       </div>
       <div class="g-controls">
         <fieldset class="seg" id="device">
@@ -122,7 +123,7 @@
           <label><input type="radio" name="device" value="phone"><span><svg class="icon" aria-hidden="true"><use href="#i-smartphone"/></svg>Phone</span></label>
           <label><input type="radio" name="device" value="computer"><span><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg>Computer</span></label>
         </fieldset>
-        <button class="btn btn-ghost btn-sm" type="button" id="reveal" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span>Reveal images</span></button>
+        <button class="btn btn-ghost btn-sm" type="button" id="reveal" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="rv-t">Reveal</span><span class="rv-w"> images</span></button>
       </div>
       <p class="g-hint" id="g-hint"><svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg><span class="g-hint-tap">Tap All · Images · Videos to switch, tap any result to open it.</span><span class="g-hint-click">Click All · Images · Videos to switch, click any result to open it.</span><span class="g-hint-small">Shrunk to fit this screen. <button class="linkish" type="button" data-device-go="phone">Switch to Phone</button> to tap results.</span></p>
       <div id="g-stage" class="g-stage"></div>
