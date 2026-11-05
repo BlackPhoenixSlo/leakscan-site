@@ -310,7 +310,8 @@ def scan_flow(browser, vp_name, vp):
         while page.locator("[data-more=videos]").count():
             page.locator("[data-more=videos]").click()
         nv = page.locator("#g-panel .g-v").count()
-        check(f"{vp_name}/{device} Videos tab count (every video at once)", nv0 == nv == len(VIDEOS), f"{nv0}→{nv} want {len(VIDEOS)}")
+        check(f"{vp_name}/{device} Videos tab count (first look {4 if device == 'phone' else 8}, More reaches every video)",
+              nv0 == min(4 if device == "phone" else 8, len(VIDEOS)) and nv == len(VIDEOS), f"{nv0}→{nv} want {len(VIDEOS)}")
         page.wait_for_timeout(300)
         g.screenshot(path=str(out / f"{vp_name}-5-{device}-videos.png"))
 
@@ -493,7 +494,8 @@ def huge_flow(browser, vp_name, vp):
         check(f"{tag} pin: All first look <= 1.5 screens, rest behind More", runs["all"]["run"] <= 1.5 * g["vh"] and runs["all"]["more"], [runs["all"], g["vh"]])
         check(f"{tag} pin: Images = all {min(HUGE_IMAGES, 60)} of {HUGE_IMAGES} images as 3-column tiles inside the screen's own scroll, More only past 60",
               ri["n"] == min(HUGE_IMAGES, 60) and ri["cols"] == 3 and ri["inner"] and ri["reach"] and ri["more"] == (HUGE_IMAGES > 60) and ri["run"] > 2 * g["vh"], [ri, g["vh"]])
-        check(f"{tag} pin: Videos = all {HUGE_VIDEOS} inside the screen's own scroll, no More", rv["n"] == min(HUGE_VIDEOS, 60) and rv["inner"] and rv["reach"] and not rv["more"], rv)
+        check(f"{tag} pin: Videos first look = 4 of {HUGE_VIDEOS} inside the screen's own scroll (<= 1.5 screens of scrolling, like All), rest behind More",
+              rv["n"] == min(HUGE_VIDEOS, 4) and rv["inner"] and rv["reach"] and rv["more"] == (HUGE_VIDEOS > 4) and rv["run"] <= 1.5 * g["vh"], [rv, g["vh"]])
         page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
         page.wait_for_timeout(250)
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
@@ -722,8 +724,8 @@ def huge_flow(browser, vp_name, vp):
                 p2.locator(f"#g-tab-{t}").click()
                 p2.wait_for_timeout(250)
                 fh[t] = [p2.evaluate("document.querySelector('.frame-phone').offsetHeight"), p2.locator(f"#g-panel {item}").count()]
-            check(f"{tag} short screen ({w}x{h}): All's static preview <= 1.5 screens tall; Images / Videos show everything up to 60",
-                  fh["all"][0] <= 1.5 * h and fh["images"][1] == min(HUGE_IMAGES, 60) and fh["videos"][1] == min(HUGE_VIDEOS, 60), [fh, 1.5 * h])
+            check(f"{tag} short screen ({w}x{h}): All's static preview <= 1.5 screens tall; Images shows everything up to 60, Videos its first 4",
+                  fh["all"][0] <= 1.5 * h and fh["images"][1] == min(HUGE_IMAGES, 60) and fh["videos"][1] == min(HUGE_VIDEOS, 4), [fh, 1.5 * h])
             p2.locator("[data-more=all]").click()
             p2.wait_for_timeout(200)
             n2 = p2.locator("#g-panel .g-r").count()
@@ -736,11 +738,11 @@ def huge_flow(browser, vp_name, vp):
             check(f"{tag} short screen ({w}x{h}): Reveal pill label on one line, inside the phone screen", pl[0] == 1 and min(pl[1:]) >= 8, pl)
             # Show fewer: back to exactly the first look; focus on More, clear of the pinned header + section nav
             fl = {}
-            for t, item in (("all", ".g-r"), ("images", ".g-tile")):   # (Videos: all 10 shown, no More)
+            for t, item in (("all", ".g-r"), ("images", ".g-tile"), ("videos", ".g-v")):
                 p2.locator(f"#g-tab-{t}").click()
                 p2.wait_for_timeout(200)
                 n0 = r[1] if t == "all" else p2.locator(f"#g-panel {item}").count()   # All: grown above
-                if t != "all":
+                if t != "all" and p2.locator(f"[data-more={t}]").count():
                     p2.locator(f"[data-more={t}]").click()
                     p2.wait_for_timeout(200)
                 n1 = p2.locator(f"#g-panel {item}").count()
@@ -775,8 +777,8 @@ def huge_flow(browser, vp_name, vp):
         p4.locator("#g-tab-images").click()
         p4.wait_for_timeout(300)
         rr["images_n"] = [ni, p4.locator("#g-panel .g-tile").count()]
-        check(f"{tag} resize 390x844 → 360x640: All refits (<= 1.5 screens), frame >= 78%, Videos all, Images grown by More keeps its {HUGE_IMAGES}",
-              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["frame_pct"] >= 78 and rr["videos_n"] == HUGE_VIDEOS
+        check(f"{tag} resize 390x844 → 360x640: All refits (<= 1.5 screens), frame >= 78%, Videos first 4, Images grown by More keeps its {HUGE_IMAGES}",
+              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["frame_pct"] >= 78 and rr["videos_n"] == min(HUGE_VIDEOS, 4)
               and rr["images_n"][0] == rr["images_n"][1] == HUGE_IMAGES, rr)
         # a grown tab shrinks back: "Show fewer" restores its first look (60), the view lands on its More button
         grown = p4.locator("#g-panel .g-tile").count()
@@ -2426,14 +2428,38 @@ def tabs_flow(browser, vp_name, vp):
             page.wait_for_timeout(500)
             shot(page, "v-videos-images-tab")
         page.locator("#g-tab-videos").click()
-        vn = page.locator("#g-panel .g-v").count()
+        vcount = lambda: page.locator("#g-panel .g-v").count()
+        first, steps, kb = vcount(), [], None
         if how.endswith("demoVideos01"):
+            page.wait_for_timeout(300)
+            shot(page, "v-videos-first-look")
+        if how.endswith("demoVideos01") and page.locator("#g-panel [data-more=videos]").count():   # keyboard Enter → +12, focus on the first new video
+            page.locator("#g-panel [data-more=videos]").focus()
+            page.keyboard.press("Enter")
+            page.wait_for_timeout(300)
+            kb = page.evaluate("() => { const v = [...document.querySelectorAll('#g-panel .g-v')]; return v.findIndex(e => e.contains(document.activeElement)); }")
+            steps.append(vcount())
+        while page.locator("#g-panel [data-more=videos]").count():
+            page.locator("#g-panel [data-more=videos]").click()
+            page.wait_for_timeout(100)
+            steps.append(vcount())
+        vn = vcount()
+        if how.endswith("demoVideos01"):   # Show fewer: back to the first look, focus on Show more videos, in view
+            if page.locator("#g-panel [data-less=videos]").count():
+                page.locator("#g-panel [data-less=videos]").click()
+                page.wait_for_timeout(300)
+            fw = [vcount(), page.evaluate("document.activeElement.matches('[data-more=videos]')"), page.evaluate(IN_VIEW)]
+            shot(page, "v-videos-show-fewer")
+            f0 = 4 if vp_name == "phone" else 8
+            check(f"{tag} Videos: first look {f0}, 'Show more videos' +12 (Enter: focus on the first new one) up to all 34, Show fewer → {f0}, focus on Show more, in view",
+                  first == f0 and steps == [min(f0 + 12 * k, 34) for k in range(1, len(steps) + 1)] and steps[-1:] == [34] and kb == f0
+                  and fw == [f0, True, True], [first, steps, kb, fw])
             page.locator("#g-tab-all").click()
             page.evaluate("document.querySelector('#g-panel .g-strip').scrollIntoView({block: 'center', behavior: 'instant'})")
             page.wait_for_timeout(500)
             shot(page, "v-videos-all-strip")
         want = [u for u, _v in VIDS]
-        check(f"{tag} videos report ({how.split('?')[1]}): strip + Images tab = all {len(VIDS)} unique thumbs in order, play badge on the {sum(v for _u, v in VIDS)} from video results, Videos tab 34",
+        check(f"{tag} videos report ({how.split('?')[1]}): strip + Images tab = all {len(VIDS)} unique thumbs in order, play badge on the {sum(v for _u, v in VIDS)} from video results, Videos tab reaches 34",
               sv[2] == iv[2] == want and sv[1] == iv[1] == sum(v for _u, v in VIDS) and vn == 34 and badge[0] == '""' and badge[1] == "24px" and badge[2] == "absolute",
               [sv[:2], iv[:2], len(want), vn, badge])
         ctx.close()
