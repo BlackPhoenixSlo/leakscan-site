@@ -1,0 +1,54 @@
+/* site/video/: Jack's face video (left half) + cue-driven overlay prefabs (right half). Reuses styles.css (tokens, Google
+   phone) and removals.css (Mega / X / Reddit panels, .rm-stage compare wipe); js/video-overlays.js sets every
+   animated value as a custom property from the video time: --o (in/out), --y (slide), --p (wipe, 100 = live, 0 = removed),
+   --w (wipe progress 0..1), --h (handle), --s (stamp). No CSS transitions, so a seek or a frame capture is exact. */
+.vo-page { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0c0e; }
+.vo-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.vo-stage { position: relative; width: min(100vw, 177.78vh); aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
+.vo-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+/* right half; the 640x720 design box is scaled to it (--k from JS), so the web page and the 1920x1080 renders match */
+.vo-over { position: absolute; top: 0; right: 0; width: 50%; height: 100%; pointer-events: none; overflow: hidden; }
+.vo-box { position: absolute; top: 0; left: 0; width: 640px; height: 720px; transform: scale(var(--k, 1)); transform-origin: 0 0; }
+@media (max-width: 899px) {   /* phones: video on top, overlays below, still cue-driven */
+  .vo-page { display: block; background: var(--bg); }
+  .vo-stage { width: 100%; overflow: visible; background: none; }
+  .vo-video { position: relative; height: auto; aspect-ratio: 16 / 9; background: #000; }
+  .vo-over { position: relative; width: 100%; height: auto; aspect-ratio: 640 / 720; }
+}
+
+/* one prefab: caption pill, panel, "Removed" stamp */
+.vo-pf { --o: 0; --y: 24; --w: 0; --h: 0; --s: 0; position: absolute; left: 50%; top: 50%; width: 520px; display: grid; justify-items: center; gap: 14px;
+  opacity: var(--o); transform: translate(-50%, calc(-50% + var(--y) * 1px)); font-family: var(--sans); }
+.vo-pf[data-off] { visibility: hidden; }
+.vo-cap { display: inline-flex; align-items: center; gap: 10px; margin: 0; padding: 8px 18px 8px 8px; border-radius: 999px; background: #fff; color: #1f1a15;
+  box-shadow: 0 6px 22px rgb(0 0 0 / .22); font: 600 1.05rem/1.2 var(--sans); white-space: nowrap; }
+.vo-ico { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #fff; font: 800 .9rem/1 var(--sans); }
+.vo-ico-g { background: conic-gradient(#ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0); }
+.vo-cap .rm-ico-x { background: #0f1419; color: #fff; }
+.vo-st { display: grid; color: #5c5248; font-weight: 500; }
+.vo-st > span { grid-area: 1 / 1; }
+.vo-st-live { opacity: calc(1 - var(--w) * 2); }   /* out over the first half of the wipe, the new line in over the second: never both */
+.vo-st-gone { opacity: calc(var(--w) * 2 - 1); color: #23704f; font-weight: 700; }
+.vo-panel { width: 100%; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 10px 40px rgb(0 0 0 / .28); }
+.vo-rs { height: 350px; border: 0; border-radius: 0; cursor: auto; touch-action: auto; }
+.vo .rm-handle { opacity: var(--h); }
+.vo-stamp { position: absolute; bottom: -16px; right: -10px; display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px 9px 14px; border-radius: 999px;
+  background: #23704f; color: #fff; font: 800 1.1rem/1 var(--sans); box-shadow: 0 6px 20px rgb(0 0 0 / .25);
+  opacity: var(--s); transform: rotate(-6deg) scale(calc(.6 + var(--s) * .4)); }
+.vo-stamp .icon { width: 20px; height: 20px; stroke-width: 3; }
+
+/* Google prefab: the landing page's phone, results in a compare stage */
+.vo-phone { width: 290px; }
+.vo-phone .phone-screen { display: flex; flex-direction: column; }
+.vo-phone .m-search { flex: none; }
+.vo-tabs span { padding: 0 2px 6px; border-bottom: 3px solid transparent; }
+.vo-tabs .on { color: #1a73e8; border-bottom-color: #1a73e8; }
+.vo-phone .vo-rs { flex: 1; height: auto; }
+.vo-g { background: #fff; }
+.vo-dmca { margin: 6px 4px 10px; padding: 10px 12px; border-radius: 10px; background: #f1f3f4; color: #4d5156; font-size: .74rem; line-height: 1.4; }
+
+/* ?prefab=…: one prefab alone in a 1920x1080 frame, still on the right half; bg=green → chroma #00FF00, bg=none → transparent */
+.vo-solo .vo-video { display: none; }
+.vo-solo .vo-stage { background: none; }
+html.vo-green, html.vo-green .vo-page { background: #00ff00; }
+html.vo-clear, html.vo-clear .vo-page { background: transparent; }

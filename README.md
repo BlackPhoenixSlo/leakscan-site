@@ -20,6 +20,16 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   (always present, `[]` = none; first item's `title`, `size` in bytes, `images`, `videos`, `age` ISO UTC; its `url` is
   an aggregator page and is never shown), else a mega.nz hit's title; X poster + text, Reddit subreddit + title, the
   most-seen other host, `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
+- Video page `site/video/` (noindex, not in the sitemap; `css/video.css` + `js/video-overlays.js`, own files): Jack's
+  face video (`video/jack.mp4`, left half; `jack.webm` = the Chromium fallback of the 30 s placeholder) with 4 overlay
+  prefabs on the right half (Google phone, X, Reddit, Mega, each live → the #removals compare wipe → "Removed"),
+  driven by `video.currentTime` against `data-cue-live / -removed / -out` on each `.vo-pf`. Name from `?name=` (1-40
+  letters / digits / space . - _), else the shared scan result (`?r=` / last scan, via `LeakScanRemovals.model` from
+  `js/removals.js`), else Orla. `?t=<sec>` seeks; `?prefab=google|x|reddit|mega&state=live|removed&bg=green|none` = one
+  prefab, no video. Space = play / pause; under 900px the overlays stack below the video. Cue sheet + CapCut steps:
+  `site/video/CUES.md`. Gate: `tools/video/check_video.py` (CI). Proof: `tools/video/cue_shots.py OUT`; clips for
+  CapCut (ProRes 4444 alpha .mov + green .mp4): `tools/video/render_prefabs.py OUT` (both via `cd ~/leakhunt && uv run
+  python …`; `tools/video/serve.py` = local server with Range, which `<video>` seeking needs).
 - Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
   `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
@@ -104,7 +114,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   lines; `media_gather.py` carries one `# one-project` line: `PUBLIC_ORIGIN` defaults to empty = relative media src).
   The rest is the prod tree snapshot.
 - `app/site_static.py`: stdlib static server for `site/` (`SITE_DIR`, default `<repo>/site`; realpath-confined, no
-  dotfiles, dir → `index.html`, missing → `404.html`, html `no-cache`, assets `max-age=86400`, GET/HEAD). If
+  dotfiles, dir → `index.html`, missing → `404.html`, html `no-cache`, assets `max-age=86400`, GET/HEAD, single
+  `Range` → 206 for `<video>`). If
   `SITE_DIR` is missing it logs once and `/` falls back to the legacy UI.
 - Local run: `SITE_DIR=site PUBLIC_PORT=18084 python3 app/public_app.py` → http://127.0.0.1:18084/ (no API keys =
   scans fail upstream; the tests fake Google CSE / DeepSeek / Browserbase at the wire).
@@ -186,7 +197,7 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 5. VPS host change (`SITE_HOST` in `deploy/.env.example`, e.g. abolita.com): name the new host in `site/privacy.html`
    (hosting item); `tools/check.py` fails until it does.
 
-Note: noindex pages (`showcase/**`, `scan/`, `404.html`) are kept out of search by their own
+Note: noindex pages (`showcase/**`, `scan/`, `video/`, `404.html`) are kept out of search by their own
 `<meta name="robots" content="noindex…">`, never by `robots.txt`: a Disallow stops crawlers from reading the noindex, so
 the bare URL can still be indexed (robots.txt applies at a domain root, e.g. the VPS host). `tools/check.py` fails on a
 Disallow that covers a noindex page.

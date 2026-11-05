@@ -5,10 +5,11 @@ stdlib only. `serve(handler, path)` answers GET/HEAD (public_app routes only tho
   - directory -> index.html (`/scan` -> 301 `/scan/` so relative links resolve)
   - missing -> site/404.html with status 404; never a directory listing
   - html: `Cache-Control: no-cache`; assets: `public, max-age=86400`
+  - one `Range: bytes=a-b` → 206 (+ Accept-Ranges): Safari plays <video> only with it, and seeking needs it
 Returns False only when SITE_DIR is missing (caller falls back to its own routes).
 """
 import os
-import shutil
+import re
 import sys
 import urllib.parse
 
@@ -30,6 +31,8 @@ TYPES = {
     ".json": "application/json; charset=utf-8",
     ".woff2": "font/woff2",
     ".webmanifest": "application/manifest+json",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
 }
 
 _warned = False
@@ -63,18 +66,46 @@ def _resolve(path):
     return (full if os.path.isfile(full) else None), None
 
 
+def _range(h, size):
+    """(start, end) for one satisfiable `bytes=` range, False if unsatisfiable, None for a full response."""
+    m = re.fullmatch(r"bytes=(\d*)-(\d*)", (h.headers.get("Range") or "").strip())
+    if not m or not (m[1] or m[2]):
+        return None
+    if m[1]:
+        start, end = int(m[1]), min(int(m[2]) if m[2] else size - 1, size - 1)
+    else:
+        start, end = max(0, size - int(m[2])), size - 1
+    return (start, end) if start <= end and start < size else False
+
+
 def _send(h, code, full, cache):
     ctype = TYPES.get(os.path.splitext(full)[1].lower(), "application/octet-stream")
+    size = os.path.getsize(full)
+    rng = _range(h, size) if code == 200 else None
+    if rng is False:
+        return _plain(h, 416, "Range not satisfiable", {"Content-Range": f"bytes */{size}"})
+    start, end = rng or (0, size - 1)
     try:
-        h.send_response(code)
+        h.send_response(206 if rng else code)
         h.send_header("Content-Type", ctype)
-        h.send_header("Content-Length", str(os.path.getsize(full)))
+        h.send_header("Content-Length", str(end - start + 1))
+        if code == 200:
+            h.send_header("Accept-Ranges", "bytes")
+        if rng:
+            h.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         h.send_header("Cache-Control", cache)
         h.send_header("X-Content-Type-Options", "nosniff")
         h.end_headers()
         if h.command != "HEAD":
             with open(full, "rb") as fh:
-                shutil.copyfileobj(fh, h.wfile, length=65536)
+                fh.seek(start)
+                left = end - start + 1
+                while left > 0:
+                    buf = fh.read(min(65536, left))
+                    if not buf:
+                        break
+                    h.wfile.write(buf)
+                    left -= len(buf)
     except (BrokenPipeError, ConnectionResetError):
         pass
 

@@ -23,7 +23,8 @@ class TestSiteRoutes(unittest.TestCase):
         os.makedirs(os.path.join(site, "scan"))
         os.makedirs(os.path.join(site, "css"))
         for rel, body in {"index.html": "<h1>landing LeakScan</h1>", "scan/index.html": "scan page",
-                          "404.html": "custom 404", "css/a.css": "b{}", ".env": "SECRET=1"}.items():
+                          "404.html": "custom 404", "css/a.css": "b{}", ".env": "SECRET=1",
+                          "scan/v.mp4": "0123456789"}.items():
             with open(os.path.join(site, rel), "w") as f:
                 f.write(body)
         with open(os.path.join(root, "outside.txt"), "w") as f:
@@ -42,9 +43,9 @@ class TestSiteRoutes(unittest.TestCase):
         site_static.SITE_DIR, db.DB_PATH = cls.saved
         cls.tmp.cleanup()
 
-    def req(self, path, method="GET"):
+    def req(self, path, method="GET", headers=None):
         c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=5)
-        c.request(method, path)
+        c.request(method, path, headers=headers or {})
         r = c.getresponse()
         body = r.read()
         c.close()
@@ -66,6 +67,20 @@ class TestSiteRoutes(unittest.TestCase):
         self.assertEqual((r.status, b), (200, b"b{}"))
         self.assertEqual(r.getheader("Cache-Control"), "public, max-age=86400")
         self.assertTrue(r.getheader("Content-Type").startswith("text/css"))
+
+    def test_video_ranges(self):   # site/video/: Safari plays <video> only with 206 ranges; seeking needs them
+        r, b = self.req("/scan/v.mp4")
+        self.assertEqual((r.status, b, r.getheader("Content-Type"), r.getheader("Accept-Ranges")), (200, b"0123456789", "video/mp4", "bytes"))
+        for rng, part, cr in (("bytes=2-4", b"234", "bytes 2-4/10"), ("bytes=7-", b"789", "bytes 7-9/10"),
+                              ("bytes=-2", b"89", "bytes 8-9/10"), ("bytes=5-99", b"56789", "bytes 5-9/10")):
+            r, b = self.req("/scan/v.mp4", headers={"Range": rng})
+            self.assertEqual((r.status, b, r.getheader("Content-Range"), r.getheader("Content-Length")), (206, part, cr, str(len(part))), rng)
+        r, _ = self.req("/scan/v.mp4", headers={"Range": "bytes=10-"})
+        self.assertEqual((r.status, r.getheader("Content-Range")), (416, "bytes */10"))
+        r, b = self.req("/scan/v.mp4", headers={"Range": "bytes=1-2,4-5"})   # multi-range: full body
+        self.assertEqual((r.status, b), (200, b"0123456789"))
+        r, b = self.req("/nope.mp4", headers={"Range": "bytes=0-1"})          # 404 page ignores Range
+        self.assertEqual((r.status, b), (404, b"custom 404"))
 
     def test_missing_is_custom_404(self):
         r, b = self.req("/nope.html")
