@@ -138,8 +138,8 @@ BREAK = {}   # --break-* routes, applied to every context
 
 def ctx_new(b, **kw):
     ctx = b.new_context(**kw)
-    for pat, body, ctype in BREAK.values():
-        ctx.route(pat, lambda r, body=body, ctype=ctype: r.fulfill(body=body, content_type=ctype))
+    for pat, body, ctype in BREAK.values():   # one-arg handler (playwright passes (route, request) to two-arg ones)
+        ctx.route(pat, (lambda body, ctype: lambda r: r.fulfill(body=body, content_type=ctype))(body, ctype))
     return ctx
 
 
