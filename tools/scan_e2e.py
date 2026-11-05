@@ -13,7 +13,7 @@ equal the fixture, tab item counts (All 10 → all pages after "More results", I
 frames, Reveal unblurs, CTA hrefs carry the report link + handle, every hit URL is listed, `?r=<slug>` reopens without
 a new scan, and the stub `failed` / 429 / busy / empty / not-found paths show their UI. Then `stub-huge` (1000 links on
 100 sites, CPU x4): render time, DOM budget, sites / links shown in steps, filter, export, the pinned phone scrolling
-into the sites, CLS 0, no 5xx / console errors; --break-incremental (scan.js with every step 1e9) turns only the
+into the sites, CLS 0 (whole flow), no 5xx / console errors; --break-incremental (scan.js with every step 1e9) turns only the
 `incremental:` checks red. Every non-loopback request is
 aborted and must not happen at all. Screenshots of each state go to OUT_DIR. One PASS/FAIL line per check; exit 1 on
 any FAIL.
@@ -173,7 +173,7 @@ def scan_flow(browser, vp_name, vp):
     page.goto(base + "scan/?p=fansly.com&h=%40demo.creator", wait_until="load")
 
     # 2. progress
-    page.wait_for_selector("#progress-log li", timeout=5000)
+    page.wait_for_selector("#progress-log li:not(:empty)", timeout=5000)
     check(f"{vp_name} progress visible", page.locator("#progress").is_visible()
           and "demo.creator" in page.locator("#scan-title").inner_text())
     check(f"{vp_name} scan/?p=&h= posts platform + clean handle, no socials",
@@ -247,7 +247,8 @@ def scan_flow(browser, vp_name, vp):
                 break
             page.locator("[data-more=all]").click()
         n1 = page.locator("#g-panel .g-r").count()
-        check(f"{vp_name}/{device} All tab count", (n0, n1) == (min(10, len(PAGES)), len(PAGES)), f"{n0}→{n1} want 10→{len(PAGES)}")
+        first = (1 <= n0 <= min(10, len(PAGES))) if device == "phone" else n0 == min(10, len(PAGES))   # phone: first look fitted to ~1.5 screens
+        check(f"{vp_name}/{device} All tab count (More reaches every result)", first and n1 == len(PAGES), f"{n0}→{n1} want {'≤' if device == 'phone' else ''}10→{len(PAGES)}")
         check(f"{vp_name}/{device} every result title carries open ↗", page.locator("#g-panel .g-r a.g-title .g-go").count() == n1)
         alone = page.evaluate(GO_ALONE)
         check(f"{vp_name}/{device} open ↗ never sits alone on a line (it rides on the title's last word)", not alone, alone[:3])
@@ -287,8 +288,12 @@ def scan_flow(browser, vp_name, vp):
         g.screenshot(path=str(out / f"{vp_name}-4-{device}-images.png"))
         # Videos
         page.locator("#g-tab-videos").click()
+        nv0 = page.locator("#g-panel .g-v").count()
+        while page.locator("[data-more=videos]").count():
+            page.locator("[data-more=videos]").click()
         nv = page.locator("#g-panel .g-v").count()
-        check(f"{vp_name}/{device} Videos tab count", nv == len(VIDEOS), f"{nv} want {len(VIDEOS)}")
+        check(f"{vp_name}/{device} Videos tab count (phone: first look fitted, More reaches every video)",
+              nv == len(VIDEOS) and (1 <= nv0 <= 6 if device == "phone" else nv0 == nv), f"{nv0}→{nv} want {len(VIDEOS)}")
         page.wait_for_timeout(300)
         g.screenshot(path=str(out / f"{vp_name}-5-{device}-videos.png"))
 
@@ -417,11 +422,10 @@ def huge_flow(browser, vp_name, vp):
     page.on("console", lambda m: m.type == "error" and errors.append(m.text))
     page.on("response", lambda r: r.status >= 500 and bad.append(f"{r.status} {r.url}"))
     page.on("request", lambda q: "/api/thumb" in q.url and thumbs.append(q.url))
-    # layout shifts once the report is built (the progress card → report swap before it is the scan page's, not the report's)
+    # layout shifts over the whole flow: form → progress (log fills) → report → scroll story
     page.add_init_script("""window.__ls = []; new PerformanceObserver(l => l.getEntries().forEach(e => { if (!e.hadRecentInput) window.__ls.push(e); }))
       .observe({type: 'layout-shift', buffered: true});""")
-    CLS = """() => { const m = performance.getEntriesByName('leakscan:report-start')[0], t = m ? m.startTime : 0;
-      const ls = window.__ls.filter(e => e.startTime > t);
+    CLS = """() => { const ls = window.__ls;
       return [+ls.reduce((a, e) => a + e.value, 0).toFixed(4), ls.slice(0, 3).map(e => e.sources.map(s => s.node && s.node.nodeType === 1 ? s.node.tagName + '.' + s.node.className : '?').join(','))]; }"""
     cdp = ctx.new_cdp_session(page)
     cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})   # a mid-range phone, not this machine
@@ -454,11 +458,22 @@ def huge_flow(browser, vp_name, vp):
                     max: s.scrollHeight - s.clientHeight, vh: innerHeight}; }""")
         check(f"{tag} phone frame fits the screen under the nav", g["fh"] + g["pin"] <= g["vh"], g)
         check(f"{tag} track = frame + screen overflow", abs(g["h"] - g["fh"] - g["max"]) <= 2 and g["max"] > 400, g)
+        runs = {}   # each tab's first look: at most 1.5 screens of pinned scrolling before the sites, the rest behind More
+        for t in ("images", "videos", "all"):
+            page.locator(f"#g-tab-{t}").click()
+            page.wait_for_timeout(300)
+            runs[t] = page.evaluate("""() => { const t = document.querySelector('.ph-track');
+                return [t.offsetHeight - t.firstElementChild.offsetHeight, !!document.querySelector('#g-panel [data-more]')]; }""")
+        page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+        check(f"{tag} pin: every tab scrolls <= 1.5 screens before the sites (more behind More)",
+              all(v[0] <= 1.5 * g["vh"] and v[1] for v in runs.values()), [runs, g["vh"]])
         page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
         page.wait_for_timeout(250)
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
         check(f"{tag} pin: mid-scroll the frame stays put and its screen scrolls 1:1", abs(st[0] - g["pin"]) <= 1 and abs(st[1] - 400) <= 2, st)
         page.screenshot(path=str(out / f"{vp_name}-h2-pinned.png"))
+        pb = page.evaluate("() => [document.querySelector('.ph-reveal').getBoundingClientRect().top, document.querySelector('.ph-scroll').getBoundingClientRect().bottom]")
+        check(f"{tag} pin: the Reveal pill sits in its own bar, under the results (covers no line)", pb[0] >= pb[1] - 1, pb)
         pill = page.locator(".ph-reveal")
         blur = lambda: page.eval_on_selector(".ph-scroll .g-img img", "e => getComputedStyle(e).filter")
         b0 = blur()
@@ -474,13 +489,14 @@ def huge_flow(browser, vp_name, vp):
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop, document.querySelectorAll('#g-panel .g-tile').length]")
         check(f"{tag} pin: a tab switched mid-scroll opens at its top, frame stays put", abs(st[0] - g["pin"]) <= 1 and st[1] == 0 and st[2] > 0, st)
         page.locator("#g-tab-all").click()
+        had = page.locator("#g-panel .g-r").count()
         page.locator("[data-more=all]").evaluate("b => b.focus()")   # as Tab would: the screen scrolls to it, the page follows
         page.wait_for_timeout(300)
         page.keyboard.press("Enter")
         page.wait_for_timeout(400)
         nx = page.evaluate("() => { const a = document.activeElement, r = a.closest('.g-r'); return [a.className, [...document.querySelectorAll('#g-panel .g-r')].indexOf(r)]; }")
         nx.append(page.evaluate(IN_VIEW))
-        check(f"{tag} keyboard More results → focus on the first new result, in view", nx == ["g-title", 10, True], nx)
+        check(f"{tag} keyboard More results → focus on the first new result, in view", nx == ["g-title", had, True], [nx, had])
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
         page.wait_for_timeout(150)
     page.mouse.move(vp["width"] / 2, vp["height"] / 2)
@@ -580,6 +596,19 @@ def huge_flow(browser, vp_name, vp):
     got = {ln for ln in txt.splitlines() if ln.startswith("https://") and "/scan/?r=" not in ln}
     check(f"{tag} Download .txt carries every link ({HUGE_LINKS})", got == {u for us in HUGE_SITES.values() for u in us}, len(got))
 
+    # 5b. section nav: scrolls to the section, no history entry, no #hash in the report URL
+    hl, url0 = page.evaluate("history.length"), page.url
+    page.locator(".rnav-a[data-sec=sites]").click()
+    page.wait_for_timeout(900)
+    nav = page.evaluate("""() => [history.length, location.hash, Math.round(document.getElementById('sites').getBoundingClientRect().top),
+        document.activeElement.id, document.querySelector('.rnav-a[aria-current]') && document.querySelector('.rnav-a[aria-current]').dataset.sec]""")
+    page.locator(".rnav-a[data-sec=google]").click()
+    page.wait_for_timeout(900)
+    nav2 = page.evaluate("[history.length, location.hash, Math.round(document.getElementById('google').getBoundingClientRect().top)]")
+    check(f"{tag} section nav: scrolls to Sites / Google, focus on the heading, no history entry or #hash",
+          nav[0] == hl and nav[1] == "" and 0 <= nav[2] <= 200 and nav[3] == "sites-title" and nav[4] == "sites"
+          and nav2[0] == hl and nav2[1] == "" and 0 <= nav2[2] <= 200 and page.url == url0, [hl, nav, nav2])
+
     # 6. reopen ?r= (stored huge report) renders the same way
     slug = parse_qs(urlsplit(page.url).query).get("r", [""])[0]
     page.goto(base + "scan/?r=" + slug)
@@ -590,25 +619,32 @@ def huge_flow(browser, vp_name, vp):
     check(f"{tag} incremental: ?r= reopen shows the first 10 sites", rows() == 10, rows())
     page.screenshot(path=str(out / f"{vp_name}-h1-top.png"))
     cls = [cls0, page.evaluate(CLS)]
-    check(f"{tag} no layout shift without input once the report is built (CLS 0: fresh scan + scroll story, ?r= reopen)", cls[0][0] == 0 and cls[1][0] == 0, cls)
+    check(f"{tag} no layout shift without input over the whole flow (CLS 0: form → progress → report → scroll story; ?r= reopen)", cls[0][0] == 0 and cls[1][0] == 0, cls)
     check(f"{tag} no 5xx", not bad, bad)
     check(f"{tag} no request left loopback", not outside, outside)
     check(f"{tag} no JS / console errors", not errors, errors)
     (out / f"{vp_name}-huge-metrics.json").write_text(json.dumps({"render_ms": round(ms), "reopen_ms": round(ms2), "dom_elements": nodes,
                                                                   "wheel_steps_to_sites": steps, "cls": [cls[0][0], cls[1][0]], "thumbs_at_load": thumbs0, "thumbs_total": len(thumbs)}))
     ctx.close()
-    if phone:   # a screen too short to pin the phone (landscape): the frame scrolls with the page, its screen by itself
-        ctx = browser.new_context(viewport={"width": 390, "height": 560}, device_scale_factor=2, is_mobile=True, has_touch=True)
-        p2 = ctx.new_page()
-        p2.goto(base + "scan/?r=" + slug)
-        p2.wait_for_selector("#report:not([hidden])", timeout=8000)
-        p2.wait_for_timeout(300)
-        r = p2.evaluate("""() => { const t = document.querySelector('.ph-track'), f = t.firstElementChild, s = t.querySelector('.ph-scroll');
-            const y = scrollY; s.scrollTop = 300; return [getComputedStyle(f).position, getComputedStyle(s).overflowY, t.style.height, f.getBoundingClientRect().height <= innerHeight, s.scrollTop, scrollY - y]; }""")
-        p2.wait_for_timeout(200)
-        check(f"{tag} short screen (390x560): frame not pinned, fits, its screen scrolls by itself", r[:4] == ["static", "auto", "", True] and r[4] == 300 and r[5] == 0
-              and p2.evaluate("scrollY") == 0, r)
-        ctx.close()
+    if phone:   # screens too short to pin the phone: a shorter static preview, no scroll box inside the page; More expands it
+        for w, h in ((320, 568), (390, 560)):
+            ctx = browser.new_context(viewport={"width": w, "height": h}, device_scale_factor=2, is_mobile=True, has_touch=True)
+            p2 = ctx.new_page()
+            p2.goto(base + "scan/?r=" + slug)
+            p2.wait_for_selector("#report:not([hidden])", timeout=8000)
+            p2.wait_for_timeout(300)
+            SCROLLERS = """() => [...document.querySelectorAll('#report *')].filter(e => ['auto', 'scroll'].includes(getComputedStyle(e).overflowY)
+                && e.scrollHeight > e.clientHeight + 1).map(e => e.className)"""
+            r = p2.evaluate("""() => { const f = document.querySelector('.frame-phone'); return [getComputedStyle(f).position, document.querySelectorAll('#g-panel .g-r').length,
+                !!document.querySelector('#g-panel [data-more=all]')]; }""")
+            sc = p2.evaluate(SCROLLERS)
+            p2.locator("[data-more=all]").click()
+            p2.wait_for_timeout(200)
+            n2 = p2.locator("#g-panel .g-r").count()
+            sc2 = p2.evaluate(SCROLLERS)
+            check(f"{tag} short screen ({w}x{h}): frame not pinned, short preview, no inner scroll box; More results expands it",
+                  r[0] == "static" and 0 < r[1] < 10 and r[2] and not sc and not sc2 and n2 > r[1], [r, sc, n2, sc2])
+            ctx.close()
         wide = {}   # narrow phones: nothing sticks out sideways (summary numbers, section nav, controls, filter)
         for w in (320, 360):
             ctx = browser.new_context(viewport={"width": w, "height": 700}, device_scale_factor=2, is_mobile=True, has_touch=True)

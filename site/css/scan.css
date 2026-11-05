@@ -16,14 +16,15 @@
 
 /* Progress */
 .progress-head { display: flex; align-items: center; gap: 12px; }
-.progress-head p { margin: 0; font-weight: 600; }
+.progress-head p { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }   /* one line: no shift as the stage changes */
 .spinner { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 3px solid var(--accent-soft); border-top-color: var(--accent); animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .bar { height: 8px; margin: 16px 0 14px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); transition: width .4s ease; }
-.progress-log { list-style: none; margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); min-height: 3.2em;
+/* the log: 6 fixed one-line slots (js: logSlots), so nothing in or below it moves during the scan */
+.progress-log { list-style: none; margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--surface-2);
   font: 500 .82rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); }
-.progress-log li { overflow-wrap: anywhere; }
+.progress-log li { height: 1.6em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .progress-log li:last-child { color: var(--ink); }
 .progress-note { margin: 14px 0 0; color: var(--muted); font-size: .93rem; }
 
@@ -207,7 +208,9 @@
 .frame-phone .g-title { font-size: 18px; }
 .frame-phone .g-snip { -webkit-line-clamp: 3; }
 .frame-phone .g-pack-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.frame-phone .g-grid { column-count: 2; }
+.frame-phone .g-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 8px; column-count: auto; }
+.frame-phone .g-tile .g-img { aspect-ratio: 3 / 4; min-height: 0; }   /* same-size tiles: no jump as thumbs load, rows fit (js: fitPhone) */
+.frame-phone .g-tile .g-img img { height: 100%; object-fit: cover; }
 .frame-phone .g-safe { gap: 6px; font-size: 12px; flex-wrap: wrap; }
 .frame-phone .chip-g { padding: 5px 11px; }
 .frame-phone .g-v { flex-direction: column; gap: 8px; padding-bottom: 18px; border-bottom: 1px solid var(--g-line); }
@@ -267,12 +270,13 @@
   height: clamp(420px, calc(100vh - var(--pin-top) - 44px), 760px); height: clamp(420px, calc(100svh - var(--pin-top) - 44px), 760px); }
 .ph-track .ph-status { flex: none; }
 .ph-scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
-.ph-page { padding-bottom: 52px; }   /* the end of the page clears the Reveal pill */
+.ph-page { padding-bottom: 16px; }
 .ph-scroll .g-tabs { position: sticky; top: 0; z-index: 3; background: var(--g-bg); }
-.ph-fade { position: absolute; left: 0; right: 0; bottom: 26px; height: 64px; background: linear-gradient(rgb(0 0 0 / 0), var(--g-bg)); pointer-events: none; transition: opacity .2s; }
+.ph-fade { position: absolute; left: 0; right: 0; bottom: 64px; height: 64px; background: linear-gradient(rgb(0 0 0 / 0), var(--g-bg)); pointer-events: none; transition: opacity .2s; }
 .ph-end .ph-fade { opacity: 0; }
 /* Reveal / Blur on the phone itself: the button above the frame scrolls away while the frame is pinned */
-.ph-reveal { position: absolute; right: 14px; bottom: 36px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
+.ph-track .ph-screen { padding-bottom: 64px; }   /* a bottom bar of its own for the Reveal pill + home bar: no result line under it */
+.ph-reveal { position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
   border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 600 13px/1 var(--sans); box-shadow: 0 4px 14px rgb(0 0 0 / .45); cursor: pointer; }
 .ph-reveal .icon { width: 16px; height: 16px; }
 .ph-reveal[aria-pressed="true"] { background: #e8eaed; color: #202124; }
@@ -281,8 +285,10 @@
 /* screens too short to pin a usable phone: the screen scrolls by itself */
 @media (max-height: 599px) {
   .ph-track .frame-phone { position: static; }
-  .ph-track .ph-screen { height: 520px; height: max(360px, calc(100svh - 32px)); }
-  .ph-scroll { overflow-y: auto; }
+  .ph-track .ph-screen { height: auto; }   /* a shorter static preview (js: fitPhone), no scroll box inside the page */
+  .ph-scroll { overflow: visible; }
+  .ph-scroll .g-tabs { position: static; }
+  .ph-fade { display: none; }
 }
 
 /* "Where the copies are": every site, its links on demand (js: renderSites) */
@@ -315,6 +321,7 @@ details[open] > .lx-sum .lx-n::after { margin-top: 3px; transform: rotate(-135de
 .lx-top { display: none; }
 @media (max-width: 759px) { .lx-filtered .lx-sum { grid-template-areas: "dom n" "top top" "bar bar"; } }
 .lx-filtered .lx-top { grid-area: top; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .8rem; }   /* phone: what matched */
+details[open] > .lx-sum .lx-top { display: none; }   /* open: the links themselves are right below */
 .lx-links { list-style: none; margin: 0; padding: 0 16px 6px 38px; }
 .lx-links li + li { border-top: 1px dashed var(--line); }
 .lx-a { display: block; padding: 10px 0; overflow-wrap: anywhere; color: var(--ink); text-decoration: none; }   /* whole path, wrapped: the tail is what tells links apart */
@@ -329,8 +336,13 @@ details[open] > .lx-sum .lx-n::after { margin-top: 3px; transform: rotate(-135de
 .lx-foot { margin: 14px 0 0; text-align: center; }
 .lx-foot .btn { min-height: 44px; }
 @media (min-width: 760px) {
-  .lx-sum { grid-template-columns: minmax(200px, 260px) 150px 110px minmax(0, 1fr); grid-template-areas: "dom n bar top"; gap: 0 24px; }
+  .lx-sum { grid-template-columns: minmax(200px, 260px) 150px 110px minmax(0, 1fr) 14px; grid-template-areas: "dom n bar top chev"; gap: 0 24px; }
   .lx-n { justify-content: flex-end; }
+  .lx-n::after { content: none; }
+  .lx-sum::after { content: ""; grid-area: chev; justify-self: end; width: 7px; height: 7px; margin: -3px 2px 0 0; border: solid var(--muted); border-width: 0 2px 2px 0;
+    transform: rotate(45deg); transition: transform .15s; }   /* the chevron at the row's end */
+  details[open] > .lx-sum::after { margin-top: 3px; transform: rotate(-135deg); }
+  details[open] > .lx-sum .lx-top { display: block; visibility: hidden; }
   .lx-top { grid-area: top; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
   .lx-links { padding-left: 60px; }
   .lx-lmore { width: auto; margin-left: 60px; }

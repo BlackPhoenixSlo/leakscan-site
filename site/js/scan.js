@@ -25,7 +25,7 @@
 
   // ---------- state ----------
   var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone', revealed: false,
-    more: { all: 10, images: 12 }, retry: null };
+    more: { all: 10, images: 12, videos: 6 }, fitted: {}, log: [], retry: null };
   state.device = window.matchMedia('(min-width: 720px)').matches ? 'computer' : 'phone';
 
   function setTitle(kicker, title, lead) {
@@ -94,7 +94,8 @@
     var name = PLATFORMS[state.platform];
     setTitle('Free leak scan', 'Scanning Google for @' + state.handle,
       'I’m checking what Google has indexed for your ' + name + ' handle: pages, images and videos.');
-    $('progress-log').textContent = '';
+    state.log = [];
+    logSlots();
     $('progress-stage').textContent = 'Starting the scan…';
     setBar(3);
     show('progress', true);
@@ -114,11 +115,16 @@
     var p = E.progressInfo(text);
     if (p.pct != null) setBar(p.pct);
     $('progress-stage').textContent = p.stage;
+    state.log = state.log.concat(text).slice(-LOG_LINES);
+    logSlots();
+    $('progress-sr').textContent = text;
+  }
+  // the log: LOG_LINES fixed one-line slots, newest at the bottom; lines move by text, not by box (no layout shift)
+  var LOG_LINES = 6;
+  function logSlots() {
     var log = $('progress-log');
-    var li = document.createElement('li');
-    li.textContent = text;
-    log.appendChild(li);
-    while (log.children.length > 6) log.removeChild(log.firstChild);
+    while (log.children.length < LOG_LINES) log.appendChild(document.createElement('li'));
+    for (var i = 0; i < LOG_LINES; i++) log.children[i].textContent = state.log[i - (LOG_LINES - state.log.length)] || '';
   }
   function reopen(slug) {
     hideAll();
@@ -280,16 +286,17 @@
     }).join('') + '</div>';
     return h + more('images', 'Show more images', items.length - n);
   }
-  function panelVideos(d) {
+  function panelVideos(d, phone) {
     var vids = d.results.filter(function (r) { return r.kind === 'video'; });
     if (!vids.length) return '<p class="g-empty">No video results indexed for this handle</p>';
-    return vids.map(function (r) {
+    var n = phone ? Math.min(state.more.videos, vids.length) : vids.length;
+    return vids.slice(0, n).map(function (r) {
       var t = r.thumb && thumb(r.thumb) ? img(r.thumb, r.title) : '<span class="g-img g-img-none"></span>';
       return '<div class="g-v">' + a(r.link, 'g-vthumb', t + '<span class="g-play" aria-hidden="true"></span>' + GO) +
         '<div class="g-vbody">' + a(r.link, 'g-title', titled(r.title || r.link)) +
         '<span class="g-cite">' + fav(r.domain, 'g-fav-s') + esc(r.domain) + esc(crumbs(r.link).replace(/^https?:\/\/[^ ]+/, '')) + '</span>' +
         (r.snippet ? '<p class="g-snip">' + esc(r.snippet) + '</p>' : '') + '</div></div>';
-    }).join('');
+    }).join('') + more('videos', 'More videos', vids.length - n);
   }
   var TABS = [['all', 'All'], ['images', 'Images'], ['videos', 'Videos']];
   function tabRow() {
@@ -303,7 +310,7 @@
   function renderGoogle(focusTab) {
     var d = state.data, phone = state.device === 'phone';
     var q = d.handle + ' leaks';
-    var panel = state.tab === 'images' ? panelImages(d, phone) : state.tab === 'videos' ? panelVideos(d) : panelAll(d, phone);
+    var panel = state.tab === 'images' ? panelImages(d, phone) : state.tab === 'videos' ? panelVideos(d, phone) : panelAll(d, phone);
     var body = '<div class="g-panel g-panel-' + state.tab + '" role="tabpanel" id="g-panel" aria-labelledby="g-tab-' + state.tab + '">' + panel + '</div>';
     var search = '<div class="g-search" aria-hidden="true"><svg class="icon"><use href="#i-search"/></svg><span>' + esc(q) + '</span></div>';
     var h;
@@ -336,7 +343,7 @@
     });
     if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
     if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus({ preventScroll: true }); }
-    pinPhone();
+    pinPhone(focusTab);
   }
 
   // ---------- the phone frame stays put while its screen scrolls ----------
@@ -345,7 +352,7 @@
   // sites below. Short screens (css: frame not sticky) scroll the screen by itself. A scroll of the screen itself (focus,
   // find in page) moves the page to match. A new tab starts at its top.
   var pin = null, pinTab = null, pinRo = null;
-  function pinPhone() {
+  function pinPhone(focusTab) {
     var track = document.querySelector('.ph-track'), reset = pinTab !== state.tab;
     if (pinRo) { pinRo.disconnect(); pinRo = null; }
     pin = track && { track: track, frame: track.firstElementChild, scr: track.querySelector('.ph-scroll'), set: -1 };
@@ -356,6 +363,27 @@
     var off = pin.track.getBoundingClientRect().top - pin.top;   // < 0: scrolled into / past the phone
     if (reset && pin.on && off < 0) window.scrollTo({ top: window.pageYOffset + off, behavior: 'instant' });
     if (window.ResizeObserver) { pinRo = new ResizeObserver(measurePin); pinRo.observe(pin.scr.firstElementChild); pinRo.observe(pin.frame); }
+    fitPhone(focusTab);
+  }
+  // The phone's first look at a tab is at most ~1.5 screens of scrolling (pinned) or ~1.5 screens tall (short screens,
+  // not pinned): fewer results to start with, "More …" adds the rest. Once per tab and device; a click on More is the user's.
+  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 18, videos: 6 }, FIT_MIN = { all: 2, images: 2, videos: 1 };
+  function fitPhone(focusTab) {
+    var t = state.tab, page = pin.scr.firstElementChild;
+    if (state.fitted[t]) return;
+    state.fitted[t] = true;
+    var items = page.querySelectorAll(ITEM[t]), last = items[items.length - 1];
+    if (items.length <= FIT_MIN[t]) return;
+    var top = page.getBoundingClientRect().top, bottom = function (e) { return e.getBoundingClientRect().bottom - top; };
+    var tail = Math.max(90, page.scrollHeight - bottom(last));   // More button + page end
+    var room = 1.5 * innerHeight - tail + (pin.on ? pin.scr.clientHeight : -(pin.frame.offsetHeight - pin.scr.clientHeight));
+    var n = 0;
+    if (t === 'images') {   // two columns of same-size tiles (css): rows that fit, two tiles each
+      var h = items[0].offsetHeight + 12;
+      n = 2 * Math.floor((room - (items[0].getBoundingClientRect().top - top)) / h);
+    } else while (n < items.length && bottom(items[n]) <= room) n++;
+    n = Math.max(FIT_MIN[t], n);
+    if (n < items.length) { state.more[t] = n; renderGoogle(focusTab); }
   }
   function measurePin() {
     if (!pin || !pin.track.isConnected) return;
@@ -409,8 +437,8 @@
     if (t.dataset.tab) { state.tab = t.dataset.tab; renderGoogle(true); }
     else if (t.dataset.goto) { state.tab = t.dataset.goto; renderGoogle(true); }
     else {
-      var k = t.dataset.more, sel = k === 'all' ? '#g-panel .g-r' : '#g-panel .g-tile', had = document.querySelectorAll(sel).length;
-      state.more[k] += k === 'all' ? 10 : 18;
+      var k = t.dataset.more, sel = '#g-panel ' + ITEM[k], had = document.querySelectorAll(sel).length;
+      state.more[k] += MORE_STEP[k];
       renderGoogle(false);
       var nx = document.querySelectorAll(sel)[had];   // keyboard: carry on at the first new result
       var nb = (nx && nx.querySelector('a')) || document.querySelector('[data-more="' + k + '"]') || $('g-tab-' + state.tab);
@@ -432,7 +460,7 @@
   });
   document.querySelectorAll('#device input').forEach(function (r) {
     r.checked = r.value === state.device;
-    r.addEventListener('change', function () { if (r.checked) { state.device = r.value; state.more = { all: 10, images: 12 }; renderGoogle(false); } });
+    r.addEventListener('change', function () { if (r.checked) { state.device = r.value; state.more = { all: 10, images: 12, videos: 6 }; state.fitted = {}; renderGoogle(false); } });
   });
   // Reveal / Blur: the button above the frame + the same switch on the pinned phone (the one above scrolls away)
   function revealPill() {
@@ -646,6 +674,17 @@
     });
   }
   window.addEventListener('scroll', function () { if (!navRaf && !$('report').hidden) navRaf = requestAnimationFrame(navCurrent); }, { passive: true });
+  // a tap scrolls to the section without a history entry or a #hash in the report URL (Back leaves the report, ?r= stays clean)
+  $('rnav').addEventListener('click', function (e) {
+    var a = e.target.closest('.rnav-a'), sec = a && $(a.getAttribute('data-sec'));
+    if (!sec || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    sec.scrollIntoView({ behavior: still ? 'instant' : 'smooth', block: 'start' });
+    var h = sec.querySelector('h2');
+    if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+    if (location.hash) history.replaceState(history.state, '', location.pathname + location.search);
+  });
 
   // ---------- boot ----------
   $('scan-title').setAttribute('tabindex', '-1');
