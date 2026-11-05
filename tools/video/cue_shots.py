@@ -25,10 +25,14 @@ Plus:
   data-cue-named-shift; generic never asks for it
 - personalized (tools/scan_stub.py, ?r=demoRemove1): named mode, texts from the scan result in every prefab; every
   .rm-img = the scan's thumbs via <API>/api/thumb, loaded, still blurred; and ?name= keeps the default photos (img/removals)
-- cta-steps (generic end card): at cta + 0.9 step 1 typing (a proper prefix of the demo name), + 2.2 typed in full, + 3.3
-  step 2 mid-scan (bar 10-90 %, "N leaks found" rolling) = frame-1920-generic-cta-steps-step2.png; after the take ends
-  the post-roll clock keeps it looping: step 3 with the name flipped in (frame-1920-generic-cta-steps-step3-postroll.png);
-  named mode never shows it
+- cta-steps (generic end card): at cta + 0.9 step 1 typing (a proper prefix of the name typed in full at + 2.2), at + 2.2
+  the landing-style scan box typed DEMO ("Jaka Basej") in full + "Scan now" pressed (frame-1920-generic-cta-steps-step1.png,
+  phone-portrait-generic-cta-step1.png, phone-theater-generic-cta-step1.png; on-screen glyph size >= 10 px portrait,
+  >= 20 px theater), + 3.3 step 2 mid-scan (bar 10-90 %, "Searching <place>, step N of 9…", "N links found" rolling) =
+  frame-1920-generic-cta-steps-step2.png, through step 2 the places walk Google → … → Mega with N rising to "87 links
+  found"; after the take ends the post-roll clock keeps it looping: step 3 with the typed name flipped in
+  (frame-1920-generic-cta-steps-step3-postroll.png); named mode never shows it, its "for NAME" pill stays from
+  data-cue-say to the end and after the take ends (desktop-named-pill-after-end.png)
 - player: phone (touch): no native controls, own play bar, a tap on the stage plays + "Rotate for full size" hint;
   proof-phone-portrait-generic-google-live.png = the whole 390x844 screen, card inside the stage's right half;
   iPhone theater (declared: Fullscreen API removed by an init script, as on iPhone Safari): the button rotates the stage
@@ -40,15 +44,16 @@ Plus:
   (declared): generic at 0 s the bar sits under the stage, in view, with the pulsing "type your name" pill (gone after the
   first focus); an invalid name is rejected inline (message, URL unchanged); phone: in theater (declared: Fullscreen API
   removed, as iPhone) the "Your name" pill closes it and focuses the input; played past 2.4 s, SWAP_NAME + Enter →
-  the "REBUILDING FOR …" card, then within 2 s: ?name=<encoded> (replaceState, same document), named mode, playing from
-  < 2 s; spoken with SWAP_NAME at data-cue-say-start (desktop: and at data-cue-say), "for" pill; google at its live cue
+  at once (no rebuild card: no .vo-rb in the page, no pause event): ?name=<encoded> (replaceState, same document), named
+  mode, within 1 s playing from < 1 s ({vp}-swap-settled.png); spoken with SWAP_NAME at data-cue-say-start (desktop: and at data-cue-say), "for" pill; google at its live cue
   shows SWAP_NAME; cta-steps never shown (MutationObserver); Change re-opens the input prefilled; Reset → generic, URL
-  without query, restarted, end card back. Proof PNGs: frame-1920-swap-bar-generic-0s.png (page), frame-1920-swap-rebuilding.png,
+  without query, restarted, end card back. Proof PNGs: frame-1920-swap-bar-generic-0s.png (page), frame-1920-swap-settled.png,
   frame-1920-swap-google-live.png (1920x1080 stage).
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
 --break-steps serves index.html without the cta-steps animation (.vo-steps): only the "cta-steps:" checks go red.
 --break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap]
+--break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the "cta-steps: step 1 … DEMO" check goes red.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, pathlib, re, socket, subprocess, sys, time, urllib.parse
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -94,9 +99,13 @@ SFX_STUB = """window.__sfx = []; window.__actx = 0; { const A = window.AudioCont
   createBufferSource() { __sfx.push(['noise', +document.querySelector('video').currentTime.toFixed(2)]); return super.createBufferSource(); } }; }"""
 # cta-steps state: {off, so: [opacity per step], typed, bar, count, mini} or null without the animation
 STEPS = """() => { const c = document.querySelector('.vo-cta'), s = c && c.querySelector('.vo-steps'); if (!s) return null;
-  return {off: c.hasAttribute('data-off'), so: [...s.querySelectorAll('.vo-step')].map(e => +getComputedStyle(e).opacity), typed: s.querySelector('.vo-mi-t').textContent,
-          bar: +s.style.getPropertyValue('--bar'), count: s.querySelector('.vo-mc').textContent.replace(/\\s+/g, ' ').trim(), mini: s.querySelector('.vo-mini-n').textContent}; }"""
-DEMO = "Orla Brennick"
+  const mi = s.querySelector('.vo-mi-t'), k = +document.querySelector('.vo-box').style.getPropertyValue('--k');
+  return {off: c.hasAttribute('data-off'), so: [...s.querySelectorAll('.vo-step')].map(e => +getComputedStyle(e).opacity), typed: mi.textContent,
+          px: +(parseFloat(getComputedStyle(mi).fontSize) * k).toFixed(1), btn: s.querySelector('.vo-mbtn').textContent.trim(), press: +s.style.getPropertyValue('--press'),
+          ms: (s.querySelector('.vo-ms') || {}).textContent, bar: +s.style.getPropertyValue('--bar'), count: s.querySelector('.vo-mc').textContent.replace(/\\s+/g, ' ').trim(),
+          mini: s.querySelector('.vo-mini-n').textContent}; }"""
+DEMO, LEAKS = "Jaka Basej", 87
+PROGRESS = re.compile(r"Searching (Google|Google Images|X|Reddit|Mega), step ([1-9]) of 9…")
 # [stage rect, .vo-over rect, visible card rect, stage transform, data-vo-full, html overflow, video.controls]
 GEOM = """() => { const r = e => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; }, st = document.querySelector('.vo-stage'),
   card = [...document.querySelectorAll('.vo-pf')].find(e => !e.hasAttribute('data-off'));
@@ -312,21 +321,35 @@ def named_take(b, base, name, cues, shift):
 
 
 def cta_steps(pg, base, out, cta, name_q):
-    """the generic end card's 3-step loop, on the 1920x1080 page (pg)"""
+    """the generic end card's 3-step loop, on the 1920x1080 page (pg); returns the name step 1 typed in full"""
     goto(pg, base, "", round(cta + 0.9, 2))
-    s = pg.evaluate(STEPS)
-    check("cta-steps: cta + 0.9 = step 1, the name typing (a proper prefix of the demo name)",
-          s and s["so"][0] > .9 and s["so"][1] == 0 and 0 < len(s["typed"]) < len(DEMO) and DEMO.startswith(s["typed"]), s)
+    s0 = pg.evaluate(STEPS)
     goto(pg, base, "", round(cta + 2.2, 2))
+    f = out / "frame-1920-generic-cta-steps-step1.png"
+    pg.locator(".vo-stage").screenshot(path=str(f))
     s = pg.evaluate(STEPS)
-    check(f"cta-steps: cta + 2.2 = step 1, typed in full ({DEMO!r})", s and s["so"][0] > .9 and s["typed"] == DEMO, s)
+    full = s["typed"] if s else ""
+    check("cta-steps: cta + 0.9 = step 1, the name typing (a proper prefix of the name typed in full at + 2.2)",
+          s0 and s0["so"][0] > .9 and s0["so"][1] == 0 and 0 < len(s0["typed"]) < len(full) and full.startswith(s0["typed"]), (s0, full))
+    check(f"cta-steps: step 1 at cta + 2.2: the scan box typed DEMO {DEMO!r} in full, the 'Scan now' pill pressed -> {f.name}",
+          s and s["so"][0] > .9 and s["typed"] == DEMO and s["btn"] == "Scan now" and s["press"] > .5, s)
     goto(pg, base, "", round(cta + 3.3, 2))
     f = out / "frame-1920-generic-cta-steps-step2.png"
     pg.locator(".vo-stage").screenshot(path=str(f))
     s = pg.evaluate(STEPS)
-    n = re.fullmatch(r"(\d+) leaks found", s["count"]) if s else None
-    check(f"cta-steps: cta + 3.3 = step 2 mid-scan (bar 10-90 %, 'N leaks found' rolling to 37), steps 1 / 3 off -> {f.name}",
-          s and s["so"] == [0, 1, 0] and .1 < s["bar"] < .9 and n and 0 < int(n[1]) < 37, s)
+    n = re.fullmatch(r"(\d+) links found", s["count"]) if s else None
+    check(f"cta-steps: cta + 3.3 = step 2 mid-scan (bar 10-90 %, 'Searching <place>, step N of 9…', 'N links found' rolling to {LEAKS}), steps 1 / 3 off -> {f.name}",
+          s and s["so"] == [0, 1, 0] and .1 < s["bar"] < .9 and PROGRESS.fullmatch(s["ms"] or "") and n and 0 < int(n[1]) < LEAKS, s)
+    walk = []
+    for dt in (2.9, 3.3, 3.7, 4.1, 4.5, 5.0):
+        pg.evaluate("t => window.VideoOverlays.draw(t)", cta + dt)   # pure draw(t) of the loop (no seek needed)
+        s = pg.evaluate(STEPS)
+        walk.append((s["ms"], s["count"]))
+    m = [PROGRESS.fullmatch(w[0] or "") for w in walk[:-1]]
+    nums = [int(re.match(r"\d+", w[1])[0]) for w in walk]
+    check(f"cta-steps: step 2 walks Google → … → Mega, step N rising, ends at '{LEAKS} links found'",
+          all(m) and len({x[1] for x in m}) >= 4 and m[0][1] == "Google" and m[-1][1] == "Mega" and [int(x[2]) for x in m] == sorted(int(x[2]) for x in m)
+          and nums == sorted(nums) and walk[-1][1] == f"{LEAKS} links found", walk)
     # past the end: the post-roll clock keeps the loop going (the real take ends ~2 s after the cue)
     pg.goto(f"{base}video/?t=43.4")
     pg.wait_for_function(SEEKED, arg=43.4, timeout=15000)
@@ -341,12 +364,50 @@ def cta_steps(pg, base, out, cta, name_q):
     f = out / "frame-1920-generic-cta-steps-step3-postroll.png"
     pg.locator(".vo-stage").screenshot(path=str(f))
     s = pg.evaluate(STEPS)
-    check(f"cta-steps: after the video ends it keeps looping: step 3, the mini page flipped to {DEMO!r} -> {f.name}",
-          s and s["so"][2] > .9 and s["mini"] == DEMO and pg.evaluate("() => document.querySelector('video').ended"), s)
+    check(f"cta-steps: after the video ends it keeps looping: step 3, the mini page flipped to the typed name {full!r} -> {f.name}",
+          s and full and s["so"][2] > .9 and s["mini"] == full and pg.evaluate("() => document.querySelector('video').ended"), s)
     for t in (round(cta + 0.9, 2), round(cta + 3.3, 2)):
         goto(pg, base, name_q, t)
         s = pg.evaluate(STEPS)
         check(f"cta-steps: named mode never shows it (t={t:g})", s and s["off"] and pg.evaluate("() => document.documentElement.dataset.voMode") == "named", s)
+    # named: the name stays on screen at the end (the "for NAME" pill from data-cue-say on, also after the take ends)
+    nm = urllib.parse.unquote(name_q.split("=", 1)[1])
+    goto(pg, base, name_q, round(cta + 3.0, 2))
+    pill = lambda: pg.evaluate("() => { const e = document.querySelector('.vo-for'); return [e.hasAttribute('data-off'), e.innerText.replace(/\\s+/g, ' ').trim(), document.querySelector('video').ended]; }")
+    p1 = pill()
+    pg.goto(f"{base}video/?{name_q}&t=43.4")
+    pg.wait_for_function(SEEKED, arg=43.4, timeout=15000)
+    play(pg, 43.9)
+    pg.wait_for_function("() => document.querySelector('video').ended", timeout=8000)
+    pg.wait_for_timeout(1500)
+    f = out / "desktop-named-pill-after-end.png"
+    pg.locator(".vo-stage").screenshot(path=str(f))
+    p2 = pill()
+    check(f"named end: 'for {nm}' pill on at data-cue-say + 3 s and still 1.5 s after the take ended -> {f.name}",
+          not p1[0] and p1[1].endswith(f"for {nm}") and not p2[0] and p2[1].endswith(f"for {nm}") and p2[2], (p1, p2))
+    return full
+
+
+def cta_phone(b, base, out, cta, full):
+    """step 1 on an iPhone: portrait (the stage = the top 390x219) and the rotated theater; the typed name readable"""
+    ctx = ctx_new(b, **VIEWPORTS["phone"])
+    ctx.add_init_script(IPHONE_FS)
+    pg = ctx.new_page()
+    goto(pg, base, "", round(cta + 2.2, 2))
+    f = out / "phone-portrait-generic-cta-step1.png"
+    pg.screenshot(path=str(f))
+    s = pg.evaluate(STEPS)
+    check(f"cta-steps (phone portrait): step 1 shows the typed name {full!r} in full, on-screen glyphs >= 10 px -> {f.name}",
+          s and full and s["so"][0] > .9 and s["typed"] == full and s["px"] >= 10, s)
+    pg.locator(".vo-fs").tap()
+    pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+    pg.wait_for_timeout(400)
+    f = out / "phone-theater-generic-cta-step1.png"
+    pg.screenshot(path=str(f))
+    s = pg.evaluate(STEPS)
+    check(f"cta-steps (phone theater): step 1 shows {full!r}, on-screen glyphs >= 20 px -> {f.name}",
+          s and full and s["so"][0] > .9 and s["typed"] == full and s["px"] >= 20, s)
+    ctx.close()
 
 
 def swap(b, base, out, cues, cta, vp, opts):
@@ -395,31 +456,25 @@ def swap(b, base, out, cues, cta, vp, opts):
     play(pg, 2.4)
     before = pg.evaluate("() => document.querySelector('video').currentTime")
     pg.fill("#vo-nb-in", SWAP_NAME)
-    pg.evaluate("() => { window.__same = 1; window.__said.length = 0; }")
+    pg.evaluate("() => { window.__same = 1; window.__said.length = 0; window.__pauses = 0; document.querySelector('video').addEventListener('pause', () => __pauses++); }")
     t0 = time.monotonic()
     pg.press("#vo-nb-in", "Enter")
-    rb = None
-    try:
-        pg.wait_for_function("() => !document.querySelector('.vo-rb').hasAttribute('data-off') && +getComputedStyle(document.querySelector('.vo-rb')).opacity > .9", timeout=1000)
-        pg.wait_for_timeout(200)
-        pg.locator(".vo-stage").screenshot(path=str(out / f"{vp}-swap-rebuilding.png"))
-        rb = pg.evaluate("() => [document.querySelector('.vo-rb').innerText.replace(/\\s+/g, ' ').trim(), document.querySelector('video').paused]")
-    except Exception:
-        pass
-    check(f"swap ({vp}): the 'REBUILDING FOR {SWAP_NAME.upper()}…' card on the right half, video paused under it -> {vp}-swap-rebuilding.png",
-          rb == [f"REBUILDING FOR {SWAP_NAME.upper()}…", True], rb)
+    now = pg.evaluate("() => [document.querySelector('.vo-rb'), location.search, document.documentElement.dataset.voMode, document.querySelector('video').currentTime < 1]")
+    check(f"swap ({vp}): Enter → at once, no rebuild card (no .vo-rb in the page): {want_q}, named mode, back at 0", now == [None, want_q, "named", True], now)
     done = False
     try:
         pg.wait_for_function("""q => { const v = document.querySelector('video'); return location.search === q && document.documentElement.dataset.voMode === 'named'
-            && !v.paused && v.currentTime > 0 && v.currentTime < 2 && document.querySelector('.vo-rb').hasAttribute('data-off'); }""", arg=want_q,
-            timeout=max(1, 2000 - (time.monotonic() - t0) * 1000))
+            && !v.paused && v.currentTime > 0 && v.currentTime < 1; }""", arg=want_q, timeout=1000)
         done = True
     except Exception:
         pass
+    pg.wait_for_timeout(300)
+    pg.locator(".vo-stage").screenshot(path=str(out / f"{vp}-swap-settled.png"))
     dt = time.monotonic() - t0
     got = pg.evaluate("() => [location.search, document.documentElement.dataset.voMode, !document.querySelector('video').paused, document.querySelector('video').currentTime, window.__same === 1, document.querySelector('.vo-nb-n').textContent]")
-    check(f"swap ({vp}): {dt:.2f} s after Enter (< 2): {want_q}, same document, named mode, restarted from {before:.1f} s to < 2 s and playing, bar 'Rebuilt for {SWAP_NAME}'",
-          done and got[4] and got[5] == SWAP_NAME, (got, dt))
+    pauses = pg.evaluate("() => __pauses")
+    check(f"swap ({vp}): {dt:.2f} s after Enter: {want_q}, same document, named mode, restarted from {before:.1f} s, playing within 1 s, never paused, bar 'Rebuilt for {SWAP_NAME}' -> {vp}-swap-settled.png",
+          done and got[4] and got[5] == SWAP_NAME and pauses == 0, (got, dt, pauses))
     try:
         pg.wait_for_function("() => __said.length > 0", timeout=3000)
     except Exception:
@@ -427,7 +482,7 @@ def swap(b, base, out, cues, cta, vp, opts):
     pg.wait_for_timeout(150)
     said = pg.evaluate("() => __said")
     pill = pg.evaluate("() => { const e = document.querySelector('.vo-for'); return [e.hasAttribute('data-off'), e.innerText.replace(/\\s+/g, ' ').trim()]; }")
-    check(f"swap ({vp}): spoken once with {SWAP_NAME!r} at data-cue-say-start {cues['say-start']} after the restart (not during the card), 'for' pill",
+    check(f"swap ({vp}): spoken once with {SWAP_NAME!r} at data-cue-say-start {cues['say-start']} after the restart, 'for' pill",
           len(said) == 1 and said[0][0] == SWAP_NAME and cues["say-start"] <= said[0][1] < cues["say-start"] + 0.5 and not pill[0] and pill[1].endswith(f"for {SWAP_NAME}"), (said, pill))
     g = cues["google"]
     tg = round(g[0] + 1.3, 2)
@@ -566,6 +621,7 @@ def main():
     ap.add_argument("--break-thumbs", action="store_true")
     ap.add_argument("--break-steps", action="store_true")
     ap.add_argument("--break-swap", action="store_true")
+    ap.add_argument("--break-demo", action="store_true")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -579,6 +635,11 @@ def main():
         broken, k = re.subn(r"(inp\.blur\(\);)\n\s*rebuild\(n\);", r"\1", js)
         assert k == 1, "break: rebuild(n) call not found"
         BREAK["swap"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_demo:   # wire boundary: video-overlays.js with the old demo name
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"DEMO = '[^']*'", "DEMO = 'Orla Brennick'", js)
+        assert k == 1, "break: DEMO not found"
+        BREAK["demo"] = ("**/js/video-overlays.js", broken, "application/javascript")
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     tap = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', html)
@@ -701,7 +762,7 @@ def main():
         player(b, base, out, cues)
         for vp, opts in SWAP_VIEWPORTS.items():
             swap(b, base, out, cues, cta, vp, opts)
-        for f in ("bar-generic-0s", "rebuilding", "google-live"):
+        for f in ("bar-generic-0s", "settled", "google-live"):
             print(f"swap proof -> frame-1920-swap-{f}.png")
         # the framing proofs: the whole 1920x1080 frame
         ctx = ctx_new(b, viewport={"width": 1920, "height": 1080})
@@ -715,8 +776,9 @@ def main():
                 fx = pg.evaluate(FX, "mega")
                 rolls = pg.evaluate(VISIBLE)[0][4]
                 check("frame mega removed (named): counter at 0, stamp on, particles flying", "0 GB · 0 videos" in rolls and fx[7] == 1 and fx[8] > .3 and fx[6] == "block", (rolls, fx[6:9]))
-        cta_steps(pg, base, out, cta, name_q)
+        full = cta_steps(pg, base, out, cta, name_q)
         ctx.close()
+        cta_phone(b, base, out, cta, full)
         speech(b, base, out, a.name, cues)
         sfx(b, base, cues)
         named_take(b, base, a.name, cues, shift)
