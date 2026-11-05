@@ -249,6 +249,10 @@
 /* Section nav: docked under the site header once the report starts (in flow: no layout shift) */
 #report { --rnav-h: 52px; --pin-top: calc(var(--header-h) + var(--rnav-h) + 12px); }
 #report > .scan-section { scroll-margin-top: var(--rnav-h); }
+/* focus / scrollIntoView clear the pinned section nav (the header: html scroll-padding); not inside the pinned phone's
+   own screen (js: pin sync) */
+#report .g-stage :is(a, button) { scroll-margin: var(--rnav-h) 0 12px; }
+@media (min-height: 600px) { #report .ph-scroll :is(a, button) { scroll-margin: 0; } }
 .rnav { position: sticky; top: var(--header-h); z-index: 40; background: var(--bg); border-block: 1px solid var(--line); }
 .rnav-row { display: flex; align-items: center; gap: 6px; height: calc(var(--rnav-h) - 2px); }
 .rnav-who { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
@@ -280,7 +284,7 @@
 /* Reveal / Blur on the phone itself: the button above the frame scrolls away while the frame is pinned */
 .ph-track .ph-screen { padding-bottom: 64px; }   /* a bottom bar of its own for the Reveal pill + home bar: no result line under it */
 .ph-reveal { position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
-  border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 600 13px/1 var(--sans); box-shadow: 0 4px 14px rgb(0 0 0 / .45); cursor: pointer; }
+  border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 600 13px/1 var(--sans); white-space: nowrap; box-shadow: 0 4px 14px rgb(0 0 0 / .45); cursor: pointer; }
 .ph-reveal .icon { width: 16px; height: 16px; }
 .ph-reveal[aria-pressed="true"] { background: #e8eaed; color: #202124; }
 .ph-reveal:focus-visible { outline: 3px solid #8ab4f8; outline-offset: 2px; }

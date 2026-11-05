@@ -650,6 +650,26 @@ def huge_flow(browser, vp_name, vp):
             sc2 = p2.evaluate(SCROLLERS)
             check(f"{tag} short screen ({w}x{h}): frame not pinned, short preview, no inner scroll box; More results expands it",
                   r[0] == "static" and 0 < r[1] < 10 and r[2] and not sc and not sc2 and n2 > r[1], [r, sc, n2, sc2])
+            pl = p2.evaluate("() => { const r = document.querySelector('.ph-reveal').getBoundingClientRect(), s = document.querySelector('.ph-screen').getBoundingClientRect(); return [Math.round(r.height), Math.round(r.left - s.left), Math.round(s.right - r.right)]; }")
+            check(f"{tag} short screen ({w}x{h}): Reveal pill on one line, inside the phone screen", pl[0] <= 44 and min(pl[1:]) >= 8, pl)
+            # Show fewer: back to exactly the first look; focus on More, clear of the pinned header + section nav
+            fl = {}
+            for t, item in (("all", ".g-r"), ("images", ".g-tile"), ("videos", ".g-v")):
+                p2.locator(f"#g-tab-{t}").click()
+                p2.wait_for_timeout(200)
+                n0 = r[1] if t == "all" else p2.locator(f"#g-panel {item}").count()   # All: grown above
+                if t != "all":
+                    p2.locator(f"[data-more={t}]").click()
+                    p2.wait_for_timeout(200)
+                n1 = p2.locator(f"#g-panel {item}").count()
+                if p2.locator(f"[data-less={t}]").count():
+                    p2.locator(f"[data-less={t}]").click()
+                    p2.wait_for_timeout(300)
+                fl[t] = p2.evaluate("""([t, item]) => { const a = document.activeElement, r = a.getBoundingClientRect(), bar = document.querySelector('.rnav').getBoundingClientRect().bottom;
+                    return {n: document.querySelectorAll('#g-panel ' + item).length, more: a.matches('[data-more=' + t + ']'), top: Math.round(r.top), bar: Math.round(bar), inView: r.bottom <= innerHeight}; }""", [t, item])
+                fl[t].update(first=n0, grown=n1)
+            check(f"{tag} short screen ({w}x{h}): Show fewer restores each tab's first look exactly; focus on More, below the pinned bar, in view",
+                  all(v["n"] == v["first"] < v["grown"] and v["more"] and v["top"] >= v["bar"] and v["inView"] for v in fl.values()), fl)
             ctx.close()
         # rotation / resize: each tab not grown by More refits to the new screen; a tab grown by More keeps its items
         ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
@@ -682,10 +702,29 @@ def huge_flow(browser, vp_name, vp):
             p4.wait_for_timeout(300)
         sf = p4.evaluate("""() => { const m = document.querySelector('#g-panel [data-more=videos]'), r = m && m.getBoundingClientRect(), t = document.querySelector('.ph-track');
             return {run: t.offsetHeight - t.firstElementChild.offsetHeight, n: document.querySelectorAll('#g-panel .g-v').length, less: !!document.querySelector('[data-less]'),
-              focus: document.activeElement === m, seen: !!r && r.top >= 0 && r.bottom <= innerHeight}; }""")
+              focus: document.activeElement === m, seen: !!r && r.top >= document.querySelector('.rnav').getBoundingClientRect().bottom && r.bottom <= innerHeight}; }""")
         sf["grown"], sf["has_less"] = grown, has_less
         check(f"{tag} Show fewer: a grown tab goes back to a fitted first look (<= 1.5 screens), focus + view on its More button",
               has_less and grown > 1.5 * 640 and sf["run"] <= 1.5 * 640 and 0 < sf["n"] < 10 and not sf["less"] and sf["focus"] and sf["seen"], sf)
+        ctx.close()
+        # keyboard: Enter on "Show more images" until all are shown; focus stays in the panel (new tile / More / Show fewer)
+        ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        p6 = ctx.new_page()
+        p6.goto(base + "scan/?r=" + slug)
+        p6.wait_for_selector("#report:not([hidden])", timeout=8000)
+        p6.locator("#g-tab-images").click()
+        p6.wait_for_timeout(300)
+        kb = []
+        for _ in range(12):
+            m = p6.locator("#g-panel [data-more=images]")
+            if not m.count():
+                break
+            m.focus()
+            p6.keyboard.press("Enter")
+            p6.wait_for_timeout(150)
+            kb.append(p6.evaluate("() => { const a = document.activeElement; return [!!a.closest('#g-panel'), a.className, document.querySelectorAll('#g-panel .g-tile').length]; }"))
+        check(f"{tag} keyboard: Enter on More until every image shows, focus never leaves the panel (ends on Show fewer / a tile)",
+              kb and all(k[0] for k in kb) and not p6.locator("#g-panel [data-more=images]").count(), kb)
         ctx.close()
         # landscape phone: pinned chrome (site header + section nav) <= 15% of the screen height
         ctx = browser.new_context(viewport={"width": 844, "height": 390}, device_scale_factor=2, is_mobile=True, has_touch=True)

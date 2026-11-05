@@ -419,7 +419,7 @@
       if (innerWidth === vpW && Math.abs(innerHeight - vpH) < 150) return;
       vpW = innerWidth; vpH = innerHeight;
       if (state.device !== 'phone' || !state.data) return;
-      Object.keys(MORE0).forEach(function (t) { if (!state.expanded[t]) { state.more[t] = MORE0[t]; state.fitted[t] = false; state.first[t] = 0; } });
+      Object.keys(MORE0).forEach(function (t) { state.first[t] = 0; if (!state.expanded[t]) { state.more[t] = MORE0[t]; state.fitted[t] = false; } });
       if (!state.expanded[state.tab]) renderGoogle($('g-stage').contains(document.activeElement));
     }, 200);
   });
@@ -473,14 +473,15 @@
     var t = e.target.closest('[data-tab],[data-more],[data-less],[data-goto]');
     if (!t) return;
     if (t.dataset.tab) { state.tab = t.dataset.tab; renderGoogle(true); }
-    else if (t.dataset.less) {   // back to a first look; the view lands on its More button (pinned: the screen's end)
+    else if (t.dataset.less) {   // back to its first look; the view lands on its More button (pinned: the screen's end)
       var kl = t.dataset.less;
-      state.more[kl] = MORE0[kl];
-      state.expanded[kl] = state.fitted[kl] = false;   // the phone refits it to this screen
+      state.more[kl] = firstLook(kl);
+      state.expanded[kl] = false;
+      if (!state.first[kl]) state.fitted[kl] = false;   // no first look on this screen yet (resized since): the phone refits it
       renderGoogle(false);
       var mb = document.querySelector('#g-panel [data-more="' + kl + '"]') || $('g-tab-' + state.tab);
       if (pin && pin.on) window.scrollTo({ top: window.pageYOffset + pin.track.getBoundingClientRect().top - pin.top + pin.max, behavior: 'instant' });
-      else if (mb) mb.scrollIntoView({ block: 'nearest' });
+      else if (mb) mb.scrollIntoView({ block: 'nearest', behavior: 'instant' });
       if (mb) mb.focus({ preventScroll: true });
     }
     else if (t.dataset.goto) { state.tab = t.dataset.goto; renderGoogle(true); }
@@ -490,7 +491,7 @@
       state.expanded[k] = true;
       renderGoogle(false);
       var nx = document.querySelectorAll(sel)[had];   // keyboard: carry on at the first new result
-      var nb = (nx && nx.querySelector('a')) || document.querySelector('[data-more="' + k + '"]') || $('g-tab-' + state.tab);
+      var nb = (nx && nx.querySelector('a')) || document.querySelector('#g-panel [data-more="' + k + '"]') || document.querySelector('#g-panel [data-less]') || $('g-tab-' + state.tab);
       if (nb) nb.focus({ preventScroll: true });
     }
   });
