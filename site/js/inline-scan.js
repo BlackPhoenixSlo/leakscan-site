@@ -96,9 +96,12 @@
       if (d) res.push({ link: x.href, domain: d, title: str(r.title, 200), thumb: okThumb(r.thumb) ? r.thumb : null, kind: r.kind === 'video' ? 'video' : 'page' });
     });
     m.sites.sort(function (a, b) { return b.n - a.n; });
-    var imgs = E.imageItems((Array.isArray(raw.images) ? raw.images : []).slice(0, 200), res, okThumb, MAX_IMAGES);
-    // the ones that open a page first: the strip / grid / band lead with tiles that go somewhere
-    m.images = imgs.filter(function (it) { return it.link; }).concat(imgs.filter(function (it) { return !it.link; }));
+    var gi = (Array.isArray(raw.images) ? raw.images : []).slice(0, 200), imgs = E.imageItems(gi, res, okThumb, MAX_IMAGES), had = {};
+    imgs.forEach(function (it) { had[it.src] = 1; });
+    // the ones that open a page first: the strip / grid / band lead with tiles that go somewhere; then video results'
+    // stills (no badge; people-photo check like the rest), so a handle Google shows mostly as videos still fills the views
+    m.images = imgs.filter(function (it) { return it.link; }).concat(imgs.filter(function (it) { return !it.link; }),
+      E.imageItems(gi, res, okThumb, Infinity, true).filter(function (it) { return it.video && !had[it.src]; })).slice(0, MAX_IMAGES);
     m.videos = res.filter(E.isVideo);
     return m;
   }
@@ -219,8 +222,9 @@
     });
     return g;
   }
-  // view(m, box, max, cap): box shows the first `max` images that are still alive, refilled in order when one drops
-  function view(m, box, max, cap) {
+  // view(m, box, max, cap, skip): box shows the first `max` images that are still alive (src not in skip), refilled in
+  // order when one drops
+  function view(m, box, max, cap, skip) {
     var g = gallery(m), v = { box: box };
     v.sync = function () {
       var have = {};
@@ -228,7 +232,7 @@
         var src = el.getAttribute('data-src');
         if (g.dead[src]) el.remove(); else have[src] = 1;
       });
-      m.images.forEach(function (it) { if (box.children.length < max && !have[it.src]) box.appendChild(tile(it, m.slug, cap, g)); });
+      m.images.forEach(function (it) { if (box.children.length < max && !have[it.src] && !(skip && skip[it.src])) box.appendChild(tile(it, m.slug, cap, g)); });
     };
     g.views.push(v);
     v.sync();
@@ -604,7 +608,9 @@
     var empty = function (what) { return [make('p', 'm-empty', ['No ' + what + ' results for @' + m.handle + ' right now.'])]; };
     if (m.images.length) {
       var n = make('span', 'm-n');
-      put('images', [make('div', 'm-head', [n, revealBtn(band)]), view(m, make('div', 'm-grid'), BAND, true)]);
+      var inVids = {};   // a still its Videos tab already shows stays out of the band's Images grid
+      m.videos.slice(0, BAND_VIDEOS).forEach(function (v) { if (v.thumb) inVids[v.thumb] = 1; });
+      put('images', [make('div', 'm-head', [n, revealBtn(band)]), view(m, make('div', 'm-grid'), BAND, true, inVids)]);
       var count = function (k) { n.textContent = plural(k, 'image', 'images'); };
       gallery(m).subs.push(count);
       count(m.images.length);

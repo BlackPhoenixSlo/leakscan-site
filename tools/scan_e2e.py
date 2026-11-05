@@ -48,8 +48,8 @@ drift speed 0: only `drift:` checks may go red. --break-phones serves personaliz
 
 tabs (the owner's three asks): (1) report card ?r=demoBrokenT1 (stub: three page-result thumbs answer 404 / a 1×1
 blank, two are a flat site logo, a video still leads images[]): failed / blank / logo tiles leave the strip, the Images grid and the #free phone, the
-next image takes the slot, the label / tab / "+N more" / phone counts say what shows, every tile is painted, no video
-still; (2) #website copy → demo iframe → Before / After phones (in #showcase), their All / Images / Videos tabs switch
+next image takes the slot, the label / tab / "+N more" / phone counts say what shows, every tile is painted, video
+stills only after the real images; (2) #website copy → demo iframe → Before / After phones (in #showcase), their All / Images / Videos tabs switch
 on click and keys without moving anything, the demo pops out to a full-screen layer (Esc / button / backdrop close,
 focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the #free phone: same
 tabs, the illustration without a scan, her handle / rows / tiles / videos + Reveal with ?r=; no horizontal overflow.
@@ -95,8 +95,9 @@ dead_thumb = lambda u, extra=(): "DEAD" in u or "BLANK" in u or "LOGO" in u or a
 
 def _images(fx, alive=False, extra=()):
     """Mirror of inline-scan.js model().images: images[] (with the result that has that thumb) then results' thumbs,
-    gstatic only, deduped, video results' stills skipped, max 60; the ones with a link first. alive: minus the thumbs
-    the stub answers 404 or blank, plus `extra` (route-level 404s; gallery() drops them all). → [(src, link, domain)]"""
+    gstatic only, deduped, video results' stills skipped, max 60; the ones with a link first; then the video results'
+    stills (top-up), max 60 in all. alive: minus the thumbs the stub answers 404 or blank, plus `extra` (route-level 404s;
+    gallery() drops them all). → [(src, link, domain)]"""
     ok = lambda u: isinstance(u, str) and len(u) <= 600 and GS_RE.match(u)
     res = [r for r in fx.get("results", []) if r.get("link")]
     by, seen, out = {}, set(), []
@@ -114,7 +115,15 @@ def _images(fx, alive=False, extra=()):
         add(r.get("thumb"), r)
     out = out[:60]
     out = [o for o in out if o[1]] + [o for o in out if not o[1]]
+    had = {o[0] for o in out}
+    out = (out + [(u, by[u]["link"], by[u]["domain"]) for u, v in _scan_images(fx) if v and u not in had])[:60]
     return [o for o in out if not dead_thumb(o[0], extra)] if alive else out
+
+
+def _band(fx, ims):
+    """The #free band's Images grid: first 9 of `ims` minus the stills its Videos tab shows (first 3 video results)."""
+    v3 = {r.get("thumb") for r in [r for r in fx.get("results", []) if r.get("link") and is_video(r)][:3]}
+    return [x for x in ims if x[0] not in v3][:9]
 
 
 def _scan_images(fx, alive=False):
@@ -1961,7 +1970,7 @@ def inline_flow(browser, vp_name, vp):
     NI = len(IM)
     tile_href = lambda it: it[1] or base + "scan/?r=" + slug
     want_tiles = lambda k: [[tile_href(it), "_blank" if it[1] else "", "noopener noreferrer nofollow" if it[1] else "",
-                             API + "/api/thumb?u=" + quote(it[0], safe="")] for it in IM[:k]]
+                             API + "/api/thumb?u=" + quote(it[0], safe="")] for it in (_band(FX, IM) if k == 9 else IM[:k])]
     i = ill(page)
     check(f"{tag} thumbs: band: #free phone Images tab = her first 9 image results (link → result in a new tab, else the report)",
           i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] == "group"
@@ -2376,7 +2385,9 @@ def tabs_flow(browser, vp_name, vp):
           st["label"] == f"{len(A)} images on Google Images" and st["tab"] == str(len(A)) and st["more"] == (f"+ {len(A) - G} more in the full report" if len(A) > G else None), st)
     check(f"{tag} thumbs: every grid tile painted (loaded, >= 16 px, opacity 1), no empty square", len(st["painted"]) == min(G, len(A)) and all(st["painted"]), st["painted"])
     check(f"{tag} thumbs: strip = first 24 that load", st["strip"] == [x[0] for x in A[:24]], st["strip"][:3])
-    check(f"{tag} videos: no video still among the image tiles (grid, strip)", not (set(st["grid"] + st["strip"]) & vids) and any(u in vids for u in BROKEN["images"][:1]), sorted(vids)[:2])
+    vs = [u in vids for u in st["strip"]]
+    check(f"{tag} videos: video stills only after every real image (strip; images[]' leading still moved back), none if photos fill it",
+          any(u in vids for u in BROKEN["images"][:1]) and vs == sorted(vs) and st["strip"][:1] != BROKEN["images"][:1], [sum(vs), len(vs)])
     shot(page, "1-card-images-broken-removed", ".report-card")
     # the same report on the scan page: failed tiles leave its Images grid too
     ctx.close()
@@ -2665,7 +2676,7 @@ def tabs_flow(browser, vp_name, vp):
           vids: q('[data-live=band-videos] a.m-link').map(a => a.href), illus: q('.m-illus').filter(e => e.offsetParent !== null).length}; }""")
     check(f"{tag} free: report → search = @handle, All = her first 4 rows (new tab), Images = first 9 that load + count, Videos = her video results",
           lv["search"] == "@demo.creator" and lv["label"] == "Google results for @demo.creator" and [x[0] for x in lv["all"]] == [r[2] for r in rows[:4]]
-          and all(x[1] == "_blank" for x in lv["all"]) and lv["tiles"] == [x[0] for x in IMs[:9]] and lv["n"] == f"{len(IMs)} images"
+          and all(x[1] == "_blank" for x in lv["all"]) and lv["tiles"] == [x[0] for x in _band(FX, IMs)] and lv["n"] == f"{len(IMs)} images"
           and lv["vids"] == [r["link"] for r in VID[:3]] and lv["illus"] == 0, lv)
     for k in ("all", "images", "videos"):
         page.locator(f"#mt-free-{k}").click()
