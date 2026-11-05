@@ -6,6 +6,8 @@ the official site each client gets (fictional creator, built from the tessa temp
 iframes it as `showcase/`. The demo loads Google Fonts (so the homepage does too, via the iframe); `privacy.html`
 discloses that and `tools/check.py` keeps the two in sync. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
+Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py --variants` rebuilds them from
+the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB copy and any full-size photo > 200 KB).
 
 - Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card) · `#free` one Google
   phone (All / Images / Videos tabs; after a scan her real results, `js/inline-scan.js`) · `#why` · `#how` (7 steps) ·

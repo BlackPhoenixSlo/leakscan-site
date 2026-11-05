@@ -30,6 +30,7 @@ import textwrap
 from pathlib import Path
 
 import _sitelib as site
+import _variants
 
 OUT = site.PUBLIC / "imgs"
 CSS = site.PUBLIC / "css" / "base.css"
@@ -191,6 +192,7 @@ def main() -> int:
     colors = palette()
     for name in wanted:
         card(OUT / name, *SPECS[name], colors)
+    _variants.build()  # imgs/<W>/ copies follow the placeholders, never the old photos
 
     unused = sorted(set(SPECS) - set(wanted))
     print(f"Wrote {len(wanted)} placeholders to {OUT}")

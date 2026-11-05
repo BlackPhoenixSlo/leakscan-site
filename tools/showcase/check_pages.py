@@ -14,7 +14,9 @@ showcase, so those two legs are gone. Two showcase-only rules replace them:
 every page is <meta name="robots" content="noindex, nofollow"> (the demo must
 not rank), and every page carries the demo ribbon linking back to the
 Abolita landing page one level above site/showcase/. Every page also has
-exactly one <h1> and no skipped heading levels (h2 -> h4). A page using
+exactly one <h1> and no skipped heading levels (h2 -> h4). Responsive image
+variants (imgs/<W>/, _variants.py) must exist, match their full-size photo,
+fit their weight budget and carry true w descriptors + sizes. A page using
 [data-fade] sets html.js in an inline <head> script, and the CSS hides
 [data-fade] only under .js, so the content shows with JS off or main.js down.
 
@@ -40,6 +42,7 @@ from urllib.parse import urlsplit
 
 import _sitelib as site
 from _make_placeholders import SPECS
+import _variants
 
 # Pages that legitimately do not carry the site chrome.
 NO_CHROME: set[str] = set()
@@ -340,6 +343,7 @@ def main() -> int:
     errors += check_link_purpose(parsed)
     errors += check_showcase(parsed, paths)
     errors += check_fade_css()
+    errors += _variants.problems()
 
     for e in errors:
         print(f"FAIL  {e}")

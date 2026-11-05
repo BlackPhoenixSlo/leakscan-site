@@ -7,6 +7,8 @@ Each image is cropped to the aspect ratio _make_placeholders.SPECS gives for
 its filename, at SPECS size (never upscaled), then saved as WebP at the
 highest quality that fits its weight budget, stepping the size down if even
 q=60 does not fit. Give file names to rebuild only those. Downloads stay in the cache dir, outside the repo.
+Last, the responsive variants pages reference (imgs/<W>/NAME, see _variants.py) are re-derived from the
+full-size files; --variants does only that step (offline).
 The demo creator is fictional; the photos are one Pexels series of one model (a potter in her studio), so the
 site reads as one real person. Output is capped at MAX_W px wide and BUDGET bytes (page weight).
 """
@@ -19,6 +21,7 @@ import urllib.request
 from PIL import Image
 
 import _sitelib as site
+import _variants
 from _make_placeholders import SPECS
 
 OUT = site.PUBLIC / "imgs"
@@ -90,8 +93,12 @@ def encode(im, budget):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", default="/tmp/showcase-px/src")
+    ap.add_argument("--variants", action="store_true", help="only rebuild imgs/<W>/ variants from imgs/")
     ap.add_argument("only", nargs="*", help="rebuild only these files")
     a = ap.parse_args()
+    if a.variants:
+        _variants.build()
+        return 0
     unknown = set(a.only) - set(IMAGES)
     if unknown:
         sys.exit(f"unknown image(s): {', '.join(sorted(unknown))}")
@@ -110,6 +117,7 @@ def main():
         data, size, q = encode(im, HERO_BUDGET if name in HEROES else BUDGET)
         (OUT / name).write_bytes(data)
         print(f"{name:28} {size[0]}x{size[1]}  q{q}  {len(data) // 1024} KB  (pexels {pid})")
+    _variants.build()
     return 0
 
 
