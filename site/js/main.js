@@ -40,10 +40,12 @@
     var hero = document.querySelector('.hero');
     var contact = document.getElementById('contact');
     if (cta && hero) {
-      var heroOut = false, contactIn = false;
-      var update = function () { cta.classList.toggle('show', heroOut && !contactIn); };
+      var heroOut = false, contactIn = false, demoIn = false, demo = document.querySelector('#showcase .browser-demo');
+      var update = function () { cta.classList.toggle('show', heroOut && !contactIn && !demoIn); };
       new IntersectionObserver(function (en) { heroOut = !en[0].isIntersecting; update(); }).observe(hero);
       if (contact) new IntersectionObserver(function (en) { contactIn = en[0].isIntersecting; update(); }).observe(contact);
+      // and while the showcase preview is behind the bar (the bottom quarter of the screen): it would cover the preview
+      if (demo) new IntersectionObserver(function (en) { demoIn = en[0].isIntersecting; update(); }, { rootMargin: '-75% 0px 0px 0px' }).observe(demo);
     }
   }
 })();

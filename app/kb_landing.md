@@ -16,9 +16,9 @@
 - Business: Ognjeni Feniks, Jaka Basej, s.p., Ljubljana, Slovenia (address on the privacy page: Kvedrova cesta 5A, 1000 Ljubljana, Slovenia).
 
 ## Free, before you pay anything
-- "See what the scan finds. See me remove one. Then decide." No sales call, no trial that quietly renews.
+- "See what the scan finds. See me remove one. Then decide." One compact band: two short lines, buttons "Scan free" (jumps to the scan box) and "Send me the report", and a mini Google Images view (placeholder tiles; after a scan, your handle's image results, blurred until you tap Reveal).
 - Free scan: runs right here on the site. Type your handle into the box at the top of the page (platforms: OnlyFans, Instagram, Fansly, TikTok, Patreon). It checks hundreds of known leak sites for copies of your content and gives you a report link with every link it found. "Free. No account. You see every link it finds." No account, no card. The scan also has its own page (scan/).
-- One page removed free, so you see it work: send Jaka the report link. He picks one leak page from it, usually the simplest site, and gets it taken down. You see the work and the result before any money changes hands. No account, no credit card, just the report link in a message.
+- One page removed free, so you see it work: send Jaka the report link. He picks one leak page from it, usually the simplest site, and gets it taken down. You see the work and the result before any money changes hands. "No account. No credit card. Just the report link in a message."
 - Then €250/month or €500 one-time, only if you continue.
 
 ## Pricing (prices in EUR)

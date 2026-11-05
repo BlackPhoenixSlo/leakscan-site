@@ -5,7 +5,6 @@
   var E = window.LeakScanEngine;
   var REPORT_BASE = E.REPORT_BASE, PLATFORMS = E.PLATFORMS, cleanHandle = E.cleanHandle, thumb = E.thumb, setMessages = E.setMessages;
   var MAX_THUMBS = 30;
-  var FAV_COLORS = ['#ea4335', '#4285f4', '#34a853', '#fbbc05', '#ab47bc', '#00acc1', '#ff7043']; // cse_mosaic _TAB_PALETTE
   var G_COLORS = ['#4285f4', '#ea4335', '#fbbc05', '#4285f4', '#34a853', '#ea4335'];
 
   var $ = function (id) { return document.getElementById(id); };
@@ -196,14 +195,7 @@
   }
 
   // ---------- "What Google shows" ----------
-  function favColor(dom) {
-    var s = 0;
-    for (var i = 0; i < dom.length; i++) s += dom.charCodeAt(i);
-    return dom ? FAV_COLORS[s % FAV_COLORS.length] : FAV_COLORS[0];
-  }
-  function fav(dom, cls) {
-    return '<span class="' + (cls || 'g-fav') + '" style="background:' + favColor(dom) + '" aria-hidden="true">' + esc((dom.charAt(0) || '?').toUpperCase()) + '</span>';
-  }
+  function fav(dom, cls) { return E.fav(dom, cls).outerHTML; }
   function siteName(dom) { var b = dom.split('.')[0] || dom; return b.charAt(0).toUpperCase() + b.slice(1); }
   function crumbs(u) {
     try {
@@ -216,23 +208,20 @@
       return '<span style="color:' + G_COLORS[i] + '">' + c + '</span>';
     }).join('') + '</span>';
   }
-  function imageItems(d) {
-    var byThumb = {}, seen = {}, out = [];
-    d.results.forEach(function (r) { if (r.thumb && !byThumb[r.thumb]) byThumb[r.thumb] = r; });
-    var add = function (u, r) {
-      if (typeof u !== 'string' || seen[u] || !thumb(u)) return;
-      seen[u] = 1;
-      out.push({ src: u, title: r ? r.title : '', domain: r ? r.domain : '', link: r ? r.link : '' });
-    };
-    d.images.forEach(function (u) { add(u, byThumb[u]); });
-    d.results.forEach(function (r) { add(r.thumb, r); });
-    return out.slice(0, MAX_THUMBS);
-  }
+  function imageItems(d) { return E.imageItems(d.images, d.results, thumb, MAX_THUMBS); }
   function img(u, alt) {
     return '<span class="g-img"><img src="' + esc(thumb(u)) + '" alt="' + esc(alt || '') + '" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';
   }
   function a(u, cls, inner) {
     return '<a class="' + cls + '" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer nofollow">' + inner + '</a>';
+  }
+  // "open ↗" on hover / focus; on touch screens a small ↗ that is always there (css: .g-go)
+  var GO = '<span class="g-go" aria-hidden="true"><span class="g-go-w">open </span>↗</span>';
+  // the pill rides on the title's last word (never alone on a line); a long last word (a bare URL) wraps as before
+  function titled(t) {
+    t = esc(String(t).trim());
+    var i = t.lastIndexOf(' '), w = t.slice(i + 1);
+    return w.length > 24 ? t + GO : t.slice(0, i + 1) + '<span class="g-nw">' + w + GO + '</span>';
   }
   function more(kind, label, left) {
     return left > 0 ? '<button type="button" class="g-more" data-more="' + kind + '">' + esc(label) + '</button>' : '';
@@ -244,7 +233,9 @@
     var h = phone ? '' : '<p class="g-stats">About ' + num(d.google_total) + ' results</p>';
     if (imgs.length) {
       h += '<div class="g-pack"><p class="g-pack-h">Images</p><div class="g-pack-row">' +
-        imgs.map(function (it) { return img(it.src, it.title); }).join('') +
+        imgs.map(function (it) {
+          return '<button type="button" class="g-pack-b" data-goto="images" aria-label="Show image results">' + img(it.src, '') + '</button>';
+        }).join('') +
         '</div><button type="button" class="g-more g-more-sm" data-goto="images">Show more images</button></div>';
     }
     if (!pages.length) return h + '<p class="g-empty">No web results indexed for this handle.</p>';
@@ -252,7 +243,7 @@
     h += pages.slice(0, n).map(function (r) {
       return '<div class="g-r"><div class="g-src">' + fav(r.domain) + '<div class="g-src-t"><span class="g-site">' + esc(siteName(r.domain)) +
         '</span><span class="g-cite">' + esc(crumbs(r.link)) + '</span></div></div>' +
-        a(r.link, 'g-title', esc(r.title || r.link)) + (r.snippet ? '<p class="g-snip">' + esc(r.snippet) + '</p>' : '') + '</div>';
+        a(r.link, 'g-title', titled(r.title || r.link)) + (r.snippet ? '<p class="g-snip">' + esc(r.snippet) + '</p>' : '') + '</div>';
     }).join('');
     return h + more('all', 'More results', pages.length - n);
   }
@@ -260,11 +251,13 @@
     var items = imageItems(d);
     if (!items.length) return '<p class="g-empty">No image results indexed for this handle.</p>';
     var n = phone ? Math.min(state.more.images, items.length) : items.length;
-    var h = '<div class="g-safe" aria-hidden="true"><span>SafeSearch</span><span class="chip-g on">✓ Off</span><span class="chip-g">Blur</span><span class="chip-g">Filter</span></div>';
+    var h = '<div class="g-safe" aria-hidden="true"><span>SafeSearch off: what anyone searching your handle sees</span></div>';
     h += '<div class="g-grid">' + items.slice(0, n).map(function (it) {
-      var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>' : '';
+      // an image no result has: same caption shape, credited to Google Images (nothing to open: this is the report)
+      var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>'
+        : '<span class="g-ct">Image result</span><span class="g-cs">' + fav('google.com', 'g-fav-s') + 'Google Images</span>';
       var tile = img(it.src, it.title || 'Image result');
-      return '<figure class="g-tile">' + (it.link ? a(it.link, 'g-tile-a', tile) : tile) + (cap ? '<figcaption>' + cap + '</figcaption>' : '') + '</figure>';
+      return '<figure class="g-tile">' + (it.link ? a(it.link, 'g-tile-a', tile + GO) : tile) + '<figcaption>' + cap + '</figcaption></figure>';
     }).join('') + '</div>';
     return h + more('images', 'Show more images', items.length - n);
   }
@@ -273,8 +266,8 @@
     if (!vids.length) return '<p class="g-empty">No video results indexed for this handle</p>';
     return vids.map(function (r) {
       var t = r.thumb && thumb(r.thumb) ? img(r.thumb, r.title) : '<span class="g-img g-img-none"></span>';
-      return '<div class="g-v">' + a(r.link, 'g-vthumb', t + '<span class="g-play" aria-hidden="true"></span>') +
-        '<div class="g-vbody">' + a(r.link, 'g-title', esc(r.title || r.link)) +
+      return '<div class="g-v">' + a(r.link, 'g-vthumb', t + '<span class="g-play" aria-hidden="true"></span>' + GO) +
+        '<div class="g-vbody">' + a(r.link, 'g-title', titled(r.title || r.link)) +
         '<span class="g-cite">' + fav(r.domain, 'g-fav-s') + esc(r.domain) + esc(crumbs(r.link).replace(/^https?:\/\/[^ ]+/, '')) + '</span>' +
         (r.snippet ? '<p class="g-snip">' + esc(r.snippet) + '</p>' : '') + '</div></div>';
     }).join('');
@@ -315,7 +308,7 @@
     stage.querySelectorAll('img').forEach(function (im) {
       im.addEventListener('error', function () { im.parentNode.classList.add('g-img-none'); im.remove(); }, { once: true });
     });
-    if (!phone) fitComputer();
+    if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
     if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus(); }
   }
   var ro = null;
@@ -323,8 +316,10 @@
     var wrap = document.querySelector('.cw-scale'), frame = wrap && wrap.firstElementChild;
     if (!frame) return;
     var fit = function () {
-      var s = Math.min(1, wrap.clientWidth / frame.offsetWidth);
+      if (!wrap.isConnected) return;   // replaced by the next render (ResizeObserver still reports it, at 0 px)
+      var s = Math.min(1, wrap.clientWidth / frame.offsetWidth), hint = $('g-hint');
       frame.style.transform = s < 1 ? 'scale(' + s + ')' : '';
+      if (hint) hint.toggleAttribute('data-small', s < 0.6);   // tabs / tiles below a usable tap size: point to the Phone view
       wrap.style.height = Math.ceil(frame.offsetHeight * s) + 'px';
     };
     fit();
@@ -354,6 +349,10 @@
     i = e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length;
     state.tab = TABS[i][0];
     renderGoogle(true);
+  });
+  document.addEventListener('click', function (e) {   // "Switch to Phone" in the hint = the Phone toggle
+    var b = e.target.closest && e.target.closest('[data-device-go]'), r = b && document.querySelector('#device input[value="' + b.getAttribute('data-device-go') + '"]');
+    if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event('change')); r.focus(); }
   });
   document.querySelectorAll('#device input').forEach(function (r) {
     r.checked = r.value === state.device;

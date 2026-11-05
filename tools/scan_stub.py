@@ -18,10 +18,11 @@ Serves site/ and the API routes of the contract the scan page talks to:
   socials read off leak pages; stub-mixed / stub-empty carry none.
 - GET /api/profile/<slug> → {slug, profile}; GET /api/avatar/<slug> → a generated PNG when profile.avatar is true, else 404.
 - GET /api/media/<slug> (demo photos, arrive after the scan) → polls 1-2: {status:"pending", images:[2]}, then
-  {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (generated PNG bytes). evilR3port01
+  {status:"ready", images:[6]}; srcs are <this API origin>/api/media/<slug>/<n>.jpg (the portrait
+  showcase people photos in site/showcase/imgs, served as webp; the e2e checks the swap by src). evilR3port01
   also lists off-origin / javascript: srcs (must be dropped). --media none → {status:"none", images:[]}; --media 404 → 404.
   POST /__stub/media?slug=<slug>[&mode=normal|relative|none|404] resets that slug's poll counter (and mode) for a test.
-- GET /api/thumb?u=<https url> → a generated SVG placeholder (size/colour derived from u), never fetches u.
+- GET /api/thumb?u=<https url> → one of those photos (picked by a hash of u, webp), never fetches u.
 - POST /api/chat  {kb: "landing", messages: [{role, content}], slug?} → SSE: `token` events (data = JSON-encoded text
   chunk) streaming CHAT_ANSWER (markdown with an anchor, allowed + forbidden links, bold, bullets), then `done`. A last
   user message containing stub-fail → some tokens then `failed`; stub-429 → 429 rate_limited. Each request body is
@@ -77,16 +78,21 @@ def make_result(handle, platform, empty=False):
     return r
 
 
-def placeholder_svg(u):
-    h = hashlib.sha256(u.encode()).digest()
-    w, ht = 300, [220, 300, 400, 450, 260, 380][h[0] % 6]
-    c1, c2 = f"hsl({h[1] * 360 // 256} 45% 55%)", f"hsl({h[2] * 360 // 256} 50% 28%)"
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{ht}" viewBox="0 0 {w} {ht}">'
-            f'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{c1}"/>'
-            f'<stop offset="1" stop-color="{c2}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/>'
-            f'<circle cx="{w * (30 + h[3] % 40) // 100}" cy="{ht * 2 // 5}" r="{w // 6}" fill="rgb(255 255 255 / .35)"/>'
-            f'<rect x="{w // 4}" y="{ht * 3 // 5}" width="{w // 2}" height="{ht // 4}" rx="20" fill="rgb(255 255 255 / .2)"/>'
-            f'</svg>').encode()
+# the showcase people photos already in the repo (portrait ones, 1067-1400 px wide): no extra binary fixtures
+MEDIA_FILES = [ROOT / "site" / "showcase" / "imgs" / f"{n}.webp" for n in (   # 0 = the demo hero: a face with room around it
+    "editorial-02", "editorial-01", "behind-the-scenes", "editorial-03", "editorial-04")]
+
+
+# Google thumbs: every showcase photo (not the og card / favicons), so a 16-tile grid shows 16 different pictures
+THUMB_FILES = sorted(f for f in (ROOT / "site" / "showcase" / "imgs").glob("*.webp") if f.stem != "og")
+
+
+def stand_in(key, pool=MEDIA_FILES):
+    """A people photo standing in for a Google thumb / a gathered media photo (bytes). The fixture's thumb ids are
+    numbered (…DEMO0001…): the number walks the pool, so neighbours never repeat; else a hash of key picks."""
+    n = re.search(r"DEMO(\d+)", key)
+    i = int(n.group(1)) if n else hashlib.sha256(key.encode()).digest()[0]
+    return pool[i % len(pool)].read_bytes()
 
 
 def avatar_png(seed, w=48, h=48, cell=12):
@@ -160,10 +166,10 @@ class Handler(SimpleHTTPRequestHandler):
                 ans = media_answer(parts[0], f"http://{self.headers.get('Host')}")
                 return self.send_json(200, ans) if ans else self.send_json(404, {"error": "not_found"})
             if len(parts) == 2 and parts[0] in STORE and re.fullmatch(r"\d{1,2}\.jpg", parts[1]):
-                body = avatar_png(parts[0] + parts[1], 120, 160, 20)
+                body = MEDIA_FILES[int(parts[1].split(".")[0]) % len(MEDIA_FILES)].read_bytes()
                 self.send_response(200)
                 self.cors()
-                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Type", "image/webp")
                 self.send_header("Cache-Control", "max-age=3600")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -185,10 +191,10 @@ class Handler(SimpleHTTPRequestHandler):
             src = parse_qs(u.query).get("u", [""])[0]
             if not src.startswith("https://"):
                 return self.send_json(400, {"error": "bad_url"})
-            body = placeholder_svg(src)
+            body = stand_in(src, THUMB_FILES)
             self.send_response(200)
             self.cors()
-            self.send_header("Content-Type", "image/svg+xml")
+            self.send_header("Content-Type", "image/webp")
             self.send_header("Cache-Control", "max-age=3600")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()

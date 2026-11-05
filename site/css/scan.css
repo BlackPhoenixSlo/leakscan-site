@@ -51,10 +51,20 @@
 .seg { display: inline-flex; margin: 0; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
 .seg label { position: relative; }
 .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg label { cursor: pointer; }
+.seg span { transition: background-color .15s, color .15s; }
+@media (hover: hover) { .seg input:not(:checked):hover + span { background: var(--surface-2); color: var(--ink); } }
 .seg span { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 999px; font-weight: 600; color: var(--muted); }
 .seg input:checked + span { background: var(--accent); color: var(--on-accent); }
 .seg input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
 #reveal[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.g-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 14px; color: var(--muted); font-size: .92rem; }
+@media (max-width: 559px) { .g-hint { justify-content: flex-start; align-items: flex-start; font-size: .88rem; line-height: 1.4; } .g-hint .icon { margin-top: 2px; } }
+.g-hint .icon { width: 16px; height: 16px; flex: none; color: var(--accent); }
+/* the hint fits the device: "Click" with a mouse, "Tap" on touch; a computer frame shrunk below tap size says so (js: fitComputer) */
+.g-hint-click, .g-hint-small, .g-hint[data-small] .g-hint-tap, .g-hint[data-small] .g-hint-click { display: none; }
+.g-hint[data-small] .g-hint-small { display: inline; }
+@media (hover: hover) and (pointer: fine) { .g-hint:not([data-small]) .g-hint-tap { display: none; } .g-hint:not([data-small]) .g-hint-click { display: inline; } }
 .g-stage { display: flex; justify-content: center; }
 .g-note { margin: 14px auto 0; text-align: center; color: var(--muted); font-size: .9rem; }
 .after-card { max-width: 720px; margin: 24px auto 0; padding: 20px 22px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); text-align: center; }
@@ -78,11 +88,13 @@
 .g-tabs { display: flex; align-items: stretch; gap: 4px; border-bottom: 1px solid var(--g-line); overflow-x: auto; scrollbar-width: none; }
 .g-tabs::-webkit-scrollbar { display: none; }
 .g-tab, .g-tab-deco { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--g-tab); font: inherit; font-size: 14px; white-space: nowrap; }
-.g-tab { cursor: pointer; border-radius: 0; }
+.g-tab { cursor: pointer; border-radius: 8px 8px 0 0; color: var(--g-text); font-weight: 600; transition: background-color .15s, color .15s; }
 .g-tab[aria-selected="true"] { color: var(--g-on); border-bottom-color: var(--g-on); }
-.g-tab:hover { color: var(--g-text); }
-.g-tab:focus-visible { outline: 2px solid var(--g-on); outline-offset: -2px; border-radius: 4px; }
-.g-tab-deco { color: var(--g-muted); }
+@media (hover: hover) { .g-tab:hover { background: rgb(255 255 255 / .08); } }
+@media (hover: hover) { .g-tab:not([aria-selected="true"]):hover { border-bottom-color: var(--g-line); } }
+.g-tab:focus-visible { outline: 2px solid var(--g-on); outline-offset: -2px; border-radius: 6px; }
+/* decorative: the real Google has them, this frame doesn't switch to them */
+.g-tab-deco { color: var(--g-muted); opacity: .45; cursor: default; user-select: none; }
 .g-panel { padding: 12px 16px 24px; }
 .g-stats { margin: 0 0 14px; color: var(--g-muted); font-size: 13px; }
 .g-empty { margin: 28px 0; color: var(--g-muted); text-align: center; }
@@ -95,10 +107,30 @@
 .g-site { font-size: 14px; color: var(--g-text); }
 .g-cite { font-size: 12px; color: var(--g-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: block; }
 .g-dark .g-title { display: block; color: var(--g-on); font-size: 20px; line-height: 1.3; margin: 2px 0 4px; }
-.g-dark .g-title:hover { text-decoration: underline; }
+@media (hover: hover) { .g-dark .g-title:hover, .g-dark .g-title:focus-visible { text-decoration: underline; } }
+.g-dark .g-title:focus-visible { outline: 2px solid var(--g-on); outline-offset: 3px; border-radius: 4px; }
+/* "open ↗": on hover / focus; on touch screens a small ↗ that is always there */
+.g-go { display: inline-block; pointer-events: none; padding: 2px 8px; border-radius: 999px; background: rgb(0 0 0 / .72); color: #fff;
+  font: 600 11px/1.4 Arial, sans-serif; letter-spacing: .02em; white-space: nowrap; opacity: 0; transition: opacity .15s, transform .15s; }
+.g-nw { white-space: nowrap; }
+.g-title .g-go { margin-left: 8px; vertical-align: 3px; background: var(--g-pill); color: var(--g-text); transform: translateX(-3px); }
+.g-tile-a .g-go, .g-vthumb .g-go { position: absolute; top: 6px; right: 6px; z-index: 2; transform: translateY(-2px); }
+@media (hover: hover) { a:hover .g-go, a:focus-visible .g-go { opacity: 1; transform: none; } }
+@media (hover: none) {
+  .g-dark .g-go { opacity: .92; transform: none; padding: 0; width: 22px; height: 22px; text-align: center; line-height: 22px; font-size: 12px; }
+  .g-go-w { display: none; }
+}
+.g-tile-a, .g-vthumb { position: relative; display: block; border-radius: 10px; }
+.g-tile-a .g-img, .g-vthumb .g-img { transition: box-shadow .15s; }
+@media (hover: hover) { .g-tile-a:hover .g-img, .g-vthumb:hover .g-img { box-shadow: 0 0 0 2px var(--g-on); } }
+.g-tile-a:focus-visible, .g-vthumb:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; }
+@media (hover: hover) { .g-tile-a:hover + figcaption .g-ct { text-decoration: underline; } }
+.g-pack-b { display: block; width: 100%; padding: 0; border: 0; border-radius: 10px; background: none; cursor: pointer; }
+@media (hover: hover) { .g-pack-b:hover .g-img { box-shadow: 0 0 0 2px var(--g-on); } }
+.g-pack-b:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; }
 .g-snip { margin: 0; color: var(--g-tab); font-size: 14px; line-height: 1.58; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .g-more { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 420px; min-height: 44px; margin: 8px auto 0; border: 1px solid var(--g-line); border-radius: 999px; background: var(--g-pill); color: var(--g-text); font: inherit; font-size: 14px; cursor: pointer; }
-.g-more:hover { background: #3c4043; }
+@media (hover: hover) { .g-more:hover { background: #3c4043; } }
 .g-more:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; }
 .g-more-sm { max-width: 260px; margin: 10px 0 0; }
 
@@ -112,11 +144,11 @@
 .g-pack { margin: 0 0 26px; padding-bottom: 18px; border-bottom: 1px solid var(--g-line); }
 .g-pack-h { margin: 0 0 10px; font-size: 18px; }
 .g-pack-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
-.g-pack-row .g-img { aspect-ratio: 1; }
+.g-pack-row .g-img { aspect-ratio: 1; transition: box-shadow .15s; }
 .g-pack-row .g-img img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Images tab */
-.g-safe { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; color: var(--g-muted); font-size: 13px; }
+.g-safe { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; color: var(--g-muted); font-size: 13px; }   /* plain caption, no fake controls */
 .chip-g { padding: 6px 14px; border-radius: 999px; background: rgb(32 33 36); color: var(--g-muted); }
 .chip-g.on { background: rgb(26 115 232); color: #fff; }
 .g-grid { column-count: 8; column-gap: 8px; }

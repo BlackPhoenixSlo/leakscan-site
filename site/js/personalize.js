@@ -58,6 +58,14 @@
     var h = x.hostname.toLowerCase();
     return PLAT[key].slice(1).some(function (d) { return h === d || h.slice(-d.length - 1) === '.' + d; }) ? x.href : null;
   }
+  // a leak page's own URL: http(s), no credentials, on that site (or a subdomain of it)
+  function hitUrl(u, d) {
+    if (typeof u !== 'string' || u.length > 600 || !/^https?:\/\/[^\s"'<>\\]+$/i.test(u)) return null;
+    var x;
+    try { x = new URL(u); } catch (e) { return null; }
+    var h = x.hostname.toLowerCase().replace(/^www\./, '');
+    return !x.username && !x.password && (h === d || h.slice(-d.length - 1) === '.' + d) ? x.href : null;
+  }
   function cleanProfile(p) {
     if (!p || typeof p !== 'object') return null;
     var o = {
@@ -82,13 +90,15 @@
     if (!r || typeof r !== 'object') return null;
     var h = handle(r.handle);
     if (!h) return null;
-    var occ = {}, order = [];
+    var occ = {}, order = [], urls = {}, best = {};
     (Array.isArray(r.hits) ? r.hits : []).slice(0, 1000).forEach(function (x) {
       var d = x && domain(x.domain);
       if (!d) return;
       var n = typeof x.occurrences === 'number' && x.occurrences > 0 ? Math.min(x.occurrences, 1e6) : 1;
       if (!occ.hasOwnProperty(d)) { occ[d] = 0; order.push(d); }
       occ[d] += n;
+      var u = hitUrl(x.url, d); // the phone's row for this site opens its most-seen page
+      if (u && !(best[d] >= n)) { best[d] = n; urls[d] = u; }
     });
     order.sort(function (a, b) { return occ[b] - occ[a]; });
     var images = (Array.isArray(r.images) ? r.images : []).filter(function (u) {
@@ -106,7 +116,9 @@
       fseen[k] = 1;
       found.push({ key: k, handle: fh, url: accountUrl(a.url, k) });
     });
-    return { slug: slug, handle: h, platform: platKey(r.platform), leaks: order.slice(0, 4), images: images.slice(0, 3),
+    var leaks = order.slice(0, 4), top = {};
+    leaks.forEach(function (d) { if (urls[d]) top[d] = urls[d]; });
+    return { slug: slug, handle: h, platform: platKey(r.platform), leaks: leaks, urls: top, images: images.slice(0, 3),
       profile: cleanProfile(r.profile), socials: socials, found: found };
   }
 
@@ -265,6 +277,12 @@
         if (site == null) return hide(r);
         if (site) text(r.querySelector('.m-site'), site);
         if (title) text(r.querySelector('.m-title'), title);
+        var f = site && /^(leak-\d|gone)$/.test(k) && r.querySelector('.fav'), E = window.LeakScanEngine;
+        if (f) { // a letter avatar per leak site, like the hero card's rows
+          f.textContent = site.charAt(0).toUpperCase();
+          f.classList.add('fav-l');
+          if (E && E.favColor) f.style.background = E.favColor(site);
+        }
       });
     };
     each($$('[data-p="search"]'), function (el) { text(el, name); });
@@ -284,7 +302,11 @@
     row('tt', d.tiktok ? '' : null, d.tiktok ? '@' + d.tiktok : '');
     row('own', d.site, name + ': Official site');
     row('blog', d.site + ' \u203a blog');
-    if (m.profile) text(q('site-url'), d.site);
+    phones(m, d);
+    if (m.profile) {
+      text(q('site-url'), d.site);
+      text(q('demo-intro'), 'A preview built from your scan: your name and links, your photos as they arrive. Scroll around inside it. The real one we make together.');
+    }
     // Hero "Weekly report" card + "Free scan report" illustration: only the handle for now. Their rows / "N links
     // found" pill are marked (report-row-*, scan-row-*, scan-count) but stay the illustration: no invented statuses.
     each($$('[data-p="report-handle"], [data-p="scan-handle"]'), function (el) { text(el, '@' + m.handle); });
@@ -302,11 +324,60 @@
         location.href = location.pathname;
       });
       line.textContent = '';
-      [ 'Scanned ', make('strong', {}, ['@' + m.handle]), ' \u2014 this page now shows your results. ',
-        make('a', { href: 'scan/?r=' + encodeURIComponent(m.slug) }, ['Back to your report']), ' \u00b7 ', reset
+      // one line in the note's slot (CSS): the handle shortens before anything wraps
+      [ make('span', {}, ['Scanned ', make('strong', {}, ['@' + m.handle])]), ' \u00b7 ',
+        make('a', { href: 'scan/?r=' + encodeURIComponent(m.slug) }, ['Your report']), ' \u00b7 ', reset
       ].forEach(function (c) { line.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
       line.hidden = false;
     }
+  }
+
+  // Before / after phones: after a scan every row is a real link (leak rows → her leak pages, Instagram / TikTok → her
+  // accounts, her site / blog → the demo site below, Removed → pricing); the phones stop being one image for screen
+  // readers and become labelled groups of links. Without a scan they stay the illustration.
+  var PHONES = null;
+  function phones(m, d) {
+    var ba = document.querySelector('.ba');
+    if (!ba) return;
+    if (!PHONES) PHONES = Array.prototype.map.call($$('.phone', ba), function (ph) { return [ph, ph.getAttribute('aria-label')]; });
+    PHONES.forEach(function (p) { // back to the illustration first (apply() can run again with another result)
+      p[0].setAttribute('role', 'img');
+      p[0].setAttribute('aria-label', p[1]);
+      var scr = p[0].querySelector('.phone-screen');
+      if (scr) scr.setAttribute('aria-hidden', 'true');
+    });
+    ba.classList.remove('is-live');
+    var hint = document.querySelector('.ba-hint');
+    if (hint) hint.remove();
+    var urls = m.urls || {}, acc = function (k) { return d.acc[k] && d.acc[k].url; };
+    var to = {
+      own: '#showcase', blog: '#showcase', gone: '#pricing', ig: acc('instagram'), tt: acc('tiktok'),
+      'leak-1': urls[m.leaks[0]], 'leak-2': urls[m.leaks[1]], 'leak-3': urls[m.leaks[2]], 'leak-4': urls[m.leaks[3]]
+    };
+    var n = 0;
+    each($$('[data-p]', ba), function (r) {
+      var k = r.getAttribute('data-p'), href = to[k];
+      if (!href || !r.classList.contains('m-result') || r.hasAttribute('data-p-off')) return;
+      var out = href.charAt(0) !== '#', site = r.querySelector('.m-site'), title = r.querySelector('.m-title');
+      var label = [site && site.textContent, title && title.textContent].filter(Boolean).join(': ') + (out ? ' (opens in a new tab)' : '');
+      var a = make('a', out ? { 'class': 'm-link', href: href, target: '_blank', rel: 'noopener noreferrer nofollow', 'aria-label': label }
+        : { 'class': 'm-link', href: href, 'aria-label': label });
+      while (r.firstChild) a.appendChild(r.firstChild);
+      a.appendChild(make('span', { 'class': 'm-go', 'aria-hidden': 'true' }, ['\u2197']));
+      r.appendChild(a);
+      r.classList.add('is-link');
+      n++;
+    });
+    if (!n) return;
+    PHONES.forEach(function (p) {
+      p[0].setAttribute('role', 'group');
+      p[0].setAttribute('aria-label', p[1].replace(/^Illustration: /, '').replace(/^./, function (c) { return c.toUpperCase(); }));
+      var scr = p[0].querySelector('.phone-screen');
+      if (scr) scr.removeAttribute('aria-hidden');
+      each($$('.m-search, .m-tabs', p[0]), function (x) { x.setAttribute('aria-hidden', 'true'); });
+    });
+    ba.classList.add('is-live');
+    if (!document.querySelector('.ba-hint')) ba.parentNode.insertBefore(make('p', { 'class': 'ba-hint' }, ['Tap a result to open it']), ba.nextSibling);
   }
 
   // ---------- demo site ----------
@@ -378,7 +449,14 @@
   };
 
   function showEl(el) { if (el) { el.style.display = ''; el.removeAttribute('data-p-off'); } }
-  function swapImg(img, src, d) {
+  // "<name>, photo n of N": N = photos arrived so far; every swapped photo is re-labelled when more arrive
+  function photoLabel(img, d, total) {
+    var n = +img.getAttribute('data-p-media') + 1, t = d.name + ', photo ' + n + ' of ' + Math.max(total, n);
+    img.setAttribute('alt', t);
+    var unit = img.closest('[data-p-media-only]'), b = unit && unit.querySelector('button[aria-label]');
+    if (b) b.setAttribute('aria-label', 'View larger: ' + t);
+  }
+  function swapImg(img, src, d, total) {
     img.setAttribute('data-p-src', src);
     var pre = new Image();
     pre.onload = function () {
@@ -388,17 +466,17 @@
       // fixed box: keep the placeholder's aspect ratio, crop the photo into it
       if (img.getAttribute('width')) img.style.aspectRatio = img.getAttribute('width') + ' / ' + img.getAttribute('height');
       img.style.objectFit = 'cover';
+      // her photo, focal point unknown: faces sit in the upper part of most photos (a portrait is cropped hardest)
+      img.style.objectPosition = pre.naturalHeight > pre.naturalWidth ? 'center 20%' : 'center 30%';
       img.classList.add('p-fade');
       img.style.opacity = '0';
       img.removeAttribute('srcset');
       img.setAttribute('src', src);
-      img.setAttribute('alt', 'Photo of ' + d.name);
+      photoLabel(img, d, total());
       var unit = img.closest('[data-p-media-only]');
       if (unit) {
         showEl(unit);
         showEl(unit.closest('[data-p-gallery]'));
-        var b = unit.querySelector('button[aria-label]');
-        if (b) b.setAttribute('aria-label', 'View larger: photo of ' + d.name);
       }
       requestAnimationFrame(function () { requestAnimationFrame(function () { img.style.opacity = ''; }); });
     };
@@ -407,10 +485,14 @@
   function media(m, d) {
     var slots = $$('img[data-p-media]');
     if (!slots.length) return;
+    var total = 0, count = function () { return total; };
     pollMedia(m.slug, function (imgs) {
+      var was = total;
+      total = Math.min(imgs.length, slots.length);
       each(slots, function (img) {
         var it = imgs[+img.getAttribute('data-p-media')];
-        if (it && img.getAttribute('data-p-src') !== it.src) swapImg(img, it.src, d);
+        if (it && img.getAttribute('data-p-src') !== it.src) swapImg(img, it.src, d, count);
+        else if (total !== was && img.classList.contains('p-fade')) photoLabel(img, d, total);
       });
     });
   }
