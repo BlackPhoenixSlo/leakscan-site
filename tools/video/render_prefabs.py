@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render the 5 video overlay prefabs (site/video/?prefab=…) as CapCut-ready clips, 1920x1080, 30 fps, 6 s each:
 slide in (0-0.4 s) → live → compare wipe (2.4-3.6 s) → "Removed" stamp → slide out (5.6-6 s). The card sits in the
-bottom-right corner (40 px margin, same place as on the web page), so the clip drops on top of Jack's video with no
+right half of the frame (vertically centred, same place as on the web page), so the clip drops on top of Jack's video with no
 repositioning and needs no CapCut in / out animation.
 
 Per prefab ID (google, google-images, x, reddit, mega) in OUT_DIR:

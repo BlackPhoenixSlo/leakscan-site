@@ -1,4 +1,4 @@
-// site/video/: overlay prefabs (Google, Google Images, X, Reddit, Mega) in the bottom-right corner, driven by the face video's currentTime. Cues are the
+// site/video/: overlay prefabs (Google, Google Images, X, Reddit, Mega) on the right half (Jack is on the left), driven by the face video's currentTime. Cues are the
 // data-cue-live / -removed / -out seconds on each .vo-pf (site/video/CUES.md). draw(t) is a pure function of t (no CSS
 // transitions), so seeking, ?t= and frame-by-frame capture (tools/video/render_prefabs.py) all show the exact frame.
 // URL: ?name=<1-40 letters/digits/space . - _> (else the shared scan result: ?r= or the last scan, like #removals)
@@ -7,9 +7,11 @@
 // "Removed" stamp, slides out down / right (0.4 s, gone at the out cue). google-images also taps "Images" 0.6 s after
 // live and swaps the results for the image grid by live + 1.2 s (derived from live: no extra cue).
 // Scan result (?r= / last scan): texts AND the .rm-img photos (its thumbs via /api/thumb, blurred by removals.css), as #removals.
+// Google / Google Images after state = the landing after-phone: her site (data-vo=site: profile.site_domain, else
+// <handle>.com, as personalize.js), Instagram (data-vo=ig), TikTok (tt); the after photos (.vo-own) stay the landing's.
 // data-cue-say on .vo-stage: with a personalized name (?name= / scan result, never the default) the browser says it once
 // per playback (speechSynthesis, after the user's play gesture; video ducked to 0.25 meanwhile; cancelled on pause / seek)
-// and a "for <name>" pill slides into the same corner for 2 s (also reads where there is no voice).
+// and a "for <name>" pill slides into the same slot for 2 s (also reads where there is no voice).
 // Keys: space = play / pause. textContent only; no requests except the scan-result read (js/scan-engine.js).
 (function () {
   'use strict';
@@ -50,7 +52,7 @@
     });
     document.documentElement.setAttribute('data-vo-t', t.toFixed(2));
   }
-  function fit() { root.querySelector('.vo-box').style.setProperty('--k', (over.clientWidth / 520).toFixed(4)); }
+  function fit() { root.querySelector('.vo-box').style.setProperty('--k', (over.clientWidth / 640).toFixed(4)); }
   fit();
   if (window.ResizeObserver) new ResizeObserver(fit).observe(over); else window.addEventListener('resize', fit);
 
@@ -62,9 +64,9 @@
       if (typeof v[k] === 'string' && el.textContent !== v[k]) el.textContent = v[k];
     });
   }
-  function values(m) {   // m = LeakScanRemovals.model(result), or {name} from ?name=
+  function values(m) {   // m = LeakScanRemovals.model(result) + mine(result), or {name} from ?name=
     var name = m.name, h = (m.handle || name).toLowerCase().replace(/[^a-z0-9_.]/g, '') || 'creator';
-    var v = { name: name, handle: h, 'mega-title': m.mtitle || name + ' \u2013 pack', 'x-l1': m.xtext || name + ' leaked', 'x-l2': m.xtext ? '' : name + ' ' + (m.plat || 'onlyfans'),
+    var v = { name: name, site: m.site || (h.replace(/[^a-z0-9-]/g, '') || 'creator') + '.com', ig: m.ig || h, tt: m.tt || m.ig || h, 'mega-title': m.mtitle || name + ' \u2013 pack', 'x-l1': m.xtext || name + ' leaked', 'x-l2': m.xtext ? '' : name + ' ' + (m.plat || 'onlyfans'),
       sub: m.sub || 'r/' + (h.replace(/\./g, '').slice(0, 14) || 'creator') + '_leaks', 'rd-title': m.rtitle || name + ' full pack, link in comments' };
     if (m.xat) { v['x-at'] = m.xat; v['x-name'] = m.xat.slice(1); v['x-av'] = m.xat.charAt(1).toUpperCase(); }
     if (m.mmeta) v['mega-meta'] = m.mmeta;
@@ -72,6 +74,23 @@
     if (m.mimg != null) v['mega-img'] = m.mimg + ' files';
     if (m.host) v.host = m.host;
     return v;
+  }
+  // her own site + accounts from the raw result, the way personalize.js dict() reads them (it is not loaded here)
+  var HANDLE = /^[A-Za-z0-9_.]{1,30}$/, DOMAIN = /^(?=.{4,60}$)[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+  function mine(raw) {
+    var pr = raw.profile && typeof raw.profile === 'object' ? raw.profile : {}, so = raw.socials && typeof raw.socials === 'object' ? raw.socials : {};
+    var ok = function (x) { x = typeof x === 'string' ? x.trim().replace(/^@/, '') : ''; return HANDLE.test(x) ? x : null; };
+    var acc = function (k) {
+      var a = (Array.isArray(pr.accounts) ? pr.accounts : []).filter(function (a) {
+        return a && typeof a.platform === 'string' && a.platform.toLowerCase().replace(/^www\./, '').split('.')[0] === k && ok(a.handle);
+      })[0];
+      return a ? ok(a.handle) : null;
+    };
+    var plat = typeof raw.platform === 'string' ? raw.platform.toLowerCase().replace(/^www\./, '').split('.')[0] : '';
+    var sd = typeof pr.site_domain === 'string' ? pr.site_domain.trim().toLowerCase() : '', base = ok(pr.username) || ok(raw.handle) || '';
+    base = base.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    return { site: DOMAIN.test(sd) ? sd : base ? base + '.com' : null,
+      ig: ok(so.instagram) || acc('instagram') || (plat === 'instagram' ? ok(raw.handle) : null), tt: acc('tiktok') || (plat === 'tiktok' ? ok(raw.handle) : null) };
   }
   // the scan's thumbs into every .rm-img, cycled, same as js/removals.js render(); a failed one falls back to its default
   function thumbs(list) {
@@ -91,7 +110,7 @@
     var E = window.LeakScanEngine, R = window.LeakScanRemovals, slug = q.get('r');
     if (slug === null) { try { slug = (JSON.parse(localStorage.getItem('leakscan.last') || 'null') || {}).slug; } catch (e) { slug = null; } }
     if (E && E.fetchResult && R && typeof slug === 'string' && E.SLUG_RE.test(slug)) {
-      E.fetchResult(slug).then(function (raw) { var m = R.model(raw); if (m) { fill(values(m)); thumbs(m.thumbs); personal(m.name); } }, function () { /* defaults */ });
+      E.fetchResult(slug).then(function (raw) { var m = R.model(raw); if (m) { var o = mine(raw); m.site = o.site; m.ig = o.ig; m.tt = o.tt; fill(values(m)); thumbs(m.thumbs); personal(m.name); } }, function () { /* defaults */ });
     }
   }
 
