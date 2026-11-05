@@ -11,7 +11,7 @@
   if (!E || !form || !card || !window.fetch) return;
   var DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/, HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/;
   var GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
-  var ROWS = 5, SITES = 6, MAX_SITES = 12, STRIP = 24, BAND = 10, MAX_IMAGES = 60;
+  var ROWS = 5, MAX_SITES = 12, STRIP = 24, BAND = 10, MAX_IMAGES = 60;
   var btn = form.querySelector('button[type=submit]'), btnText = btn && btn.lastChild, btnLabel = btnText && btnText.nodeValue;
   var token = 0, busy = false, live = null, msg = null, saved = null;
   var P = function () { return window.LeakScanPersonalize; };
@@ -160,8 +160,12 @@
         make('span', 'chip chip-live live-count', [], { hidden: '' })]),
       make('p', 'live-status', [], { role: 'status' }),
       make('div', 'live-bar', [make('i')], { 'aria-hidden': 'true' }),
-      // placeholder rows while scanning (CSS hides them once the card is no longer aria-busy)
-      make('div', 'live-skel', [0, 1, 2, 3, 4].map(function () { return make('span', 'live-skel-row', [make('i'), make('b')]); }), { 'aria-hidden': 'true' }),
+      // placeholder tabs, rows, image strip and actions while scanning, about the result's height (CSS hides them once
+      // the card is no longer aria-busy): the card grows at the click, not when the result lands
+      make('div', 'live-skel', [make('span', 'live-skel-tabs', [make('b'), make('b'), make('b')])]
+        .concat([0, 1, 2, 3, 4].map(function () { return make('span', 'live-skel-row', [make('i'), make('b')]); }))
+        .concat([make('span', 'live-skel-strip', [make('b'), make('span', '', [make('i'), make('i'), make('i'), make('i')])]),
+          make('span', 'live-skel-act', [make('b'), make('b')])]), { 'aria-hidden': 'true' }),
       make('div', 'live-body')
     ]);
     card.appendChild(live);
@@ -204,7 +208,9 @@
     return b;
   }
   function rowLink(url, dom, thumbSrc, text, chip, label) {
-    return make('a', 'live-link', [E.fav(dom, 'live-ico', thumbSrc ? E.thumb(thumbSrc) : null), make('span', 'live-txt', text), chip,
+    var ico = E.fav(dom, 'live-ico', thumbSrc ? E.thumb(thumbSrc) : null);
+    if (!thumbSrc) { ico.style.background = ''; ico.classList.add('fav-none'); }   // same neutral letter as a failed thumb
+    return make('a', 'live-link', [ico, make('span', 'live-txt', text), chip,
       make('span', 'live-go', [icon('i-external-link')])], ext({ href: url, 'aria-label': label }));
   }
 
@@ -312,7 +318,8 @@
     a.onfinish = a.oncancel = function () { card.classList.remove('is-growing'); };
   }
   function heroResult(m, ease) {
-    var h0 = card.offsetHeight;
+    var h0 = card.offsetHeight;   // the visible height, mid-ease if the scan was quick: stop that ease, lay out for real
+    if (card.getAnimations) card.getAnimations().forEach(function (a) { a.cancel(); });
     if (!live || live.getAttribute('data-handle') !== m.handle) heroOpen(m.handle, m.platform);
     var n = m.rows.length, body = q('.live-body'), slugQ = encodeURIComponent(m.slug);
     live.setAttribute('data-slug', m.slug);
@@ -381,11 +388,11 @@
           make('span', 'live-ttl', [s.url.replace(/^https?:\/\/(www\.)?/, '')])],
           make('span', 'chip chip-soft', [plural(s.n, 'link', 'links')]), s.domain + ': ' + plural(s.n, 'link', 'links') + ' (opens its first link in a new tab)')]);
       }))]);
-      if (m.sites.length > SITES) sites.appendChild(make('a', 'live-more live-more-a', [], { href: 'scan/?r=' + slugQ }));
+      sites.appendChild(make('a', 'live-more live-more-a', [], { href: 'scan/?r=' + slugQ }));
       tabs.push(['sites', 'Sites', m.sites.length, sites]);
       body.appendChild(tabBar(tabs));
       body.appendChild(make('div', 'live-panels', tabs.map(function (t) { return t[3]; })));
-      fitSites(sites, m.sites.length, tabs.filter(function (t) { return t[3] !== sites; }).map(function (t) { return t[3]; }));
+      fitSites(sites, m.sites.length);
       if (strip) {
         var edges = function () {
           if (!(drifter && drifter.strip === strip && drifter.x() !== strip.scrollLeft)) stripEdges(sbox, strip.scrollLeft, strip.scrollWidth - strip.clientWidth);
@@ -404,16 +411,26 @@
     mediaStatus(m);
     if (ease) grow(h0);
   }
-  // The Sites list shows as many sites (6 to 12) as fit in the height the other panels give the card: no empty band
-  // above the actions, the card never grows for it. "+N more sites" sits at the panel's foot.
-  function fitSites(panel, total, others) {
-    var list = panel.firstChild, more = panel.querySelector('.live-more'), top = panel.getBoundingClientRect().top;
-    var room = Math.max.apply(null, others.map(function (p) { var l = p.lastElementChild; return l ? l.getBoundingClientRect().bottom - top : 0; }));
-    var foot = more ? more.offsetHeight + 8 : 0;
-    while (list.children.length > SITES && list.getBoundingClientRect().bottom - top + foot > room) list.removeChild(list.lastChild);
-    var left = total - list.children.length;
-    if (more && left > 0) more.textContent = '+ ' + left + ' more ' + (left === 1 ? 'site' : 'sites') + ' in the full report';
-    else if (more) more.remove();
+  // The Sites panel takes no height of its own (CSS: contain size): the card is as tall as the other panels give it.
+  // Its list shows the sites that fit whole in that height (up to 12) and "+N more sites" sits at its foot; re-fitted
+  // whenever the panel's box changes (fonts, the Pause button appearing, a resize). No empty band, never a taller card.
+  function fitSites(panel, total) {
+    var list = panel.firstChild, more = panel.querySelector('.live-more'), rows = list.children;
+    var fit = function () {
+      if (!panel.isConnected) return;
+      Array.prototype.forEach.call(rows, function (li) { li.hidden = false; });
+      var bottom = list.offsetTop + list.clientHeight + 0.5, shown = 0;   // layout boxes: the rows' entry nudge doesn't count
+      Array.prototype.forEach.call(rows, function (li) {
+        if (li.offsetTop + li.offsetHeight > bottom) li.hidden = true; else shown++;
+      });
+      var left = total - shown;
+      if (more) {
+        more.hidden = left <= 0;
+        more.textContent = '+ ' + left + ' more ' + (left === 1 ? 'site' : 'sites') + ' in the full report';
+      }
+    };
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(panel);
   }
   // [[key, label, count, panel]] → a tablist; the panels share one grid cell, so switching never moves anything else.
   function tabBar(tabs) {
@@ -454,6 +471,7 @@
   };
   function heroError(kind, handle, platform) {
     var e = ERR[kind] || ERR.failed, body = q('.live-body'), send = msgLinks(), h0 = card.offsetHeight;
+    if (card.getAnimations) card.getAnimations().forEach(function (a) { a.cancel(); });
     card.removeAttribute('aria-busy');
     q('.live-status').textContent = '';
     q('.live-bar').hidden = true;
@@ -518,10 +536,23 @@
   }
 
   // ---------- scan ----------
+  // Brings the card into view once its height ease ends: its top under the header, and if the report runs past the
+  // fold, as far as its "Send me the report" buttons without scrolling its title away. Never after the visitor has
+  // scrolled / swiped / typed since pressing Scan.
+  var asked = 0, intent = 0;
+  ['wheel', 'touchstart', 'keydown'].forEach(function (t) { window.addEventListener(t, function () { intent = Date.now(); }, { passive: true }); });
   function bring() {
+    var run = card.getAnimations && card.getAnimations().filter(function (a) { return a.playState === 'running'; })[0];
+    if (run && run.finished) { run.finished.then(bring, function () {}); return; }
+    if (intent > asked) return;
     var r = card.getBoundingClientRect(), top = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
-    if (r.top >= top && r.bottom <= window.innerHeight) return;
-    window.scrollTo({ top: Math.max(0, window.pageYOffset + r.top - top), behavior: reduce() ? 'auto' : 'smooth' });
+    var y = window.pageYOffset, to = r.top >= top && r.bottom <= window.innerHeight ? y : y + r.top - top;
+    var send = !card.hasAttribute('aria-busy') && q('.live-send'), title = q('.live-title');
+    if (send && title) {
+      var want = y + send.getBoundingClientRect().bottom + 16 - window.innerHeight;
+      if (want > to) to = Math.min(want, y + title.getBoundingClientRect().top - top);
+    }
+    if (Math.abs(to - y) > 2) window.scrollTo({ top: Math.max(0, to), behavior: reduce() ? 'auto' : 'smooth' });
   }
   function settle() {
     setBusy(false);
@@ -531,12 +562,15 @@
   }
   function scan(handle, platform, social) {
     var tok = ++token;
+    asked = Date.now();
     mediaTok++;
     setBusy(true);
     bandReset();
+    var h0 = card.offsetHeight;
     heroOpen(handle, platform).setAttribute('data-handle', handle);
     card.setAttribute('aria-busy', 'true');
     q('.live-status').textContent = 'Starting the scan…';
+    grow(h0);
     bring();
     E.runScan({ platform: platform, handle: handle, social: social,
       onProgress: function (t) { if (tok === token) progress(t); },

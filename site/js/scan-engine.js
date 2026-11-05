@@ -76,7 +76,8 @@
     if (src) {
       var im = document.createElement('img');
       im.src = src; im.alt = ''; im.loading = 'lazy'; im.decoding = 'async'; im.referrerPolicy = 'no-referrer';
-      im.addEventListener('error', function () { im.remove(); }, { once: true });
+      // a failed thumb: a neutral, theme-coloured letter (no bright hue among the blurred thumbs)
+      im.addEventListener('error', function () { im.remove(); el.style.background = ''; el.classList.add('fav-none'); }, { once: true });
       el.appendChild(im);
     }
     return el;

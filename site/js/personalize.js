@@ -449,7 +449,14 @@
   };
 
   function showEl(el) { if (el) { el.style.display = ''; el.removeAttribute('data-p-off'); } }
-  function swapImg(img, src, d, n, total) {
+  // "<name>, photo n of N": N = photos arrived so far; every swapped photo is re-labelled when more arrive
+  function photoLabel(img, d, total) {
+    var n = +img.getAttribute('data-p-media') + 1, t = d.name + ', photo ' + n + ' of ' + Math.max(total, n);
+    img.setAttribute('alt', t);
+    var unit = img.closest('[data-p-media-only]'), b = unit && unit.querySelector('button[aria-label]');
+    if (b) b.setAttribute('aria-label', 'View larger: ' + t);
+  }
+  function swapImg(img, src, d, total) {
     img.setAttribute('data-p-src', src);
     var pre = new Image();
     pre.onload = function () {
@@ -465,13 +472,11 @@
       img.style.opacity = '0';
       img.removeAttribute('srcset');
       img.setAttribute('src', src);
-      img.setAttribute('alt', d.name + ', photo ' + (n + 1) + ' of ' + total);
+      photoLabel(img, d, total());
       var unit = img.closest('[data-p-media-only]');
       if (unit) {
         showEl(unit);
         showEl(unit.closest('[data-p-gallery]'));
-        var b = unit.querySelector('button[aria-label]');
-        if (b) b.setAttribute('aria-label', 'View larger: ' + d.name + ', photo ' + (n + 1) + ' of ' + total);
       }
       requestAnimationFrame(function () { requestAnimationFrame(function () { img.style.opacity = ''; }); });
     };
@@ -480,10 +485,14 @@
   function media(m, d) {
     var slots = $$('img[data-p-media]');
     if (!slots.length) return;
+    var total = 0, count = function () { return total; };
     pollMedia(m.slug, function (imgs) {
+      var was = total;
+      total = Math.min(imgs.length, slots.length);
       each(slots, function (img) {
         var it = imgs[+img.getAttribute('data-p-media')];
-        if (it && img.getAttribute('data-p-src') !== it.src) swapImg(img, it.src, d, +img.getAttribute('data-p-media'), Math.min(imgs.length, slots.length));
+        if (it && img.getAttribute('data-p-src') !== it.src) swapImg(img, it.src, d, count);
+        else if (total !== was && img.classList.contains('p-fade')) photoLabel(img, d, total);
       });
     });
   }

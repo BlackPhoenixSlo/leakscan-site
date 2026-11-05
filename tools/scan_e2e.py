@@ -41,7 +41,7 @@ drift speed 0: only `drift:` checks may go red. --break-phones serves personaliz
 `phones:` checks may go red.
 """
 import json, pathlib, re, socket, subprocess, sys, time, urllib.request
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -160,6 +160,8 @@ def scan_flow(browser, vp_name, vp):
           tabs: [...document.querySelectorAll('.g-tab')].map(e => getComputedStyle(e).cursor),
           seg: [...document.querySelectorAll('#device label')].map(e => getComputedStyle(e).cursor)};
     }""")
+    bare = page.evaluate(BARE_HOVER)
+    check(f"{vp_name} scan page: no :hover rule outside @media (hover: hover) (no sticky tint after a tap)", not bare, bare)
     want_hint = "Tap All · Images · Videos to switch, tap any result to open it." if vp_name == "phone" else "Click All · Images · Videos to switch, click any result to open it."
     check(f"{vp_name} scan page: hint next to the frame says Tap on touch / Click with a mouse", aff["hint"] == want_hint, aff["hint"])
     check(f"{vp_name} scan page: decorative tabs muted, not focusable; real tabs + device toggle pointer",
@@ -565,9 +567,11 @@ def personalize_flow(browser, vp_name, vp):
     gal = page.eval_on_selector_all("[data-p-media-only] img", "els => els.map(e => [e.getAttribute('src'), e.naturalWidth])")
     check(f"{tag} profile: media ready: 4 gallery photos fade in from the API", shown(page, "[data-p-media-only]") == 4
           and all(g[0].startswith(API + "/api/media/") and g[1] > 0 for g in gal), gal)
+    page.wait_for_timeout(400)   # last batch's photos preload + fade
     alts = page.eval_on_selector_all("img[data-p-src]", "els => [...new Set(els.map(e => e.alt))]")
-    check(f"{tag} profile: media alts tell the photos apart ('<name>, photo n of N')", len(alts) >= 4
-          and all(re.fullmatch(re.escape(PROFILE["display_name"]) + r", photo \d of \d", a) for a in alts), alts)
+    tots = {a.rsplit(" of ", 1)[-1] for a in alts}
+    check(f"{tag} profile: media alts tell the photos apart ('<name>, photo n of N', one N for all after batches)", len(alts) >= 4
+          and all(re.fullmatch(re.escape(PROFILE["display_name"]) + r", photo \d of \d", a) for a in alts) and len(tots) == 1, alts)
     page.wait_for_timeout(700)
     page.screenshot(path=str(out / f"{vp_name}-p5-demo-media-ready.png"))
     about = page.locator("nav a[href*='about.html']").first.get_attribute("href") or ""
@@ -1113,10 +1117,13 @@ def inline_flow(browser, vp_name, vp):
         ctx.add_init_script("window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value, e.hadRecentInput]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}")
 
         def route(r, _req):
-            if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost"):
+            u = r.request.url
+            if urlsplit(u).hostname in ("127.0.0.1", "localhost"):
+                if "/api/thumb" in u and DEAD_THUMB in unquote(u):   # fault at the wire: one Google thumb is gone (404)
+                    return r.fulfill(status=404, body="")
                 r.continue_()
             else:
-                net["outside"].append(r.request.url)
+                net["outside"].append(u)
                 r.abort()
         ctx.route("**/*", route)
         break_routes(ctx)
@@ -1125,7 +1132,8 @@ def inline_flow(browser, vp_name, vp):
             pg.on("pageerror", lambda e: net["errors"].append(str(e)))
             # the browser logs each provoked 429 / 400 / aborted scan POST as "Failed to load resource": expected here
             pg.on("console", lambda m: m.type == "error" and urlsplit(m.location.get("url") or "").hostname not in FONT_HOSTS
-                  and not (m.text.startswith("Failed to load resource") and "/api/public-scan" in (m.location.get("url") or ""))
+                  and not (m.text.startswith("Failed to load resource") and ("/api/public-scan" in (m.location.get("url") or "")
+                                                                             or DEAD_THUMB in unquote(m.location.get("url") or "")))
                   and net["console"].append(m.text + " @ " + (m.location.get("url") or "")))
             pg.on("request", lambda q: q.method == "POST" and "/api/public-scan" in q.url and net["bodies"].append(json.loads(q.post_data)))
             pg.on("framenavigated", lambda f: f == pg.main_frame and net["nav"].append(f.url))
@@ -1214,8 +1222,10 @@ def inline_flow(browser, vp_name, vp):
     lc1 = lcol()
     check(f"{tag} hero: the left column doesn't move when the result lands (scanned line takes the note's slot)", lc1 == lc0, (lc0, lc1))
     an = page.evaluate("window.__anim.map(a => [a[0].map(k => parseFloat(k.height)), a[1]])")
-    check(f"{tag} hero: the card eases to the result's height (one height animation, ~320 ms, no snap)", len(an) == 1 and an[0][0][1] > an[0][0][0] + 100
-          and 200 <= an[0][1] <= 500, an)
+    hf = page.evaluate("document.querySelector('.report-card').offsetHeight")
+    check(f"{tag} hero: the card eases twice, no snap: at Scan up to the skeleton (about the report's height), then to the result's exact height (~320 ms each)",
+          len(an) == 2 and an[0][0][1] > an[0][0][0] + 300 and abs(an[1][0][1] - hf) <= 1 and abs(hf - an[0][0][1]) <= 0.15 * hf
+          and all(200 <= a[1] <= 500 for a in an), [an, hf])
     slug = parse_qs(urlsplit(page.url).query).get("r", [""])[0]
     check(f"{tag} hero: no navigation, URL = index.html?r=<slug>", re.fullmatch(r"[A-Za-z0-9]{12}", slug or "") is not None
           and page.url == base + "?r=" + slug and all(urlsplit(u).path == "/" for u in net["nav"]), [page.url] + net["nav"])
@@ -1237,6 +1247,16 @@ def inline_flow(browser, vp_name, vp):
         pass
     box = page.locator(".report-card").bounding_box()
     check(f"{tag} hero: card focused + scrolled into view", "live-title" in focus and box["y"] >= 0 and box["y"] < vp["height"] - 100, f"{focus} y={box['y']:.0f}")
+    try:
+        page.wait_for_function("() => { const r = document.querySelector('.report-card .live-send').getBoundingClientRect(); return r.bottom <= innerHeight; }", timeout=2500)
+    except Exception:
+        pass
+    page.wait_for_timeout(300)
+    fold = page.evaluate("() => { const pad = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;"
+                         " return [Math.round(document.querySelector('.report-card .live-send').getBoundingClientRect().bottom), innerHeight,"
+                         " Math.round(document.querySelector('.report-card .live-title').getBoundingClientRect().top), Math.round(pad)]; }")
+    if vp_name == "desktop":   # phone: the report is taller than the screen; its title stays in view, the buttons are a scroll away
+        check(f"{tag} hero: after the ease the page shows the card's 'Send me the report' buttons, title still under the header", fold[0] <= fold[1] and fold[2] >= fold[3], fold)
     IM = _images(FX)
     NI = len(IM)
     tile_href = lambda it: it[1] or base + "scan/?r=" + slug
@@ -1257,7 +1277,7 @@ def inline_flow(browser, vp_name, vp):
           stripH: (c.querySelector('.live-strip-h') || {}).textContent,
           blur: getComputedStyle(c.querySelector('.live-strip .gi-img')).filter, ico: q('.live-rows .live-ico').length,
           rowH: Math.min(...q('.live-rows a.live-link').map(a => a.getBoundingClientRect().height)),
-          sites: q('.live-sites a.live-link').map(a => [a.href, a.target, a.rel])};
+          sites: q('.live-sites li:not([hidden]) a.live-link').map(a => [a.href, a.target, a.rel])};
     }""")
     sites = _sites(rows)
     check(f"{tag} hero: tabs Links / Images / Sites with the fixture's counts, Links selected",
@@ -1274,10 +1294,11 @@ def inline_flow(browser, vp_name, vp):
           hero["sites"] == [[by_dom[d], "_blank", "noopener noreferrer nofollow"] for d in [x[0] for x in sorted(_site_counts(rows), key=lambda x: -x[1])][:ns]], hero["sites"])
     sg = page.evaluate("""() => { const p = document.querySelector('#lp-sites'), ul = p.querySelector('ul'), m = p.querySelector('.live-more'), others = [...document.querySelectorAll('.report-card .live-panel:not(#lp-sites)')];
         const nat = e => e.lastElementChild.getBoundingClientRect().bottom - e.getBoundingClientRect().top;
-        return {gap: Math.round(m.getBoundingClientRect().top - ul.getBoundingClientRect().bottom), more: m.textContent, href: m.getAttribute('href'),
+        const lastRow = [...ul.children].filter(li => !li.hidden).pop();
+        return {gap: Math.round(m.getBoundingClientRect().top - lastRow.getBoundingClientRect().bottom), clip: Math.round(lastRow.getBoundingClientRect().bottom - ul.getBoundingClientRect().bottom), more: m.textContent, href: m.getAttribute('href'),
           grew: Math.round(nat(p) - Math.max(...others.map(nat))), card: [document.querySelector('.report-card').getBoundingClientRect().width, document.querySelector('.hero-grid').clientWidth]}; }""")
     nsites = len(_site_counts(rows))
-    check(f"{tag} hero: Sites panel has no empty band ('+N more sites' link at its foot, gap < one row, card not taller for it)", sg["gap"] < 52 + 12
+    check(f"{tag} hero: Sites panel has no empty band ('+N more sites' link at its foot, gap < one row, last row whole, card not taller for it)", sg["gap"] < 52 + 12 and sg["clip"] <= 4
           and sg["grew"] <= 0 and sg["more"] == f"+ {nsites - ns} more sites in the full report" and sg["href"] == "scan/?r=" + slug, sg)
     cw = page.evaluate("[document.querySelector('.report-card').getBoundingClientRect().right, document.querySelector('.hero-grid').getBoundingClientRect().right - parseFloat(getComputedStyle(document.querySelector('.hero-grid')).paddingRight)]")
     check(f"{tag} hero: the card fits its column (no overflow into the gutter)", cw[0] <= cw[1] + 0.5, cw)
@@ -1353,16 +1374,19 @@ def inline_flow(browser, vp_name, vp):
           loaded: [...document.querySelectorAll('.report-card .live-strip .gi-box:not(.gi-wait) img')].filter(i => i.complete && i.naturalWidth).length, fade: getComputedStyle(document.querySelector('.report-card .gi-img')).transitionProperty}; }""")
     check(f"{tag} tiles: light placeholder in the light theme, Google-dark in #free, images fade in on load", tl["card"] is not None and tl["card"] > 150
           and tl["band"] is not None and tl["band"] < 90 and tl["waiting"] == 0 and tl["loaded"] >= 3 and "opacity" in tl["fade"], tl)
+    # a row whose thumb failed: neutral letter on the theme surface (no bright hue among the blurred thumbs)
+    fb = page.evaluate("""() => { const s2 = getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim(), probe = document.createElement('i');
+        probe.style.background = s2; document.body.appendChild(probe); const want = getComputedStyle(probe).backgroundColor; probe.remove();
+        const lone = [...document.querySelectorAll('.report-card .live-ico')].filter(e => !e.querySelector('img'));
+        return {n: lone.length, ok: lone.every(e => e.classList.contains('fav-none') && getComputedStyle(e).backgroundColor === want), bg: lone.map(e => getComputedStyle(e).backgroundColor), want}; }""")
+    check(f"{tag} hero: a failed row thumb falls back to a neutral theme-coloured letter", fb["n"] >= 1 and fb["ok"], fb)
     # hover looks only where there is hover (a tap leaves nothing tinted)
     page.locator(".report-card .live-link").first.hover()
     page.wait_for_timeout(250)
     hv = page.evaluate("getComputedStyle(document.querySelector('.report-card .live-link')).backgroundColor")
     hov = page.evaluate("matchMedia('(hover: hover)').matches")   # Playwright's screenshots flip a touch context to hover: ask the page
-    bare = page.evaluate("""() => { const out = [], walk = (rules, gated) => { for (const r of rules) {
-        if (r.media) walk(r.cssRules, gated || /hover:\\s*hover/.test(r.conditionText || r.media.mediaText));
-        else if (r.selectorText && /\\.live-(link|tab):hover/.test(r.selectorText) && !gated) out.push(r.selectorText); } };
-      for (const sh of document.styleSheets) { try { walk(sh.cssRules, false); } catch (e) {} } return out; }""")
-    check(f"{tag} hero: row hover tint only where hover exists (phone: none after a tap)", (hv == "rgba(0, 0, 0, 0)") == (not hov) and not bare, [hv, hov, bare])
+    bare = page.evaluate(BARE_HOVER)
+    check(f"{tag} hero: row hover tint only where hover exists (phone: none after a tap; no :hover rule, a:hover included, outside @media (hover: hover))", (hv == "rgba(0, 0, 0, 0)") == (not hov) and not bare, [hv, hov, bare])
     page.mouse.move(0, 0)
     # the Ask AI pill never sits on the card's actions or on the before / after phones
     def pill_clear(sel):
@@ -1371,9 +1395,9 @@ def inline_flow(browser, vp_name, vp):
         return page.evaluate(f"""() => {{ const L = document.querySelector('.askai-launcher'), b = L.getBoundingClientRect(), r = document.querySelector('{sel}').getBoundingClientRect();
             const over = r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom;
             return [over, getComputedStyle(L).visibility]; }}""")
-    pa, pb = pill_clear(".report-card .live-actions"), pill_clear(".ba")
-    check(f"{tag} askai: launcher hidden while it would cover the card's actions / the phones", all(not o or v == "hidden" for o, v in (pa, pb))
-          and (pa[0] or pb[0]), (pa, pb))
+    pa, pb, ps = pill_clear(".report-card .live-actions"), pill_clear(".ba"), pill_clear("#showcase .browser-demo")
+    check(f"{tag} askai: launcher hidden while it would cover the card's actions / the phones / the showcase preview", all(not o or v == "hidden" for o, v in (pa, pb, ps))
+          and (pa[0] or pb[0]) and (ps[0] or vp_name != "phone"), (pa, pb, ps))
     page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
     last = json.loads(page.evaluate("localStorage.getItem('leakscan.last')") or "{}")
     check(f"{tag} hero: localStorage leakscan.last", last.get("slug") == slug and last.get("handle") == "demo.creator", last)
@@ -1554,6 +1578,12 @@ stub = subprocess.Popen([sys.executable, str(ROOT / "tools" / "scan_stub.py"), "
                         stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
 stub.stdout.readline()
 base = f"http://127.0.0.1:{port}/"
+# every :hover rule of the page's own stylesheets sits inside @media (hover: hover): a tap on touch leaves nothing painted
+DEAD_THUMB = "DEMO0111"   # inline flow: this fixture thumb (a Sites-tab icon, past the 24 tiles) answers 404
+BARE_HOVER = """() => { const out = [], walk = (rules, gated) => { for (const r of rules) {
+    if (r.cssRules && !r.selectorText) walk(r.cssRules, gated || /hover:\\s*hover/.test(r.conditionText || (r.media && r.media.mediaText) || ''));
+    else if (r.selectorText && /:hover/.test(r.selectorText) && !gated) out.push(r.selectorText); } };
+  for (const sh of document.styleSheets) { try { walk(sh.cssRules, false); } catch (e) {} } return out; }"""
 API = f"http://localhost:{port}"   # the stub injects the other loopback name as data-api
 
 try:

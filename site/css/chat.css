@@ -9,7 +9,7 @@
 }
 .askai-launcher[hidden] { display: none; }
 .askai-launcher .icon { color: var(--accent); width: 1.3em; height: 1.3em; }
-.askai-launcher:hover { border-color: var(--accent); transform: translateY(-1px); }
+@media (hover: hover) { .askai-launcher:hover { border-color: var(--accent); transform: translateY(-1px); } }
 @media (min-width: 720px) { .askai-launcher { right: 24px; bottom: 24px; } }
 /* Phone: sit above the sticky "Free scan" bar when it is showing. While the hero is on screen (js/chat.js sets
    .in-hero) stay hidden: the pill would cover hero lines / contact buttons, and the hero has its own CTAs. */
@@ -52,7 +52,7 @@
   display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: none;
   border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer;
 }
-.askai-close:hover { border-color: var(--muted); }
+@media (hover: hover) { .askai-close:hover { border-color: var(--muted); } }
 .askai-note { margin: 0; padding: 0 18px 10px; font-size: .86rem; color: var(--muted); border-bottom: 1px solid var(--line); }
 
 .askai-log { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 14px 6px; display: flex; flex-direction: column; gap: 10px; }
@@ -72,7 +72,7 @@
   font: 500 .88rem/1.25 var(--sans); text-align: left; cursor: pointer;
   padding: .45em .8em; border-radius: 999px; border: 1px solid var(--accent); background: var(--surface); color: var(--accent);
 }
-.askai-chip:hover, .askai-more:hover { background: var(--accent-soft); }
+@media (hover: hover) { .askai-chip:hover, .askai-more:hover { background: var(--accent-soft); } }
 .askai-actions { margin-top: 8px; }
 
 .askai-dots { display: inline-flex; gap: 4px; padding: 4px 0; }

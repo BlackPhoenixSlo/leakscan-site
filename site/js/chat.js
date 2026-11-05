@@ -440,8 +440,8 @@
   }
   launcher.hidden = false;
   // Any width: also out of the way while the pill would sit on the hero card's actions (after a scan) or on the
-  // before / after phones (.in-quiet, same look as .in-hero).
-  var QUIET = ['.report-card .live-actions', '.ba'], qraf = 0;
+  // before / after phones or the showcase preview (.in-quiet, same look as .in-hero).
+  var QUIET = ['.report-card .live-actions', '.ba', '#showcase .browser-demo'], qraf = 0;
   var quiet = function () {
     qraf = 0;
     var b = launcher.getBoundingClientRect(), hit = !dlg.open && document.activeElement !== launcher && QUIET.some(function (sel) {
