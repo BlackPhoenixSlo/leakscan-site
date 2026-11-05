@@ -4,58 +4,9 @@
 // Personalized from the scan result the page already fetches (?r=<slug> or the last scan: js/scan-engine.js
 // fetchResult, one request shared with the hero card), and again after an in-page scan (wraps LeakScanPersonalize.apply).
 // textContent only; leak URLs are read for their host / subreddit / poster, never rendered or linked.
+// model() is defined before the #removals check and exposed as LeakScanRemovals.model (the video page has no #removals).
 (function () {
   'use strict';
-  var root = document.getElementById('removals');
-  if (!root) return;
-  var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
-
-  // ---------- compare: --p = edge position in % (100 = all live, 0 = all removed) ----------
-  function set(card, p, anim) {
-    p = Math.max(0, Math.min(100, Math.round(p)));
-    var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), b = card.querySelector('.rm-btn'), gone = p <= 50;
-    stage.classList.toggle('rm-anim', !!anim);
-    stage.style.setProperty('--p', p);
-    stage.setAttribute('data-end', p >= 95 ? 'r' : p <= 5 ? 'l' : '');
-    card.classList.toggle('is-removed', gone);
-    h.setAttribute('aria-valuenow', p);
-    h.setAttribute('aria-valuetext', p === 100 ? 'Leak live' : p === 0 ? 'Removed' : p + '% leak, ' + (100 - p) + '% removed');
-    b.setAttribute('aria-pressed', String(gone));
-    b.textContent = gone ? 'Show again' : 'Remove';
-  }
-  var now = function (card) { return +card.querySelector('.rm-handle').getAttribute('aria-valuenow'); };
-  each(root.querySelectorAll('.rm-card'), function (card) {
-    var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), drag = null;
-    card.querySelector('.rm-btn').addEventListener('click', function () { set(card, now(card) <= 50 ? 100 : 0, true); });
-    var at = function (e) { var r = stage.getBoundingClientRect(); return (e.clientX - r.left) / r.width * 100; };
-    stage.addEventListener('pointerdown', function (e) {
-      if (e.button !== 0) return;
-      drag = e.pointerId;
-      try { stage.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ }
-      set(card, at(e), false);
-      if (e.pointerType !== 'touch') h.focus({ preventScroll: true });
-    });
-    stage.addEventListener('pointermove', function (e) { if (drag === e.pointerId) set(card, at(e), false); });
-    var end = function (e) { if (drag === e.pointerId) drag = null; };
-    stage.addEventListener('pointerup', end);
-    stage.addEventListener('pointercancel', end);   // a vertical swipe (touch-action: pan-y) scrolls the page instead
-    h.addEventListener('keydown', function (e) {
-      var p = now(card), k = e.key, n = k === 'ArrowLeft' || k === 'ArrowDown' ? p - 10 : k === 'ArrowRight' || k === 'ArrowUp' ? p + 10
-        : k === 'PageDown' ? p - 25 : k === 'PageUp' ? p + 25 : k === 'Home' ? 0 : k === 'End' ? 100 : null;
-      if (n === null) return;
-      e.preventDefault();
-      set(card, n, false);
-    });
-    set(card, 100, false);
-  });
-  var rev = root.querySelector('.rm-reveal');
-  if (rev) rev.addEventListener('click', function () {
-    var on = rev.getAttribute('aria-pressed') !== 'true';
-    rev.setAttribute('aria-pressed', String(on));
-    root.classList.toggle('revealed', on);
-    rev.lastChild.textContent = on ? 'Blur images' : 'Reveal images';
-  });
-
   // ---------- personalization ----------
   var HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/, SLUG_RE = /^[A-Za-z0-9_-]{4,64}$/, GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
   var NOT_LEAK = /(^|\.)(x|twitter|reddit|redd|mega|instagram|tiktok|onlyfans|fansly|patreon|youtube|threads|twitch|google|facebook)\.(com|net|tv|it|nz|io)$/;
@@ -134,6 +85,58 @@
     }).slice(0, 10).map(E.thumb).filter(Boolean) : [];
     return m;
   }
+
+  window.LeakScanRemovals = { model: model };   // site/js/video-overlays.js reuses the same validation
+
+  var root = document.getElementById('removals');
+  if (!root) return;
+  var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
+
+  // ---------- compare: --p = edge position in % (100 = all live, 0 = all removed) ----------
+  function set(card, p, anim) {
+    p = Math.max(0, Math.min(100, Math.round(p)));
+    var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), b = card.querySelector('.rm-btn'), gone = p <= 50;
+    stage.classList.toggle('rm-anim', !!anim);
+    stage.style.setProperty('--p', p);
+    stage.setAttribute('data-end', p >= 95 ? 'r' : p <= 5 ? 'l' : '');
+    card.classList.toggle('is-removed', gone);
+    h.setAttribute('aria-valuenow', p);
+    h.setAttribute('aria-valuetext', p === 100 ? 'Leak live' : p === 0 ? 'Removed' : p + '% leak, ' + (100 - p) + '% removed');
+    b.setAttribute('aria-pressed', String(gone));
+    b.textContent = gone ? 'Show again' : 'Remove';
+  }
+  var now = function (card) { return +card.querySelector('.rm-handle').getAttribute('aria-valuenow'); };
+  each(root.querySelectorAll('.rm-card'), function (card) {
+    var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), drag = null;
+    card.querySelector('.rm-btn').addEventListener('click', function () { set(card, now(card) <= 50 ? 100 : 0, true); });
+    var at = function (e) { var r = stage.getBoundingClientRect(); return (e.clientX - r.left) / r.width * 100; };
+    stage.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      drag = e.pointerId;
+      try { stage.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ }
+      set(card, at(e), false);
+      if (e.pointerType !== 'touch') h.focus({ preventScroll: true });
+    });
+    stage.addEventListener('pointermove', function (e) { if (drag === e.pointerId) set(card, at(e), false); });
+    var end = function (e) { if (drag === e.pointerId) drag = null; };
+    stage.addEventListener('pointerup', end);
+    stage.addEventListener('pointercancel', end);   // a vertical swipe (touch-action: pan-y) scrolls the page instead
+    h.addEventListener('keydown', function (e) {
+      var p = now(card), k = e.key, n = k === 'ArrowLeft' || k === 'ArrowDown' ? p - 10 : k === 'ArrowRight' || k === 'ArrowUp' ? p + 10
+        : k === 'PageDown' ? p - 25 : k === 'PageUp' ? p + 25 : k === 'Home' ? 0 : k === 'End' ? 100 : null;
+      if (n === null) return;
+      e.preventDefault();
+      set(card, n, false);
+    });
+    set(card, 100, false);
+  });
+  var rev = root.querySelector('.rm-reveal');
+  if (rev) rev.addEventListener('click', function () {
+    var on = rev.getAttribute('aria-pressed') !== 'true';
+    rev.setAttribute('aria-pressed', String(on));
+    root.classList.toggle('revealed', on);
+    rev.lastChild.textContent = on ? 'Blur images' : 'Reveal images';
+  });
 
   // defaults (the demo creator) kept so a second result / no data puts them back
   var DEF = {}, IMGS = root.querySelectorAll('.rm-img'), DEF_IMG = [];
