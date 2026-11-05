@@ -132,7 +132,7 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
    form; the only interactive overlay. Dark like the site on Jack's phone: the site's tokens (styles.css), dark values, scoped */
 .vo-cta { box-sizing: border-box; width: 520px; gap: 12px; padding: 16px 18px 18px; border: 1px solid #362f28; border-radius: 30px; background: rgb(21 18 15 / .92);
   color: #f3ece2; box-shadow: 0 24px 60px rgb(0 0 0 / .5); }
-.vo-cta-f, .vo-end-c a { pointer-events: auto; }   /* the rest of the card: a tap goes to the stage (play / pause), as on every card */
+.vo-cta-f { pointer-events: auto; }   /* the rest of the card: a tap goes to the stage (play / pause), as on every card */
 /* mode parts: generic = the title, the form, "Rewatch…" + the flip (.vo-gen); named = "This is what I'd clear for <name>" + contacts (.vo-nm) */
 [data-vo-mode="named"] .vo-gen, [data-vo-mode="named"] .vo-cta-t, [data-vo-mode="named"] .vo-cta-f, html:not([data-vo-mode="named"]) .vo-nm { display: none; }
 .vo-cta-t { margin: 0; font: 700 1.4rem/1.15 var(--sans); text-align: center; letter-spacing: -.01em; }
@@ -239,8 +239,7 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
   background: var(--accent); color: var(--on-accent); font: 700 2.3rem/1.1 var(--sans); white-space: nowrap; perspective: 300px; }
 .vo-end-c { display: grid; gap: 4px; font: 700 2.3rem/1.15 var(--sans); }   /* >= 11 px on a 390 px phone (x .305) */
 [data-vo-mode="named"] .vo-end { width: 560px; margin-left: -280px; }   /* the phone number line fits (named only: the generic clip stays) */
-.vo-end-c a { color: var(--ink); text-decoration: none; white-space: nowrap; }
-.vo-end-c a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.vo-end-c span { white-space: nowrap; }
 .vo-mini-n { display: inline-block; transform: rotateX(calc(var(--fl, 0) * 1deg)) scale(var(--fp, 1)); transform-origin: 20% 50%; }
 
 /* the name bar under the stage: generic = label + input + "Rebuild this video with my name" (+ the pulsing "type your name"

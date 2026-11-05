@@ -125,15 +125,15 @@ STEPS = """() => { const c = document.querySelector('.vo-cta'), s = c && c.query
           rows: [...s.querySelectorAll('.vo-dom')].map(e => e.textContent), more: q('.vo-more').textContent, end: sp(q('.vo-end-h').textContent),
           eo: +getComputedStyle(q('.vo-end')).opacity, endpx: +(Math.min(fs(q('.vo-end-h')), fs(q('.vo-end-f'))) * k).toFixed(1), mini: q('.vo-mini-n').textContent,
           shown: [...s.querySelectorAll('.vo-end > span')].filter(e => getComputedStyle(e).display !== 'none').map(e => sp(e.textContent)),
-          contacts: [...s.querySelectorAll('.vo-end-c a')].map(a => [sp(a.textContent), a.getAttribute('href')]),
-          inbox: (() => { const e = q('.vo-end').getBoundingClientRect(); return [...s.querySelectorAll('.vo-end > .vo-nm, .vo-end-c a')].every(x => { const r = x.getBoundingClientRect();
+          contacts: [...s.querySelectorAll('.vo-end-c > span')].map(a => sp(a.textContent)),
+          inbox: (() => { const e = q('.vo-end').getBoundingClientRect(); return [...s.querySelectorAll('.vo-end > .vo-nm, .vo-end-c > span')].every(x => { const r = x.getBoundingClientRect();
             return r.width > 0 && r.left >= e.left - .5 && r.right <= e.right + .5 && x.scrollWidth <= x.clientWidth + 1; }); })(),
           nmpx: +(Math.min(...[...s.querySelectorAll('.vo-end > .vo-nm')].map(fs)) * k).toFixed(1),
           chrome: [...c.querySelectorAll(':scope > .vo-cta-t, :scope > .vo-cta-f')].map(e => getComputedStyle(e).display)}; }"""
 DEMO, LEAKS = "Jaka Basej", 87
-CONTACTS = [["Telegram @jakabasej", "https://t.me/jakabasej"], ["WhatsApp +386 40 703 992", "https://wa.me/38640703992"], ["me@jackbase.dev", "mailto:me@jackbase.dev"]]
+CONTACTS = ["Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"]   # = site/imprint.html
 def named_end(s, nm):   # the named toast: "This is what I'd clear for NAME" + the contact row, nothing generic, no title / form
-    return (s and s["shown"] == ["This is what I'd clear for", nm, "".join(c[0] for c in CONTACTS)] and s["contacts"] == CONTACTS and s["inbox"]
+    return (s and s["shown"] == ["This is what I'd clear for", nm, "".join(CONTACTS)] and s["contacts"] == CONTACTS and s["inbox"]
             and s["chrome"] == ["none", "none"])
 HERO_H1 = "Leaked content, taken down by a real person. Me."
 handle = lambda n: re.sub(r"[^\w.]", "", n.lower()) or "creator"   # = js handle(): "Jaka Basej" → "jakabasej"
