@@ -269,7 +269,7 @@
     var h = phone ? '' : '<p class="g-stats">About ' + num(d.google_total) + ' results</p>';
     if (imgs.length) {   // one row that swipes sideways, every image, the next one peeking in from the right (desktop: arrows on hover)
       var nav = function (dir, label) {
-        return '<button type="button" class="g-strip-nav g-strip-' + (dir < 0 ? 'prev' : 'next') + '" data-strip="' + dir + '" tabindex="-1" aria-hidden="true" title="' + label + '">' +
+        return '<button type="button" class="g-strip-nav g-strip-' + (dir < 0 ? 'prev' : 'next') + '" data-strip="' + dir + '" tabindex="-1" aria-label="' + label + '" title="' + label + '"' + (dir < 0 ? ' disabled' : '') + '>' +   // pointer aid; keys: ← → on the tiles
           '<svg class="icon" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>';
       };
       h += '<div class="g-pack"><p class="g-pack-h" id="g-pack-h">Images</p><div class="g-strip-w at-start">' + (phone ? '' : nav(-1, 'Previous images') + nav(1, 'More images')) +
@@ -352,8 +352,10 @@
     var strip = stage.querySelector('.g-strip');
     if (strip) {   // desktop arrows: none at the start / end
       var edges = function () {
-        strip.parentNode.classList.toggle('at-start', strip.scrollLeft < 4);
-        strip.parentNode.classList.toggle('at-end', strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 4);
+        var w = strip.parentNode, s0 = strip.scrollLeft < 4, s1 = strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 4;
+        w.classList.toggle('at-start', s0);
+        w.classList.toggle('at-end', s1);
+        w.querySelectorAll('[data-strip]').forEach(function (b) { b.disabled = b.dataset.strip < 0 ? s0 : s1; });
       };
       strip.addEventListener('scroll', edges, { passive: true });
       strip.addEventListener('g-shrunk', edges);   // a tile moved away (watchThumb)
@@ -400,7 +402,11 @@
         if (l && !l.hasAttribute('aria-label')) l.setAttribute('aria-label', im.alt || 'Image result');
         im.parentNode.classList.add('g-img-none'); im.remove(); return;
       }
-      if (had) { var f = nu.matches('a, button') ? nu : nu.querySelector('a'); if (f) f.focus({ preventScroll: true }); }
+      if (had) {   // focus stays on the slot; a tile with no link (an image no result has) passes it to the next tile, else the last one
+        var fs = [].slice.call(box.querySelectorAll('a, button')), f = nu.matches('a, button') ? nu : nu.querySelector('a, button');
+        f = f || fs.filter(function (x) { return nu.compareDocumentPosition(x) & 4; })[0] || fs[fs.length - 1];
+        if (f) f.focus({ preventScroll: true });
+      }
     };
     im.addEventListener('error', drop, { once: true });
     im.addEventListener('load', function () { if (im.naturalWidth < 16 || im.naturalHeight < 16) drop(); }, { once: true });

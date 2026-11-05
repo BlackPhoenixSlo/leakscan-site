@@ -528,7 +528,7 @@ def huge_flow(browser, vp_name, vp):
     else:       # hover shows the arrows; the next arrow pages the strip
         page.mouse.move(*sb)
         page.wait_for_timeout(350)
-        arrows = page.evaluate("() => ['.g-strip-prev', '.g-strip-next'].map(c => +getComputedStyle(document.querySelector('#g-panel ' + c)).opacity)")
+        arrows = page.evaluate("() => ['.g-strip-prev', '.g-strip-next'].map(c => { const b = document.querySelector('#g-panel ' + c); return [+getComputedStyle(b).opacity, b.disabled, b.getAttribute('aria-label')]; })")
         try:
             page.locator("#g-panel .g-strip-next").click(timeout=3000)
         except PWTimeout:
@@ -540,8 +540,10 @@ def huge_flow(browser, vp_name, vp):
         check(f"{tag} strip: a touch swipe left scrolls the strip and snaps to a tile; page and phone screen stay put", s1["left"] > 100 and s1["snapped"] and s1["pageX"] <= 0
               and s1["inner"] == s0["inner"] and not s1["start"], [s0["left"], s1])
     else:
-        check(f"{tag} strip: desktop arrows on hover (prev hidden at the start), next pages the strip and snaps", arrows[0] == 0 and arrows[1] == 1
-              and s1["left"] >= 0.6 * s1["cw"] and s1["snapped"] and not s1["start"] and s1["pageX"] <= 0, [arrows, s1])
+        prev_on = page.evaluate("() => !document.querySelector('#g-panel .g-strip-prev').disabled")
+        check(f"{tag} strip: desktop arrows on hover, named (prev hidden + disabled at the start), next pages the strip and snaps, then prev is enabled",
+              arrows[0][:2] == [0, True] and arrows[1][:2] == [1, False] and arrows[0][2] and arrows[1][2] and prev_on
+              and s1["left"] >= 0.6 * s1["cw"] and s1["snapped"] and not s1["start"] and s1["pageX"] <= 0, [arrows, prev_on, s1])
         page.mouse.move(0, 0)
     page.locator("#g-panel .g-strip > .g-pack-b").first.focus()
     kk = []
