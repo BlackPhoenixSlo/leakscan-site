@@ -229,10 +229,27 @@ def get_scan(slug, path=None):
     # whatever the worker stored so a share/reload renders the full report.
     for key in ("img_meta", "gallery", "cse_sites", "top_leaks", "n_leaks",
                 "n_media", "n_hosting", "n_sites", "quote", "links_by_domain",
-                "excluded"):
+                "excluded", "mega"):
         if key in extra:
             d[key] = extra[key]
     return d
+
+
+def recent_extra(handle, key, max_age_s, path=None):
+    """extra_json of the newest scan of `handle` (case-insensitive) younger than max_age_s that has `key`
+    set truthy, else None. Per-handle cache over the scans table (idx_scans_handle)."""
+    since = (datetime.now(timezone.utc) - timedelta(seconds=max_age_s)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with _db(path) as c:
+        rows = c.execute("SELECT extra_json FROM scans WHERE handle = ? COLLATE NOCASE AND created_at >= ? "
+                         "ORDER BY created_at DESC LIMIT 10", (handle, since)).fetchall()
+    for r in rows:
+        try:
+            ex = json.loads(r[0] or "{}") or {}
+        except ValueError:
+            continue
+        if ex.get(key):
+            return ex
+    return None
 
 
 def mark_verified(slug, path=None):

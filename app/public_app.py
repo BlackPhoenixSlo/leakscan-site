@@ -49,6 +49,7 @@ import alias_enrich
 import chat_proxy
 import cse_scanner
 import leak_evidence
+import leakshaven
 import media_gather
 import profile_extract
 import report_live
@@ -330,6 +331,26 @@ def enrich_aliases(declared, rows, results, prog, started):
     _event(f"alias_enrich pages={d['pages']} cand={d['cand']} kept={d['kept']} new={len(new)} "
            f"items={len(extra)} secs={time.monotonic() - t0:.1f} reasons={alias_enrich.reasons_str(d['reasons'])}")
     return extra, new, d["socials"], d["names"]
+
+
+def leakshaven_step(handle, socials, aliases, names, prog):
+    """leakshaven.com packs for this creator -> (mega items, fresh_ok). Reuses a scan of the same
+    handle from the last 6 h; else one suggest + one pack-list request. Never raises; one log line."""
+    if not leakshaven.ENABLED:
+        return [], False
+    try:
+        ex = db.recent_extra(handle, "mega_ok", leakshaven.CACHE_TTL)
+    except Exception:
+        ex = None
+    if ex is not None:
+        mega = ex.get("mega") if isinstance(ex.get("mega"), list) else []
+        _event(f"leakshaven cache=hit packs={len(mega)}")
+        return mega, False            # only a fresh fetch is a cache source: TTL can't roll forward
+    prog("Checking leak aggregators…")
+    t0 = time.monotonic()
+    mega, reason = leakshaven.lookup(socials.get("instagram") or handle, aliases, names)
+    _event(f"leakshaven {reason} packs={len(mega)} secs={time.monotonic() - t0:.1f}")
+    return mega, reason in ("ok", "nomatch")
 
 
 def merge_items(results, extra):
@@ -1813,6 +1834,7 @@ class Handler(BaseHTTPRequestHandler):
                     "n_accepted", "n_removed"):   # counts only — the URL lists come from /api/scan-links
             if key in row:
                 pub[key] = row[key]
+        pub["mega"] = row.get("mega") or []
         if row["level"] == "low":
             ex = _scan_extra_all(slug) or {}
             pub["results"] = ex.get("results") or []
@@ -2021,6 +2043,9 @@ class Handler(BaseHTTPRequestHandler):
         alias_info = {"declared": list(aliases), "discovered": found,
                       "socials": [s for s in found_socials if s["handle"].lower() not in
                                   {v.lower() for v in socials.values()}]}
+        mega, mega_ok = leakshaven_step(handle, socials, list(aliases) + found +
+                                        [s["handle"] for s in alias_info["socials"]], names, prog)
+        rows = rows + leakshaven.hit_rows(mega, handle)
         images = cse_scanner.good_images(results, handle, CSE_IMAGES)
         # Replace Google's inflated raw totalResults with a grounded estimate.
         if USE_TOTAL_RESULTS_QUERY:
@@ -2044,7 +2069,7 @@ class Handler(BaseHTTPRequestHandler):
                               status=status, client_ip_hash=_ip_hash(ip),
                               extra={"images": images, "google_total": google_total,
                                      "results": shaped, "profile": profile, "socials": socials,
-                                     "aliases": alias_info})
+                                     "aliases": alias_info, "mega": mega, "mega_ok": mega_ok})
         if avatar and not _save_avatar(slug, avatar) and profile:
             profile["avatar"] = False
         media = {"status": media_gather.start(slug, platform, handle, profile, results,
@@ -2054,10 +2079,11 @@ class Handler(BaseHTTPRequestHandler):
                f"profile={(profile or {}).get('generated_by')} avatar={bool(avatar)} media={media['status']}")
         wc.sse(self, "result", json.dumps({
             "slug": slug, "handle": handle, "platform": platform, "level": "low",
-            "status": status, "hit_count": len(rows), "domain_count": len(rows),
+            "status": status, "hit_count": len(rows),
+            "domain_count": len({r.get("domain") for r in rows if r.get("domain")}),
             "google_total": google_total, "images": images, "hits": rows,
             "results": shaped, "profile": profile, "media": media, "socials": socials,
-            "aliases": alias_info,
+            "aliases": alias_info, "mega": mega,
         }, ensure_ascii=False))
         wc.sse(self, "done", "end")
 
