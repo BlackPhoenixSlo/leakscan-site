@@ -2383,6 +2383,9 @@ def tabs_flow(browser, vp_name, vp):
     check(f"{tag} thumbs: every All-strip thumb comes back blank, late: strip keeps its height, results below stay put, failed visible slots stay as empty tiles, no layout shift",
           a1[0] == a0[0] and a1[1] == a0[1] and a1[2] >= 1 and a1[3] >= 1 and a1[4] == 0 and not ls, [a0, a1, ls[:2]])
     ctx.close()
+    STRIP_IN_VIEW = """() => { const t = document.querySelector('.ph-track');   /* the strip on screen: phone pinned at its top, desktop centred */
+        if (t && getComputedStyle(t.firstElementChild).position === 'sticky') window.scrollTo({top: t.getBoundingClientRect().top + scrollY - parseFloat(getComputedStyle(t.firstElementChild).top), behavior: 'instant'});
+        else document.querySelector('#g-panel .g-strip').scrollIntoView({block: 'center', behavior: 'instant'}); }"""
     # failure order: the strip's last tile fails first (empty slot), then the first one: its slot gets a tile with an image, never the empty one
     ctx = new_ctx()
     page = ctx.new_page()
@@ -2396,6 +2399,7 @@ def tabs_flow(browser, vp_name, vp):
         held.remove(r)
         r.continue_()
     blank = lambda src: [r.fulfill(status=200, body=GIF1, content_type="image/gif") for r in [r for r in held if r.request.url.endswith(src)] if not held.remove(r)]
+    page.evaluate(STRIP_IN_VIEW)
     page.evaluate("() => { const s = document.querySelector('#g-panel .g-strip'); s.scrollTo({left: s.scrollWidth, behavior: 'instant'}); }")
     page.wait_for_timeout(800)
     blank(pick[1])
@@ -2408,9 +2412,38 @@ def tabs_flow(browser, vp_name, vp):
     lf = page.evaluate("""() => { const b = [...document.querySelector('#g-panel .g-strip').children], i = b[0].querySelector('img'), e = b[b.length - 1];
         return {first: !!i && !b[0].querySelector('.g-img-none'), painted: !!i && i.complete && i.naturalWidth >= 16, lastEmpty: !!e.querySelector('.g-img-none'),
                 lastName: (e.matches('a, button') ? e : e.querySelector('a, button')).getAttribute('aria-label') || '', n: b.length}; }""")
+    lf["inView"] = page.evaluate("() => { const r = document.querySelector('#g-panel .g-strip').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }")
     lf["shift"] = page.evaluate("(t0) => window.__ls.filter(x => x[0] > t0 && x[1] > 0 && !x[2]).map(x => x[3])", t0)
     check(f"{tag} thumbs: last strip tile fails first (empty slot keeps a name), then the first: its slot gets a tile with an image, not the empty one; no layout shift",
-          lf["first"] and lf["painted"] and lf["lastEmpty"] and lf["lastName"] and not lf["shift"], lf)
+          lf["inView"] and lf["first"] and lf["painted"] and lf["lastEmpty"] and lf["lastName"] and not lf["shift"], lf)
+    ctx.close()
+    # viewing the strip's end: its last 6 tiles fail (empty slots fill the view), then the first one: nothing at the end moves, no clamp
+    ctx = new_ctx()
+    page = ctx.new_page()
+    held, hold, pick = [], [True], []
+    page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] or any(r.request.url.endswith(x) for x in pick) else r.continue_())
+    page.goto(base + "scan/?r=demoR3port01", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    pick += page.evaluate("() => { const b = [...document.querySelector('#g-panel .g-strip').children]; return [b[0]].concat(b.slice(-6)).map(e => e.querySelector('img').getAttribute('src')); }")
+    hold[0] = False
+    for r in [r for r in held if not any(r.request.url.endswith(x) for x in pick)]:
+        held.remove(r)
+        r.continue_()
+    page.evaluate(STRIP_IN_VIEW)
+    page.evaluate("() => { const s = document.querySelector('#g-panel .g-strip'); s.scrollTo({left: s.scrollWidth, behavior: 'instant'}); }")
+    page.wait_for_timeout(800)
+    for src in pick[1:]:
+        blank(src)
+    page.wait_for_timeout(800)
+    END = """() => { const s = document.querySelector('#g-panel .g-strip'), b = [...s.children];
+        return [Math.round(s.scrollLeft), Math.round(b[b.length - 1].getBoundingClientRect().left), b.length, b.slice(-6).filter(e => e.querySelector('.g-img-none')).length]; }"""
+    e0, t0 = page.evaluate(END), page.evaluate("performance.now()")
+    blank(pick[0])
+    page.wait_for_timeout(1000)
+    e1 = page.evaluate(END)
+    ls = page.evaluate("(t0) => window.__ls.filter(x => x[0] > t0 && x[1] > 0 && !x[2]).map(x => x[3])", t0)
+    check(f"{tag} thumbs: viewing the strip's end, its last 6 fail then the first: the end stays put (scroll position, tiles), no layout shift",
+          e0[3] == 6 and e1[:3] == e0[:3] and not ls, [e0, e1, ls[:2]])
     ctx.close()
 
     # ---------- (3) #free phone: tabs, illustration without a scan ----------

@@ -356,6 +356,7 @@
         strip.parentNode.classList.toggle('at-end', strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 4);
       };
       strip.addEventListener('scroll', edges, { passive: true });
+      strip.addEventListener('g-shrunk', edges);   // a tile moved away (watchThumb)
       edges();
     }
     if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
@@ -372,6 +373,7 @@
       return r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom;
     });
   }
+  function tail(e) { var r = []; for (; e; e = e.nextElementSibling) r.push(e); return r; }
   function watchThumb(im) {
     var drop = function () {
       var t = im.closest('.g-tile, .g-pack-b');
@@ -389,7 +391,9 @@
         nu = tmp.firstElementChild;
         t.replaceWith(nu);
         watchThumb(nu.querySelector('img'));
-      } else if (last !== t && !onScreen(last)) { nu = last; t.replaceWith(last); }   // all shown: the last one (off screen) takes the slot
+      } else if (last !== t && !tail(last).some(onScreen)) {   // all shown: the last one takes the slot if it and all after it are off screen
+        nu = last; t.replaceWith(last); box.dispatchEvent(new Event('g-shrunk'));
+      }
       else {   // it is on screen (few images): keep an empty slot, nothing moves; the link keeps its name
         var l = t.matches('a, button') ? t : t.querySelector('a, button');
         if (l && !l.hasAttribute('aria-label')) l.setAttribute('aria-label', im.alt || 'Image result');
