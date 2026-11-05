@@ -382,6 +382,7 @@
       box.querySelectorAll('img').forEach(function (x) { shown[x.getAttribute('src')] = 1; });
       var spare = imageItems(state.data).filter(function (it) { return !shown[thumb(it.src)]; });
       var had = t.contains(document.activeElement), nu, last = box.lastElementChild;
+      while (last !== t && last.querySelector('.g-img-none')) last = last.previousElementSibling;   // the last tile still showing an image (after t)
       if (spare.length) {
         var tmp = document.createElement('div');
         tmp.innerHTML = t.classList.contains('g-tile') ? gTile(spare[0]) : packB(spare[0]);
@@ -389,7 +390,11 @@
         t.replaceWith(nu);
         watchThumb(nu.querySelector('img'));
       } else if (last !== t && !onScreen(last)) { nu = last; t.replaceWith(last); }   // all shown: the last one (off screen) takes the slot
-      else { im.parentNode.classList.add('g-img-none'); im.remove(); return; }   // it is on screen (few images): keep an empty slot, nothing moves
+      else {   // it is on screen (few images): keep an empty slot, nothing moves; the link keeps its name
+        var l = t.matches('a, button') ? t : t.querySelector('a, button');
+        if (l && !l.hasAttribute('aria-label')) l.setAttribute('aria-label', im.alt || 'Image result');
+        im.parentNode.classList.add('g-img-none'); im.remove(); return;
+      }
       if (had) { var f = nu.matches('a, button') ? nu : nu.querySelector('a'); if (f) f.focus({ preventScroll: true }); }
     };
     im.addEventListener('error', drop, { once: true });
