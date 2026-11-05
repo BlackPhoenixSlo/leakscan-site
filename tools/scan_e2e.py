@@ -638,6 +638,12 @@ def huge_flow(browser, vp_name, vp):
             r = p2.evaluate("""() => { const f = document.querySelector('.frame-phone'); return [getComputedStyle(f).position, document.querySelectorAll('#g-panel .g-r').length,
                 !!document.querySelector('#g-panel [data-more=all]')]; }""")
             sc = p2.evaluate(SCROLLERS)
+            fh = {}
+            for t in ("images", "videos", "all"):
+                p2.locator(f"#g-tab-{t}").click()
+                p2.wait_for_timeout(250)
+                fh[t] = p2.evaluate("document.querySelector('.frame-phone').offsetHeight")
+            check(f"{tag} short screen ({w}x{h}): every tab's static preview <= 1.5 screens tall", all(v <= 1.5 * h for v in fh.values()), [fh, 1.5 * h])
             p2.locator("[data-more=all]").click()
             p2.wait_for_timeout(200)
             n2 = p2.locator("#g-panel .g-r").count()
@@ -668,6 +674,30 @@ def huge_flow(browser, vp_name, vp):
         rr["videos_n"] = [nv, p4.locator("#g-panel .g-v").count()]
         check(f"{tag} resize 390x844 → 360x640: untouched tabs refit (<= 1.5 screens), the tab grown by More keeps its items",
               rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["images"] <= 1.5 * 640 and rr["videos_n"][0] == rr["videos_n"][1] > 6, rr)
+        # a grown tab shrinks back: "Show fewer" refits it, the view lands on its More button
+        grown = p4.evaluate(RUN)
+        has_less = p4.locator("[data-less=videos]").count() == 1
+        if has_less:
+            p4.locator("[data-less=videos]").click()
+            p4.wait_for_timeout(300)
+        sf = p4.evaluate("""() => { const m = document.querySelector('#g-panel [data-more=videos]'), r = m && m.getBoundingClientRect(), t = document.querySelector('.ph-track');
+            return {run: t.offsetHeight - t.firstElementChild.offsetHeight, n: document.querySelectorAll('#g-panel .g-v').length, less: !!document.querySelector('[data-less]'),
+              focus: document.activeElement === m, seen: !!r && r.top >= 0 && r.bottom <= innerHeight}; }""")
+        sf["grown"], sf["has_less"] = grown, has_less
+        check(f"{tag} Show fewer: a grown tab goes back to a fitted first look (<= 1.5 screens), focus + view on its More button",
+              has_less and grown > 1.5 * 640 and sf["run"] <= 1.5 * 640 and 0 < sf["n"] < 10 and not sf["less"] and sf["focus"] and sf["seen"], sf)
+        ctx.close()
+        # landscape phone: pinned chrome (site header + section nav) <= 15% of the screen height
+        ctx = browser.new_context(viewport={"width": 844, "height": 390}, device_scale_factor=2, is_mobile=True, has_touch=True)
+        p5 = ctx.new_page()
+        p5.goto(base + "scan/?r=" + slug)
+        p5.wait_for_selector("#report:not([hidden])", timeout=8000)
+        p5.evaluate("document.getElementById('sites').scrollIntoView({behavior: 'instant'}); window.scrollBy(0, 400)")
+        p5.wait_for_timeout(200)
+        ch = p5.evaluate("""() => { const b = e => e.getBoundingClientRect(), h = b(document.querySelector('.site-header')), n = b(document.querySelector('.rnav'));
+            return {header: Math.max(0, Math.round(h.bottom)), nav: [Math.round(n.top), Math.round(n.bottom)], chrome: Math.round(Math.max(0, h.bottom, n.bottom)), vh: innerHeight}; }""")
+        p5.screenshot(path=str(out / f"{vp_name}-h6-landscape.png"))
+        check(f"{tag} landscape 844x390: pinned chrome (header + section nav) <= 15% of the screen", ch["nav"][0] >= -1 and ch["chrome"] <= 0.15 * ch["vh"], ch)
         ctx.close()
         wide = {}   # narrow phones: nothing sticks out sideways (summary numbers, section nav, controls, filter)
         for w in (320, 360):

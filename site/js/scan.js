@@ -28,7 +28,7 @@
     more: null, fitted: null, expanded: null, dead: {}, log: [], retry: null };
   // phone preview: items per tab (fitPhone trims the first look), tabs fitted / grown by More (per device + report)
   var MORE0 = { all: 10, images: 12, videos: 6 };
-  function resetPreview() { state.more = Object.assign({}, MORE0); state.fitted = {}; state.expanded = {}; }
+  function resetPreview() { state.more = Object.assign({}, MORE0); state.fitted = {}; state.expanded = {}; state.first = {}; }
   resetPreview();
   state.device = window.matchMedia('(min-width: 720px)').matches ? 'computer' : 'phone';
 
@@ -254,9 +254,12 @@
     var i = t.lastIndexOf(' '), w = t.slice(i + 1);
     return w.length > 24 ? t + GO : t.slice(0, i + 1) + '<span class="g-nw">' + w + GO + '</span>';
   }
+  // More adds the next batch; once a tab has grown, "Show fewer" takes it back to its first look
   function more(kind, label, left) {
-    return left > 0 ? '<button type="button" class="g-more" data-more="' + kind + '">' + esc(label) + '</button>' : '';
+    return (left > 0 ? '<button type="button" class="g-more" data-more="' + kind + '">' + esc(label) + '</button>' : '') +
+      (state.more[kind] > firstLook(kind) ? '<button type="button" class="g-less" data-less="' + kind + '">Show fewer</button>' : '');
   }
+  function firstLook(k) { return state.first[k] || MORE0[k]; }
 
   function panelAll(d, phone) {
     var pages = d.results.filter(function (r) { return r.kind !== 'video'; });
@@ -390,7 +393,7 @@
   }
   // The phone's first look at a tab is at most ~1.5 screens of scrolling (pinned) or ~1.5 screens tall (short screens,
   // not pinned): fewer results to start with, "More …" adds the rest. Once per tab and device; a click on More is the user's.
-  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 18, videos: 6 }, FIT_MIN = { all: 2, images: 2, videos: 1 };
+  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 18, videos: 6 }, FIT_MIN = { all: 1, images: 2, videos: 1 };
   function fitPhone(focusTab) {
     var t = state.tab, page = pin.scr.firstElementChild;
     if (state.fitted[t]) return;
@@ -406,7 +409,7 @@
       n = 2 * Math.floor((room - (items[0].getBoundingClientRect().top - top)) / h);
     } else while (n < items.length && bottom(items[n]) <= room) n++;
     n = Math.max(FIT_MIN[t], n);
-    if (n < items.length) { state.more[t] = n; renderGoogle(focusTab); }
+    if (n < items.length) { state.more[t] = state.first[t] = n; renderGoogle(focusTab); }
   }
   // a new viewport (rotation, resize; not the mobile URL bar) refits the tabs More has not grown
   var vpW = innerWidth, vpH = innerHeight, refitT = 0;
@@ -416,7 +419,7 @@
       if (innerWidth === vpW && Math.abs(innerHeight - vpH) < 150) return;
       vpW = innerWidth; vpH = innerHeight;
       if (state.device !== 'phone' || !state.data) return;
-      Object.keys(MORE0).forEach(function (t) { if (!state.expanded[t]) { state.more[t] = MORE0[t]; state.fitted[t] = false; } });
+      Object.keys(MORE0).forEach(function (t) { if (!state.expanded[t]) { state.more[t] = MORE0[t]; state.fitted[t] = false; state.first[t] = 0; } });
       if (!state.expanded[state.tab]) renderGoogle($('g-stage').contains(document.activeElement));
     }, 200);
   });
@@ -467,9 +470,19 @@
   window.addEventListener('resize', function () { if (state.device === 'computer' && state.data) fitComputer(); });
 
   $('g-stage').addEventListener('click', function (e) {
-    var t = e.target.closest('[data-tab],[data-more],[data-goto]');
+    var t = e.target.closest('[data-tab],[data-more],[data-less],[data-goto]');
     if (!t) return;
     if (t.dataset.tab) { state.tab = t.dataset.tab; renderGoogle(true); }
+    else if (t.dataset.less) {   // back to a first look; the view lands on its More button (pinned: the screen's end)
+      var kl = t.dataset.less;
+      state.more[kl] = MORE0[kl];
+      state.expanded[kl] = state.fitted[kl] = false;   // the phone refits it to this screen
+      renderGoogle(false);
+      var mb = document.querySelector('#g-panel [data-more="' + kl + '"]') || $('g-tab-' + state.tab);
+      if (pin && pin.on) window.scrollTo({ top: window.pageYOffset + pin.track.getBoundingClientRect().top - pin.top + pin.max, behavior: 'instant' });
+      else if (mb) mb.scrollIntoView({ block: 'nearest' });
+      if (mb) mb.focus({ preventScroll: true });
+    }
     else if (t.dataset.goto) { state.tab = t.dataset.goto; renderGoogle(true); }
     else {
       var k = t.dataset.more, sel = '#g-panel ' + ITEM[k], had = document.querySelectorAll(sel).length;

@@ -149,6 +149,9 @@
 @media (hover: hover) { .g-more:hover { background: #3c4043; } }
 .g-more:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; }
 .g-more-sm { max-width: 260px; margin: 10px 0 0; }
+.g-less { display: block; min-height: 44px; margin: 2px auto 0; padding: 0 16px; border: 0; background: none; color: var(--g-muted); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+@media (hover: hover) { .g-less:hover { color: var(--g-text); } }
+.g-less:focus-visible { outline: 2px solid var(--g-on); outline-offset: 2px; border-radius: 999px; }
 
 /* thumbnails: blurred until Reveal */
 .g-img { display: block; position: relative; overflow: hidden; border-radius: 10px; background: #2a2b2e; line-height: 0; min-height: 60px; }
@@ -283,6 +286,13 @@
 .ph-reveal:focus-visible { outline: 3px solid #8ab4f8; outline-offset: 2px; }
 @media (hover: hover) { .ph-reveal:hover { filter: brightness(1.08); } }
 /* screens too short to pin a usable phone: the screen scrolls by itself */
+/* landscape phones: the site header scrolls away, only a slimmer section nav stays pinned (~11% of 390px) */
+@media (max-height: 500px) {
+  .site-header { position: relative; }
+  html { scroll-padding-top: 12px; }
+  #report { --rnav-h: 44px; }
+  .rnav { top: 0; }
+}
 @media (max-height: 599px) {
   .ph-track .frame-phone { position: static; }
   .ph-track .ph-screen { height: auto; }   /* a shorter static preview (js: fitPhone), no scroll box inside the page */
