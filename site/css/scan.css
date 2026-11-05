@@ -193,6 +193,7 @@
 .ph-sig { width: 17px; height: 11px; background: linear-gradient(90deg, currentColor 0 3px, transparent 3px 5px, currentColor 5px 8px, transparent 8px 10px, currentColor 10px 13px, transparent 13px 14px, currentColor 14px); clip-path: polygon(0 100%, 100% 0, 100% 100%); }
 .ph-wifi { width: 15px; height: 11px; background: currentColor; clip-path: polygon(50% 100%, 0 30%, 15% 12%, 50% 0, 85% 12%, 100% 30%); }
 .ph-bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; opacity: .95; }
+@media (max-width: 359px) { .ph-status { padding: 0 20px 0 26px; } .ph-status::after { width: 76px; height: 26px; top: 12px; } }   /* notch clear of the clock / icons */
 .ph-bat::after { content: ""; position: absolute; inset: 1.5px 5px 1.5px 1.5px; background: currentColor; border-radius: 1.5px; }
 .gm-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 10px; }
 .gm-burger { display: grid; gap: 4px; width: 20px; }
@@ -304,6 +305,7 @@
 .lx-sum:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: var(--radius-sm); }
 .lx-dom { grid-area: dom; display: flex; align-items: center; min-width: 0; font-weight: 600; }
 .lx-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 479px) { .lx-name { white-space: normal; overflow-wrap: break-word; } }   /* phone: whole domain, wrapped after a dot (js: wbr) */
 .lx-n { grid-area: n; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: .9rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .lx-n b { color: var(--ink); font-weight: 650; }
 .lx-n::after { content: ""; width: 7px; height: 7px; margin: -3px 2px 0 10px; border: solid var(--muted); border-width: 0 2px 2px 0; transform: rotate(45deg); transition: transform .15s; }

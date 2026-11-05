@@ -548,6 +548,10 @@ def huge_flow(browser, vp_name, vp):
     prev = page.locator("#lx-list .lx-top").evaluate_all("els => els.map(e => e.textContent)")
     check(f"{tag} filter: each site's preview is its first matching link", prev and all(q in t.lower() for t in prev), prev[:3])
     page.screenshot(path=str(out / f"{vp_name}-h5-filter.png"))
+    filt("huge-2")   # matches the tail of long links: the preview starts just before the match
+    vis = page.evaluate("""() => [...document.querySelectorAll('#lx-list .lx-top')].filter(e => e.offsetWidth).map(e => {
+        const m = e.querySelector('mark'); return !!m && m.getBoundingClientRect().right <= e.getBoundingClientRect().right + 1; })""")
+    check(f"{tag} filter: a match in a link's tail is in view in its preview", vis and all(vis), vis)
     st = filt("FANZONE")
     check(f"{tag} filter by site name (any case)", st.startswith("1 site · ") and page.locator("#lx-list .lx-name").all_inner_texts() == ["fanzone.example"], st)
     st = filt("zzqx")

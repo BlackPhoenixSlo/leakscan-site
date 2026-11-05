@@ -491,11 +491,21 @@
     h = h.replace(/^www\./i, '');
     return (h.toLowerCase() === dom ? '' : h) + (rest && rest !== '/' ? rest : (h.toLowerCase() === dom ? '/' : ''));
   }
-  function marked(parent, text, q) {   // text with the first match of q in <mark>
+  function marked(parent, text, q, dots) {   // text with the first match of q in <mark>; dots: a line may break after a '.'
+    var put = function (t) {
+      if (!dots) return parent.append(t);
+      t.split('.').forEach(function (p, j, a) { parent.append(j < a.length - 1 ? p + '.' : p); if (j < a.length - 1) parent.appendChild(el('wbr')); });
+    };
     var i = q ? text.toLowerCase().indexOf(q) : -1;
-    if (i < 0) { parent.textContent = text; return parent; }
-    parent.append(text.slice(0, i), el('mark', '', text.slice(i, i + q.length)), text.slice(i + q.length));
+    if (i < 0) { put(text); return parent; }
+    put(text.slice(0, i)); parent.appendChild(el('mark', '', text.slice(i, i + q.length))); put(text.slice(i + q.length));
     return parent;
+  }
+  function excerpt(text, q) {   // a long link previewed from just before its match, so a match in the tail stays visible
+    var i = q ? text.toLowerCase().indexOf(q) : -1;
+    if (i <= 16) return text;
+    var k = text.lastIndexOf('/', i - 1);   // from the path segment the match is in, when that is short
+    return '\u2026' + text.slice(k >= 0 && i - k <= 24 ? k : i - 8);
   }
   function renderSites() {
     lx.groups = groups(state.data);
@@ -540,13 +550,13 @@
   function siteRow(it, open) {
     var g = it.g, li = el('li', 'lx-site'), det = el('details'), sum = el('summary', 'lx-sum'), q = lx.q;
     var name = el('span', 'lx-dom');
-    name.append(E.fav(g.domain, 'g-fav-s'), marked(el('span', 'lx-name'), g.domain, q));
+    name.append(E.fav(g.domain, 'g-fav-s'), marked(el('span', 'lx-name'), g.domain, q, true));
     var cnt = el('span', 'lx-n');
     cnt.append(el('b', '', num(it.links.length)), ' ' + (it.inside ? 'of ' + num(g.links.length) + ' ' : '') + plural(g.links.length, 'link', 'links'));
     var bar = el('span', 'lx-bar');
     bar.setAttribute('aria-hidden', 'true');
     bar.appendChild(el('i')).style.width = Math.max(2, Math.round(100 * g.links.length / lx.max)) + '%';
-    sum.append(name, cnt, marked(el('span', 'lx-top mono'), shortUrl(it.links[0], g.domain), it.inside ? q : ''), bar);
+    sum.append(name, cnt, marked(el('span', 'lx-top mono'), excerpt(shortUrl(it.links[0], g.domain), it.inside ? q : ''), it.inside ? q : ''), bar);
     det.appendChild(sum);
     det.addEventListener('toggle', function () {
       if (det.open && !det.querySelector('.lx-links')) { var ul = el('ul', 'lx-links'); det.appendChild(ul); showLinks(det, it, LINKS_STEP); }

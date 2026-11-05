@@ -86,9 +86,12 @@ EVIL_MEGA = [{"url": "javascript:alert(1)", "host": "mega.nz", "title": "<img sr
               "images": "<b>", "videos": -5, "age": "https://evil.example/age", "status": "live"}]
 
 
+LONG = "free-full-gallery-all-photos-and-videos-download/"   # some huge-fixture links are long: the handle sits in the tail
+
+
 def huge_result(handle, n_links=1000, n_domains=100):
     """1000 links on 100 domains, same every run: long-tail counts (domain i ~ 1/(i+1)^0.9, each >= 1, sum exact),
-    80 Google results on the top domains (every 8th a video), 30 images. Report-view scale fixture (stub-huge)."""
+    every 3rd link long (handle in its tail), 80 Google results on the top domains (every 8th a video), 30 images. Report-view scale fixture (stub-huge)."""
     pre = ["leak", "fan", "only", "nude", "pic", "vid", "clip", "mirror", "dump", "thot"]
     suf = ["vault", "zone", "base", "stash", "hoard", "drop", "rip", "bay", "flood", "board"]
     doms = [f"{pre[i % 10]}{suf[(i // 10 + i) % 10]}.example" for i in range(n_domains)]
@@ -97,7 +100,7 @@ def huge_result(handle, n_links=1000, n_domains=100):
     for i in range(n_links - sum(cnt)):
         cnt[i % n_domains] += 1
     kinds = ["gallery", "model", "album", "thread", "set", "video", "post", "tag"]
-    hits = [{"domain": d, "url": f"https://{'www.' if i % 7 == 3 else ''}{d}/{kinds[(i + k) % 8]}/{1000 + i * 37 + k}/{handle}-{k + 1}",
+    hits = [{"domain": d, "url": f"https://{'www.' if i % 7 == 3 else ''}{d}/{kinds[(i + k) % 8]}/{1000 + i * 37 + k}/{LONG if k % 3 == 1 else ''}{handle}-{k + 1}",
              "occurrences": max(1, 12 - k // 3 - i // 10), "method": "google", "alias": None, "live": k % 5 != 4,
              "title": f"{handle} {kinds[(i + k) % 8]} {k + 1} - {d.split('.')[0].title()}"}
             for i, (d, c) in enumerate(zip(doms, cnt)) for k in range(c)]
