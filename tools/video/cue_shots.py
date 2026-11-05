@@ -100,9 +100,10 @@ def speech(b, base, name):
                 pg.wait_for_function("() => __said.length > 0", timeout=6000)
             except Exception:
                 pass
+            pg.wait_for_timeout(500)    # the pill has slid in (0.4 s)
             pill = pg.evaluate("() => { const e = document.querySelector('.vo-for'); return [e.hasAttribute('data-off'), e.innerText.replace(/\\s+/g, ' ').trim()]; }")
             pg.screenshot(path=str(pathlib.Path(OUT) / f"desktop-say-{who}.png"))
-            pg.wait_for_timeout(700)
+            pg.wait_for_timeout(300)
             said, vol = pg.evaluate("() => [__said, document.querySelector('video').volume]")
             check(f"speech ?name={who}: spoken once at the cue with the name, rate 0.95, en, video ducked to 0.25 then restored",
                   len(said) == 1 and said[0][0] == who and 29.2 <= said[0][1] < 29.7 and said[0][2] == 0.25 and abs(said[0][3] - 0.95) < 1e-6

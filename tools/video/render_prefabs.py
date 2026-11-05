@@ -10,7 +10,7 @@ Per prefab ID (google, google-images, x, reddit, mega) in OUT_DIR:
   ID-green.mp4    H.264 yuv420p on chroma #00FF00 (the same frames composited by ffmpeg) for CapCut's Chroma key
   ID-live.png / ID-removed.png   the settled states (1.6 s / 5.4 s) on green, screenshots of
                   ?prefab=ID&state=live|removed&bg=green (so the chroma mode itself is exercised too)
-  ID-in.png / ID-out.png   mid slide-in (0.2 s) / mid slide-out (5.8 s), stills from ID-green.mp4
+  ID-in.png / ID-out.png   mid slide-in (0.1 s) / mid slide-out (5.8 s), stills from ID-green.mp4
 Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/render_prefabs.py OUT_DIR [--name X] [--keep-frames]
 Needs ffmpeg with prores_ks + libx264."""
 import argparse, pathlib, shutil, subprocess, sys, urllib.parse
@@ -58,7 +58,7 @@ def main():
             ff("-f", "lavfi", "-i", f"color=c=0x00FF00:s={W}x{H}:r={FPS}", *seq, "-filter_complex",
                "[0][1]overlay=shortest=1,format=yuv420p", "-c:v", "libx264", "-crf", "14", "-preset", "medium",
                "-movflags", "+faststart", str(out / f"{pid}-green.mp4"))
-            for t, name in ((0.2, "in"), (5.8, "out")):
+            for t, name in ((0.1, "in"), (5.8, "out")):
                 ff("-ss", str(t), "-i", str(out / f"{pid}-green.mp4"), "-frames:v", "1", str(out / f"{pid}-{name}.png"))
             if not a.keep_frames:
                 shutil.rmtree(frames)
