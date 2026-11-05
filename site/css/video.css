@@ -1,4 +1,5 @@
-/* site/video/: Jack's face video (he is on the left half) + cue-driven overlay prefabs filling the right half. Reuses styles.css (tokens, Google phone) and removals.css (Mega / X / Reddit panels, .rm-stage compare wipe);
+/* site/video/: Jack's face video fills the whole 16:9 stage (he sits in its left half, his take leaves the right half empty) + cue-driven
+   overlay prefabs drawn ON the video's right half (transparent layer, no panel of their own: the cards' own shadows carry them). Reuses styles.css (tokens, Google phone) and removals.css (Mega / X / Reddit panels, .rm-stage compare wipe);
    js/video-overlays.js sets every animated value as a custom property from the video time: --o (opacity), --x / --y
    (slide in / out + the snap shake), --rot (shake), --sc (pop-in scale), --f (snap flash), --p (wipe, 100 = live, 0 =
    removed), --w (wipe progress 0..1), --h (handle), --s (stamp slam), --b / --bo (confetti), --kls / --klo / --kgs /
@@ -9,8 +10,9 @@
 .vo { --nb-h: 76px; }
 .vo.vo-solo { --nb-h: 0px; }
 .vo-stage { position: relative; width: min(100vw, calc((100vh - var(--nb-h)) * 16 / 9)); aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
-.vo-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-/* the right half: a 640x720 design box (960x1080 frame px at 1920), scaled to it (--k = width / 640 from JS), so the web
+/* full frame: the video is the whole stage (cover: a take that is not exactly 16:9 still fills it, no bars; full screen = contain, below) */
+.vo-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* the right half, over the video (no background): a 640x720 design box (960x1080 frame px at 1920), scaled to it (--k = width / 640 from JS), so the web
    page and the 1920x1080 renders match. Not clipped: the card slides in from the frame edge (the stage clips). */
 .vo-over { position: absolute; top: 0; right: 0; width: 50%; height: 100%; pointer-events: none; }
 .vo-box { position: absolute; top: 0; left: 0; width: 640px; height: 720px; transform: scale(var(--k, 1)); transform-origin: 0 0; }
@@ -18,6 +20,7 @@
    phone = rotate it (the stage fills the landscape screen) or the full screen button (js): the stage in the Fullscreen API
    (desktop, Android), else (iPhone: no element full screen) "theater": the stage fixed, rotated 90deg over the portrait screen */
 .vo-stage:fullscreen { background: #000; }
+.vo-stage:fullscreen .vo-video { object-fit: contain; }   /* the whole take, centred: the .vo-over rule below tracks its right half */
 .vo-stage:fullscreen .vo-over { top: 50%; right: calc((100vw - min(100vw, 177.78vh)) / 2); width: calc(min(100vw, 177.78vh) / 2);
   height: min(100vh, 56.25vw); transform: translateY(-50%); }   /* the right half of the 16:9 picture (object-fit: contain) */
 html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidden; }   /* body scroll locked */
