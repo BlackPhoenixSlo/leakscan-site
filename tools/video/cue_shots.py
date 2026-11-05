@@ -2,8 +2,8 @@
 """Real-path proof for site/video/: serve site/ (Range-capable, tools/video/serve.py), open video/?t=<cue> in BOTH modes,
 generic (no name, no scan) and named (?name=NAME), at phone 390x844 and desktop 1440x900, wait until the <video> has
 seeked there, screenshot, and assert: only the cue's prefab is on screen, in the right state (wipe --p 100 live / 0
-removed), the mode's name in it ("Your name" / NAME), html[data-vo-mode], on desktop it sits on the right half,
-vertically centred (left >= 50 %, centre within 5 % of the middle: Jack on the left stays uncovered), the rolling
+removed), the mode's name in it ("Your name" / NAME), html[data-vo-mode], at both widths (phone too: no stacking) it
+sits inside the stage's right half, vertically centred (left >= 50 %, centre within 5 % of the middle: Jack on the left stays uncovered), the rolling
 counters (google "About 4,120 results" → "About 3 results", mega "52 GB · 318 videos" → "0 GB · 0 videos"), no request
 leaves 127.0.0.1, no console error (named: the 404 of the jack-named.mp4 HEAD probe is expected, declared). Each prefab
 is shot live (settled; google-images after its tap + grid) and removed (removed + 2 s).
@@ -25,8 +25,19 @@ Plus:
   data-cue-named-shift; generic never asks for it
 - personalized (tools/scan_stub.py, ?r=demoRemove1): named mode, texts from the scan result in every prefab; every
   .rm-img = the scan's thumbs via <API>/api/thumb, loaded, still blurred; and ?name= keeps the default photos (img/removals)
+- cta-steps (generic end card): at cta + 0.9 step 1 typing (a proper prefix of the demo name), + 2.2 typed in full, + 3.3
+  step 2 mid-scan (bar 10-90 %, "N leaks found" rolling) = frame-1920-generic-cta-steps-step2.png; after the take ends
+  the post-roll clock keeps it looping: step 3 with the name flipped in (frame-1920-generic-cta-steps-step3-postroll.png);
+  named mode never shows it
+- player: phone (touch): no native controls, own play bar, a tap on the stage plays + "Rotate for full size" hint;
+  proof-phone-portrait-generic-google-live.png = the whole 390x844 screen, card inside the stage's right half;
+  iPhone theater (declared: Fullscreen API removed by an init script, as on iPhone Safari): the button rotates the stage
+  90deg over the screen (proof-phone-theater-generic-google-live.png; the card in its right half = the screen's lower
+  half), scroll locked, Esc / back / X each close it; desktop: the button puts the STAGE in full screen, the card on the
+  right half of the centred 16:9 picture
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs]
+--break-steps serves index.html without the cta-steps animation (.vo-steps): only the "cta-steps:" checks go red.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, pathlib, re, socket, subprocess, sys, urllib.parse
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -70,6 +81,18 @@ SFX_STUB = """window.__sfx = []; window.__actx = 0; { const A = window.AudioCont
   constructor(...a) { super(...a); __actx++; }
   createOscillator() { __sfx.push(['osc', +document.querySelector('video').currentTime.toFixed(2)]); return super.createOscillator(); }
   createBufferSource() { __sfx.push(['noise', +document.querySelector('video').currentTime.toFixed(2)]); return super.createBufferSource(); } }; }"""
+# cta-steps state: {off, so: [opacity per step], typed, bar, count, mini} or null without the animation
+STEPS = """() => { const c = document.querySelector('.vo-cta'), s = c && c.querySelector('.vo-steps'); if (!s) return null;
+  return {off: c.hasAttribute('data-off'), so: [...s.querySelectorAll('.vo-step')].map(e => +getComputedStyle(e).opacity), typed: s.querySelector('.vo-mi-t').textContent,
+          bar: +s.style.getPropertyValue('--bar'), count: s.querySelector('.vo-mc').textContent.replace(/\\s+/g, ' ').trim(), mini: s.querySelector('.vo-mini-n').textContent}; }"""
+DEMO = "Orla Brennick"
+# [stage rect, .vo-over rect, visible card rect, stage transform, data-vo-full, html overflow, video.controls]
+GEOM = """() => { const r = e => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; }, st = document.querySelector('.vo-stage'),
+  card = [...document.querySelectorAll('.vo-pf')].find(e => !e.hasAttribute('data-off'));
+  return [r(st), r(document.querySelector('.vo-over')), card ? r(card.querySelector('.vo-phone, .vo-panel, .vo-steps') || card) : null, getComputedStyle(st).transform,
+          document.documentElement.dataset.voFull || null, getComputedStyle(document.documentElement).overflow, document.querySelector('video').controls]; }"""
+IPHONE_FS = ("Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: () => false });"
+             "Element.prototype.requestFullscreen = undefined; Element.prototype.webkitRequestFullscreen = undefined;")
 fails = []
 
 
@@ -96,7 +119,7 @@ def guard(ctx, base_ok, seen=None):
         if seen is not None:
             seen.append(r.request.url)
         if any(r.request.url.startswith(b) for b in base_ok):
-            r.continue_()
+            r.fallback()   # → a --break-* route (registered earlier), else the network
         else:
             ext.append(r.request.url)
             r.abort()
@@ -108,6 +131,16 @@ def console(pg, errs):
     probe = lambda m: m.type == "error" and "404" in m.text and (m.location or {}).get("url", "").endswith("/video/jack-named.mp4")
     pg.on("console", lambda m: errs.append(m.text) if m.type == "error" and not probe(m) else None)
     pg.on("pageerror", lambda e: errs.append(str(e)))
+
+
+BREAK = {}   # --break-* routes, applied to every context
+
+
+def ctx_new(b, **kw):
+    ctx = b.new_context(**kw)
+    for pat, body, ctype in BREAK.values():
+        ctx.route(pat, lambda r, body=body, ctype=ctype: r.fulfill(body=body, content_type=ctype))
+    return ctx
 
 
 def goto(pg, base, query, t):
@@ -185,7 +218,7 @@ def play(pg, until):
 def speech(b, base, out, name, cues):
     start, say = cues["say-start"], cues["say"]
     for label, query, t, until in (("start", f"name={name}", 0, start + 0.6), ("end", f"name={name}", say - 0.6, say + 0.6)):
-        ctx = b.new_context(viewport={"width": 1440, "height": 900})
+        ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
         ctx.add_init_script(SAY_STUB)
         pg = ctx.new_page()
         goto(pg, base, query, t)
@@ -202,7 +235,7 @@ def speech(b, base, out, name, cues):
         check(f"speech ?name={name} ({label}): 'for {name}' pill on screen", not pill[0] and pill[1].endswith(f"for {name}"), pill)
         ctx.close()
     # generic: never spoken, no pill, the end card instead
-    ctx = b.new_context(viewport={"width": 1440, "height": 900})
+    ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
     ctx.add_init_script(SAY_STUB)
     pg = ctx.new_page()
     goto(pg, base, "", say - 0.6)
@@ -212,7 +245,7 @@ def speech(b, base, out, name, cues):
     ctx.close()
     # data-cue-say past the end of the take (declared: moved to 99): the video's `ended` brings the name / the end card
     for query in (f"name={name}", ""):
-        ctx = b.new_context(viewport={"width": 1440, "height": 900})
+        ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
         ctx.add_init_script(SAY_STUB)
         pg = ctx.new_page()
         goto(pg, base, query, 43.2)
@@ -230,7 +263,7 @@ def sfx(b, base, cues):
     for label, query, t, until, want in (("pop at live", "", g[0] - 0.4, g[0] + 0.3, [["osc", g[0]]]),
                                          ("whoosh + thud at removed", "", g[1] - 0.3, g[1] + 0.4, [["noise", g[1]], ["osc", g[1]]]),
                                          ("?sfx=0: silent", "sfx=0", g[1] - 0.3, g[1] + 0.4, [])):
-        ctx = b.new_context(viewport={"width": 1440, "height": 900})
+        ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
         ctx.add_init_script(SFX_STUB)
         pg = ctx.new_page()
         goto(pg, base, query, t)
@@ -245,7 +278,7 @@ def sfx(b, base, cues):
 
 def named_take(b, base, name, cues, shift):
     """jack-named.mp4 = jack.mp4's bytes via a route (declared): it must play and shift every cue by data-cue-named-shift"""
-    ctx = b.new_context(viewport={"width": 1440, "height": 900})
+    ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
     ctx.route("**/video/jack-named.mp4", lambda r: r.continue_(url=r.request.url.replace("jack-named.mp4", "jack.mp4")))
     pg = ctx.new_page()
     g = cues["google"]
@@ -259,15 +292,138 @@ def named_take(b, base, name, cues, shift):
     ctx.close()
 
 
+def cta_steps(pg, base, out, cta, name_q):
+    """the generic end card's 3-step loop, on the 1920x1080 page (pg)"""
+    goto(pg, base, "", round(cta + 0.9, 2))
+    s = pg.evaluate(STEPS)
+    check("cta-steps: cta + 0.9 = step 1, the name typing (a proper prefix of the demo name)",
+          s and s["so"][0] > .9 and s["so"][1] == 0 and 0 < len(s["typed"]) < len(DEMO) and DEMO.startswith(s["typed"]), s)
+    goto(pg, base, "", round(cta + 2.2, 2))
+    s = pg.evaluate(STEPS)
+    check(f"cta-steps: cta + 2.2 = step 1, typed in full ({DEMO!r})", s and s["so"][0] > .9 and s["typed"] == DEMO, s)
+    goto(pg, base, "", round(cta + 3.3, 2))
+    f = out / "frame-1920-generic-cta-steps-step2.png"
+    pg.locator(".vo-stage").screenshot(path=str(f))
+    s = pg.evaluate(STEPS)
+    n = re.fullmatch(r"(\d+) leaks found", s["count"]) if s else None
+    check(f"cta-steps: cta + 3.3 = step 2 mid-scan (bar 10-90 %, 'N leaks found' rolling to 37), steps 1 / 3 off -> {f.name}",
+          s and s["so"] == [0, 1, 0] and .1 < s["bar"] < .9 and n and 0 < int(n[1]) < 37, s)
+    # past the end: the post-roll clock keeps the loop going (the real take ends ~2 s after the cue)
+    pg.goto(f"{base}video/?t=43.4")
+    pg.wait_for_function(SEEKED, arg=43.4, timeout=15000)
+    play(pg, 43.9)
+    pg.wait_for_function("() => document.querySelector('video').ended", timeout=8000)
+    try:
+        pg.wait_for_function("() => { const s = document.querySelectorAll('.vo-step'); return s.length === 3 && +getComputedStyle(s[2]).opacity > .9"
+                             " && document.querySelector('.vo-mini-n').textContent !== 'Your name'"
+                             " && document.querySelector('.vo-steps').style.getPropertyValue('--fp') === '1.000'; }", timeout=9000)
+    except Exception:
+        pass
+    f = out / "frame-1920-generic-cta-steps-step3-postroll.png"
+    pg.locator(".vo-stage").screenshot(path=str(f))
+    s = pg.evaluate(STEPS)
+    check(f"cta-steps: after the video ends it keeps looping: step 3, the mini page flipped to {DEMO!r} -> {f.name}",
+          s and s["so"][2] > .9 and s["mini"] == DEMO and pg.evaluate("() => document.querySelector('video').ended"), s)
+    for t in (round(cta + 0.9, 2), round(cta + 3.3, 2)):
+        goto(pg, base, name_q, t)
+        s = pg.evaluate(STEPS)
+        check(f"cta-steps: named mode never shows it (t={t:g})", s and s["off"] and pg.evaluate("() => document.documentElement.dataset.voMode") == "named", s)
+
+
+def player(b, base, out, cues):
+    """phone merged layout, tap-to-play + hint, iPhone theater, desktop full screen"""
+    g = cues["google"]
+    t = round(g[0] + 1.3, 2)
+    near = lambda a, b, tol=2: abs(a - b) <= tol
+    ctx = ctx_new(b, **VIEWPORTS["phone"])
+    pg = ctx.new_page()
+    goto(pg, base, "", t)
+    pg.screenshot(path=str(out / "proof-phone-portrait-generic-google-live.png"))
+    st, ov, card, tr, full, _, ctl = pg.evaluate(GEOM)
+    check("player: phone portrait: stage 16:9 full width, .vo-over = its right half, the card inside it (not below) -> proof-phone-portrait-generic-google-live.png",
+          near(st[2], 390) and near(st[3], 390 * 9 / 16) and near(ov[0], st[0] + st[2] / 2) and near(ov[1], st[1]) and near(ov[3], st[3])
+          and card and card[0] >= ov[0] - 1 and card[1] >= st[1] - 1 and card[1] + card[3] <= st[1] + st[3] + 1, (st, ov, card))
+    vis = pg.evaluate("() => [document.documentElement.hasAttribute('data-vo-touch'), getComputedStyle(document.querySelector('.vo-ctl')).display, getComputedStyle(document.querySelector('.vo-fs')).display]")
+    check("player: phone = touch: native controls off, own play bar + Rotate button shown", ctl is False and vis == [True, "flex", "flex"], (ctl, vis))
+    pg.locator(".vo-stage").tap(position={"x": 97, "y": 140})
+    pg.wait_for_function("() => !document.querySelector('video').paused", timeout=5000)
+    pg.wait_for_timeout(400)
+    pg.screenshot(path=str(out / "phone-generic-tap-played-hint.png"))
+    h = pg.evaluate("() => { const e = document.querySelector('.vo-hint'); return [getComputedStyle(e).display, e.textContent, document.documentElement.hasAttribute('data-vo-playing')]; }")
+    check("player: phone: a tap on the stage plays, 'Rotate for full size' hint shown", h == ["block", "Rotate for full size", True], h)
+    ctx.close()
+    # iPhone Safari: no element full screen → theater (declared: the Fullscreen API removed by an init script)
+    ctx = ctx_new(b, **VIEWPORTS["phone"])
+    ctx.add_init_script(IPHONE_FS)
+    pg = ctx.new_page()
+    goto(pg, base, "", t)
+    n0 = pg.evaluate("history.length")
+
+    def open_theater():
+        pg.locator(".vo-fs").tap()
+        pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+        pg.wait_for_timeout(300)
+    open_theater()
+    pg.screenshot(path=str(out / "proof-phone-theater-generic-google-live.png"))
+    st, ov, card, tr, full, ovf, ctl = pg.evaluate(GEOM)
+    m = [float(x) for x in re.findall(r"-?[\d.e]+", tr)[:4]]
+    rotated = len(m) == 4 and near(m[0], 0, .01) and near(m[1], 1, .01) and near(m[2], -1, .01) and near(m[3], 0, .01)
+    # rotated 90deg clockwise: the stage's right half = the lower half of the screen box
+    check("player: iPhone theater: stage rotated 90deg, filling the 390 px width (693 px tall), scroll locked, no native controls, "
+          "card in its right half (= the lower half) -> proof-phone-theater-generic-google-live.png",
+          rotated and near(st[2], 390) and near(st[3], 390 * 16 / 9, 3) and ovf == "hidden" and ctl is False
+          and card and card[1] >= st[1] + st[3] / 2 - 1 and card[1] + card[3] <= st[1] + st[3] + 1 and card[0] >= st[0] - 1, (tr, st, card, ovf, ctl))
+    pg.keyboard.press("Escape")
+    closed = lambda: pg.evaluate("() => !document.documentElement.dataset.voFull && getComputedStyle(document.documentElement).overflow !== 'hidden'")
+    pg.wait_for_timeout(300)
+    c1 = closed()
+    open_theater()
+    pg.evaluate("history.back()")
+    pg.wait_for_timeout(500)
+    c2 = closed()
+    open_theater()
+    pg.locator(".vo-fs").tap()
+    pg.wait_for_timeout(500)
+    c3 = closed() and pg.evaluate("history.length") == n0 + 1 and pg.url.endswith(f"t={t:g}")
+    check("player: iPhone theater closes on Esc / back / the X (scroll unlocked, page stays)", c1 and c2 and c3, (c1, c2, c3, pg.url))
+    ctx.close()
+    # desktop: the STAGE goes full screen (cards stay), on the right half of the centred 16:9 picture
+    ctx = ctx_new(b, **VIEWPORTS["desktop"])
+    pg = ctx.new_page()
+    goto(pg, base, "", t)
+    pg.locator(".vo-fs").click()
+    try:
+        pg.wait_for_function("() => document.fullscreenElement === document.querySelector('.vo-stage')", timeout=4000)
+    except Exception:
+        pass
+    pg.wait_for_timeout(500)
+    pg.screenshot(path=str(out / "desktop-fullscreen-generic-google-live.png"))
+    st, ov, card, tr, full, _, ctl = pg.evaluate(GEOM)
+    vw, vh = pg.evaluate("() => [innerWidth, innerHeight]")
+    pw = min(vw, vh * 16 / 9)
+    check("player: desktop full screen = the stage (data-vo-full=fs); .vo-over = the right half of the centred 16:9 picture, card inside, native controls kept",
+          full == "fs" and near(ov[0], (vw + pw) / 2 - pw / 2) and near(ov[2], pw / 2) and near(ov[3], pw * 9 / 16) and near(ov[1], (vh - pw * 9 / 16) / 2)
+          and card and card[0] >= ov[0] and card[0] + card[2] <= ov[0] + ov[2] + 1 and ctl is True, (full, [vw, vh], ov, card, ctl))
+    pg.locator(".vo-fs").click()
+    pg.wait_for_timeout(400)
+    check("player: desktop: the X leaves full screen", pg.evaluate("() => !document.fullscreenElement && !document.documentElement.dataset.voFull"))
+    ctx.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
     ap.add_argument("--name", default="Tessa")
     ap.add_argument("--break-thumbs", action="store_true")
+    ap.add_argument("--break-steps", action="store_true")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
     html = (ROOT / "site/video/index.html").read_text(encoding="utf-8")
+    if a.break_steps:   # wire boundary: index.html minus the cta-steps animation (the end card + form stay)
+        broken, k = re.subn(r'\n        <div class="vo-steps".*?\n        </div>\n(?=        <p class="vo-dots")', "\n", html, flags=re.S)
+        assert k == 1, "break: .vo-steps block not found"
+        BREAK["steps"] = (lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), broken, "text/html")
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     tap = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', html)
@@ -280,7 +436,7 @@ def main():
         b = p.chromium.launch()
         for mode, query, who in (("generic", "", GENERIC), ("named", name_q, a.name)):
             for vp, opts in VIEWPORTS.items():
-                ctx = b.new_context(**opts)
+                ctx = ctx_new(b, **opts)
                 seen = []
                 ext = guard(ctx, (base,), seen)
                 pg = ctx.new_page()
@@ -301,7 +457,7 @@ def main():
                         vis = [s[0] for s in st]
                         ok = vis == [pid] and float(st[0][1]) == (100 if state == "live" else 0) and who in st[0][2]
                         box = [round(x, 3) for x in st[0][3]] if st else None
-                        corner = vp == "phone" or (box and box[0] >= .5 and box[1] >= 0 and box[2] <= 1 and box[3] <= 1
+                        corner = (box and box[0] >= .5 and box[1] >= 0 and box[2] <= 1 and box[3] <= 1
                                                    and abs((box[1] + box[3]) / 2 - .5) <= .05)
                         print(f"{vp} {mode} t={t:g} {pid} {state}: visible={vis} p={[s[1] for s in st]} box={box} rolls={st[0][4] if st else None} -> {shot.name}")
                         if not ok:
@@ -322,9 +478,9 @@ def main():
                 (pg.locator(".vo-stage") if vp == "phone" else pg).screenshot(path=str(shot))
                 st = pg.evaluate(VISIBLE)
                 got = [(s[0], s[2].strip()) for s in st]
-                want = "vo-pf vo-cta" if mode == "generic" else "vo-pf vo-for"
+                want = "cta-steps" if mode == "generic" else "vo-pf vo-for"
                 ok = len(st) == 1 and st[0][0] == want and (CTA_TEXT in st[0][2] if mode == "generic" else re.sub(r"\s", "", st[0][2]).endswith("for" + re.sub(r"\s", "", a.name)))
-                if vp == "desktop" and st:
+                if st:   # both widths: the right half
                     box = st[0][3]
                     ok = ok and box[0] >= .5 and box[2] <= 1 and abs((box[1] + box[3]) / 2 - .5) <= .05
                 check(f"{vp} {mode} t={t:g}: end = {'the Type-your-name card + form' if mode == 'generic' else f'the for {a.name} pill, no card'}, right half -> {shot.name}", ok, got)
@@ -367,7 +523,7 @@ def main():
                     check("snap at google removed + 0.08: 'GONE.' card, shake offset, flash on", fx[3][0] == "GONE." and fx[3][1] > .9 and abs(fx[0]) > 1 and fx[1] > .2 and fx[5] == "block", fx[:6])
                 ctx.close()
         # reduced motion: plain fades
-        ctx = b.new_context(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
+        ctx = ctx_new(b, viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
         pg = ctx.new_page()
         g, m = cues["google"], cues["mega"]
         goto(pg, base, "", round(g[1] + 0.08, 2))
@@ -383,8 +539,9 @@ def main():
         fx = pg.evaluate(FX, "mega")
         check("reduced motion, stamp: no particles (burst display none), stamp unscaled", fx[6] == "none" and fx[7] == 1, (fx[6], fx[7]))
         ctx.close()
+        player(b, base, out, cues)
         # the framing proofs: the whole 1920x1080 frame
-        ctx = b.new_context(viewport={"width": 1920, "height": 1080})
+        ctx = ctx_new(b, viewport={"width": 1920, "height": 1080})
         pg = ctx.new_page()
         for mode, pid, t in (("generic", "google", cues["google"][0] + 1), ("named", "mega", cues["mega"][1] + 1.6), ("generic", "cta", cta + 0.6)):
             goto(pg, base, name_q if mode == "named" else "", round(t, 2))
@@ -395,6 +552,7 @@ def main():
                 fx = pg.evaluate(FX, "mega")
                 rolls = pg.evaluate(VISIBLE)[0][4]
                 check("frame mega removed (named): counter at 0, stamp on, particles flying", "0 GB · 0 videos" in rolls and fx[7] == 1 and fx[8] > .3 and fx[6] == "block", (rolls, fx[6:9]))
+        cta_steps(pg, base, out, cta, name_q)
         ctx.close()
         speech(b, base, out, a.name, cues)
         sfx(b, base, cues)

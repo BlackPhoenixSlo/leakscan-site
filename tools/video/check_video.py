@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Gate for site/video/ (Jack's video page). Silent + exit 0 when green; prints each problem + exit 1.
 
-- exactly the 5 prefabs google, google-images, x, reddit, mega (in script order), each with numeric data-cue-live <
+- exactly 6 prefabs: the 5 cued ones google, google-images, x, reddit, mega (in script order) + cta-steps (the generic
+  end card .vo-cta, no cues of its own: data-cue-cta; 3 .vo-step "Type your name" / "Run the free scan" / "Rewatch this
+  video with YOUR content" + the real form inside it; js hides it in named mode); tools/video/render_prefabs.py renders
+  the same 6. The 5 cued ones each have numeric data-cue-live <
   data-cue-removed < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending);
   room for the animations (js/video-overlays.js): removed - live >= 0.45 s pop-in (google-images: >= 1.2 s, its tap +
   grid; an optional data-cue-tap sits in live + 0.45 .. removed - 0.7), out - removed >= 1.95 s (snap shake 0.25 + wipe
@@ -16,6 +19,9 @@
   "for <name>" pill (.vo-for) exists; js/video-overlays.js keeps the generic name "Your name", the jack-named.mp4 probe
   and the ?sfx=0 switch
 - css/video.css has a prefers-reduced-motion: reduce block that drops the particles (.vo-burst) and the shake
+- merged at every width: css/video.css has no max-width media query (the old < 900px "card below the video" stacking)
+  and never puts .vo-over in the flow; full screen + theater CSS present (.vo-stage:fullscreen; [data-vo-full="theater"]
+  .vo-stage fixed + rotate(90deg), body scroll lock); the page has the .vo-ui full screen button
 - the page is noindex and not in sitemap.xml
 - no external requests: no http(s):// or protocol-relative src/href/poster in the page, no http(s):// URL in
   js/video-overlays.js or css/video.css (the og:image <meta content> is a URL, not a load); no audio / font files
@@ -30,6 +36,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SITE = ROOT / "site"
 PAGE = SITE / "video" / "index.html"
 ORDER = ["google", "google-images", "x", "reddit", "mega"]
+CTA_STEPS = "cta-steps"
+STEP_TEXT = ["Type your name", "Run the free scan", "Rewatch this video with YOUR content"]
 MIN_LIVE = {"google-images": 1.2}   # seconds from live to removed (default: the 0.45 s pop-in)
 IN = 0.45
 CTA_TEXT = "Type your name in the link → this video rebuilds with YOUR leaks"
@@ -91,7 +99,7 @@ def modes(html, p, last_out):
     """the two modes: named (say start / end, shift, pill) and generic (the end card + form at data-cue-cta / -say)"""
     bad = []
     say, start, shift = stage_cue(p, "data-cue-say"), stage_cue(p, "data-cue-say-start"), stage_cue(p, "data-cue-named-shift")
-    first_live = float(p.prefabs[0]["data-cue-live"]) if p.prefabs and p.prefabs[0].get("data-cue-live", "").replace(".", "", 1).isdigit() else None
+    first_live = float(p.prefabs[0]["data-cue-live"]) if p.prefabs and "data-cue-live" in p.prefabs[0] and p.prefabs[0].get("data-cue-live", "").replace(".", "", 1).isdigit() else None
     if say is None:
         bad.append(f"video/index.html: .vo-stage needs a numeric data-cue-say (got {p.stage.get('data-cue-say')!r})")
     elif last_out is not None and say < last_out:
@@ -112,7 +120,7 @@ def modes(html, p, last_out):
         bad.append(f"video/index.html: generic end card .vo-cta missing (with {CTA_TEXT!r} + a form, input name=name)")
     if "vo-for" not in p.classes:
         bad.append("video/index.html: named \"for <name>\" pill .vo-for missing")
-    for pf in p.prefabs:
+    for pf in (a for a in p.prefabs if "data-cue-live" in a):
         g = re.search(r'data-prefab="%s".*?<span class="vo-kw"><span class="vo-kw-live">(.+?)</span><span class="vo-kw-gone">(.+?)</span>' % re.escape(pf.get("data-prefab", "")), html, re.S)
         if not g:
             bad.append(f"video/index.html: prefab {pf.get('data-prefab')} has no .vo-kw (live + gone word card)")
@@ -127,17 +135,55 @@ def modes(html, p, last_out):
     return bad
 
 
+def steps_and_player(html, p):
+    """cta-steps (6th prefab, generic only), the render list, no stacking, full screen + theater"""
+    bad = []
+    ids = [a.get("data-prefab") for a in p.prefabs]
+    if ids != ORDER + [CTA_STEPS]:
+        bad.append(f"video/index.html: prefabs {ids}, want {ORDER + [CTA_STEPS]} (6)")
+    m = re.search(r'<div class="vo-pf vo-cta" data-prefab="cta-steps"[^>]*>(.*?)</form>', html, re.S)
+    if not m:
+        bad.append("video/index.html: cta-steps must be the generic end card (.vo-cta data-prefab=cta-steps) with the form inside")
+    else:
+        heads = [re.sub(r"<[^>]+>|\d", "", h).strip() for h in re.findall(r'<p class="vo-step-h">(.*?)</p>', m[1], re.S)]
+        if m[1].count('class="vo-step"') != 3 or heads != STEP_TEXT or not all(k in m[1] for k in ("vo-mi-t", "vo-mb", "vo-mc-n", "vo-mini-n")):
+            bad.append(f"video/index.html: cta-steps needs 3 .vo-step {STEP_TEXT} (mock input, scan bar, counter, mini page), got {heads}")
+    cta_tag = re.search(r'<div class="vo-pf vo-cta"[^>]*>', html)
+    if cta_tag and "data-cue-" in cta_tag[0]:
+        bad.append("video/index.html: cta-steps has its own data-cue-* (its cue is the stage's data-cue-cta)")
+    js = (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8")
+    pers = re.search(r"function personal\(n\) \{(.*?)\n  \}", js, re.S)
+    if not pers or "ctaEl.setAttribute('data-off', '')" not in pers[1] or "ctac = null" not in pers[1]:
+        bad.append("js/video-overlays.js: personal() must hide cta-steps (named mode never shows it)")
+    if "function steps(c, t)" not in js or "SOLO_CTA" not in js:
+        bad.append("js/video-overlays.js: cta-steps loop (steps()) / its solo clip (SOLO_CTA) missing")
+    rp = re.search(r"PREFABS = \(([^)]*)\)", (ROOT / "tools" / "video" / "render_prefabs.py").read_text(encoding="utf-8"))
+    if not rp or re.findall(r'"([\w-]+)"', rp[1]) != ORDER + [CTA_STEPS]:
+        bad.append(f"tools/video/render_prefabs.py: PREFABS must be the 6 {ORDER + [CTA_STEPS]}")
+    css = (SITE / "css" / "video.css").read_text(encoding="utf-8")
+    if re.search(r"@media[^{]*max-width", css) or re.search(r"\.vo-over \{[^}]*position: relative", css):
+        bad.append("css/video.css: a max-width media query / .vo-over in the flow: the cards must stay in the stage's right half at every width")
+    th = re.search(r'\[data-vo-full="theater"\] \.vo-stage \{([^}]*)\}', css)
+    if not th or "position: fixed" not in th[1] or "rotate(90deg)" not in th[1] or not re.search(r'html\[data-vo-full="theater"\][^{]*body \{ overflow: hidden', css) \
+            or ".vo-stage:fullscreen" not in css:
+        bad.append("css/video.css: theater (fixed + rotate(90deg) stage, body scroll lock) / .vo-stage:fullscreen CSS missing")
+    if 'class="vo-fs"' not in html or "requestFullscreen" not in js:
+        bad.append("video/index.html / js: the .vo-fs full screen button (stage.requestFullscreen, else theater) missing")
+    return bad
+
+
 def main():
     bad = []
     p = P()
     html = PAGE.read_text(encoding="utf-8")
     p.feed(html)
     bad += after_state(html)
-    ids = [a.get("data-prefab") for a in p.prefabs]
-    if ids != ORDER:
-        bad.append(f"video/index.html: prefabs {ids}, want {ORDER}")
+    bad += steps_and_player(html, p)
+    cued = [a for a in p.prefabs if "data-cue-live" in a]
+    if [a.get("data-prefab") for a in cued] != ORDER:
+        bad.append(f"video/index.html: cued prefabs {[a.get('data-prefab') for a in cued]}, want {ORDER}")
     prev_out, prev_id = None, None
-    for a in p.prefabs:
+    for a in cued:
         pid = a.get("data-prefab")
         try:
             live, rem, out = (float(a[k]) for k in CUES)

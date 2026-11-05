@@ -2,10 +2,15 @@
 // data-cue-live / -removed / -out seconds on each .vo-pf (site/video/CUES.md, SCRIPT.md). draw(t) is a pure function of t (no CSS
 // transitions), so seeking, ?t= and frame-by-frame capture (tools/video/render_prefabs.py) all show the exact frame.
 // URL: ?name=<1-40 letters/digits/space . - _> (else the shared scan result: ?r= or the last scan, like #removals)
-//      ?t=<sec> seek · ?sfx=0 no sound · ?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none: one prefab, no video.
+//      ?t=<sec> seek · ?sfx=0 no sound · ?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none: one prefab, no video
+//      (?prefab=cta-steps&state=step1|step2|step3: the generic end card's 3 steps, 8 s, no form: the 6th CapCut clip).
 // Two modes (html[data-vo-mode]): "named" (?name= or a scan result: her texts, the name spoken, "for <name>" pill, the
 // jack-named.mp4 take if the server has it) and "generic" (texts say "Your name", default blurred thumbs, no speech, at
-// data-cue-cta (default data-cue-say) the "Type your name" card whose form reloads the page with ?name=).
+// data-cue-cta (default data-cue-say) the "Type your name" card = cta-steps: 3 steps on an 8 s loop, type your name → run the
+// free scan → rewatch this video with YOUR content, kept looping after the video ends; its form reloads the page with ?name=).
+// Player UI (.vo-ui): full screen = the stage (Fullscreen API, + landscape lock on Android), else (iPhone) a CSS "theater":
+// the stage fixed + rotated 90deg (Esc / X / back closes); touch devices: no native controls, own play bar, a tap on the
+// stage plays / pauses, "Rotate for full size" hint after the first tap.
 // Each prefab: live cue = pops in from the right (0.45 s, scale .6 → 1.08 → 1) + kinetic word card; removed cue = the
 // snap: 0.25 s shake + flash + "GONE." word card, then the compare wipe (0.95 s; .vo-roll counters roll down meanwhile),
 // "Removed" stamp slams in (scale 2 → 1, 0.2 s) + a 12-piece confetti burst; slides out (0.4 s, gone at the out cue).
@@ -13,7 +18,7 @@
 // prefers-reduced-motion: css/video.css drops the shake / scale / particles / wipe for plain fades (same custom properties).
 // Sound (web page only, never in ?prefab= renders): WebAudio-synthesized pop at live, whoosh + thud at removed, only while
 // playing after the user's play gesture, low volume.
-// Keys: space = play / pause. textContent only; requests: the scan-result read (js/scan-engine.js) and, named only, a HEAD
+// Keys: space = play / pause, Esc closes the theater. textContent only; requests: the scan-result read (js/scan-engine.js) and, named only, a HEAD
 // for jack-named.mp4 (same folder).
 (function () {
   'use strict';
@@ -22,13 +27,16 @@
   var IN = 0.45, OUT = 0.4, SHAKE = 0.25, WIPE = 0.95, STAMP = 0.2, BURST = 0.6, KW = 0.6, SLIDE = 160;   // seconds; px
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
   var GENERIC = 'Your name', NAMED_TAKE = 'jack-named.mp4';
+  // cta-steps: step windows (s into its 8 s loop), the name it types (or what the viewer typed in the form), the count it rolls to
+  var STEPS = [[0, 2.6], [2.6, 5.3], [5.3, 8]], CYCLE = 8, DEMO = 'Orla Brennick', LEAKS = 37;
+  var SOLO_CTA = { end: 8, step1: 2.2, step2: 3.9, step3: 7.2 };   // ?prefab=cta-steps: clip length, state= stills
   // ?prefab= timeline = the CapCut clip: in 0-0.45, snap at 2.4, wipe 2.65-3.6, stamp 3.6, out 5.6-6; state=live / removed = these stills
   var SOLO = { wipe: 2.4, end: 6, live: 1.6, removed: 5.4 };
   var q = new URLSearchParams(location.search), solo = q.get('prefab');
   var video = root.querySelector('.vo-video'), over = root.querySelector('.vo-over'), stage = root.querySelector('.vo-stage');
   var forEl = root.querySelector('.vo-for'), ctaEl = root.querySelector('.vo-cta'), forc = null, ctac = null, who = null, shift = 0, endT = Infinity;
   var num = function (el, k) { var v = el.getAttribute(k); return v === null ? NaN : parseFloat(v); };
-  var pfs = Array.prototype.map.call(root.querySelectorAll('.vo-pf[data-prefab]'), function (el) {
+  var pfs = Array.prototype.map.call(root.querySelectorAll('.vo-pf[data-prefab][data-cue-live]'), function (el) {
     var c = { el: el, id: el.getAttribute('data-prefab'), l0: num(el, 'data-cue-live'), r0: num(el, 'data-cue-removed'), o0: num(el, 'data-cue-out'),
       t0: num(el, 'data-cue-tap'), rolls: el.querySelectorAll('.vo-roll') };
     var burst = document.createElement('span');   // 12 confetti pieces, deterministic spread over the stamp
@@ -63,6 +71,33 @@
       var s = d && w < 1 ? x.toFixed(d) : String(Math.round(x));
       return (n.indexOf(',') >= 0 ? s.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : s) + unit;
     });
+  }
+  var bump = function (k) { return k > 0 && k < 1 ? Math.sin(Math.PI * k) : 0; };
+  var setText = function (el, s) { if (el && el.textContent !== s) el.textContent = s; };
+  function demoName() {   // what step 1 types: the form's name once the viewer typed a valid one, else the demo name
+    var inp = ctaEl && ctaEl.querySelector('input'), v = inp ? inp.value.replace(/\s+/g, ' ').trim() : '';
+    return v && NAME_RE.test(v) ? v : DEMO;
+  }
+  function steps(c, t) {   // cta-steps at t: u = seconds into its loop (from the card's live cue, = the clip's 0 s)
+    var box = c.steps, u = Math.max(0, t - c.live) % CYCLE, name = demoName(), bs = box.style;
+    Array.prototype.forEach.call(box.querySelectorAll('.vo-step'), function (el, i) {
+      var a = u - STEPS[i][0], d = STEPS[i][1] - STEPS[i][0], on = a >= 0 && a < d;
+      el.style.setProperty('--so', (on ? Math.min(clamp(a / 0.15), clamp((d - a) / 0.2)) : 0).toFixed(3));
+      el.style.setProperty('--ss', (on ? pop(clamp(a / 0.35)) : 1).toFixed(4));
+      var dot = c.dots[i];
+      if (dot) dot.style.setProperty('--d', on ? '1' : '.3');
+    });
+    var n = Math.round(clamp((u - 0.35) / 1.4) * name.length), p = 1 - Math.pow(1 - clamp((u - 2.8) / 1.8), 2), f = clamp((u - 6.1) / 0.3);
+    setText(box.querySelector('.vo-mi-t'), name.slice(0, n));
+    bs.setProperty('--caret', u < STEPS[0][1] && (n < name.length || Math.floor(u * 2.5) % 2 === 0) ? '1' : '0');
+    bs.setProperty('--press', bump((u - 2.0) / 0.3).toFixed(3));
+    bs.setProperty('--bar', p.toFixed(3));
+    setText(box.querySelector('.vo-mc-n'), String(Math.round(LEAKS * p)));
+    bs.setProperty('--cp', (1 + 0.25 * bump((u - 4.6) / 0.4)).toFixed(3));
+    bs.setProperty('--fl', ((f < 0.5 ? f : f - 1) * 180).toFixed(1));   // 0 → 90deg, swap the text, -90 → 0
+    setText(box.querySelector('.vo-mini-n'), f >= 0.5 ? name : GENERIC);
+    bs.setProperty('--fp', (1 + 0.3 * bump((u - 6.4) / 0.4)).toFixed(3));
+    bs.setProperty('--mp', clamp((u - 5.3) / 2.7).toFixed(3));
   }
   var cueAt = function (k) { return num(stage, k); };
   var sayStart = function () { return cueAt('data-cue-say-start'); };
@@ -104,6 +139,7 @@
       st.setProperty('--klo', kl[1].toFixed(3));
       st.setProperty('--kgs', kg[0].toFixed(3));
       st.setProperty('--kgo', kg[1].toFixed(3));
+      if (c.steps) steps(c, t);
     });
     document.documentElement.setAttribute('data-vo-t', t.toFixed(2));
   }
@@ -179,14 +215,16 @@
   function personal(n) {
     who = n;
     mode('named');
-    ctac = null;
+    ctac = null;   // cta-steps: generic only
+    pfs = pfs.filter(function (c) { return c.el !== ctaEl; });
     if (ctaEl) ctaEl.setAttribute('data-off', '');
     if (forEl) forc = { el: forEl, removed: Infinity, tap: Infinity };
     namedTake();
   }
   mode('generic');
   fill(values({ name: GENERIC }));
-  if (ctaEl) ctac = { el: ctaEl, out: Infinity, removed: Infinity, tap: Infinity };
+  if (ctaEl) ctac = { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps'),
+    dots: ctaEl.querySelectorAll('.vo-dots i') };
   var name = q.get('name');
   name = name === null ? null : name.replace(/\s+/g, ' ').trim();
   if (name && NAME_RE.test(name)) { fill(values({ name: name })); personal(name); }
@@ -212,29 +250,28 @@
   if (form) form.querySelector('input').addEventListener('input', function (e) { e.target.setCustomValidity(''); });
 
   // ---------- clock ----------
-  var api = { prefabs: pfs.map(function (c) { return c.id; }), SOLO: SOLO, draw: draw };
+  var api = { prefabs: pfs.map(function (c) { return c.id; }).concat(ctac ? [ctac.id] : []), SOLO: SOLO, SOLO_CTA: SOLO_CTA, draw: draw };
   var bg = q.get('bg');
   if (bg === 'green' || bg === 'none') document.documentElement.classList.add(bg === 'green' ? 'vo-green' : 'vo-clear');
   if (solo !== null) {
-    var one = pfs.filter(function (c) { return c.id === solo; })[0] || pfs[0];
+    var one = pfs.concat(ctac ? [ctac] : []).filter(function (c) { return c.id === solo; })[0] || pfs[0], cfg = one === ctac ? SOLO_CTA : SOLO;
     pfs.forEach(function (c) { if (c !== one) c.el.remove(); });
-    [forEl, ctaEl].forEach(function (el) { if (el) el.remove(); });
+    [forEl, one === ctac ? one.el.querySelector('form') : ctaEl, root.querySelector('.vo-ui')].forEach(function (el) { if (el) el.remove(); });
     pfs = [one];
-    one.live = 0; one.removed = SOLO.wipe; one.out = SOLO.end; one.tap = TAP;
+    if (one === ctac) { ctac = null; one.live = 0; } else { one.live = 0; one.removed = SOLO.wipe; one.out = SOLO.end; one.tap = TAP; }
     root.classList.add('vo-solo');
     if (video) { video.pause(); video.removeAttribute('src'); video.remove(); }
-    var state = q.get('state'), t0 = null, held = null;
+    var state = q.get('state'), at = state && /^(live|removed|step[123])$/.test(state) ? cfg[state] : undefined, t0 = null, held = null;
     // seek(t) stops the clock and draws exactly t (the frame renderer calls it once per frame)
     api.seek = function (t) { held = t; draw(t); };
-    if (state === 'live') api.seek(SOLO.live);
-    else if (state === 'removed') api.seek(SOLO.removed);
+    if (typeof at === 'number') api.seek(at);
     else {
       var tick = function (now) {
         if (held !== null) return;
         if (t0 === null) t0 = now;
-        var t = Math.min(SOLO.end, (now - t0) / 1000);
+        var t = Math.min(cfg.end, (now - t0) / 1000);
         draw(t);
-        if (t < SOLO.end) requestAnimationFrame(tick);
+        if (t < cfg.end) requestAnimationFrame(tick);
       };
       draw(0);
       requestAnimationFrame(tick);
@@ -312,18 +349,24 @@
     });
   }
 
-  video.addEventListener('play', function () { if (gesture()) audio(); lastT = video.currentTime; });
+  var post = null;   // the post-roll clock: after the take ends, cta-steps keeps looping (the take may end ~2 s after its cue)
+  function postroll(now) { if (post === null || !video.ended || !ctac) { post = null; return; } draw(video.currentTime + (now - post) / 1000); requestAnimationFrame(postroll); }
+  video.addEventListener('play', function () { post = null; if (gesture()) audio(); lastT = video.currentTime; });
   video.addEventListener('pause', function () { if (!video.ended) hush(); });
   video.addEventListener('seeking', function () {
     hush();
     lastT = null;
+    post = null;
     endT = Infinity;
     says.forEach(function (s) { if (video.currentTime < s.at()) s.done = false; });
   });
-  video.addEventListener('ended', function () { endT = video.currentTime - IN; draw(video.currentTime); speak(video.currentTime); });   // a say / card cue past the end: now, fully popped in
+  video.addEventListener('ended', function () {
+    endT = video.currentTime - IN; draw(video.currentTime); speak(video.currentTime);
+    if (ctac && post === null) { post = performance.now(); requestAnimationFrame(postroll); }
+  });   // a say / card cue past the end: now, fully popped in
 
   var looping = false;
-  function loop() { var t = video.currentTime; draw(t); speak(t); sounds(t); if (!video.paused && !video.ended) requestAnimationFrame(loop); else looping = false; }
+  function loop() { var t = video.currentTime; draw(t); speak(t); sounds(t); sync(); if (!video.paused && !video.ended) requestAnimationFrame(loop); else looping = false; }
   function kick() { if (!looping) { looping = true; requestAnimationFrame(loop); } }
   video.addEventListener('play', kick);
   ['seeked', 'timeupdate', 'loadeddata', 'pause'].forEach(function (ev) { video.addEventListener(ev, function () { draw(video.currentTime); }); });
@@ -335,7 +378,69 @@
     var go = function () { video.currentTime = t; };
     if (video.readyState >= 1) go(); else video.addEventListener('loadedmetadata', go, { once: true });
   } else draw(0);
+  // ---------- player UI: full screen / theater, touch play bar, hint ----------
+  var html = document.documentElement, ui = root.querySelector('.vo-ui'), fsBtn = ui && ui.querySelector('.vo-fs'), hintBtn = ui && ui.querySelector('.vo-hint');
+  var pp = ui && ui.querySelector('.vo-pp'), seekEl = ui && ui.querySelector('.vo-seek'), touch = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  var pushed = false, hintT = null, dragging = false, started = false, full = function () { return html.getAttribute('data-vo-full'); };
+  if (touch) { html.setAttribute('data-vo-touch', ''); video.controls = false; }
+  function sync() {
+    if (!video.paused && !video.ended) html.setAttribute('data-vo-playing', ''); else html.removeAttribute('data-vo-playing');
+    if (pp) pp.setAttribute('aria-label', video.paused ? 'Play' : 'Pause');
+    if (seekEl && !dragging && video.duration) seekEl.value = String(Math.round(video.currentTime / video.duration * 1000));
+    if (fsBtn) fsBtn.setAttribute('aria-label', full() ? 'Close full screen' : 'Full screen');
+  }
+  function hint(on) { clearTimeout(hintT); if (on) { html.setAttribute('data-vo-hint', ''); hintT = setTimeout(hint, 6000, false); } else html.removeAttribute('data-vo-hint'); }
+  function theater(on, popped) {
+    if (on) { html.setAttribute('data-vo-full', 'theater'); history.pushState({ voTheater: 1 }, ''); pushed = true; }
+    else if (full() === 'theater') { html.removeAttribute('data-vo-full'); if (pushed && !popped) history.back(); pushed = false; }
+    sync();
+  }
+  function enter() {
+    hint(false);
+    if (stage.requestFullscreen && document.fullscreenEnabled) {
+      stage.requestFullscreen({ navigationUI: 'hide' }).then(function () {
+        var o = screen.orientation;
+        if (o && o.lock) o.lock('landscape').catch(function () { /* desktop: no lock */ });
+      }, function () { theater(true); });
+    } else if (stage.webkitRequestFullscreen && document.webkitFullscreenEnabled) stage.webkitRequestFullscreen();
+    else theater(true);   // iPhone Safari: no element full screen
+  }
+  function leave() {
+    if (full() === 'theater') theater(false);
+    else if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () {});
+    else if (document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+  function onFs() {
+    if ((document.fullscreenElement || document.webkitFullscreenElement) === stage) html.setAttribute('data-vo-full', 'fs');
+    else if (full() === 'fs') { html.removeAttribute('data-vo-full'); try { screen.orientation.unlock(); } catch (e) { /* none */ } }
+    sync();
+  }
+  function toggle() {
+    if (!video.paused && !video.ended) { video.pause(); return; }
+    video.play().catch(function () {});
+    if (!started && touch && !full()) hint(true);
+    started = true;
+  }
+  var own = function (f) { return function (e) { e.stopPropagation(); f(); }; };
+  if (fsBtn) fsBtn.addEventListener('click', own(function () { if (full()) leave(); else enter(); }));
+  if (hintBtn) hintBtn.addEventListener('click', own(enter));
+  if (pp) pp.addEventListener('click', own(toggle));
+  if (seekEl) {
+    seekEl.addEventListener('pointerdown', function () { dragging = true; });
+    ['pointerup', 'pointercancel', 'change'].forEach(function (ev) { seekEl.addEventListener(ev, function () { dragging = false; }); });
+    seekEl.addEventListener('input', function () { if (video.duration) video.currentTime = seekEl.value / 1000 * video.duration; });
+  }
+  stage.addEventListener('click', function (e) {   // touch: a tap on the stage plays / pauses (not on the controls / the form)
+    if (touch && !e.target.closest('button, input, form, a, .vo-ctl')) toggle();
+  });
+  document.addEventListener('fullscreenchange', onFs);
+  document.addEventListener('webkitfullscreenchange', onFs);
+  window.addEventListener('popstate', function () { theater(false, true); });
+  if (form) form.querySelector('input').addEventListener('focus', function () { theater(false); });   // the keyboard comes up upright
+  ['play', 'pause', 'ended', 'seeked', 'timeupdate', 'loadedmetadata'].forEach(function (ev) { video.addEventListener(ev, sync); });
+  sync();
   document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && full() === 'theater') { theater(false); return; }
     if (e.key !== ' ' || e.target === video || /^(BUTTON|INPUT|TEXTAREA|SELECT|A)$/.test(e.target.tagName)) return;
     e.preventDefault();
     if (video.paused) video.play().catch(function () { /* autoplay policy: needs a click first */ }); else video.pause();
