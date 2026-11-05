@@ -4,7 +4,7 @@
   'use strict';
   var E = window.LeakScanEngine;
   var REPORT_BASE = E.REPORT_BASE, PLATFORMS = E.PLATFORMS, cleanHandle = E.cleanHandle, thumb = E.thumb, setMessages = E.setMessages;
-  var MAX_THUMBS = 30;
+  var MAX_THUMBS = 120;   // every image Google shows (images[] + result thumbs, deduped)
   var G_COLORS = ['#4285f4', '#ea4335', '#fbbc05', '#4285f4', '#34a853', '#ea4335'];
 
   var $ = function (id) { return document.getElementById(id); };
@@ -26,9 +26,10 @@
   // ---------- state ----------
   var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone', revealed: false,
     more: null, fitted: null, expanded: null, dead: {}, log: [], retry: null };
-  // phone preview: items per tab (fitPhone trims the first look), tabs fitted / grown by More (per device + report)
-  // desktop Images: 3 rows of 8 to start (spares for a failed thumb's slot, see watchThumb), +3 rows per More
-  var MORE0 = { all: 10, images: 24, videos: 6 }, DESK = { images: 24 };
+  // phone preview: items per tab (fitPhone trims All's first look), tabs fitted / grown by More (per device + report).
+  // Phone Images / Videos: everything (up to 60) in the pinned screen's own scroll. Desktop Images: 3 rows of 8 to
+  // start (spares for a failed thumb's slot, see watchThumb), +3 rows per More
+  var MORE0 = { all: 10, images: 60, videos: 60 }, DESK = { images: 24 };
   function more0(k) { return (state.device === 'phone' ? 0 : DESK[k]) || MORE0[k]; }
   function resetPreview() { state.more = {}; Object.keys(MORE0).forEach(function (k) { state.more[k] = more0(k); }); state.fitted = {}; state.expanded = {}; state.first = {}; }
   resetPreview();
@@ -265,12 +266,15 @@
 
   function panelAll(d, phone) {
     var pages = d.results.filter(function (r) { return r.kind !== 'video'; });
-    var imgs = imageItems(d).slice(0, phone ? 4 : 6);
+    var imgs = imageItems(d);
     var h = phone ? '' : '<p class="g-stats">About ' + num(d.google_total) + ' results</p>';
-    if (imgs.length) {
-      h += '<div class="g-pack"><p class="g-pack-h">Images</p><div class="g-pack-row">' +
-        imgs.map(packB).join('') +
-        '</div><button type="button" class="g-more g-more-sm" data-goto="images">Show more images</button></div>';
+    if (imgs.length) {   // one row that swipes sideways, every image, the next one peeking in from the right (desktop: arrows on hover)
+      var nav = function (dir, label) {
+        return '<button type="button" class="g-strip-nav g-strip-' + (dir < 0 ? 'prev' : 'next') + '" data-strip="' + dir + '" tabindex="-1" aria-hidden="true" title="' + label + '">' +
+          '<svg class="icon" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>';
+      };
+      h += '<div class="g-pack"><p class="g-pack-h" id="g-pack-h">Images</p><div class="g-strip-w at-start">' + (phone ? '' : nav(-1, 'Previous images') + nav(1, 'More images')) +
+        '<div class="g-strip" role="group" aria-labelledby="g-pack-h">' + imgs.map(packB).join('') + '</div></div></div>';
     }
     if (!pages.length) return h + '<p class="g-empty">No web results indexed for this handle.</p>';
     var n = Math.min(state.more.all, pages.length);
@@ -281,8 +285,9 @@
     }).join('');
     return h + more('all', 'More results', pages.length - n);
   }
-  function packB(it) {
-    return '<button type="button" class="g-pack-b" data-goto="images" aria-label="Show image results">' + img(it.src, '') + '</button>';
+  function packB(it) {   // opens the page the image is on; an image no result has opens the Images tab
+    return it.link ? '<a class="g-pack-b" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer nofollow">' + img(it.src, it.title || it.domain) + '</a>'
+      : '<button type="button" class="g-pack-b" data-goto="images" aria-label="Show image results">' + img(it.src, '') + '</button>';
   }
   function gTile(it) {
     // an image no result has: same caption shape, credited to Google Images (nothing to open: this is the report)
@@ -302,7 +307,7 @@
   function panelVideos(d, phone) {
     var vids = d.results.filter(function (r) { return r.kind === 'video'; });
     if (!vids.length) return '<p class="g-empty">No video results indexed for this handle</p>';
-    var n = phone ? Math.min(state.more.videos, vids.length) : vids.length;
+    var n = phone ? Math.min(state.more.videos, vids.length) : vids.length;   // phone: up to 60, the pinned screen scrolls through
     return vids.slice(0, n).map(function (r) {
       var t = r.thumb && thumb(r.thumb) ? img(r.thumb, r.title) : '<span class="g-img g-img-none"></span>';
       return '<div class="g-v">' + a(r.link, 'g-vthumb', t + '<span class="g-play" aria-hidden="true"></span>' + GO) +
@@ -345,6 +350,15 @@
     stage.className = 'g-stage' + (state.revealed ? ' revealed' : '');
     stage.innerHTML = h;
     stage.querySelectorAll('img').forEach(watchThumb);
+    var strip = stage.querySelector('.g-strip');
+    if (strip) {   // desktop arrows: none at the start / end
+      var edges = function () {
+        strip.parentNode.classList.toggle('at-start', strip.scrollLeft < 4);
+        strip.parentNode.classList.toggle('at-end', strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 4);
+      };
+      strip.addEventListener('scroll', edges, { passive: true });
+      edges();
+    }
     if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
     if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus({ preventScroll: true }); }
     pinPhone(focusTab);
@@ -362,13 +376,16 @@
       var box = t.parentNode, shown = {};
       box.querySelectorAll('img').forEach(function (x) { shown[x.getAttribute('src')] = 1; });
       var spare = imageItems(state.data).filter(function (it) { return !shown[thumb(it.src)]; });
-      if (!spare.length) { t.remove(); return; }
-      var tmp = document.createElement('div');
-      tmp.innerHTML = t.classList.contains('g-tile') ? gTile(spare[0]) : packB(spare[0]);
-      var nu = tmp.firstElementChild, had = t.contains(document.activeElement);
-      t.replaceWith(nu);
-      watchThumb(nu.querySelector('img'));
-      if (had) { var f = nu.matches('button') ? nu : nu.querySelector('a'); if (f) f.focus({ preventScroll: true }); }
+      var had = t.contains(document.activeElement), nu, last = box.lastElementChild;
+      if (spare.length) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = t.classList.contains('g-tile') ? gTile(spare[0]) : packB(spare[0]);
+        nu = tmp.firstElementChild;
+        t.replaceWith(nu);
+        watchThumb(nu.querySelector('img'));
+      } else if (last !== t) { nu = last; t.replaceWith(last); }   // all shown: the last one (off screen) takes the slot, nothing on screen moves
+      else { t.remove(); return; }
+      if (had) { var f = nu.matches('a, button') ? nu : nu.querySelector('a'); if (f) f.focus({ preventScroll: true }); }
     };
     im.addEventListener('error', drop, { once: true });
     im.addEventListener('load', function () { if (im.naturalWidth < 16 || im.naturalHeight < 16) drop(); }, { once: true });
@@ -395,24 +412,19 @@
   }
   // The phone's first look at a tab is at most ~1.5 screens of scrolling (pinned) or ~1.5 screens tall (short screens,
   // not pinned): fewer results to start with, "More …" adds the rest. Once per tab and device; a click on More is the user's.
-  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 12, videos: 6 }, FIT_MIN = { all: 1, images: 3, videos: 1 }, IMG_ROWS = 6;
+  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 60, videos: 60 };
   function fitPhone(focusTab) {
     var t = state.tab, page = pin.scr.firstElementChild;
-    if (state.fitted[t]) return;
+    if (state.fitted[t] || t !== 'all') return;   // Images / Videos: all of them, the pinned screen scrolls through
     state.fitted[t] = true;
     var items = page.querySelectorAll(ITEM[t]), last = items[items.length - 1];
-    if (items.length <= FIT_MIN[t]) return;
+    if (items.length <= 1) return;
     var top = page.getBoundingClientRect().top, bottom = function (e) { return e.getBoundingClientRect().bottom - top; };
     var tail = Math.max(90, page.scrollHeight - bottom(last));   // More button + page end
     var room = 1.5 * innerHeight - tail + (pin.on ? pin.scr.clientHeight : -(pin.frame.offsetHeight - pin.scr.clientHeight));
     var n = 0;
-    if (t === 'images') {   // same-size tiles (css grid): whole rows that fit; pinned, images may take up to 2 screens for 6 rows
-      var cols = 0, h = items[0].offsetHeight + 12, y0 = items[0].getBoundingClientRect().top - top;
-      while (cols < items.length && items[cols].offsetTop === items[0].offsetTop) cols++;
-      var rows = function (r) { return Math.floor((r - y0) / h); };
-      n = cols * Math.max(rows(room), pin.on ? Math.min(IMG_ROWS, rows(room + 0.5 * innerHeight)) : 0);
-    } else while (n < items.length && bottom(items[n]) <= room) n++;
-    n = Math.max(FIT_MIN[t], n);
+    while (n < items.length && bottom(items[n]) <= room) n++;
+    n = Math.max(1, n);
     if (n < items.length) { state.more[t] = state.first[t] = n; renderGoogle(focusTab); }
   }
   // a new viewport (rotation, resize; not the mobile URL bar) refits the tabs More has not grown
@@ -498,6 +510,20 @@
       var nb = (nx && nx.querySelector('a')) || document.querySelector('#g-panel [data-more="' + k + '"]') || document.querySelector('#g-panel [data-less]') || $('g-tab-' + state.tab);
       if (nb) nb.focus({ preventScroll: true });
     }
+  });
+  $('g-stage').addEventListener('click', function (e) {   // desktop strip arrows: about a strip's width per click
+    var b = e.target.closest('[data-strip]'), strip = b && b.parentNode.querySelector('.g-strip');
+    if (!strip) return;
+    var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    strip.scrollBy({ left: +b.dataset.strip * strip.clientWidth * 0.8, behavior: still ? 'instant' : 'smooth' });
+  });
+  $('g-stage').addEventListener('keydown', function (e) {   // the image strip: arrow keys walk its tiles (each scrolls into view)
+    var tile = e.target.closest('.g-strip > .g-pack-b');
+    if (!tile || ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return;
+    var all = tile.parentNode.children, i = [].indexOf.call(all, tile);
+    i = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : Math.max(0, Math.min(all.length - 1, i + (e.key === 'ArrowRight' ? 1 : -1)));
+    e.preventDefault();
+    all[i].focus();
   });
   $('g-stage').addEventListener('keydown', function (e) {
     var t = e.target.closest('[role=tab]');
