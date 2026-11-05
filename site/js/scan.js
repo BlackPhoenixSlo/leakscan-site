@@ -26,10 +26,9 @@
   var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone', revealed: false,
     more: null, fitted: null, expanded: null, dead: {}, log: [], retry: null };
   // phone preview: items per tab (fitPhone trims All's first look), tabs fitted / grown by More (per device + report).
-  // Phone Images: everything (up to 60) in the pinned screen's own scroll. Desktop Images: 3 rows of 8 to start (spares
-  // for a failed thumb's slot, see watchThumb), +3 rows per More. Videos: a short first look (phone 4 = <= 1.5 screens of
-  // scrolling like All's, a video card is ~300px tall; desktop 8), +12 per More
-  var MORE0 = { all: 10, images: 60, videos: 4 }, DESK = { images: 24, videos: 8 }, DESK_STEP = { images: 24, videos: 12 };
+  // Images: 4 rows to start (phone 4 x 3, desktop 3 x 8; spares for a failed thumb's slot, see watchThumb), +24 per More.
+  // Videos: phone 5 (a card is ~300px: More shows up as the 5th ends), desktop 8, +12 per More. Then the page carries on
+  var MORE0 = { all: 10, images: 12, videos: 5 }, DESK = { images: 24, videos: 8 }, DESK_STEP = { images: 24, videos: 12 };
   function more0(k) { return (state.device === 'phone' ? 0 : DESK[k]) || MORE0[k]; }
   function resetPreview() { state.more = {}; Object.keys(MORE0).forEach(function (k) { state.more[k] = more0(k); }); state.fitted = {}; state.expanded = {}; state.first = {}; }
   resetPreview();
@@ -308,7 +307,7 @@
   function panelVideos(d, phone) {
     var vids = d.results.filter(function (r) { return r.kind === 'video'; });
     if (!vids.length) return '<p class="g-empty">No video results indexed for this handle</p>';
-    var n = Math.min(state.more.videos, vids.length);   // a short first look (phone 4, desktop 8), +12 per More
+    var n = Math.min(state.more.videos, vids.length);   // a short first look (phone 5, desktop 8), +12 per More
     return vids.slice(0, n).map(function (r) {
       var t = r.thumb && thumb(r.thumb) ? img(r.thumb, r.title) : '<span class="g-img g-img-none"></span>';
       return '<div class="g-v">' + a(r.link, 'g-vthumb', t + '<span class="g-play" aria-hidden="true"></span>' + GO) +
@@ -366,6 +365,25 @@
     if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
     if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus({ preventScroll: true }); }
     pinPhone(focusTab);
+    if (phone) riseMore(stage);
+  }
+  // phone: "Show more images / videos" fades + slides up as it enters the screen, so a quick scroll does not pass it
+  // unseen (none with reduced motion; focus shows it at once, css)
+  var riseIo = null;
+  function riseMore(stage) {
+    if (riseIo) { riseIo.disconnect(); riseIo = null; }
+    var b = stage.querySelector('#g-panel [data-more=images], #g-panel [data-more=videos]');
+    if (!b || !window.IntersectionObserver || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    b.style.transition = 'none';   // starts hidden, no fade-out first
+    b.classList.add('g-rise');
+    void b.offsetWidth;
+    b.style.transition = '';
+    riseIo = new IntersectionObserver(function (es) {
+      if (!es.some(function (e) { return e.isIntersecting; })) return;
+      b.classList.add('g-in');
+      riseIo.disconnect(); riseIo = null;
+    }, { threshold: 0.5 });
+    riseIo.observe(b);
   }
 
   // An image tile whose thumb fails or loads blank (hotlink-blocked) leaves the grid / pack (no empty square): the next
@@ -435,10 +453,10 @@
   }
   // The phone's first look at a tab is at most ~1.5 screens of scrolling (pinned) or ~1.5 screens tall (short screens,
   // not pinned): fewer results to start with, "More …" adds the rest. Once per tab and device; a click on More is the user's.
-  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 60, videos: 12 };
+  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 24, videos: 12 };
   function fitPhone(focusTab) {
     var t = state.tab, page = pin.scr.firstElementChild;
-    if (state.fitted[t] || t !== 'all') return;   // Images: all (<= 60), the pinned screen scrolls through; Videos: fixed first look
+    if (state.fitted[t] || t !== 'all') return;   // Images / Videos: a fixed first look
     state.fitted[t] = true;
     var items = page.querySelectorAll(ITEM[t]), last = items[items.length - 1];
     if (items.length <= 1) return;
@@ -519,6 +537,7 @@
       if (!state.first[kl]) state.fitted[kl] = false;   // no first look on this screen yet (resized since): the phone refits it
       renderGoogle(false);
       var mb = document.querySelector('#g-panel [data-more="' + kl + '"]') || $('g-tab-' + state.tab);
+      if (mb) mb.classList.remove('g-rise');   // the view lands on it: shown at once, in place
       if (pin && pin.on) window.scrollTo({ top: window.pageYOffset + pin.track.getBoundingClientRect().top - pin.top + pin.max, behavior: 'instant' });
       else if (mb) mb.scrollIntoView({ block: 'nearest', behavior: 'instant' });
       if (mb) mb.focus({ preventScroll: true });

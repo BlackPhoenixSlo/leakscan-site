@@ -310,8 +310,8 @@ def scan_flow(browser, vp_name, vp):
         while page.locator("[data-more=videos]").count():
             page.locator("[data-more=videos]").click()
         nv = page.locator("#g-panel .g-v").count()
-        check(f"{vp_name}/{device} Videos tab count (first look {4 if device == 'phone' else 8}, More reaches every video)",
-              nv0 == min(4 if device == "phone" else 8, len(VIDEOS)) and nv == len(VIDEOS), f"{nv0}→{nv} want {len(VIDEOS)}")
+        check(f"{vp_name}/{device} Videos tab count (first look {5 if device == 'phone' else 8}, More reaches every video)",
+              nv0 == min(5 if device == "phone" else 8, len(VIDEOS)) and nv == len(VIDEOS), f"{nv0}→{nv} want {len(VIDEOS)}")
         page.wait_for_timeout(300)
         g.screenshot(path=str(out / f"{vp_name}-5-{device}-videos.png"))
 
@@ -480,7 +480,7 @@ def huge_flow(browser, vp_name, vp):
         check(f"{tag} phone frame fits the screen under the nav", g["fh"] + g["pin"] <= g["vh"], g)
         check(f"{tag} phone frame ~80% of the screen (>= 78%)", g["fh"] >= 0.78 * g["vh"], [g["fh"], g["vh"]])
         check(f"{tag} track = frame + screen overflow", abs(g["h"] - g["fh"] - g["max"]) <= 2 and g["max"] > 400, g)
-        runs = {}   # All: first look fitted (<= 1.5 screens, rest behind More); Images / Videos: everything (<= 60) in the screen's own scroll
+        runs = {}   # All: first look fitted (<= 1.5 screens, rest behind More); Images 12 / Videos 5 in the screen's own scroll, rest behind More
         for t in ("images", "videos", "all"):
             page.locator(f"#g-tab-{t}").click()
             page.wait_for_timeout(300)
@@ -492,10 +492,43 @@ def huge_flow(browser, vp_name, vp):
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
         ri, rv = runs["images"], runs["videos"]
         check(f"{tag} pin: All first look <= 1.5 screens, rest behind More", runs["all"]["run"] <= 1.5 * g["vh"] and runs["all"]["more"], [runs["all"], g["vh"]])
-        check(f"{tag} pin: Images = all {min(HUGE_IMAGES, 60)} of {HUGE_IMAGES} images as 3-column tiles inside the screen's own scroll, More only past 60",
-              ri["n"] == min(HUGE_IMAGES, 60) and ri["cols"] == 3 and ri["inner"] and ri["reach"] and ri["more"] == (HUGE_IMAGES > 60) and ri["run"] > 2 * g["vh"], [ri, g["vh"]])
-        check(f"{tag} pin: Videos first look = 4 of {HUGE_VIDEOS} inside the screen's own scroll (<= 1.5 screens of scrolling, like All), rest behind More",
-              rv["n"] == min(HUGE_VIDEOS, 4) and rv["inner"] and rv["reach"] and rv["more"] == (HUGE_VIDEOS > 4) and rv["run"] <= 1.5 * g["vh"], [rv, g["vh"]])
+        check(f"{tag} pin: Images first look = 4 rows x 3 = {min(HUGE_IMAGES, 12)} of {HUGE_IMAGES} inside the screen's own scroll (< 1 screen of scrolling), rest behind More",
+              ri["n"] == min(HUGE_IMAGES, 12) and ri["cols"] == 3 and ri["inner"] and ri["reach"] and ri["more"] == (HUGE_IMAGES > 12) and ri["run"] < g["vh"], [ri, g["vh"]])
+        check(f"{tag} pin: Videos first look = 5 of {HUGE_VIDEOS} inside the screen's own scroll (<= 1.75 screens of scrolling, relaxed), rest behind More",
+              rv["n"] == min(HUGE_VIDEOS, 5) and rv["inner"] and rv["reach"] and rv["more"] == (HUGE_VIDEOS > 5) and rv["run"] <= 1.75 * g["vh"], [rv, g["vh"]])
+        # hand-off: 60 px before the screen's end, a 400 px wheel / touch scroll over the phone ends the screen and moves the
+        # page the rest (frame goes up, nothing stuck); "Show more …" is hidden (rise) until it enters the screen, then shown
+        HO = """() => { const f = document.querySelector('.frame-phone'), s = f.querySelector('.ph-scroll'), m = document.querySelector('#g-panel [data-more]');
+            return {y: Math.round(scrollY), st: Math.round(s.scrollTop), max: s.scrollHeight - s.clientHeight, ft: Math.round(f.getBoundingClientRect().top),
+                    rise: !!m && m.classList.contains('g-rise'), seen: !!m && m.classList.contains('g-in'), op: m ? +getComputedStyle(m).opacity : -1}; }"""
+        ho = {}
+        for t in ("images", "videos"):
+            page.locator(f"#g-tab-{t}").click()
+            page.wait_for_timeout(700)
+            for how in ("wheel", "touch"):
+                a0 = page.evaluate(HO)
+                page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin']} + {a0['max']} - 60, behavior: 'instant'}})")
+                page.wait_for_timeout(300)
+                a = page.evaluate(HO)
+                box = page.locator(".frame-phone").bounding_box()
+                cx, cy = box["x"] + box["width"] / 2, g["pin"] + 200
+                if how == "wheel":
+                    page.mouse.move(cx, cy)
+                    page.mouse.wheel(0, 400)
+                else:
+                    page.context.new_cdp_session(page).send("Input.synthesizeScrollGesture", {"x": int(cx), "y": int(cy), "yDistance": -400, "speed": 1200, "gestureSourceType": "touch", "preventFling": True})
+                page.wait_for_timeout(800)
+                z = page.evaluate(HO)
+                ho[f"{t}/{how}"] = {"hidden_at_top": [a0["rise"], a0["seen"], a0["op"]], "dy": z["y"] - a["y"], "st": [a["st"], z["st"], z["max"]],
+                                    "frame_up": g["pin"] - z["ft"], "shown": [z["seen"], z["op"]]}
+            page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+            page.wait_for_timeout(200)
+        page.locator("#g-tab-all").click()
+        page.wait_for_timeout(300)
+        check(f"{tag} pin: Images / Videos hand-off: a wheel / touch scroll past the screen's end moves the page (screen at its end, frame goes up the rest)",
+              all(abs(v["dy"] - 400) <= 8 and v["st"][1] == v["st"][2] and abs(v["frame_up"] - (400 - (v["st"][2] - v["st"][0]))) <= 8 for v in ho.values()), ho)
+        check(f"{tag} pin: 'Show more images / videos' hidden until it enters the screen, then shown (rise animation, ends at opacity 1)",
+              all(v["hidden_at_top"] == [True, False, 0] and v["shown"] == [True, 1] for k, v in ho.items() if k.endswith("wheel")), ho)
         page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
         page.wait_for_timeout(250)
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
@@ -724,8 +757,8 @@ def huge_flow(browser, vp_name, vp):
                 p2.locator(f"#g-tab-{t}").click()
                 p2.wait_for_timeout(250)
                 fh[t] = [p2.evaluate("document.querySelector('.frame-phone').offsetHeight"), p2.locator(f"#g-panel {item}").count()]
-            check(f"{tag} short screen ({w}x{h}): All's static preview <= 1.5 screens tall; Images shows everything up to 60, Videos its first 4",
-                  fh["all"][0] <= 1.5 * h and fh["images"][1] == min(HUGE_IMAGES, 60) and fh["videos"][1] == min(HUGE_VIDEOS, 4), [fh, 1.5 * h])
+            check(f"{tag} short screen ({w}x{h}): All's static preview <= 1.5 screens tall; Images its first 12, Videos its first 5",
+                  fh["all"][0] <= 1.5 * h and fh["images"][1] == min(HUGE_IMAGES, 12) and fh["videos"][1] == min(HUGE_VIDEOS, 5), [fh, 1.5 * h])
             p2.locator("[data-more=all]").click()
             p2.wait_for_timeout(200)
             n2 = p2.locator("#g-panel .g-r").count()
@@ -777,10 +810,10 @@ def huge_flow(browser, vp_name, vp):
         p4.locator("#g-tab-images").click()
         p4.wait_for_timeout(300)
         rr["images_n"] = [ni, p4.locator("#g-panel .g-tile").count()]
-        check(f"{tag} resize 390x844 → 360x640: All refits (<= 1.5 screens), frame >= 78%, Videos first 4, Images grown by More keeps its {HUGE_IMAGES}",
-              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["frame_pct"] >= 78 and rr["videos_n"] == min(HUGE_VIDEOS, 4)
-              and rr["images_n"][0] == rr["images_n"][1] == HUGE_IMAGES, rr)
-        # a grown tab shrinks back: "Show fewer" restores its first look (60), the view lands on its More button
+        check(f"{tag} resize 390x844 → 360x640: All refits (<= 1.5 screens), frame >= 78%, Videos first 5, Images grown by More keeps its {min(HUGE_IMAGES, 36)}",
+              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["frame_pct"] >= 78 and rr["videos_n"] == min(HUGE_VIDEOS, 5)
+              and rr["images_n"][0] == rr["images_n"][1] == min(HUGE_IMAGES, 36), rr)
+        # a grown tab shrinks back: "Show fewer" restores its first look (12), the view lands on its More button
         grown = p4.locator("#g-panel .g-tile").count()
         has_less = p4.locator("[data-less=images]").count() == 1
         if has_less:
@@ -790,8 +823,8 @@ def huge_flow(browser, vp_name, vp):
             return {n: document.querySelectorAll('#g-panel .g-tile').length, less: !!document.querySelector('[data-less]'),
               focus: document.activeElement === m, seen: !!r && r.top >= document.querySelector('.rnav').getBoundingClientRect().bottom && r.bottom <= innerHeight}; }""")
         sf["grown"], sf["has_less"] = grown, has_less
-        check(f"{tag} Show fewer: grown Images goes back to its first 60, focus + view on its More button",
-              has_less and grown == HUGE_IMAGES and sf["n"] == min(HUGE_IMAGES, 60) and not sf["less"] and sf["focus"] and sf["seen"], sf)
+        check(f"{tag} Show fewer: grown Images (36) goes back to its first 12, focus + view on its More button",
+              has_less and grown == min(HUGE_IMAGES, 36) and sf["n"] == min(HUGE_IMAGES, 12) and not sf["less"] and sf["focus"] and sf["seen"], sf)
         ctx.close()
         # keyboard: Enter on "Show more images" until all are shown; focus stays in the panel (new tile / More / Show fewer)
         ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
@@ -2374,7 +2407,7 @@ def tabs_flow(browser, vp_name, vp):
         page.wait_for_timeout(1500)
         s1 = page.evaluate("""(t0) => [[...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16]),
             window.__ls.filter(x => x[0] > t0 + 200 && x[1] > 0 && !x[2]).map(x => x[3])]""", t0)
-        # every image already shown (phone Images: all up to 60): a failed slot is taken by the last tile, so the count is every live image
+        # phone Images: first 12; a failed slot is taken by a spare image (else the last tile)
         d0 = next(i for i, u in enumerate(s0) if dead_thumb(u)) if any(dead_thumb(u) for u in s0) else -1
         check(f"{tag} thumbs: pinned phone Images: failed tiles' slots filled in place (spare image, else the last tile), every live image painted, tiles above untouched, no layout shift",
               d0 >= 0 and len(s1[0]) == (len(s0) if len(AS) > len(s0) else len(AS)) and all(ok for _u, ok in s1[0]) and [u for u, _ok in s1[0][:d0]] == s0[:d0]
@@ -2407,9 +2440,9 @@ def tabs_flow(browser, vp_name, vp):
         page.locator("#g-panel [data-more=images]").click()
         isteps.append(page.locator("#g-panel .g-tile").count())
     tab_n = isteps[-1]
-    i0 = 24 if vp_name == "desktop" else 60   # Images: desktop 24, +24; phone 60, +60
-    check(f"{tag} thumbs: > 80 results: every result's thumb in the strip and the Images tab ({i0}, +{i0} per More; pages stay capped at 80)",
-          strip_n == tab_n == many.n > 80 and pages_n == many.pages and isteps == [min(i0 * k, many.n) for k in range(1, len(isteps) + 1)], [strip_n, isteps, many.n, pages_n, many.pages])
+    i0 = 24 if vp_name == "desktop" else 12   # Images: desktop 24, phone 12; +24 per More
+    check(f"{tag} thumbs: > 80 results: every result's thumb in the strip and the Images tab ({i0}, +24 per More; pages stay capped at 80)",
+          strip_n == tab_n == many.n > 80 and pages_n == many.pages and isteps == [min(i0 + 24 * k, many.n) for k in range(len(isteps))], [strip_n, isteps, many.n, pages_n, many.pages])
     ctx.close()
     # a report that is mostly video results (real 2_YPj7TbK4rm shape): every unique thumb in the strip and the Images tab,
     # video results' stills with a play badge; images[] entries that share a video still stay image results. Fresh scan + reopen
@@ -2457,7 +2490,7 @@ def tabs_flow(browser, vp_name, vp):
                 page.wait_for_timeout(300)
             fw = [vcount(), page.evaluate("document.activeElement.matches('[data-more=videos]')"), page.evaluate(IN_VIEW)]
             shot(page, "v-videos-show-fewer")
-            f0 = 4 if vp_name == "phone" else 8
+            f0 = 5 if vp_name == "phone" else 8
             check(f"{tag} Videos: first look {f0}, 'Show more videos' +12 (Enter: focus on the first new one) up to all 34, Show fewer → {f0}, focus on Show more, in view",
                   first == f0 and steps == [min(f0 + 12 * k, 34) for k in range(1, len(steps) + 1)] and steps[-1:] == [34] and kb == f0
                   and fw == [f0, True, True] and names == {'Show more videos', 'Show fewer'}, [first, steps, kb, fw, sorted(names)])
