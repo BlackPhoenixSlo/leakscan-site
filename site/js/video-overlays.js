@@ -5,15 +5,17 @@
 // result · ?t=<sec> seek · ?sfx=0 no sound.
 // Two modes (html[data-vo-mode]): "generic" ("Your name", default blurred thumbs, no speech; at data-cue-cta the cta-steps
 // end card: a phone replica of the landing, one 10 s take: zoom onto the onlyfans.com/ field, types "Jaka Basej" (or the
-// viewer's typed name) as a handle, "Scan now" → "Searching Google, step N of 9…" → the report "87 links found" + tabs + rows →
+// viewer's typed name in its form) as a handle, "Scan now" → "Searching Google, step N of 9…" → the report "87 links found" + tabs + rows →
 // "Rewatch this video with YOUR content" + the name flip, looping after the video ends) and "named" (?name=, ?r= or the name
 // bar: her texts, the name spoken at data-cue-say-start (in the take's 1.5 s silent opening) and data-cue-say, "for <name>"
-// pill 2 s; at data-cue-cta the same take with HER handle, ending on "This is what I'd clear for <name>" + the contact row,
-// held 5 s per loop).
+// pill 2 s; at data-cue-cta the same take, typing handle(DEMO) "jakabasej" (@jakabasej) too, the report = HER counts / rows /
+// thumbs, ending on "This is what I'd clear for <name>" + the contact row, held 5 s per loop).
 // Production images (named): a scan result (js/scan-engine.js: ?r= → fetchResult(slug) = GET <API>/api/scan-result/<slug>; the
 // name bar → runScan = the landing's POST <API>/api/public-scan, onlyfans.com/<handle>) fills the cards like the landing
 // hero card (js/inline-scan.js model): Google rows = her real result domains + titles, Google Images grid + every .rm-img
-// = her real Google thumbs via <API>/api/thumb (blurred, .rm-img), the cta-steps report = her real counts (links / images /
+// = her real Google thumbs via <API>/api/thumb (blurred, .rm-img), people photos only: each probed like the landing
+// report's gallery() (js/inline-scan.js), kept if it loads >= 16 px and E.isPhoto (js/scan-engine.js) passes, so the
+// cards drop the same logos / banners / icons as the report (VideoOverlays.photos = {kept, dropped}); the cta-steps report = her real counts (links / images /
 // sites) + rows + thumbs; the after photos = her own SFW photos (GET <API>/api/media/<slug> → /<n>.jpg, unblurred .vo-own),
 // else the defaults. A failed scan / read = text only. Leak URLs are read for their host, never rendered.
 // While the name bar's scan runs: the .vo-wait status pill ("Searching Google, step N of 9…"); the take plays its intro and
@@ -39,7 +41,7 @@
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
   var GENERIC = 'Your name', WAIT_MAX = 45, HOLD_LEAD = 0.4;   // the scan hold: at most 45 s, 0.4 s before the first card
   // cta-steps: one 10 s take (s into its loop) in a phone replica of the landing: the hero, the camera zooms onto the
-  // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form), "Scan now"; the scan card
+  // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form; named: DEMO), "Scan now"; the scan card
   // ("Searching <place>, step N of 9…", js/scan-engine.js progressInfo); the report card (LEAKS links rolling, tabs, rows)
   // + "Rewatch this video with YOUR content" with the name flip. SCENES = [in, out] per scene (0.2 s fades; the hero fades
   // back in over the loop's last 0.2 s)
@@ -114,7 +116,8 @@
   }
   function steps(c, t) {   // cta-steps at t: u = seconds into its loop (from the card's live cue, = the clip's 0 s)
     var v = Math.max(0, t - c.live) % (c.named ? CYCLE + HOLD : CYCLE), u = c.named && v >= SETTLED ? Math.max(SETTLED, v - HOLD) : v;
-    var box = c.steps, name = c.named ? who : demoName(), rr = c.named ? real : null, h = rr ? rr.handle : handle(name), bs = box.style, q1 = function (s) { return box.querySelector(s); };
+    var box = c.steps, name = c.named ? who : demoName(), rr = c.named ? real : null, bs = box.style,
+      h = handle(c.named ? DEMO : name), vh = rr ? rr.handle : handle(name), q1 = function (s) { return box.querySelector(s); };   // h typed / @: jakabasej in named mode too; vh: placeholder titles
     var sc = box.querySelectorAll('.vo-step'), pgs = box.querySelectorAll('.vo-pg'), W = q1('.vo-scr').clientWidth, T0 = W / 390;
     Array.prototype.forEach.call(sc, function (el, i) {
       var a = u - SCENES[i][0], d = SCENES[i][1] - SCENES[i][0], o = i === 0 && u >= SCENES[2][1] ? clamp((u - SCENES[2][1]) / 0.2) : a >= 0 && a < d + 0.2 ? Math.min(i ? clamp(a / 0.2) : 1, clamp((d + 0.2 - a) / 0.2)) : 0;
@@ -151,7 +154,7 @@
       var r = rr && rr.rows[i], d = el.querySelector('.vo-dom');
       if (d.__def == null) d.__def = d.textContent;
       setText(d, r ? r.dom : d.__def);
-      setText(el.querySelector('.vo-ttl'), r ? r.title : i === 2 ? 'Search results for ' + h : h + ttl[i]);
+      setText(el.querySelector('.vo-ttl'), r ? r.title : i === 2 ? 'Search results for ' + vh : vh + ttl[i]);
       el.style.setProperty('--ro', (u < 7 ? 1 : clamp((u - 8.15 - i * 0.08) / 0.2)).toFixed(3));
     });
     var eo = u < SCENES[2][1] ? clamp((u - 8.75) / 0.3) : clamp((SCENES[2][1] + 0.2 - u) / 0.2);
@@ -351,19 +354,56 @@
       });
     }, noop);
   }
-  // a scan result → named mode with her texts + real images; false if unusable (text only stays)
-  function useResult(raw) {
+  // people photos only: every thumb probed once as the landing report's gallery() does (js/inline-scan.js: CORS load when
+  // the API is another origin, refused → a plain one; kept if >= 16 px both sides and E.isPhoto), done(kept) when all
+  // settled (at most PROBE_MAX s: an unsettled one is left out)
+  var BLANK = 16, PROBE_MAX = 6, people = { kept: [], dropped: [] };
+  function photoOnly(list, done) {
+    var left = list.length, ok = {}, fin = false, end = function () {
+      if (fin) return;
+      fin = true;
+      people = { kept: list.filter(function (u) { return ok[u] === 1; }), dropped: list.filter(function (u) { return ok[u] !== 1; }) };
+      if (api) api.photos = people;
+      done(people.kept);
+    };
+    if (!left) return end();
+    setTimeout(end, PROBE_MAX * 1000);
+    list.forEach(function (u) {
+      var probe = function (cors) {
+        var im = new Image(), set = function (v) { if (ok[u] == null) { ok[u] = v; if (!--left) end(); } };
+        im.referrerPolicy = 'no-referrer';
+        if (cors) im.crossOrigin = 'anonymous';
+        im.onload = function () { set(im.naturalWidth >= BLANK && im.naturalHeight >= BLANK && E.isPhoto(im) ? 1 : 0); };
+        im.onerror = function () { if (cors) probe(false); else set(0); };
+        im.src = u;
+      };
+      probe(E.XO);
+    });
+  }
+  // a scan result → named mode with her texts + real images (people photos only); false if unusable (text only stays);
+  // done() once the images are in
+  function useResult(raw, done) {
     var m = R && E && R.model(raw);
     if (!m || !E.SLUG_RE.test(raw.slug || '')) return false;
     var o = mine(raw); m.site = o.site; m.ig = o.ig; m.tt = o.tt;
     var r = report(raw);
     m.gcount = r.gtotal;
     apply(values(m));
-    real = r;
-    thumbs(real.imgs.length ? real.imgs : m.thumbs);
     personal(m.name);
-    realize();
     photos(raw.slug, gen);
+    var g = gen, all = r.imgs;
+    r.imgs = [];
+    real = r;
+    realize();   // her rows now, her images once probed
+    photoOnly(all, function (kept) {
+      if (g !== gen || real !== r) return;
+      r.imgs = kept;
+      r.nimg = kept.length;   // the report's Images tab: what is left, as on the landing
+      thumbs(kept.length ? kept : all.length ? [] : m.thumbs);   // all dropped: the defaults stay (text only)
+      realize();
+      draw(video.currentTime);
+      if (done) done();
+    });
     draw(video.currentTime);
     return true;
   }
@@ -418,7 +458,7 @@
   var form = ctaEl && ctaEl.querySelector('form'), nbForm = nb && nb.querySelector('form');
 
   // ---------- clock ----------
-  var api = { prefabs: pfs.map(function (c) { return c.id; }).concat(ctac ? [ctac.id] : []), draw: draw };
+  var api = { prefabs: pfs.map(function (c) { return c.id; }).concat(ctac ? [ctac.id] : []), draw: draw, photos: people };
   var gesture = function () { return !navigator.userActivation || navigator.userActivation.hasBeenActive; };
 
   // ---------- the name, spoken (named only): data-cue-say-start and data-cue-say, each once per playback ----------
@@ -606,8 +646,9 @@
       onProgress: function (t) { if (scanning === g) setText(waitEl, E.progressInfo(t).stage); },
       onResult: function (raw) {
         if (g !== gen) return;
-        if (useResult(raw)) history.replaceState(history.state, '', location.pathname + '?r=' + encodeURIComponent(raw.slug));
-        if (scanning === g) waiting(false);
+        var go = function () { if (scanning === g) waiting(false); };
+        if (useResult(raw, go)) history.replaceState(history.state, '', location.pathname + '?r=' + encodeURIComponent(raw.slug));
+        else go();
       },
       onError: function () { if (scanning === g) waiting(false); } });
   }

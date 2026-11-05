@@ -44,7 +44,7 @@ Plus:
   ends the post-roll clock keeps it looping to the flip (frame-1920-generic-cta-flip-postroll.png); phone portrait +
   iPhone theater: every phase shot (phone-{portrait,theater}-generic-cta-<n>-<phase>.png), typed handle on screen >= 11 px
   portrait / >= 20 px theater, the toast's letters >= 11 px portrait
-- named flow (?name=NAME, data-cue-cta): the same take with handle(NAME) typed, '@handle' on the scan / report cards, the toast
+- named flow (?name=NAME, data-cue-cta): the same take with handle(DEMO) "jakabasej" typed, '@jakabasej' on the scan / report cards, the toast
   "This is what I'd clear for NAME" + the contact row (Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev), no
   title / form / flip / pill; held to cta + 14.6 (named loop 15 s), looping after the take ends; 1920 + phone portrait + iPhone
   theater phases (frame-1920-named-cta-*.png, phone-{portrait,theater}-named-cta-*.png), toast + contacts >= 11 px portrait
@@ -78,8 +78,16 @@ Plus:
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
 --break-steps serves index.html without the cta-steps phone (.vo-steps): only the "cta-steps:" checks go red.
 --break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
---break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the "cta-steps: typed … DEMO" check goes red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img]
+--break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the typed-handle checks (generic "cta-steps: typed …
+  DEMO", the "named flow" / "prod … end card" jakabasej ones) go red.
+- prod real images: every leak image on every card (.rm-img, .vo-real) blurred >= 5px (video cards: blur(5px), the floor =
+  styles.css .live-ico; removals.css / the report untouched), the after photos unblurred; the cards use people photos only:
+  "prod logos:" the landing report (?r=PROD_SLUG, js/inline-scan.js gallery() + E.isPhoto, same proxy) and the video drop
+  the same thumbs (its Images tab = the video's kept count, every landing tile in the video's kept set, none dropped by
+  the video); per card a trigger (live + 0.15) + settled (live settled, removed + 2) shot: prod-<label>-<card>-<state>.png
+- no "Tessa" in the DOM text (generic + named; the test name is SophieStar)
+--break-logos serves video-overlays.js with its E.isPhoto test off (logos kept): only the "prod logos:" check goes red.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name SophieStar] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--only prod]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, json, pathlib, re, socket, subprocess, sys, time, urllib.parse, urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -264,7 +272,7 @@ def personalized(b, out, break_thumbs):
         pg.goto(f"{base}video/?r=demoRemove1&t=15.3")
         try:
             pg.wait_for_function("() => document.querySelector('[data-vo=name]').textContent === 'Mira Example'", timeout=8000)
-            pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete)", timeout=8000)
+            pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete && i.src.includes('/api/thumb'))", timeout=12000)
         except Exception:
             pass
         pg.wait_for_timeout(500)
@@ -310,7 +318,13 @@ GSTATIC = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 REAL = """() => { const q = s => [...document.querySelectorAll(s)], im = i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter];
   return {g: q('.vo-pf[data-prefab="google"] .rm-live .rm-img').map(im), grows: q('.vo-pf[data-prefab="google"] .rm-live .m-site').map(e => e.textContent),
           grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
-          own: q('.vo-own').map(im), count: (document.querySelector('[data-vo="g-count"]') || {}).textContent}; }"""
+          own: q('.vo-own').map(im), count: (document.querySelector('[data-vo="g-count"]') || {}).textContent, photos: window.VideoOverlays.photos,
+          cards: q('.vo-pf[data-prefab]').map(e => [e.dataset.prefab, [...e.querySelectorAll('.rm-img, .vo-real')].map(im)])}; }"""
+BLUR = lambda f: float(m[1]) if (m := re.search(r"blur\(([\d.]+)px\)", f or "")) else 0.0
+BLUR_MIN = 5   # px: the video cards' leak-image blur floor (= styles.css .live-ico, the site's lightest rule)
+# the landing report (?r=, js/inline-scan.js) once its probes settled: [Images tab count, every strip / grid tile src]
+LANDING = """() => { const n = document.querySelector('#lt-images .live-tab-n');
+  return [n ? +n.textContent : null, [...document.querySelectorAll('.live-strip-track .gi-img, .live-grid .gi-img')].map(i => i.getAttribute('src'))]; }"""
 
 
 def prod_expect(raw):
@@ -442,7 +456,7 @@ def prod(b, base, out, cues, cta):
                 r.fulfill(status=200, content_type="text/event-stream", body=sse)
         try:
             pg.wait_for_function("s => location.search === '?r=' + s || document.documentElement.dataset.voMode === 'named'", arg=slug, timeout=15000)
-            pg.wait_for_function("""() => [...document.querySelectorAll('.rm-img, .vo-real')].every(i => i.complete)
+            pg.wait_for_function("""() => window.VideoOverlays.photos.kept.length > 0 && [...document.querySelectorAll('.rm-img, .vo-real')].every(i => i.complete)
                 && [...document.querySelectorAll('.vo-own')].every(i => i.src.includes('/api/media/') && i.complete)""", timeout=30000)
         except Exception:
             pass
@@ -454,30 +468,73 @@ def prod(b, base, out, cues, cta):
             v = pg.evaluate("() => [document.querySelector('video').paused, document.querySelector('video').currentTime]")
             check(f"prod ({label}): the held take plays on after the result", v[0] is False, v)
         real = pg.evaluate(REAL)
-        thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and "blur(" in x[2] for x in xs)
+        thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and BLUR(x[2]) >= BLUR_MIN for x in xs)
         check(f"prod img ({label}): Google: 3 real thumbs on the first row, loaded, blurred", len(real["g"]) == 3 and thumb(real["g"], 3), real["g"])
         check(f"prod img ({label}): Google Images: 6 real thumbs, loaded, blurred", len(real["grid"]) == 6 and thumb(real["grid"], 6), real["grid"][:2])
         check(f"prod img ({label}): cta-steps report: 9 real thumbs (rows + strip), loaded, blurred", len(real["rep"]) == 9 and thumb(real["rep"], 9), real["rep"][:2])
         check(f"prod img ({label}): every .rm-img = a real /api/thumb one, loaded, blurred", thumb(real["all"], 13), [x for x in real["all"] if not x[0].startswith("/api/thumb")][:2])
         check(f"prod ({label}): Google rows = her real domains, count {want['count']!r}", real["grows"] == want["rows"][:4] and real["count"] == want["count"], (real["grows"], real["count"]))
+        weak = [(c, x[0][-24:], x[2]) for c, xs in real["cards"] for x in xs if BLUR(x[2]) < BLUR_MIN]
+        n_leak = sum(len(xs) for _, xs in real["cards"])
+        check(f"prod blur ({label}): every leak image on every card ({n_leak} on {', '.join(c for c, xs in real['cards'] if xs)}) blurred >= {BLUR_MIN}px",
+              n_leak >= 22 and not weak, weak[:3] or sorted({x[2] for _, xs in real["cards"] for x in xs}))
+        kept, dropped = real["photos"]["kept"], real["photos"]["dropped"]
+        print(f"prod ({label}): people photos kept {len(kept)}, dropped {len(dropped)} (logos / banners / icons / dead)")
         own = real["own"]
         check(f"prod ({label}): after photos = her own (/api/media/{slug}/<n>.jpg), loaded, unblurred",
               len(own) == 6 and all(x[0].startswith(f"/api/media/{slug}/") and x[1] > 0 and x[2] == "none" for x in own), own[:2])
         live, rem, _ = cues["google-images"]
-        for name, t in (("google-live", cues["google"][0] + 1.3), ("google-images-live", min(rem - 0.1, float(TAP or live + 0.6) + 1.0)), ("google-images-removed", rem + 2.0),
-                        ("x-live", cues["x"][0] + 1.0), ("report", cta + 8.6)):
+        for pid in ("google", "google-images", "x", "reddit", "mega"):   # per card: trigger + settled, live and removed
+            l0, r0, _ = cues[pid]
+            settled = min(r0 - 0.1, float(TAP or l0 + 0.6) + 1.0) if pid == "google-images" else l0 + min(1.3, r0 - l0 - 0.1)
+            for state, t in (("trigger", l0 + 0.15), ("settled", settled), ("removed-trigger", r0 + 0.1), ("removed-settled", r0 + 2.0)):
+                pg.evaluate(DRAW, t)
+                pg.wait_for_timeout(300)
+                (pg if theater else pg.locator(".vo-stage")).screenshot(path=str(out / f"prod-{label}-{pid}-{state}.png"))
+        for name, t in (("cta-typed", cta + 3.05), ("google-live", cues["google"][0] + 1.3), ("google-images-live", min(rem - 0.1, float(TAP or live + 0.6) + 1.0)), ("google-images-removed", rem + 2.0),
+                        ("x-live", cues["x"][0] + 1.0), ("report", cta + 8.6), ("end", cta + 9.65)):
             pg.evaluate(DRAW, t)
             pg.wait_for_timeout(500)
             f = out / f"prod-{label}-{name}.png"
             (pg if theater else pg.locator(".vo-stage")).screenshot(path=str(f))
+            if name in ("cta-typed", "end"):
+                s2 = pg.evaluate(STEPS)
+                ok = s2["typed"] == handle(DEMO) and s2["at"] == "@" + handle(DEMO) if name == "cta-typed" else named_end(s2, st[4])
+                check(f"prod end card ({label}): " + (f"typed onlyfans.com/{handle(DEMO)} + '@{handle(DEMO)}' (not her {PROD_HANDLE!r})" if name == "cta-typed"
+                      else f"ends 'This is what I'd clear for {st[4]}' + contacts") + f" -> {f.name}", ok, s2 and (s2["typed"], s2["at"], s2["shown"]))
             if name == "report":
                 s2 = pg.evaluate(STEPS)
                 tabs = [int(re.sub(r"\D", "", x)) for x in s2["tabs"]]
-                check(f"prod ({label}): report = her real counts{' (not the placeholder ' + str(TABS) + ')' if want['tabs'] != TABS else ''} Links / Images / Sites {want['tabs']}, '+ {want['tabs'][0] - 5} more', her rows -> {f.name}",
-                      tabs == want["tabs"] and s2["more"] == f"+ {want['tabs'][0] - 5} more in the full report" and s2["rows"] == want["rows"], (tabs, s2["more"], s2["rows"]))
+                want_t = [want["tabs"][0], len(kept), want["tabs"][2]]   # Images = the people photos kept (as the landing's tab)
+                check(f"prod ({label}): report = her real counts{' (not the placeholder ' + str(TABS) + ')' if want_t != TABS else ''} Links / Images (kept) / Sites {want_t}, '+ {want['tabs'][0] - 5} more', her rows, '@{handle(DEMO)}' -> {f.name}",
+                      tabs == want_t and s2["at"] == "@" + handle(DEMO) and s2["more"] == f"+ {want['tabs'][0] - 5} more in the full report" and s2["rows"] == want["rows"], (tabs, s2["more"], s2["rows"]))
         text = pg.evaluate("() => document.body.innerText + ' ' + document.querySelector('.vo').textContent")
         bad = [x for x in paths if x in text][:3] + re.findall(r"https?://\S+", text)[:3]
         check(f"prod ({label}): no leak URL in the DOM text ({len(paths)} paths checked, no http(s)://)", not bad, bad)
+        if label == "1920":   # the landing report on the same result, same proxy: it must drop the same thumbs
+            lctx = ctx_new(b, **opts)   # own context: the landing's own requests (its Google Fonts css: aborted, declared) are not the video's
+            for pat in ("**/api/scan-result/**", "**/api/thumb?**", "**/api/media/**"):
+                lctx.route(pat, proxy)
+            lext = guard(lctx, (base,))
+            lp = lctx.new_page()
+            lp.goto(f"{base}?r={slug}")
+            try:   # its probes settled: the Images tab says what is left
+                lp.wait_for_function("k => { const n = document.querySelector('#lt-images .live-tab-n'); return n && +n.textContent === k; }", arg=len(kept), timeout=20000)
+            except Exception:
+                pass
+            lp.wait_for_timeout(1500)
+            n_l, tiles = lp.evaluate(LANDING)
+            lp.locator("#lt-images").first.click()
+            lp.wait_for_timeout(1200)
+            card = lp.locator(".live-card, .hero-card, #hero-card").first
+            (card if card.count() else lp).screenshot(path=str(out / "prod-landing-report-images.png"))
+            ks = set(kept)
+            check(f"prod logos: the video cards and the landing report (?r={slug}) drop the same thumbs: landing Images {n_l} == video kept {len(kept)}"
+                  f" (of {len(kept) + len(dropped)}, {len(dropped)} dropped), all {len(tiles)} landing tiles in the video's kept set -> prod-landing-report-images.png",
+                  n_l == len(kept) and tiles and all(t in ks for t in tiles) and not ks & set(dropped), (n_l, len(kept), [t[-30:] for t in tiles if t not in ks][:3]))
+            (out / "prod-photos.json").write_text(json.dumps({"slug": slug, "kept": kept, "dropped": dropped, "landing_count": n_l, "landing_tiles": tiles}, indent=1))
+            print(f"prod logos: landing page requests outside 127.0.0.1 aborted (declared, the landing's own, not the video's): {sorted(set(lext))}")
+            lctx.close()
         check(f"prod ({label}): every request to 127.0.0.1 (production only through the declared proxy), no console error",
               not ext and all(u.startswith(base) for u in seen) and not errs, (ext[:3], errs[:3]))
         ctx.close()
@@ -642,13 +699,13 @@ def named_flow(pg, base, out, cta, name_q):
         shot(name)
         s = pg.evaluate(STEPS)
         if name == "3-typed":
-            check(f"named flow: cta + 3.05 the field holds handle({nm!r}) = {handle(nm)!r}, camera zoomed -> frame-1920-named-cta-3-typed.png",
-                  s and s["typed"] == handle(nm) and s["cz"][0] >= 2.2, s and s["typed"])
+            check(f"named flow: cta + 3.05 the field holds handle(DEMO) {handle(DEMO)!r} (not {handle(nm)!r}), camera zoomed -> frame-1920-named-cta-3-typed.png",
+                  s and s["typed"] == handle(DEMO) and s["cz"][0] >= 2.2, s and s["typed"])
         if name == "5-scanning":
-            check(f"named flow: cta + 5.6 the scan card for '@{handle(nm)}', 'Searching <place>, step N of 9…'", s and s["so"] == [0, 1, 0] and s["at"] == "@" + handle(nm)
+            check(f"named flow: cta + 5.6 the scan card for '@{handle(DEMO)}', 'Searching <place>, step N of 9…'", s and s["so"] == [0, 1, 0] and s["at"] == "@" + handle(DEMO)
                   and PROGRESS.fullmatch(s["ms"] or ""), s and (s["at"], s["ms"]))
         if name == "6-report":
-            check(f"named flow: cta + 8.3 the report '{LEAKS} links found' for '@{handle(nm)}'", s and s["so"][2] > .9 and s["count"] == f"{LEAKS} links found" and s["at"] == "@" + handle(nm), s and s["count"])
+            check(f"named flow: cta + 8.3 the report '{LEAKS} links found' for '@{handle(DEMO)}'", s and s["so"][2] > .9 and s["count"] == f"{LEAKS} links found" and s["at"] == "@" + handle(DEMO), s and (s["count"], s["at"]))
         if name == "7-flip":
             check(f"named flow: cta + 9.65 'This is what I'd clear for {nm}' + Telegram / WhatsApp / email, no 'Rewatch', no flip -> frame-1920-named-cta-7-flip.png",
                   s and s["eo"] > .9 and named_end(s, nm), s and (s["shown"], s["contacts"], s["chrome"]))
@@ -669,8 +726,8 @@ def named_flow(pg, base, out, cta, name_q):
     pg.locator(".vo-stage").screenshot(path=str(f))
     s = pg.evaluate(STEPS)
     t1 = pg.evaluate("() => [document.documentElement.dataset.voT, document.querySelector('video').ended, document.querySelector('.vo-for').hasAttribute('data-off')]")
-    check(f"named flow: after the take ends it keeps playing (clock {t0} → {t1[0]}), cta-steps with '@{handle(nm)}', pill off -> {f.name}",
-          s and not s["off"] and t1[1] and t1[2] and float(t1[0]) > float(t0) + 1 and s["at"] == "@" + handle(nm), (t0, t1, s and s["at"]))
+    check(f"named flow: after the take ends it keeps playing (clock {t0} → {t1[0]}), cta-steps with '@{handle(DEMO)}', pill off -> {f.name}",
+          s and not s["off"] and t1[1] and t1[2] and float(t1[0]) > float(t0) + 1 and s["at"] == "@" + handle(DEMO), (t0, t1, s and s["at"]))
 
 
 def cta_phone(b, base, out, cta, full):
@@ -716,8 +773,8 @@ def named_phone(b, base, out, cta, name_q):
         pg.evaluate(DRAW, cta + 9.65)
         s = pg.evaluate(STEPS)
         lo = 11 if view == "portrait" else 20
-        check(f"named flow (phone {view}): typed {handle(nm)!r} >= {lo} px, end toast for {nm!r} + contacts >= 11 px -> phone-{view}-named-cta-*.png",
-              s3 and s3["typed"] == handle(nm) and s3["px"] >= lo and named_end(s, nm) and s["nmpx"] >= 11, (s3 and (s3["typed"], s3["px"]), s and (s["shown"], s["nmpx"])))
+        check(f"named flow (phone {view}): typed {handle(DEMO)!r} >= {lo} px, end toast for {nm!r} + contacts >= 11 px -> phone-{view}-named-cta-*.png",
+              s3 and s3["typed"] == handle(DEMO) and s3["px"] >= lo and named_end(s, nm) and s["nmpx"] >= 11, (s3 and (s3["typed"], s3["px"]), s and (s["shown"], s["nmpx"])))
     ctx.close()
 
 
@@ -1024,7 +1081,7 @@ def full_frame(b, base, out):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
-    ap.add_argument("--name", default="Tessa")
+    ap.add_argument("--name", default="SophieStar")
     ap.add_argument("--break-thumbs", action="store_true")
     ap.add_argument("--break-steps", action="store_true")
     ap.add_argument("--break-swap", action="store_true")
@@ -1032,6 +1089,7 @@ def main():
     ap.add_argument("--break-full", action="store_true")
     ap.add_argument("--break-named", action="store_true")
     ap.add_argument("--break-img", action="store_true")
+    ap.add_argument("--break-logos", action="store_true")
     ap.add_argument("--only", choices=["prod"], help="run only this part (iteration)")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
@@ -1064,6 +1122,11 @@ def main():
         broken, k = re.subn(r"E\.thumb\(it\.src\)", "E.thumb(it.title)", js)
         assert k == 1, "break: E.thumb(it.src) not found"
         BREAK["img"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_logos:   # wire boundary: video-overlays.js with the people-photo test off (every loaded thumb kept)
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"&& E\.isPhoto\(im\) \?", "?", js)
+        assert k == 1, "break: E.isPhoto(im) not found"
+        BREAK["logos"] = ("**/js/video-overlays.js", broken, "application/javascript")
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     tap = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', html)
@@ -1128,6 +1191,10 @@ def main():
                     ok = ok and box[0] >= .5 and box[2] <= 1 and abs((box[1] + box[3]) / 2 - .5) <= .05
                 check(f"{'' if mode == 'generic' else 'named flow: '}{vp} {mode} t={t:g}: end = {'the Type-your-name card + form' if mode == 'generic' else 'cta-steps without title / form, no pill'}, right half -> {shot.name}", ok, got)
                 mode_attr = pg.evaluate("() => document.documentElement.dataset.voMode")
+                if vp == "desktop":
+                    tx = pg.evaluate("() => document.documentElement.textContent + ' ' + document.title")
+                    check(f"{vp} {mode}: no 'Tessa' in the DOM text" + (f", {a.name!r} shown" if mode == "named" else ""),
+                          "tessa" not in tx.lower() and (mode == "generic" or a.name in tx), re.findall(r".{20}tessa.{20}", tx, re.I)[:2])
                 check(f"{vp} {mode}: html[data-vo-mode={mode}]", mode_attr == mode, mode_attr)
                 check(f"{vp} {mode}: no console errors", not errs, errs)
                 check(f"{vp} {mode}: no requests outside the local server", not ext, sorted(set(ext)))
