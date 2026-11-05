@@ -2404,6 +2404,7 @@ def tabs_flow(browser, vp_name, vp):
     page.wait_for_timeout(800)
     blank(pick[1])
     page.wait_for_timeout(500)
+    page.evaluate("() => { const b = document.querySelector('#g-panel .g-strip').children; b[b.length - 2].focus({preventScroll: true}); }")   # the donor has focus
     page.evaluate("document.querySelector('#g-panel .g-strip').scrollTo({left: 0, behavior: 'instant'})")
     page.wait_for_timeout(800)
     t0 = page.evaluate("performance.now()")
@@ -2411,11 +2412,11 @@ def tabs_flow(browser, vp_name, vp):
     page.wait_for_timeout(1200)
     lf = page.evaluate("""() => { const b = [...document.querySelector('#g-panel .g-strip').children], i = b[0].querySelector('img'), e = b[b.length - 1];
         return {first: !!i && !b[0].querySelector('.g-img-none'), painted: !!i && i.complete && i.naturalWidth >= 16, lastEmpty: !!e.querySelector('.g-img-none'),
-                lastName: (e.matches('a, button') ? e : e.querySelector('a, button')).getAttribute('aria-label') || '', n: b.length}; }""")
+                lastName: (e.matches('a, button') ? e : e.querySelector('a, button')).getAttribute('aria-label') || '', n: b.length, focus: document.activeElement === b[0]}; }""")
     lf["inView"] = page.evaluate("() => { const r = document.querySelector('#g-panel .g-strip').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }")
     lf["shift"] = page.evaluate("(t0) => window.__ls.filter(x => x[0] > t0 && x[1] > 0 && !x[2]).map(x => x[3])", t0)
-    check(f"{tag} thumbs: last strip tile fails first (empty slot keeps a name), then the first: its slot gets a tile with an image, not the empty one; no layout shift",
-          lf["inView"] and lf["first"] and lf["painted"] and lf["lastEmpty"] and lf["lastName"] and not lf["shift"], lf)
+    check(f"{tag} thumbs: last strip tile fails first (empty slot keeps a name), then the first: its slot gets a tile with an image (not the empty one), a focused donor keeps focus; no layout shift",
+          lf["inView"] and lf["first"] and lf["painted"] and lf["focus"] and lf["lastEmpty"] and lf["lastName"] and not lf["shift"], lf)
     ctx.close()
     # viewing the strip's end: its last 6 tiles fail (empty slots fill the view), then the first one: nothing at the end moves, no clamp
     ctx = new_ctx()

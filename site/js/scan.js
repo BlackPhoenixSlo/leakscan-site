@@ -392,6 +392,7 @@
         t.replaceWith(nu);
         watchThumb(nu.querySelector('img'));
       } else if (last !== t && !tail(last).some(onScreen)) {   // all shown: the last one takes the slot if it and all after it are off screen
+        had = had || last.contains(document.activeElement);   // a focused donor keeps focus after the move
         nu = last; t.replaceWith(last); box.dispatchEvent(new Event('g-shrunk'));
       }
       else {   // it is on screen (few images): keep an empty slot, nothing moves; the link keeps its name
