@@ -5,7 +5,9 @@
 //      ?t=<sec> seek · ?sfx=0 no sound · ?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none: one prefab, no video
 //      (?prefab=cta-steps&state=step1|step2|step3: the generic end card's phone take, 10 s, no form: the 6th CapCut clip).
 // Two modes (html[data-vo-mode]): "named" (?name= or a scan result: her texts, the name spoken, "for <name>" pill: 2 s at
-// data-cue-say-start, from data-cue-say on it stays to the end + after it; the jack-named.mp4 take if the server has it) and
+// data-cue-say-start + from data-cue-say to data-cue-cta; the jack-named.mp4 take if the server has it; at data-cue-cta the same
+// cta-steps take with HER name typed as the handle, ending on "This is what I'd clear for <name>" + the contact row, held 5 s
+// per loop, no title / form) and
 // "generic" (texts say "Your name", default blurred thumbs, no speech, at data-cue-cta (default data-cue-say) the "Type your
 // name" card = cta-steps: a phone replica of the landing, one 10 s take: the camera zooms onto the onlyfans.com/ field,
 // types "Jaka Basej" as a handle (or the viewer's typed name), "Scan now" → the scan card "Searching Google, step N of 9…"
@@ -38,6 +40,7 @@
   // + "Rewatch this video with YOUR content" with the name flip. SCENES = [in, out] per scene (0.2 s fades; the hero fades
   // back in over the loop's last 0.2 s)
   var CYCLE = 10, DEMO = 'Jaka Basej', LEAKS = 87, NSTEP = 9, SCENES = [[0, 4.1], [4.1, 6.8], [6.8, 9.8]];
+  var HOLD = 5, SETTLED = 9.65;   // named: the loop holds its settled end (toast + contacts) 5 s, then loops (15 s)
   var WHERE = ['Google', 'Google Images', 'X', 'Reddit', 'Mega'];
   var SOLO_CTA = { end: 10, step1: 3.05, step2: 5.6, step3: 9.65 };   // ?prefab=cta-steps: clip length, state= stills
   // ?prefab= timeline = the CapCut clip: in 0-0.45, snap at 2.4, wipe 2.65-3.6, stamp 3.6, out 5.6-6; state=live / removed = these stills
@@ -111,7 +114,8 @@
     pg.style.setProperty('--cz', T.toFixed(4));
   }
   function steps(c, t) {   // cta-steps at t: u = seconds into its loop (from the card's live cue, = the clip's 0 s)
-    var box = c.steps, u = Math.max(0, t - c.live) % CYCLE, name = demoName(), h = handle(name), bs = box.style, q1 = function (s) { return box.querySelector(s); };
+    var v = Math.max(0, t - c.live) % (c.named ? CYCLE + HOLD : CYCLE), u = c.named && v >= SETTLED ? Math.max(SETTLED, v - HOLD) : v;
+    var box = c.steps, name = c.named ? who : demoName(), h = handle(name), bs = box.style, q1 = function (s) { return box.querySelector(s); };
     var sc = box.querySelectorAll('.vo-step'), pgs = box.querySelectorAll('.vo-pg'), W = q1('.vo-scr').clientWidth, T0 = W / 390;
     Array.prototype.forEach.call(sc, function (el, i) {
       var a = u - SCENES[i][0], d = SCENES[i][1] - SCENES[i][0], o = i === 0 && u >= SCENES[2][1] ? clamp((u - SCENES[2][1]) / 0.2) : a >= 0 && a < d + 0.2 ? Math.min(i ? clamp(a / 0.2) : 1, clamp((d + 0.2 - a) / 0.2)) : 0;
@@ -150,6 +154,7 @@
     bs.setProperty('--es', (0.9 + 0.1 * back(clamp((u - 8.75) / 0.35))).toFixed(4));
     bs.setProperty('--fl', ((f < 0.5 ? f : f - 1) * 180).toFixed(1));   // 0 → 90deg, swap the text, -90 → 0
     setText(q1('.vo-mini-n'), f >= 0.5 ? name : GENERIC);
+    setText(q1('.vo-end-who'), name);
     bs.setProperty('--fp', (1 + 0.3 * bump((u - 9.3) / 0.3)).toFixed(3));
   }
   var cueAt = function (k) { return num(stage, k); };
@@ -159,9 +164,9 @@
   function draw(t) {
     var cards = pfs;
     if (!root.classList.contains('vo-solo')) {
-      if (forc) {   // 2 s at the start cue; from the end cue on it stays (the name at the end, also after the take ends)
+      if (forc) {   // 2 s at the start cue; from the say cue to the cta cue (then the named cta-steps take carries the name)
         var s0 = sayStart(), s1 = sayEnd(), early = isFinite(s0) && t < s1;
-        forc.live = early ? s0 : s1; forc.out = early ? s0 + 2 : Infinity; cards = cards.concat([forc]);
+        forc.live = early ? s0 : s1; forc.out = early ? s0 + 2 : ctac ? ctaAt() : Infinity; cards = cards.concat([forc]);
       }
       if (ctac) { ctac.live = ctaAt(); cards = cards.concat([ctac]); }
     }
@@ -271,12 +276,11 @@
   }
   function mode(m) { document.documentElement.setAttribute('data-vo-mode', m); }
   var nb = root.querySelector('.vo-nb');
+  var cta = function (nm) { return ctaEl ? { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps'), named: nm } : null; };
   function personal(n) {
     who = n;
     mode('named');
-    ctac = null;   // cta-steps: generic only
-    pfs = pfs.filter(function (c) { return c.el !== ctaEl; });
-    if (ctaEl) ctaEl.setAttribute('data-off', '');
+    ctac = cta(true);   // cta-steps with her name, ending on the contact row
     if (forEl) forc = { el: forEl, removed: Infinity, tap: Infinity };
     if (nb) { nb.removeAttribute('data-edit'); setText(nb.querySelector('.vo-nb-n'), n); }
   }
@@ -285,7 +289,7 @@
     mode('generic');
     forc = null;
     if (forEl) forEl.setAttribute('data-off', '');
-    if (ctaEl) ctac = { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps') };
+    ctac = cta(false);
     if (nb) nb.removeAttribute('data-edit');
   }
   // the page's own texts / photos, so a rebuild or Reset starts from them (not from a scan's)

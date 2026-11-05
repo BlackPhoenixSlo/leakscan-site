@@ -4,7 +4,7 @@
 - exactly 6 prefabs: the 5 cued ones google, google-images, x, reddit, mega (in script order) + cta-steps (the generic
   end card .vo-cta, no cues of its own: data-cue-cta; a phone replica of the landing: 3 .vo-step scenes (hero with the
   site's h1 + the onlyfans.com/ field + "Scan now", scan card, report card with tabs + *.example placeholder rows only) +
-  the "Rewatch this video with YOUR content" toast with the name flip + the real form inside it; js hides it in named mode); tools/video/render_prefabs.py renders
+  the "Rewatch this video with YOUR content" toast with the name flip + the real form inside it; named mode: the same take with her handle, ending "This is what I'd clear for <name>" + the contact row, no form); tools/video/render_prefabs.py renders
   the same 6. The 5 cued ones each have numeric data-cue-live <
   data-cue-removed < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending);
   room for the animations (js/video-overlays.js): removed - live >= 0.45 s pop-in (google-images: >= 1.2 s, its tap +
@@ -144,7 +144,7 @@ def modes(html, p, last_out):
 
 
 def steps_and_player(html, p):
-    """cta-steps (6th prefab, generic only), the render list, no stacking, full screen + theater"""
+    """cta-steps (6th prefab; named too, with her name), the render list, no stacking, full screen + theater"""
     bad = []
     ids = [a.get("data-prefab") for a in p.prefabs]
     if ids != ORDER + [CTA_STEPS]:
@@ -164,8 +164,11 @@ def steps_and_player(html, p):
         bad.append("video/index.html: cta-steps has its own data-cue-* (its cue is the stage's data-cue-cta)")
     js = (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8")
     pers = re.search(r"function personal\(n\) \{(.*?)\n  \}", js, re.S)
-    if not pers or "ctaEl.setAttribute('data-off', '')" not in pers[1] or "ctac = null" not in pers[1]:
-        bad.append("js/video-overlays.js: personal() must hide cta-steps (named mode never shows it)")
+    if not pers or "ctac = cta(true)" not in pers[1]:
+        bad.append("js/video-overlays.js: personal() must play cta-steps with her name (ctac = cta(true))")
+    for s in ("This is what I'd clear for", "Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"):
+        if s not in html:
+            bad.append(f"video/index.html: the named end toast lacks {s!r}")
     if "function steps(c, t)" not in js or "SOLO_CTA" not in js:
         bad.append("js/video-overlays.js: cta-steps loop (steps()) / its solo clip (SOLO_CTA) missing")
     rp = re.search(r"PREFABS = \(([^)]*)\)", (ROOT / "tools" / "video" / "render_prefabs.py").read_text(encoding="utf-8"))
