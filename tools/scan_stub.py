@@ -29,9 +29,11 @@ Serves site/ and the API routes of the contract the scan page talks to:
   also lists off-origin / javascript: srcs (must be dropped). --media none → {status:"none", images:[]}; --media 404 → 404.
   POST /__stub/media?slug=<slug>[&mode=normal|relative|scanhost|none|404] resets that slug's poll counter (and mode) for a test.
 - GET /api/thumb?u=<https url> → one of those photos (picked by a hash of u, webp), never fetches u. A u containing
-  DEAD → 404 (a thumb Google no longer serves); BLANK → a 1×1 GIF (what a hotlink-blocked thumb comes back as).
-- demoBrokenT1: the fixture with three page-result thumbs swapped for DEAD / BLANK ones (images[] too) and a video
-  result's still put first in images[] (the image views must skip it): the broken-thumb removal check.
+  DEAD → 404 (a thumb Google no longer serves); BLANK → a 1×1 GIF (what a hotlink-blocked thumb comes back as); LOGO →
+  logo_png(): a flat site-logo PNG (no person photo: the image views must drop it).
+- demoBrokenT1: the fixture with three page-result thumbs swapped for DEAD / BLANK ones (images[] too), page result #7's
+  for a LOGO one, a LOGO thumb no result has third in images[], and a video result's still put first in images[] (the
+  image views must skip it): the broken-thumb / logo removal check.
 - POST /api/chat  {kb: "landing", messages: [{role, content}], slug?} → SSE: `token` events (data = JSON-encoded text
   chunk) streaming CHAT_ANSWER (markdown with an anchor, allowed + forbidden links, bold, bullets), then `done`. A last
   user message containing stub-fail → some tokens then `failed`; stub-429 → 429 rate_limited. Each request body is
@@ -185,10 +187,11 @@ def broken_thumbs(fx):
     video result's still goes first in images[]."""
     r = json.loads(json.dumps(fx))
     pages = [x for x in r["results"] if x.get("thumb") and x.get("kind") != "video"]
-    for x, tag in zip((pages[1], pages[2], pages[4]), ("DEAD0901", "BLANK0902", "DEAD0903")):
+    for x, tag in zip((pages[1], pages[2], pages[4], pages[6]), ("DEAD0901", "BLANK0902", "DEAD0903", "LOGO0904")):
         u = f"https://encrypted-tbn0.gstatic.com/images?q=tbn:{tag}placeholder"
         r["images"] = [u if i == x["thumb"] else i for i in r["images"]]
         x["thumb"] = u
+    r["images"].insert(2, "https://encrypted-tbn0.gstatic.com/images?q=tbn:LOGO0905placeholder")
     r["images"].insert(0, next(x["thumb"] for x in r["results"] if x.get("kind") == "video" and x.get("thumb")))
     return r
 
@@ -205,7 +208,19 @@ def avatar_png(seed, w=48, h=48, cell=12):
     """A two-tone checker PNG, colours derived from seed (stdlib only, never a real photo)."""
     d = hashlib.sha256(seed.encode()).digest()
     a, b = bytes(d[0:3]), bytes(d[3:6])
-    rows = b"".join(b"\x00" + b"".join(a if (x // cell + y // cell) % 2 else b for x in range(w)) for y in range(h))
+    return png(w, h, lambda x, y: a if (x // cell + y // cell) % 2 else b)
+
+
+def logo_png(seed, w=120, h=120):
+    """A site-logo stand-in: a flat disc in a colour from seed on white (what Google Images mixes into a handle's images)."""
+    d = hashlib.sha256(seed.encode()).digest()
+    a = bytes((d[0] | 128, d[1] & 127, d[2] | 64))
+    return png(w, h, lambda x, y: a if (x - w / 2) ** 2 + (y - h / 2) ** 2 < (w / 3) ** 2 else b"\xff\xff\xff")
+
+
+def png(w, h, px):
+    """px(x, y) → 3 RGB bytes; → PNG bytes (stdlib only)."""
+    rows = b"".join(b"\x00" + b"".join(px(x, y) for x in range(w)) for y in range(h))
     chunk = lambda t, data: struct.pack(">I", len(data)) + t + data + struct.pack(">I", zlib.crc32(t + data) & 0xFFFFFFFF)
     return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
             + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
@@ -301,11 +316,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(400, {"error": "bad_url"})
             if "DEAD" in src:
                 return self.send_json(404, {"error": "not_found"})
-            blank = "BLANK" in src
-            body = BLANK_GIF if blank else stand_in(src, THUMB_FILES)
+            blank, logo = "BLANK" in src, "LOGO" in src
+            body = BLANK_GIF if blank else logo_png(src) if logo else stand_in(src, THUMB_FILES)
             self.send_response(200)
             self.cors()
-            self.send_header("Content-Type", "image/gif" if blank else "image/webp")
+            self.send_header("Content-Type", "image/gif" if blank else "image/png" if logo else "image/webp")
             self.send_header("Cache-Control", "max-age=3600")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()

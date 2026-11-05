@@ -189,12 +189,13 @@
   // ---------- images that show ----------
   // Every image is probed once, on our own API (/api/thumb). One that fails, or loads blank (a hotlink-blocked thumb
   // comes back as a tiny placeholder), is dropped everywhere: its tile leaves the strip / grid / #free phone, the next
-  // image takes the slot (the grid reflows, no gap) and every count says what is left. No dark empty squares.
+  // image takes the slot (the grid reflows, no gap) and every count says what is left. No dark empty squares. So is one
+  // that is no person photo (a site logo, banner, icon: E.isPhoto); a tile fades in only once its probe passed.
   var BLANK = 16;   // px: a real thumb is larger on both sides
   var shows = function (im) { return im.naturalWidth >= BLANK && im.naturalHeight >= BLANK; };
   function gallery(m) {
     if (m.pics) return m.pics;
-    var g = m.pics = { views: [], subs: [], dead: {} };
+    var g = m.pics = { views: [], subs: [], dead: {}, ok: {}, wait: {} };
     g.kill = function (src) {
       if (g.dead[src]) return;
       g.dead[src] = 1;
@@ -203,12 +204,18 @@
       g.views.forEach(function (v) { v.sync(); });
       g.subs.forEach(function (fn) { fn(m.images.length); });
     };
+    g.when = function (src, fn) { if (g.ok[src]) fn(); else (g.wait[src] = g.wait[src] || []).push(fn); };
+    var pass = function (src) { g.ok[src] = 1; (g.wait[src] || []).forEach(function (fn) { fn(); }); delete g.wait[src]; };
     m.images.slice().forEach(function (it) {
-      var im = new Image();
-      im.referrerPolicy = 'no-referrer';
-      im.onload = function () { if (!shows(im)) g.kill(it.src); };
-      im.onerror = function () { g.kill(it.src); };
-      im.src = E.thumb(it.src);
+      var probe = function (cors) {   // cors (API on another origin): readable pixels; refused → a plain load, kept
+        var im = new Image();
+        im.referrerPolicy = 'no-referrer';
+        if (cors) im.crossOrigin = 'anonymous';
+        im.onload = function () { if (shows(im) && E.isPhoto(im)) pass(it.src); else g.kill(it.src); };
+        im.onerror = function () { if (cors) probe(false); else g.kill(it.src); };
+        im.src = E.thumb(it.src);
+      };
+      probe(E.XO);
     });
     return g;
   }
@@ -233,7 +240,7 @@
   function tile(it, slug, cap, g) {
     var img = make('img', 'gi-img', [], { src: E.thumb(it.src), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
     var box = make('span', 'gi-box gi-wait', [img, make('span', 'gi-go', [icon(it.link ? 'i-external-link' : 'i-arrow-right')])]);
-    img.addEventListener('load', function () { if (shows(img)) box.classList.remove('gi-wait'); else g.kill(it.src); }, { once: true });   // fades in (CSS)
+    img.addEventListener('load', function () { if (shows(img)) g.when(it.src, function () { box.classList.remove('gi-wait'); }); else g.kill(it.src); }, { once: true });   // fades in (CSS)
     img.addEventListener('error', function () { g.kill(it.src); }, { once: true });
     var label = it.link ? 'Image on ' + it.domain + (it.title ? ': ' + it.title : '') + ' (opens in a new tab)' : 'Image result: see it in the full report';
     return make('a', 'gi-card', [box, cap ? make('span', 'gi-cap', [E.fav(it.domain || 'google.com', 'gi-fav'), make('span', 'gi-cap-t', [it.domain || 'Google Images'])]) : null],

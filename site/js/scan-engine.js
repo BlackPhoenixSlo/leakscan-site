@@ -29,6 +29,8 @@
     else h = s.replace(/^@+/, '');
     return HANDLE_RE.test(h) ? { net: net === 'x' ? 'x' : 'instagram', handle: h } : false;
   }
+  // Thumbs from another origin (github.io → the VPS API, the stub) have readable pixels (isPhoto) only from a CORS load
+  var XO = !!API && new URL(API, location.href).origin !== location.origin;
   function thumb(u) {
     return typeof u === 'string' && /^https:\/\//.test(u) ? API + '/api/thumb?u=' + encodeURIComponent(u) : null;
   }
@@ -87,6 +89,46 @@
   // card's image views skip it, the scan page shows it with a play badge (and lists it in its Videos tab).
   var VIDEO_RE = /\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|\/(?:videos?|watch|embed|clips?|vod)(?:[\/?#.-]|$)/i;
   function isVideo(r) { return !!r && (r.kind === 'video' || VIDEO_RE.test(r.link || '')); }
+  // ---------- people photos only ----------
+  // Google Images mixes site logos, banners, icons and placeholders into a handle's images. Drawn at 48x48, a photo has
+  // soft texture nearly everywhere (`tex`: share of neighbour steps of 7..60, black letterbox bars not counted); a logo
+  // is flat fills and hard edges. Dropped: tex < 0.2, tex < 0.3 with under 10% skin (YCbCr rule), or under 2% skin
+  // (a smooth gradient logo / text banner; a person photo always has some). Tuned on 174 real Google thumbs: 34 of 37
+  // logos / banners out, 134 of 134 people photos kept (misses: two drawn posters). photoStats(im) → {tex, skin} (0..1),
+  // or null when the pixels can't be read (tainted canvas): isPhoto is then true (fail open, never an empty strip).
+  // Callers read the image they already load (same origin: no extra request; XO: loaded with crossOrigin).
+  var PX = 48;
+  function photoStats(im) {
+    try {
+      var c = document.createElement('canvas');
+      c.width = c.height = PX;
+      var x = c.getContext('2d', { willReadFrequently: true });
+      x.fillStyle = '#fff'; x.fillRect(0, 0, PX, PX);   // a transparent logo reads as on white
+      x.drawImage(im, 0, 0, PX, PX);
+      var p = x.getImageData(0, 0, PX, PX).data;
+    } catch (e) { return null; }
+    var n = PX * PX, Y = [], skin = 0, tex = 0, pairs = 0, i;
+    for (i = 0; i < n; i++) {
+      var r = p[i * 4], g = p[i * 4 + 1], b = p[i * 4 + 2], cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b, cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+      Y[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (Y[i] > 40 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) skin++;
+    }
+    var step = function (a, z) {
+      if (Y[a] < 24 && Y[z] < 24) return;   // both black: a letterbox bar, not the picture
+      var d = Math.abs(p[a * 4] - p[z * 4]) + Math.abs(p[a * 4 + 1] - p[z * 4 + 1]) + Math.abs(p[a * 4 + 2] - p[z * 4 + 2]);
+      pairs++;
+      if (d > 6 && d <= 60) tex++;
+    };
+    for (i = 0; i < n; i++) {
+      if (i % PX < PX - 1) step(i, i + 1);
+      if (i < n - PX) step(i, i + PX);
+    }
+    return { tex: pairs ? tex / pairs : 0, skin: skin / n };
+  }
+  function isPhoto(im) {
+    var s = photoStats(im);
+    return !s || !(s.tex < 0.2 || (s.tex < 0.3 && s.skin < 0.1) || s.skin < 0.02);
+  }
   // images[] first (with the result that has the same thumb, if any), then the results' own thumbs; deduped, ok(src)
   // filters. → [{src, title, domain, link, video}] (title/domain/link '' when no result matches; video: its result is one).
   // videos false (landing card): video results' stills are skipped, images[] ones too. videos true (scan page, like Google
@@ -200,6 +242,6 @@
   window.LeakScanEngine = {
     API: API, REPORT_BASE: REPORT_BASE, PLATFORMS: PLATFORMS, SLUG_RE: SLUG_RE, HANDLE_RE: HANDLE_RE, cleanHandle: cleanHandle, cleanSocial: cleanSocial, thumb: thumb,
     who: who, setMessages: setMessages, sendReport: sendReport, remember: remember, runScan: runScan,
-    fetchResult: fetchResult, progressInfo: progressInfo, favColor: favColor, fav: fav, imageItems: imageItems, isVideo: isVideo
+    fetchResult: fetchResult, progressInfo: progressInfo, favColor: favColor, fav: fav, imageItems: imageItems, isVideo: isVideo, photoStats: photoStats, isPhoto: isPhoto, XO: XO
   };
 })();

@@ -1,9 +1,11 @@
 import http.client
+import io
 import os
 import sys
 import tempfile
 import threading
 import unittest
+import urllib.parse
 from http.server import ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -110,6 +112,29 @@ class TestCors(unittest.TestCase):
         self.assertEqual(r.status, 404)
         self.assertEqual(r.getheader("Access-Control-Allow-Origin"), ORIGIN)
         self.assertEqual(r.getheader("Vary"), "Origin")
+
+    def test_thumb_cors_and_vary(self):
+        # the report reads thumb pixels (people-photo check) via a CORS load: allowed origin gets ACAO, and every
+        # thumb response varies on Origin so a plain (no-Origin) cached copy never answers the CORS load
+        class Resp(io.BytesIO):
+            headers = {"Content-Type": "image/jpeg"}
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+        class Opener:
+            def open(self, req, timeout=None): return Resp(b"\xff\xd8jpeg")
+        old, public_app._THUMB_OPENER = public_app._THUMB_OPENER, Opener()
+        try:
+            path = "/api/thumb?u=" + urllib.parse.quote(THUMB, safe="")
+            r = self.req("GET", path, ORIGIN)
+            self.assertEqual(r.status, 200)
+            self.assertEqual(r.getheader("Access-Control-Allow-Origin"), ORIGIN)
+            self.assertEqual(r.getheaders().count(("Vary", "Origin")), 1)
+            r = self.req("GET", path, None)
+            self.assertEqual(r.status, 200)
+            self.assertIsNone(r.getheader("Access-Control-Allow-Origin"))
+            self.assertEqual(r.getheader("Vary"), "Origin")
+        finally:
+            public_app._THUMB_OPENER = old
 
 
 if __name__ == "__main__":

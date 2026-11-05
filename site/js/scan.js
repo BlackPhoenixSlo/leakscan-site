@@ -244,7 +244,7 @@
   function imageItems(d) { return E.imageItems(d.images, d.imgResults, function (u) { var t = thumb(u); return t && !state.dead[t]; }, Infinity, true); }   // every image Google shows (images[] + result thumbs, deduped)
   function img(u, alt, video) {   // video: a video result's still, play badge (css: .g-vid)
     return '<span class="g-img' + (video ? ' g-vid' : '') + '"><img src="' + esc(thumb(u)) + '" alt="' + esc(video ? 'Video: ' + (alt || 'video result') : alt || '') +
-      '" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';
+      '"' + (E.XO ? ' crossorigin="anonymous"' : '') + ' loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';   // XO: readable pixels (watchThumb)
   }
   function a(u, cls, inner) {
     return '<a class="' + cls + '" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer nofollow">' + inner + '</a>';
@@ -388,7 +388,7 @@
 
   // An image tile whose thumb fails or loads blank (hotlink-blocked) leaves the grid / pack (no empty square): the next
   // image not shown yet takes its slot (same size: nothing below moves), else the tile goes. The dead thumb stays out of
-  // later renders. Other thumbs (video stills, icons) fall back to their grey box.
+  // later renders; so does one that is no person photo. Other thumbs (Videos tab stills, icons) fall back to their grey box.
   function onScreen(e) {   // any part visible: inside the viewport, its scroll row (strip) and the phone's screen
     var r = e.getBoundingClientRect(), cs = [e.parentNode, e.closest('.ph-scroll')].filter(Boolean).map(function (c) { return c.getBoundingClientRect(); });
     return cs.concat([{ left: 0, top: 0, right: innerWidth, bottom: innerHeight }]).every(function (c) {
@@ -428,8 +428,12 @@
         if (f) f.focus({ preventScroll: true });
       }
     };
-    im.addEventListener('error', drop, { once: true });
-    im.addEventListener('load', function () { if (im.naturalWidth < 16 || im.naturalHeight < 16) drop(); }, { once: true });
+    im.addEventListener('error', function () {   // a CORS refusal (XO) loads it once more plain: pixels unread, kept
+      if (im.hasAttribute('crossorigin')) im.removeAttribute('crossorigin'); else drop();
+    });
+    im.addEventListener('load', function () {   // an image tile that is no person photo (a site logo, banner, icon) goes too
+      if (im.naturalWidth < 16 || im.naturalHeight < 16 || (im.closest('.g-tile, .g-pack-b') && !E.isPhoto(im))) drop();
+    }, { once: true });
   }
 
   // ---------- the phone frame stays put while its screen scrolls ----------
