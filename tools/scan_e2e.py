@@ -468,6 +468,11 @@ def huge_flow(browser, vp_name, vp):
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop, document.querySelectorAll('#g-panel .g-tile').length]")
         check(f"{tag} pin: a tab switched mid-scroll opens at its top, frame stays put", abs(st[0] - g["pin"]) <= 1 and st[1] == 0 and st[2] > 0, st)
         page.locator("#g-tab-all").click()
+        page.locator("[data-more=all]").focus()
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(200)
+        nx = page.evaluate("() => { const a = document.activeElement, r = a.closest('.g-r'); return [a.className, [...document.querySelectorAll('#g-panel .g-r')].indexOf(r)]; }")
+        check(f"{tag} keyboard More results → focus on the first new result", nx == ["g-title", 10], nx)
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
         page.wait_for_timeout(150)
     page.mouse.move(vp["width"] / 2, vp["height"] / 2)
@@ -512,7 +517,7 @@ def huge_flow(browser, vp_name, vp):
     page.wait_for_timeout(150)
     lm = top.locator(".lx-lmore")
     got = (top.locator("a").count(), lm.inner_text() if lm.count() else None)
-    check(f"{tag} incremental: an opened site shows 10 links + 'Show 50 more of {n_top}'", got == (10, f"Show 50 more of {n_top} on {HUGE_TOP}"), got)
+    check(f"{tag} incremental: an opened site shows 10 links + 'Show 50 more links · {n_top - 10} left'", got == (10, f"Show 50 more links · {n_top - 10} left"), got)
     hrefs = top.locator("a").evaluate_all("els => els.map(e => e.href)")
     check(f"{tag} opened site lists its own links, external + safe", set(hrefs) <= set(HUGE_SITES[HUGE_TOP]) and top.locator("a").first.get_attribute("rel") == "noopener noreferrer nofollow"
           and top.locator("a").first.get_attribute("target") == "_blank", hrefs[:2])
@@ -586,6 +591,17 @@ def huge_flow(browser, vp_name, vp):
         check(f"{tag} short screen (390x560): frame not pinned, fits, its screen scrolls by itself", r[:4] == ["static", "auto", "", True] and r[4] == 300 and r[5] == 0
               and p2.evaluate("scrollY") == 0, r)
         ctx.close()
+        wide = {}   # narrow phones: nothing sticks out sideways (summary numbers, section nav, controls, filter)
+        for w in (320, 360):
+            ctx = browser.new_context(viewport={"width": w, "height": 700}, device_scale_factor=2, is_mobile=True, has_touch=True)
+            p3 = ctx.new_page()
+            p3.goto(base + "scan/?r=" + slug)
+            p3.wait_for_selector("#report:not([hidden])", timeout=8000)
+            p3.fill("#lx-q", "thread/1")
+            p3.wait_for_timeout(400)
+            wide[w] = p3.evaluate("document.documentElement.scrollWidth")
+            ctx.close()
+        check(f"{tag} no sideways scroll at 320 / 360 px", all(v <= w for w, v in wide.items()), wide)
 
 # ---------------------------------------------------------------- personalize
 # Checks named "profile: ..." need the scan result's `profile` (and the media it unlocks); every other check must stay

@@ -270,7 +270,7 @@
     var items = imageItems(d);
     if (!items.length) return '<p class="g-empty">No image results indexed for this handle.</p>';
     var n = phone ? Math.min(state.more.images, items.length) : items.length;
-    var h = '<div class="g-safe" aria-hidden="true"><span>SafeSearch off: what anyone searching your handle sees</span></div>';
+    var h = '<div class="g-safe" aria-hidden="true"><span>Image results Google has indexed for your handle</span></div>';
     h += '<div class="g-grid">' + items.slice(0, n).map(function (it) {
       // an image no result has: same caption shape, credited to Google Images (nothing to open: this is the report)
       var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>'
@@ -409,10 +409,11 @@
     if (t.dataset.tab) { state.tab = t.dataset.tab; renderGoogle(true); }
     else if (t.dataset.goto) { state.tab = t.dataset.goto; renderGoogle(true); }
     else {
-      var k = t.dataset.more;
+      var k = t.dataset.more, sel = k === 'all' ? '#g-panel .g-r' : '#g-panel .g-tile', had = document.querySelectorAll(sel).length;
       state.more[k] += k === 'all' ? 10 : 18;
       renderGoogle(false);
-      var nb = document.querySelector('[data-more="' + k + '"]') || $('g-tab-' + state.tab);
+      var nx = document.querySelectorAll(sel)[had];   // keyboard: carry on at the first new result
+      var nb = (nx && nx.querySelector('a')) || document.querySelector('[data-more="' + k + '"]') || $('g-tab-' + state.tab);
       if (nb) nb.focus({ preventScroll: true });
     }
   });
@@ -520,6 +521,7 @@
       return out;
     }, []);
     $('lx-list').textContent = '';
+    $('lx-list').classList.toggle('lx-filtered', !!q);
     lx.shown = 0;
     showSites(SITES_STEP);
     var v = lx.view, nl = v.reduce(function (t, it) { return t + it.links.length; }, 0);
@@ -576,7 +578,8 @@
       });
       det.appendChild(mb);
     }
-    mb.textContent = 'Show ' + Math.min(MORE_LINKS, left) + ' more of ' + num(it.links.length) + ' on ' + it.g.domain;
+    mb.textContent = 'Show ' + Math.min(MORE_LINKS, left) + ' more ' + plural(Math.min(MORE_LINKS, left), 'link', 'links') + ' · ' + num(left) + ' left';
+    mb.setAttribute('aria-label', mb.textContent + ' on ' + it.g.domain);
   }
   $('lx-more').addEventListener('click', function () {
     var had = document.activeElement === $('lx-more'), nx = lx.shown;
