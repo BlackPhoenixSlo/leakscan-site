@@ -296,7 +296,12 @@
       var x = link(r.link), d = x && (dom(r.domain) || dom(x.hostname));
       if (d) res.push({ link: x.href, domain: d, title: str(r.title, 200), thumb: okThumb(r.thumb) ? r.thumb : null, kind: r.kind === 'video' ? 'video' : 'page' });
     });
-    var items = E.imageItems((Array.isArray(raw.images) ? raw.images : []).slice(0, 200), res, okThumb, 60);
+    // the landing report's image list (js/inline-scan.js model()): her real images, the ones that open a page first, then
+    // video results' stills, 60 at most; people photos only once probed (photoOnly)
+    var gi = (Array.isArray(raw.images) ? raw.images : []).slice(0, 200), had = {}, items = E.imageItems(gi, res, okThumb, 60);
+    items.forEach(function (it) { had[it.src] = 1; });
+    items = items.filter(function (it) { return it.link; }).concat(items.filter(function (it) { return !it.link; }),
+      E.imageItems(gi, res, okThumb, Infinity, true).filter(function (it) { return it.video && !had[it.src]; })).slice(0, 60);
     var g = typeof raw.google_total === 'number' && raw.google_total > 0 && raw.google_total < 1e9 ? Math.round(raw.google_total) : null;
     return { slug: raw.slug, handle: R && R.model(raw).handle, links: rows.length, sites: sites, nimg: items.length,
       rows: rows.filter(function (r) { return r.title; }), imgs: items.map(function (it) { return E.thumb(it.src); }).filter(Boolean),

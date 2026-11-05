@@ -397,7 +397,7 @@ def prod(b, base, out, cues, cta):
     raw = stored(PROD_SLUG)[0]
     sse = "".join(f"event: {e}\ndata: {d}\n\n" for e, d in [("progress", "Searching Google, step 1 of 9"), ("progress", "Searching Google, step 6 of 9"),
                                                              ("result", json.dumps(raw)), ("done", "")])
-    proxied = []
+    proxied, cache = [], {}
 
     def proxy(r):   # declared bypass: the page's same-origin API GETs → the production API, read-only
         u = urllib.parse.urlsplit(r.request.url)
@@ -405,8 +405,16 @@ def prod(b, base, out, cues, cta):
             return r.abort()
         if u.path == "/api/thumb" and not GSTATIC.match(urllib.parse.parse_qs(u.query).get("u", [""])[0]):
             return r.fulfill(status=404, body="")   # never ask production for a non-gstatic thumb
-        proxied.append(u.path.split("/")[2])
-        r.fulfill(response=r.fetch(url=PROD + u.path + ("?" + u.query if u.query else ""), timeout=30000))
+        key = u.path + ("?" + u.query if u.query else "")
+        if key not in cache:   # memoized: each production GET once per run (the video's probe, its slots, the landing: same URLs; no 429s)
+            proxied.append(u.path.split("/")[2])
+            res = r.fetch(url=PROD + key, timeout=30000)
+            hit = (res.status, {k: v for k, v in res.headers.items() if k.lower() in ("content-type", "cache-control")}, res.body())
+            if res.status != 200 or "/api/media/" in key and key.count("/") == 3:   # only stable answers (the media index may still grow)
+                return r.fulfill(status=hit[0], headers=hit[1], body=hit[2])
+            cache[key] = hit
+        st, hd, body = cache[key]
+        r.fulfill(status=st, headers=hd, body=body)
 
     def run(label, opts, theater, slug):
         _, want, paths = stored(slug)
@@ -543,7 +551,7 @@ def prod(b, base, out, cues, cta):
     run("1920", dict(viewport={"width": 1920, "height": 1080}), False, PROD_SLUG)
     run("phone", VIEWPORTS["phone"], False, PROD_SLUG)
     run("theater", VIEWPORTS["phone"], True, PROD_SLUG2)
-    print(f"prod: proxied read-only GETs: " + ", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))))
+    print(f"prod: proxied read-only GETs to production (memoized): " + ", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))))
 
 
 def play(pg, until):
