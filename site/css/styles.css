@@ -143,9 +143,10 @@ strong { font-weight: 650; }
 .accent { color: var(--accent); font-style: italic; }
 .lead { font-size: clamp(1.1rem, 2.4vw, 1.28rem); color: var(--muted); max-width: 36em; }
 /* Free-scan form: OnlyFans + optional Instagram / X. With JS it scans in place (js/inline-scan.js); without, a plain GET
-   to scan/. Stacked on phones, one row from 560px. */
+   to scan/. Stacked on phones; from 560px the OnlyFans field gets its own row, Instagram / X + button share the next
+   (one row of three clipped both placeholders and a typed handle at every width up to the 680px cap). */
 .scan-form { display: grid; gap: 10px; margin: 28px 0 10px; max-width: 680px; }
-@media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1.6fr) minmax(0, .9fr) auto; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
+@media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1fr) auto; } .scan-form > :first-child { grid-column: 1 / -1; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
 .scan-prefix { display: flex; align-items: center; gap: 0; padding: 0 0 0 1.1em; cursor: text; }
 .scan-prefix:focus-within { border-color: var(--accent); }
 .scan-pre { color: var(--muted); font-size: .9rem; white-space: nowrap; user-select: none; }

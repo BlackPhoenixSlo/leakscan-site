@@ -172,12 +172,16 @@
       else { var n = new Error('network'); n.kind = 'network'; o.onError(n); }
     }, function (e) { o.onError(e); });
   }
-  // fetchResult(slug) → Promise of the stored result; rejects with err.kind like runScan.
+  // fetchResult(slug) → Promise of the stored result; rejects with err.kind like runScan. One request per slug per page:
+  // the landing's ?r= reopen asks from inline-scan.js and personalize.js, both get this promise (a failure is not kept).
+  // Callers only read the result, never mutate it.
+  var results = {};
   function fetchResult(slug) {
-    return fetch(API + '/api/scan-result/' + encodeURIComponent(slug)).then(function (res) {
+    if (results[slug]) return results[slug];
+    return (results[slug] = fetch(API + '/api/scan-result/' + encodeURIComponent(slug), { credentials: 'omit' }).then(function (res) {
       if (res.ok) return res.json();
       return res.json().catch(function () { return {}; }).then(function (j) { throw apiError(res.status, j && j.error, 'failed'); });
-    }).catch(function (e) { if (!e.kind) e.kind = 'network'; throw e; });
+    }).catch(function (e) { delete results[slug]; if (!e.kind) e.kind = 'network'; throw e; }));
   }
   // A progress event's text → {pct: 5..95 | null, stage: what to show}.
   function progressInfo(text) {
