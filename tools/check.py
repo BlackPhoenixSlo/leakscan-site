@@ -29,6 +29,8 @@ Checks every HTML file under site/ (except site/showcase/**):
   abolita.com cut-over can't leave the policy naming only the old host
 - README.md names every <section id> of index.html as `#id` (its landing-page map can't silently go stale), and
   CREDITS.md names every directory outside showcase/ that ships .jpg/.jpeg/.webp photos
+- index.html states the track-record stat ("570 of the 633") at most once: it sat in the hero proof box and again in
+  #why ~1.5 screens later (backlog #6)
 """
 import json, pathlib, re, sys
 from html.parser import HTMLParser
@@ -338,6 +340,9 @@ def main():
     for sid in re.findall(r'<section\b[^>]*\bid="([^"]+)"', (SITE / "index.html").read_text(encoding="utf-8")):
         if f"`#{sid}`" not in readme:
             bad(f"index.html has <section id={sid}> but README.md's landing-page map does not name `#{sid}`")
+    stat = (SITE / "index.html").read_text(encoding="utf-8").count("570 of the 633")
+    if stat > 1:
+        bad(f"index.html states the track-record stat {stat} times: say it once (hero proof box)")
     credits = (ROOT / "CREDITS.md").read_text(encoding="utf-8")
     photo_dirs = {f.parent.relative_to(ROOT).as_posix() for f in SITE.rglob("*")
                   if f.suffix.lower() in (".jpg", ".jpeg", ".webp") and "showcase" not in f.relative_to(SITE).parts}
