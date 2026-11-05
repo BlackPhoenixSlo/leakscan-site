@@ -11,7 +11,7 @@ After state (removed): google lists the name's site (<name>.com) + instagram.com
 >= 4 loaded, unblurred photos of her own (not .rm-img), no "No results".
 Plus:
 - end card (data-cue-cta, default data-cue-say): generic shows the "Type your name" card + form, named shows the
-  "for NAME" pill instead; the form reloads with ?name=<trimmed> (named), an invalid name stays put with a message
+  "for NAME" pill instead; the form rebuilds in place: ?name=<trimmed> (replaceState, same document, named), an invalid name stays put with a message
 - snap (google removed + 0.1 s): "GONE." word card, shake offset, flash; live + 0.25 s: "GOOGLE" word card
 - reduced motion (prefers-reduced-motion: reduce): no shake / scale, no flash / particles, the after layer fades
 - frame-1920-generic-google-live.png / frame-1920-named-mega-removed.png (counter at 0, stamp, particles) /
@@ -36,10 +36,21 @@ Plus:
   half), scroll locked, Esc / back / X each close it; desktop: the button puts the STAGE in full screen, the card on the
   right half of the centred 16:9 picture
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
+- name bar + in-place swap (phone 390x844, desktop 1440x900, frame 1920x1156 = a 1920x1080 stage + the bar), speech stubbed
+  (declared): generic at 0 s the bar sits under the stage, in view, with the pulsing "type your name" pill (gone after the
+  first focus); an invalid name is rejected inline (message, URL unchanged); phone: in theater (declared: Fullscreen API
+  removed, as iPhone) the "Your name" pill closes it and focuses the input; played past 2.4 s, SWAP_NAME + Enter →
+  the "REBUILDING FOR …" card, then within 2 s: ?name=<encoded> (replaceState, same document), named mode, playing from
+  < 2 s; spoken with SWAP_NAME at data-cue-say-start (desktop: and at data-cue-say), "for" pill; google at its live cue
+  shows SWAP_NAME; cta-steps never shown (MutationObserver); Change re-opens the input prefilled; Reset → generic, URL
+  without query, restarted, end card back. Proof PNGs: frame-1920-swap-bar-generic-0s.png (page), frame-1920-swap-rebuilding.png,
+  frame-1920-swap-google-live.png (1920x1080 stage).
+--break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
 --break-steps serves index.html without the cta-steps animation (.vo-steps): only the "cta-steps:" checks go red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps]
+--break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
-import argparse, pathlib, re, socket, subprocess, sys, urllib.parse
+import argparse, pathlib, re, socket, subprocess, sys, time, urllib.parse
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from serve import serve
 from playwright.sync_api import sync_playwright
@@ -93,6 +104,14 @@ GEOM = """() => { const r = e => { const b = e.getBoundingClientRect(); return [
           document.documentElement.dataset.voFull || null, getComputedStyle(document.documentElement).overflow, document.querySelector('video').controls]; }"""
 IPHONE_FS = ("Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: () => false });"
              "Element.prototype.requestFullscreen = undefined; Element.prototype.webkitRequestFullscreen = undefined;")
+SWAP_NAME = "Jaka Basej"
+SWAP_VIEWPORTS = {"phone": VIEWPORTS["phone"], "desktop": VIEWPORTS["desktop"], "frame-1920": dict(viewport={"width": 1920, "height": 1156})}
+# [stage rect, bar rect, input rect, button rect, hint [display, rect, animation], innerHeight, video.currentTime]
+BAR = """() => { const r = e => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; }, h = document.querySelector('.vo-nb-hint'), hs = getComputedStyle(h);
+  return [r(document.querySelector('.vo-stage')), r(document.querySelector('.vo-nb')), r(document.querySelector('#vo-nb-in')), r(document.querySelector('.vo-nb-f button')),
+          [hs.display, r(h), hs.animationName], innerHeight, document.querySelector('video').currentTime]; }"""
+CTA_WATCH = """() => { window.__ctaSeen = false; const c = document.querySelector('.vo-cta');
+  new MutationObserver(() => { if (!c.hasAttribute('data-off')) __ctaSeen = true; }).observe(c, { attributes: true }); }"""
 fails = []
 
 
@@ -330,6 +349,136 @@ def cta_steps(pg, base, out, cta, name_q):
         check(f"cta-steps: named mode never shows it (t={t:g})", s and s["off"] and pg.evaluate("() => document.documentElement.dataset.voMode") == "named", s)
 
 
+def swap(b, base, out, cues, cta, vp, opts):
+    """the name bar: generic → SWAP_NAME in place (no reload), Change, Reset; vp = phone | desktop | frame-1920"""
+    want_q = "?name=" + urllib.parse.quote(SWAP_NAME)
+    ctx = ctx_new(b, **opts)
+    ctx.add_init_script(SAY_STUB)
+    if vp == "phone":
+        ctx.add_init_script(IPHONE_FS)
+    seen = []
+    ext = guard(ctx, (base,), seen)
+    pg = ctx.new_page()
+    errs = []
+    console(pg, errs)
+    pg.goto(f"{base}video/")
+    pg.wait_for_function("() => document.querySelector('video').readyState >= 3", timeout=15000)
+    pg.wait_for_timeout(1200)
+    pg.screenshot(path=str(out / f"{vp}-swap-bar-generic-0s.png"))
+    st, bar, inp, btn, hint, vh, t = pg.evaluate(BAR)
+    check(f"bar ({vp}): generic at {t:g} s: the name bar right under the stage, full width, input + button in view -> {vp}-swap-bar-generic-0s.png",
+          t == 0 and abs(bar[1] - (st[1] + st[3])) <= 1 and abs(bar[2] - st[2]) <= 1 and bar[1] + bar[3] <= vh + 1
+          and all(r[3] > 20 and r[1] + r[3] <= vh + 1 for r in (inp, btn)), (st, bar, inp, btn, vh, t))
+    check(f"bar ({vp}): the pulsing '👇 type your name' pill on the input, in view", hint[0] != "none" and hint[2] == "vo-nb-pulse"
+          and hint[1][3] > 0 and hint[1][1] >= st[1] + st[3] - hint[1][3] and hint[1][1] + hint[1][3] <= vh
+          and pg.evaluate("() => document.querySelector('.vo-nb-hint').textContent") == "\U0001F447 type your name", hint)
+    pg.fill("#vo-nb-in", "<b>")
+    pg.press("#vo-nb-in", "Enter")
+    pg.wait_for_timeout(300)
+    bad = pg.evaluate("() => { const e = document.querySelector('.vo-nb-err'); return [e.hidden, e.textContent, document.querySelector('#vo-nb-in').getAttribute('aria-invalid'), document.documentElement.dataset.voMode, getComputedStyle(document.querySelector('.vo-nb-hint')).display]; }")
+    check(f"bar ({vp}): invalid '<b>' rejected inline (message, aria-invalid), URL + mode unchanged; the hint gone after the first focus",
+          not bad[0] and "1-40" in bad[1] and bad[2] == "true" and bad[3] == "generic" and bad[4] == "none" and pg.url == f"{base}video/", (bad, pg.url))
+    pg.fill("#vo-nb-in", "")
+    if vp == "phone":   # iPhone theater: the pill opens the bar
+        pg.locator(".vo-fs").tap()
+        pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+        pg.wait_for_timeout(300)
+        pg.screenshot(path=str(out / "phone-swap-theater-pill.png"))
+        pill = pg.evaluate("() => { const b = document.querySelector('.vo-nb-pill').getBoundingClientRect(); return [getComputedStyle(document.querySelector('.vo-nb-pill')).display, b.width > 0]; }")
+        pg.locator(".vo-nb-pill").tap()
+        pg.wait_for_timeout(500)
+        got = pg.evaluate("() => [document.documentElement.dataset.voFull || null, document.activeElement && document.activeElement.id]")
+        check("bar (phone): theater shows the 'Your name' pill; a tap closes the theater and focuses the bar input -> phone-swap-theater-pill.png",
+              pill == ["block", True] and got == [None, "vo-nb-in"], (pill, got))
+        pg.evaluate("() => document.activeElement.blur()")
+    pg.evaluate(CTA_WATCH)
+    play(pg, 2.4)
+    before = pg.evaluate("() => document.querySelector('video').currentTime")
+    pg.fill("#vo-nb-in", SWAP_NAME)
+    pg.evaluate("() => { window.__same = 1; window.__said.length = 0; }")
+    t0 = time.monotonic()
+    pg.press("#vo-nb-in", "Enter")
+    rb = None
+    try:
+        pg.wait_for_function("() => !document.querySelector('.vo-rb').hasAttribute('data-off') && +getComputedStyle(document.querySelector('.vo-rb')).opacity > .9", timeout=1000)
+        pg.wait_for_timeout(200)
+        pg.locator(".vo-stage").screenshot(path=str(out / f"{vp}-swap-rebuilding.png"))
+        rb = pg.evaluate("() => [document.querySelector('.vo-rb').innerText.replace(/\\s+/g, ' ').trim(), document.querySelector('video').paused]")
+    except Exception:
+        pass
+    check(f"swap ({vp}): the 'REBUILDING FOR {SWAP_NAME.upper()}…' card on the right half, video paused under it -> {vp}-swap-rebuilding.png",
+          rb == [f"REBUILDING FOR {SWAP_NAME.upper()}…", True], rb)
+    done = False
+    try:
+        pg.wait_for_function("""q => { const v = document.querySelector('video'); return location.search === q && document.documentElement.dataset.voMode === 'named'
+            && !v.paused && v.currentTime > 0 && v.currentTime < 2 && document.querySelector('.vo-rb').hasAttribute('data-off'); }""", arg=want_q,
+            timeout=max(1, 2000 - (time.monotonic() - t0) * 1000))
+        done = True
+    except Exception:
+        pass
+    dt = time.monotonic() - t0
+    got = pg.evaluate("() => [location.search, document.documentElement.dataset.voMode, !document.querySelector('video').paused, document.querySelector('video').currentTime, window.__same === 1, document.querySelector('.vo-nb-n').textContent]")
+    check(f"swap ({vp}): {dt:.2f} s after Enter (< 2): {want_q}, same document, named mode, restarted from {before:.1f} s to < 2 s and playing, bar 'Rebuilt for {SWAP_NAME}'",
+          done and got[4] and got[5] == SWAP_NAME, (got, dt))
+    try:
+        pg.wait_for_function("() => __said.length > 0", timeout=3000)
+    except Exception:
+        pass
+    pg.wait_for_timeout(150)
+    said = pg.evaluate("() => __said")
+    pill = pg.evaluate("() => { const e = document.querySelector('.vo-for'); return [e.hasAttribute('data-off'), e.innerText.replace(/\\s+/g, ' ').trim()]; }")
+    check(f"swap ({vp}): spoken once with {SWAP_NAME!r} at data-cue-say-start {cues['say-start']} after the restart (not during the card), 'for' pill",
+          len(said) == 1 and said[0][0] == SWAP_NAME and cues["say-start"] <= said[0][1] < cues["say-start"] + 0.5 and not pill[0] and pill[1].endswith(f"for {SWAP_NAME}"), (said, pill))
+    g = cues["google"]
+    tg = round(g[0] + 1.3, 2)
+    pg.evaluate("t => { const v = document.querySelector('video'); v.pause(); v.currentTime = t; }", tg)
+    pg.wait_for_function(SEEKED, arg=tg, timeout=15000)
+    pg.wait_for_timeout(1200)
+    pg.locator(".vo-stage").screenshot(path=str(out / f"{vp}-swap-google-live.png"))
+    vis = pg.evaluate(VISIBLE)
+    check(f"swap ({vp}): google at its live cue (t={tg:g}) shows {SWAP_NAME!r} -> {vp}-swap-google-live.png",
+          [v[0] for v in vis] == ["google"] and SWAP_NAME in vis[0][2] and GENERIC not in vis[0][2], [(v[0], v[2][:80]) for v in vis])
+    if vp == "desktop":   # the end say cue too
+        say = cues["say"]
+        pg.evaluate("t => { document.querySelector('video').currentTime = t; }", say - 0.6)
+        pg.wait_for_function(SEEKED, arg=say - 0.6, timeout=15000)
+        pg.evaluate("() => document.querySelector('video').play()")
+        try:
+            pg.wait_for_function("() => __said.length > 1", timeout=3000)
+        except Exception:
+            pass
+        said = pg.evaluate("() => __said")
+        check(f"swap (desktop): spoken again with {SWAP_NAME!r} at data-cue-say {say}", len(said) == 2 and said[1][0] == SWAP_NAME and say <= said[1][1] < say + 0.5, said)
+        pg.evaluate("() => document.querySelector('video').pause()")
+    tc = round(cta + 0.6, 2)
+    pg.evaluate("t => { const v = document.querySelector('video'); v.pause(); v.currentTime = t; }", tc)
+    pg.wait_for_function(SEEKED, arg=tc, timeout=15000)
+    pg.wait_for_timeout(300)
+    vis = [v[0] for v in pg.evaluate(VISIBLE)]
+    check(f"swap ({vp}): cta-steps never appears after the swap (observer + at cta + 0.6 = {tc:g}: {vis})",
+          "cta-steps" not in vis and pg.evaluate("() => __ctaSeen") is False and pg.evaluate("() => document.documentElement.dataset.voMode") == "named", vis)
+    pg.locator(".vo-nb-chg").click()
+    pg.wait_for_timeout(200)
+    ch = pg.evaluate("() => [getComputedStyle(document.querySelector('.vo-nb-f')).display, document.querySelector('#vo-nb-in').value, document.activeElement.id]")
+    check(f"swap ({vp}): Change re-opens the input, prefilled with {SWAP_NAME!r}, focused", ch[0] != "none" and ch[1:] == [SWAP_NAME, "vo-nb-in"], ch)
+    pg.evaluate("() => document.activeElement.blur()")
+    pg.locator(".vo-nb-rst").click()
+    try:
+        pg.wait_for_function("""() => { const v = document.querySelector('video'); return location.search === '' && document.documentElement.dataset.voMode === 'generic'
+            && !v.paused && v.currentTime < 2 && document.querySelector('[data-vo=name]').textContent === 'Your name'; }""", timeout=3000)
+    except Exception:
+        pass
+    got = pg.evaluate("() => [location.search, document.documentElement.dataset.voMode, document.querySelector('[data-vo=name]').textContent, !document.querySelector('video').paused, document.querySelector('video').currentTime, getComputedStyle(document.querySelector('.vo-nb-f')).display, window.__same === 1]")
+    pg.evaluate("t => { const v = document.querySelector('video'); v.pause(); v.currentTime = t; }", tc)
+    pg.wait_for_function(SEEKED, arg=tc, timeout=15000)
+    pg.wait_for_timeout(300)
+    vis = [v[0] for v in pg.evaluate(VISIBLE)]
+    check(f"swap ({vp}): Reset → generic in place (URL without query, 'Your name', restarted + playing, the form back), end card back at {tc:g}",
+          got[0] == "" and got[1:4] == ["generic", GENERIC, True] and got[4] < 2 and got[5] != "none" and got[6] and vis == ["cta-steps"], (got, vis))
+    check(f"bar ({vp}): no console errors, no request outside the local server", not errs and not ext, (errs, sorted(set(ext))))
+    ctx.close()
+
+
 def player(b, base, out, cues):
     """phone merged layout, tap-to-play + hint, iPhone theater, desktop full screen"""
     g = cues["google"]
@@ -416,6 +565,7 @@ def main():
     ap.add_argument("--name", default="Tessa")
     ap.add_argument("--break-thumbs", action="store_true")
     ap.add_argument("--break-steps", action="store_true")
+    ap.add_argument("--break-swap", action="store_true")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -424,6 +574,11 @@ def main():
         broken, k = re.subn(r'\n        <div class="vo-steps".*?\n        </div>\n(?=        <p class="vo-dots")', "\n", html, flags=re.S)
         assert k == 1, "break: .vo-steps block not found"
         BREAK["steps"] = (lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), broken, "text/html")
+    if a.break_swap:   # wire boundary: video-overlays.js minus the submit's in-place rebuild (validation stays)
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"(inp\.blur\(\);)\n\s*rebuild\(n\);", r"\1", js)
+        assert k == 1, "break: rebuild(n) call not found"
+        BREAK["swap"] = ("**/js/video-overlays.js", broken, "application/javascript")
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     tap = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', html)
@@ -503,14 +658,18 @@ def main():
                         pg.press("#vo-name", "Enter")
                         pg.wait_for_timeout(300)
                         msg = pg.evaluate("() => document.querySelector('#vo-name').validationMessage")
-                        check("end card form: invalid name '<b>' → no navigation, a message", "name=" not in pg.url and bool(msg), (pg.url, msg))
+                        check("end card form: invalid name '<b>' → no rebuild, a message", "name=" not in pg.url and bool(msg), (pg.url, msg))
                         pg.fill("#vo-name", f"  {a.name}   Q ")
                         pg.screenshot(path=str(out / "desktop-generic-end-form-typed.png"))
-                        with pg.expect_navigation():
-                            pg.press("#vo-name", "Enter")
-                        pg.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=8000)
-                        nm = pg.evaluate("() => document.querySelector('[data-vo=name]').textContent")
-                        check(f"end card form: '{a.name} Q' → ?name={urllib.parse.quote(a.name + ' Q')}, named mode, texts", pg.url.endswith(f"/video/?name={urllib.parse.quote(a.name + ' Q')}") and nm == f"{a.name} Q", (pg.url, nm))
+                        pg.evaluate("() => { window.__same = 1; }")
+                        pg.press("#vo-name", "Enter")
+                        want = f"/video/?name={urllib.parse.quote(a.name + ' Q')}"
+                        try:
+                            pg.wait_for_function("u => location.href.endsWith(u) && document.documentElement.dataset.voMode === 'named'", arg=want, timeout=4000)
+                        except Exception:
+                            pass
+                        nm = pg.evaluate("() => [document.querySelector('[data-vo=name]').textContent, window.__same === 1]")
+                        check(f"swap: end card form: '{a.name} Q' → in place (same document), {want}, named mode, texts", pg.url.endswith(want) and nm == [f"{a.name} Q", True], (pg.url, nm))
                         pg.screenshot(path=str(out / "desktop-generic-end-form-submitted.png"))
                     # the snap: word cards, shake, flash
                     g = cues["google"]
@@ -540,6 +699,10 @@ def main():
         check("reduced motion, stamp: no particles (burst display none), stamp unscaled", fx[6] == "none" and fx[7] == 1, (fx[6], fx[7]))
         ctx.close()
         player(b, base, out, cues)
+        for vp, opts in SWAP_VIEWPORTS.items():
+            swap(b, base, out, cues, cta, vp, opts)
+        for f in ("bar-generic-0s", "rebuilding", "google-live"):
+            print(f"swap proof -> frame-1920-swap-{f}.png")
         # the framing proofs: the whole 1920x1080 frame
         ctx = ctx_new(b, viewport={"width": 1920, "height": 1080})
         pg = ctx.new_page()

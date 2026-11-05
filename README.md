@@ -36,13 +36,15 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `jack.mp4`, speaks the name at `data-cue-say-start` + `data-cue-say` (`speechSynthesis`, video ducked) + "for
   <name>" pill; generic = "Your name", `jack.mp4`, no speech, end card `cta-steps` at `data-cue-cta` (default `-say`):
   3 steps on an 8 s loop (type your name → run the free scan → rewatch with YOUR content; keeps looping after the
-  take ends) over a `?name=` form. `?t=<sec>` seeks; `?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none`
+  take ends) over a name form. Name bar under the stage (theater / full screen: a pill opens it; pulsing "type your
+  name" hint until focus): submit = in-place rebuild (named mode, `?name=` via replaceState, 1.2 s "REBUILDING FOR …"
+  card, take restarts from 0 playing), then Change / Reset. `?t=<sec>` seeks; `?prefab=google|google-images|x|reddit|mega&state=live|removed&bg=green|none`
   (or `cta-steps&state=step1|2|3`) = one prefab, no video. Space = play / pause. Every width: cards inside the 16:9
   stage's right half (phones too, no stacking); full screen button = the stage (Fullscreen API), iPhone = rotated CSS
   theater (Esc / X / back closes); touch: own play bar, tap-to-play + "Rotate for full size" hint. Script (2 takes):
   `site/video/SCRIPT.md`; cue sheet + CapCut steps + SFX: `site/video/CUES.md`. Gate: `tools/video/check_video.py`
   (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry at both widths, after state,
-  counters, end card + form + cta-steps, snap, reduced motion, sfx, speech, named take, player: tap / theater / full
+  counters, end card + form + cta-steps, name bar + in-place swap (`--break-swap`), snap, reduced motion, sfx, speech, named take, player: tap / theater / full
   screen, scan-stub texts + thumbs); 6 clips for CapCut (ProRes 4444 alpha .mov + green .mp4, own in / out animation,
   silent; `cta-steps` 8 s, generic only): `tools/video/render_prefabs.py OUT`; cues from a take
   (whisper / faster-whisper word timestamps → `data-cue-*` diff, untested on a real take):

@@ -5,7 +5,10 @@
    --kgo (word cards). No CSS transitions, so a seek or a frame capture is exact. */
 .vo-page { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0c0e; }
 .vo-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.vo-stage { position: relative; width: min(100vw, 177.78vh); aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
+/* --nb-h: room for the name bar under the stage (none in ?prefab= renders), so a 16:9 window still shows it */
+.vo { --nb-h: 76px; }
+.vo.vo-solo { --nb-h: 0px; }
+.vo-stage { position: relative; width: min(100vw, calc((100vh - var(--nb-h)) * 16 / 9)); aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
 .vo-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 /* the right half: a 640x720 design box (960x1080 frame px at 1920), scaled to it (--k = width / 640 from JS), so the web
    page and the 1920x1080 renders match. Not clipped: the card slides in from the frame edge (the stage clips). */
@@ -158,6 +161,44 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 .vo-dots { display: flex; gap: 10px; margin: 0; }
 .vo-dots i { width: 14px; height: 14px; box-sizing: border-box; border: 3px solid #000; border-radius: 50%; background: #000; opacity: var(--d, .3); }
 
+/* the name bar under the stage: generic = label + input + "Rebuild this video with my name" (+ the pulsing "type your name"
+   pill until the first focus); named = "Rebuilt for <name>" + Change (re-opens the form, [data-edit]) / Reset */
+.vo-nb { box-sizing: border-box; width: 100%; padding: 16px 12px 10px; background: #16181c; color: #fff; font-family: var(--sans); }
+.vo-nb-f { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0; }
+.vo-nb-f label { font: 800 1rem/1 var(--sans); }
+.vo-nb-w { position: relative; display: flex; flex: 1 1 180px; min-width: 0; }
+.vo-nb-w input { flex: 1; min-width: 0; padding: 10px 14px; border: 3px solid #ffd400; border-radius: 10px; background: #fff; color: #000; font: 700 1.05rem/1.2 var(--sans); }
+.vo-nb-w input[aria-invalid="true"] { border-color: #ff3b5c; }
+.vo-nb-f button, .vo-nb-on button { padding: 10px 16px; border: 3px solid #000; border-radius: 10px; background: #ffd400; color: #000; font: 900 1rem/1.2 var(--sans); cursor: pointer; }
+.vo-nb :focus-visible { outline: 3px solid #2f80ff; outline-offset: 2px; }
+.vo-nb-err { flex-basis: 100%; margin: 0; color: #ff8fa3; font: 700 .9rem/1.2 var(--sans); }
+.vo-nb-hint { position: absolute; left: 10px; top: 0; padding: 3px 10px 4px; border: 3px solid #000; border-radius: 999px; background: #ffd400; color: #000;
+  font: 900 .8rem/1 var(--sans); white-space: nowrap; pointer-events: none; transform: translateY(-62%) rotate(-3deg); animation: vo-nb-pulse .9s ease-in-out infinite; }
+@keyframes vo-nb-pulse { 50% { transform: translateY(-62%) rotate(-3deg) scale(1.12); } }
+[data-vo-nb-seen] .vo-nb-hint, [data-vo-mode="named"] .vo-nb-hint { display: none; }
+.vo-nb-on { display: none; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0; font: 700 1rem/1.2 var(--sans); }
+.vo-nb-on b { color: #ffd400; }
+.vo-nb-chg { margin-left: auto; }
+.vo-nb-on .vo-nb-rst { background: #fff; }
+[data-vo-mode="named"] .vo-nb:not([data-edit]) .vo-nb-f, .vo-nb[data-edit] .vo-nb-chg { display: none; }
+[data-vo-mode="named"] .vo-nb-on { display: flex; }
+.vo-nb[data-edit] .vo-nb-on { margin-top: 8px; }
+/* full screen / theater: the bar is off screen, so a pill next to the X opens it (leaves full screen, focuses the input) */
+.vo-nb-pill { position: absolute; top: 8px; left: 52px; display: none; min-height: 34px; padding: 6px 12px; border: 3px solid #000; border-radius: 999px;
+  background: #ffd400; color: #000; font: 900 .85rem/1 var(--sans); cursor: pointer; }
+[data-vo-full] .vo-nb-pill { display: block; }
+
+/* the rebuild card (js rebuild(), wall clock, 1.2 s, video paused): the right half dimmed + scanlines (--sl scroll), a
+   MrBeast word card popping in (--sc) with an RGB-split glitch (--gx px); --o fades it */
+.vo-rb { --o: 0; --sc: 1; --gx: 0; --sl: 0; position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; overflow: hidden;
+  background: rgb(11 12 14 / .88); opacity: var(--o); font-family: var(--sans); }
+.vo-rb[data-off] { visibility: hidden; }
+.vo-rb::after { content: ""; position: absolute; inset: -40px 0 0; background: repeating-linear-gradient(transparent 0 3px, rgb(255 255 255 / .08) 3px 5px);
+  transform: translateY(calc(var(--sl) * 1px)); pointer-events: none; }
+.vo-rb-t { max-width: 560px; margin: 0; padding: 14px 22px 16px; border: 5px solid #000; border-radius: 14px; background: #ffd400; color: #000;
+  box-shadow: 8px 8px 0 #000; font: 900 3rem/1.05 var(--sans); letter-spacing: -.01em; text-align: center; text-transform: uppercase; overflow-wrap: anywhere;
+  text-shadow: calc(var(--gx) * 1px) 0 #ff0033, calc(var(--gx) * -1px) 0 #00c8ff; transform: rotate(-3deg) scale(var(--sc)) translateX(calc(var(--gx) * .6px)); }
+
 /* ?prefab=…: one prefab alone in a 1920x1080 frame, still on the right half; bg=green → chroma #00FF00, bg=none → transparent */
 .vo-solo .vo-video { display: none; }
 .vo-solo .vo-stage { background: none; }
@@ -171,6 +212,8 @@ html.vo-clear, html.vo-clear .vo-page { background: transparent; }
   .vo-stamp { transform: rotate(-6deg); }
   .vo-kw > span { transform: none; }
   .vo-step, .vo-mini-n, .vo-mc, .vo-mbtn { transform: none; }
+  .vo-nb-hint { animation: none; }
+  .vo-rb-t { transform: rotate(-3deg); text-shadow: none; }
   .vo .vo-rs .rm-gone { clip-path: none; opacity: var(--w); }
   .vo .vo-rs .rm-handle { display: none; }
 }
