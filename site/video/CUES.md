@@ -45,7 +45,7 @@ leak is gone.
 | take | `jack.mp4` (Script A) | `jack-named.mp4` (Script B) if the server has it (HEAD probe), else `jack.mp4` |
 | texts | "Your name" (search box, posts, after state `yourname.com`) | her name / scan texts + scan thumbs |
 | speech | none | her name at `data-cue-say-start` (0.3 s, in Script B's 1.5 s opening gap) and at `data-cue-say` (end), each once, + "for <name>" pill (2 s at the start; from `data-cue-say` it stays to the end and after the take ends: the name on the last frame) |
-| end | `cta-steps`: the "Type your name in the link → this video rebuilds with YOUR leaks" card at `data-cue-cta` (default `data-cue-say`), stays: 3 steps on an 8 s loop from its cue (1 "Type your name": the landing's scan box (pill input + orange "Scan now" pill, site `--accent`) types "Jaka Basej" letter by letter, the viewer's own once typed in the form, then "Scan now" is pressed; 2 "Run the free scan": bar + "Searching Google, step N of 9…" walking Google → Google Images → X → Reddit → Mega, "N links found" rolls to 87; 3 "Rewatch this video with YOUR content": a mini of this page flips "Your name" → the name with a pop), still looping after the take ends; under it the real form = the name bar's rebuild (below) | the pill (never the steps) |
+| end | `cta-steps`: the "Type your name in the link → this video rebuilds with YOUR leaks" card at `data-cue-cta` (default `data-cue-say`), stays: a phone-shaped replica of the landing (dark, the site's tokens / fonts / logo), one 10 s take from its cue (0-4.1 s the hero: the camera zooms onto the `onlyfans.com/` field, types "Jaka Basej" as the handle `jakabasej` (the viewer's own once typed in the form), pulls back, "Scan now" pressed; 4.1-6.8 s the scan card "FREE SCAN · ONLYFANS @handle", "Searching Google, step N of 9…" walking Google → Google Images → X → Reddit → Mega, bar, skeleton rows; 6.8-9.8 s the report card: zoom onto "N links found" rolling to 87, pull back over tabs Links 87 / Images 12 / Sites 31, 5 placeholder `*.example` rows with grey blurred thumbs + Live pills, "+ 82 more in the full report", the blurred Google Images strip; from 8.75 s "Rewatch this video with YOUR content" + "for Your name" flipping to the name), still looping after the take ends; under it the real form = the name bar's rebuild (below) | the pill (never the steps) |
 
 **Name bar** (both modes, under the stage; full screen / theater: a "Your name" pill top-left opens it): generic =
 "Your name" input (1-40 letters / digits / space . - _, textContent only) + "Rebuild this video with my name", a pulsing
@@ -90,10 +90,10 @@ Test any moment: `?t=12.5`; one prefab alone: `?prefab=mega&state=removed&bg=gre
 5. Let the clip run to its end (the slide-out is in the clip). **No CapCut In / Out animation needed**; if the line
    ends earlier, cut at the "out" mark and add CapCut Out: Fade out 0.3 s for that one.
 6. Repeat for `google-images`, `x`, `reddit`, `mega`. Lines 1, 2 and 8 have no clip.
-6b. Line 9 (generic upload only): `cta-steps.mov` / `cta-steps-green.mp4`, 8 s = one loop of the 3 steps (pops in at
-   0 s, step 1 typing 0-2.6 s, step 2 scan 2.6-5.3 s, step 3 the mini page flip 5.3-8 s), no form, no slide-out: start
+6b. Line 9 (generic upload only): `cta-steps.mov` / `cta-steps-green.mp4`, 10 s = one loop of the phone take (pops in at
+   0 s, hero zoom + typing 0-4.1 s, scan card 4.1-6.8 s, report + rewatch toast + name flip 6.8-9.8 s), no form, no slide-out: start
    it on the line 9 cue and loop / freeze its last frame to the end. Stills: `cta-steps-step1/2/3.png`,
-   `-in / -typing / -scanning / -flip.png`. Not rendered with `--name` (named never shows it).
+   `-in / -zoom / -typed / -scanning / -report / -flip.png`. Not rendered with `--name` (named never shows it).
 7. Sound effects (CapCut → Audio → Sound effects, free; search these names, pick by ear, volume ~30 %): **"Pop"** on
    each clip's pop-in (0 s), **"Whoosh"** on the snap (2.4 s), **"Impact"** as the stamp lands (3.6-3.8 s), **"Ding"**
    (or "Cash register") on the confetti (3.8 s). Keep Jack's real finger snap audible; the SFX sit under it.
