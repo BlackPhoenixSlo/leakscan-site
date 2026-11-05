@@ -501,9 +501,14 @@ def huge_flow(browser, vp_name, vp):
         HO = """() => { const f = document.querySelector('.frame-phone'), s = f.querySelector('.ph-scroll'), m = document.querySelector('#g-panel [data-more]');
             return {y: Math.round(scrollY), st: Math.round(s.scrollTop), max: s.scrollHeight - s.clientHeight, ft: Math.round(f.getBoundingClientRect().top),
                     rise: !!m && m.classList.contains('g-rise'), seen: !!m && m.classList.contains('g-in'), op: m ? +getComputedStyle(m).opacity : -1}; }"""
-        ho = {}
+        ho, rise = {}, {}
+        OP = "() => { const m = document.querySelector('#g-panel [data-more]'); return m ? +getComputedStyle(m).opacity : -1; }"
         for t in ("images", "videos"):
             page.locator(f"#g-tab-{t}").click()
+            rise[t] = [page.evaluate(OP)]   # no flash: hidden from the first frame
+            page.evaluate("document.querySelector('#g-panel [data-more]').focus({preventScroll: true})")
+            rise[t].append(page.evaluate(OP))   # keyboard focus: shown at once
+            page.evaluate("document.activeElement.blur()")
             page.wait_for_timeout(700)
             for how in ("wheel", "touch"):
                 a0 = page.evaluate(HO)
@@ -529,6 +534,17 @@ def huge_flow(browser, vp_name, vp):
               all(abs(v["dy"] - 400) <= 8 and v["st"][1] == v["st"][2] and abs(v["frame_up"] - (400 - (v["st"][2] - v["st"][0]))) <= 8 for v in ho.values()), ho)
         check(f"{tag} pin: 'Show more images / videos' hidden until it enters the screen, then shown (rise animation, ends at opacity 1)",
               all(v["hidden_at_top"] == [True, False, 0] and v["shown"] == [True, 1] for k, v in ho.items() if k.endswith("wheel")), ho)
+        check(f"{tag} pin: 'Show more …' rise: no flash (opacity 0 from the tab's first frame), keyboard focus shows it at once", all(v == [0, 1] for v in rise.values()), rise)
+        rctx = browser.new_context(viewport=vp, device_scale_factor=2, is_mobile=True, has_touch=True, reduced_motion="reduce")
+        rp = rctx.new_page()
+        rp.goto(base + "scan/?r=" + parse_qs(urlsplit(page.url).query).get("r", [""])[0], wait_until="load")
+        rp.wait_for_selector("#report:not([hidden])", timeout=8000)
+        rm = {}
+        for t in ("images", "videos"):
+            rp.locator(f"#g-tab-{t}").click()
+            rm[t] = rp.evaluate("() => { const m = document.querySelector('#g-panel [data-more]'); return [m.classList.contains('g-rise'), +getComputedStyle(m).opacity]; }")
+        rctx.close()
+        check(f"{tag} pin: reduced motion: 'Show more …' never hidden, no rise", all(v == [False, 1] for v in rm.values()), rm)
         page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
         page.wait_for_timeout(250)
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
