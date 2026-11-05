@@ -457,12 +457,12 @@ def swap(b, base, out, cues, cta, vp, opts):
     vis = [v[0] for v in pg.evaluate(VISIBLE)]
     check(f"swap ({vp}): cta-steps never appears after the swap (observer + at cta + 0.6 = {tc:g}: {vis})",
           "cta-steps" not in vis and pg.evaluate("() => __ctaSeen") is False and pg.evaluate("() => document.documentElement.dataset.voMode") == "named", vis)
-    pg.locator(".vo-nb-chg").click()
+    pg.evaluate("() => document.querySelector('.vo-nb-chg').click()")   # DOM click: hidden (no swap) must fail the check, not abort
     pg.wait_for_timeout(200)
     ch = pg.evaluate("() => [getComputedStyle(document.querySelector('.vo-nb-f')).display, document.querySelector('#vo-nb-in').value, document.activeElement.id]")
     check(f"swap ({vp}): Change re-opens the input, prefilled with {SWAP_NAME!r}, focused", ch[0] != "none" and ch[1:] == [SWAP_NAME, "vo-nb-in"], ch)
     pg.evaluate("() => document.activeElement.blur()")
-    pg.locator(".vo-nb-rst").click()
+    pg.evaluate("() => document.querySelector('.vo-nb-rst').click()")
     try:
         pg.wait_for_function("""() => { const v = document.querySelector('video'); return location.search === '' && document.documentElement.dataset.voMode === 'generic'
             && !v.paused && v.currentTime < 2 && document.querySelector('[data-vo=name]').textContent === 'Your name'; }""", timeout=3000)
