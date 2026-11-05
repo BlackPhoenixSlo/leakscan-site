@@ -73,6 +73,7 @@ PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "https://scan.srv1395798.hstgr.c
 BB_API = "https://api.browserbase.com/v1"
 MAX_GATHERS = 2               # concurrent full gathers (Browserbase); when busy -> Google step only
 CACHE_TTL = 7 * 86400
+NONE_TTL = int(os.environ.get("MEDIA_NONE_TTL", "3600"))   # an empty result is retried after an hour, not a week
 GOOGLE_QUERIES = 2
 MIN_SIDE, MAX_SIDE, MAX_BYTES = 200, 1200, 300 * 1024
 FETCH_CAP = 8 * 1024 * 1024
@@ -359,7 +360,8 @@ def _cache_load(key):
     try:
         with open(_cache_path(key), encoding="utf-8") as fh:
             c = json.load(fh)
-        if time.time() - float(c["ts"]) > CACHE_TTL or not SLUG_RE.match(c["slug"]):
+        ttl = CACHE_TTL if c.get("images") else NONE_TTL
+        if time.time() - float(c["ts"]) > ttl or not SLUG_RE.match(c["slug"]):
             return None
         return c
     except (OSError, ValueError, KeyError, TypeError):
