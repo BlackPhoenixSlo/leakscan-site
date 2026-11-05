@@ -191,7 +191,7 @@
 .g-vbody .g-cite { margin-bottom: 4px; }
 
 /* ---------- Phone frame (390px, Google mobile) ---------- */
-.frame-phone { width: 390px; max-width: 100%; padding: 10px; border-radius: 52px; background: linear-gradient(145deg, #2b2724, #0f0d0c); box-shadow: var(--shadow-lg), inset 0 0 0 1.5px #4a4440; }
+.frame-phone { --ph-pad: 10px; width: 390px; max-width: 100%; padding: var(--ph-pad); border-radius: 52px; background: linear-gradient(145deg, #2b2724, #0f0d0c); box-shadow: var(--shadow-lg), inset 0 0 0 1.5px #4a4440; }
 .ph-screen { position: relative; border-radius: 42px; overflow: hidden; min-height: 640px; padding-bottom: 26px; }
 .ph-status { display: flex; justify-content: space-between; align-items: center; height: 46px; padding: 0 28px 0 34px; font: 600 15px/1 -apple-system, "SF Pro Text", Arial, sans-serif; }
 .ph-status::after { content: ""; position: absolute; top: 11px; left: 50%; width: 104px; height: 30px; transform: translateX(-50%); border-radius: 999px; background: #000; }
@@ -213,13 +213,14 @@
 .frame-phone .g-title { font-size: 18px; }
 .frame-phone .g-snip { -webkit-line-clamp: 3; }
 .frame-phone .g-pack-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.frame-phone .g-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.frame-phone .g-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 6px; }
+.frame-phone .g-tile figcaption { font-size: 11px; }
 .frame-phone .g-safe { gap: 6px; font-size: 12px; flex-wrap: wrap; }
 .frame-phone .chip-g { padding: 5px 11px; }
 .frame-phone .g-v { flex-direction: column; gap: 8px; padding-bottom: 18px; border-bottom: 1px solid var(--g-line); }
 .frame-phone .g-vthumb { width: 100%; }
 .ph-home { position: absolute; left: 50%; bottom: 8px; width: 134px; height: 5px; border-radius: 3px; background: #e8eaed; transform: translateX(-50%); opacity: .9; }
-@media (max-width: 400px) { .frame-phone { padding: 7px; border-radius: 44px; } .ph-screen { border-radius: 37px; } }
+@media (max-width: 400px) { .frame-phone { --ph-pad: 7px; border-radius: 44px; } .ph-screen { border-radius: 37px; } }
 
 /* ---------- Computer frame (browser window, fixed 1060px, scaled down by JS to fit) ---------- */
 .cw-scale { width: 100%; overflow: hidden; }
@@ -247,7 +248,7 @@
 .deep .icon { width: 16px; height: 16px; }
 
 /* Section nav: docked under the site header once the report starts (in flow: no layout shift) */
-#report { --rnav-h: 52px; --pin-top: calc(var(--header-h) + var(--rnav-h) + 12px); }
+#report { --rnav-h: 52px; --pin-top: calc(var(--header-h) + var(--rnav-h) + 8px); }
 #report > .scan-section { scroll-margin-top: var(--rnav-h); }
 /* focus / scrollIntoView clear the pinned section nav (the header: html scroll-padding); not inside the pinned phone's
    own screen (js: pin sync) */
@@ -274,7 +275,7 @@
 .ph-track { width: 390px; max-width: 100%; }
 .ph-track .frame-phone { position: sticky; top: var(--pin-top); }
 .ph-track .ph-screen { display: flex; flex-direction: column; min-height: 0;
-  height: clamp(420px, calc(100vh - var(--pin-top) - 44px), 760px); height: clamp(420px, calc(100svh - var(--pin-top) - 44px), 760px); }
+  height: clamp(420px, calc(100vh - var(--pin-top) - 2 * var(--ph-pad) - 8px), 860px); height: clamp(420px, calc(100svh - var(--pin-top) - 2 * var(--ph-pad) - 8px), 860px); }   /* ~80% of the screen: all under the header + nav, 8px to spare */
 .ph-track .ph-status { flex: none; }
 .ph-scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .ph-page { padding-bottom: 16px; }

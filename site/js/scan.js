@@ -28,7 +28,7 @@
     more: null, fitted: null, expanded: null, dead: {}, log: [], retry: null };
   // phone preview: items per tab (fitPhone trims the first look), tabs fitted / grown by More (per device + report)
   // desktop Images: 3 rows of 8 to start (spares for a failed thumb's slot, see watchThumb), +3 rows per More
-  var MORE0 = { all: 10, images: 12, videos: 6 }, DESK = { images: 24 };
+  var MORE0 = { all: 10, images: 24, videos: 6 }, DESK = { images: 24 };
   function more0(k) { return (state.device === 'phone' ? 0 : DESK[k]) || MORE0[k]; }
   function resetPreview() { state.more = {}; Object.keys(MORE0).forEach(function (k) { state.more[k] = more0(k); }); state.fitted = {}; state.expanded = {}; state.first = {}; }
   resetPreview();
@@ -395,7 +395,7 @@
   }
   // The phone's first look at a tab is at most ~1.5 screens of scrolling (pinned) or ~1.5 screens tall (short screens,
   // not pinned): fewer results to start with, "More …" adds the rest. Once per tab and device; a click on More is the user's.
-  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 18, videos: 6 }, FIT_MIN = { all: 1, images: 2, videos: 1 };
+  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 12, videos: 6 }, FIT_MIN = { all: 1, images: 3, videos: 1 }, IMG_ROWS = 6;
   function fitPhone(focusTab) {
     var t = state.tab, page = pin.scr.firstElementChild;
     if (state.fitted[t]) return;
@@ -406,9 +406,11 @@
     var tail = Math.max(90, page.scrollHeight - bottom(last));   // More button + page end
     var room = 1.5 * innerHeight - tail + (pin.on ? pin.scr.clientHeight : -(pin.frame.offsetHeight - pin.scr.clientHeight));
     var n = 0;
-    if (t === 'images') {   // two columns of same-size tiles (css): rows that fit, two tiles each
-      var h = items[0].offsetHeight + 12;
-      n = 2 * Math.floor((room - (items[0].getBoundingClientRect().top - top)) / h);
+    if (t === 'images') {   // same-size tiles (css grid): whole rows that fit; pinned, images may take up to 2 screens for 6 rows
+      var cols = 0, h = items[0].offsetHeight + 12, y0 = items[0].getBoundingClientRect().top - top;
+      while (cols < items.length && items[cols].offsetTop === items[0].offsetTop) cols++;
+      var rows = function (r) { return Math.floor((r - y0) / h); };
+      n = cols * Math.max(rows(room), pin.on ? Math.min(IMG_ROWS, rows(room + 0.5 * innerHeight)) : 0);
     } else while (n < items.length && bottom(items[n]) <= room) n++;
     n = Math.max(FIT_MIN[t], n);
     if (n < items.length) { state.more[t] = state.first[t] = n; renderGoogle(focusTab); }
