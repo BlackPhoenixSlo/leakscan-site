@@ -15,6 +15,7 @@ Checks every HTML file under site/ (except site/showcase/**):
 - every JSON-LD block parses; FAQPage Q&A text equals the visible <details> FAQ
 - indexable page (no robots noindex) has canonical == SITE_URL + path (and og:url, if present, equal)
 - sitemap.xml lists exactly the indexable pages; robots.txt Sitemap line points at it
+- robots.txt Disallows no page that carries noindex, showcase/ included (blocked = noindex never read)
 - no `{{` in any shipped text file
 - every file under site/assets, site/css, site/js is referenced by some page
 - every raster (.png/.jpg/.webp) under site/ (except showcase/) is <= RASTER_BUDGET bytes
@@ -270,6 +271,16 @@ def main():
     rb = SITE / "robots.txt"
     if not rb.is_file() or f"Sitemap: {SITE_URL}sitemap.xml" not in rb.read_text(encoding="utf-8"):
         bad(f"robots.txt missing or has no 'Sitemap: {SITE_URL}sitemap.xml'")
+    else:
+        disallow = [ln.split(":", 1)[1].strip() for ln in rb.read_text(encoding="utf-8").splitlines()
+                    if ln.split(":", 1)[0].strip().lower() == "disallow"]
+        for p in sorted(SITE.rglob("*.html")):
+            rel = p.relative_to(SITE).as_posix()
+            path = "/" + rel.removesuffix("index.html")
+            meta = re.search(r"""<meta\b[^>]*name=["']robots["'][^>]*>""", p.read_text(encoding="utf-8"), re.I)
+            hit = [d for d in disallow if d and path.startswith(d)]
+            if hit and meta and "noindex" in meta.group(0).lower():
+                bad(f"robots.txt 'Disallow: {hit[0]}' blocks noindex page {rel}: crawlers never see its noindex")
 
     for f in sorted(SITE.rglob("*")):
         if not f.is_file() or not shipped(f):
