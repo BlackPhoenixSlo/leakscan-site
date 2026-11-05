@@ -55,7 +55,7 @@
     var setPop = function (on) {
       if (on === popOpen()) return;
       if (on) {
-        var h = demoFig.offsetHeight, cs = getComputedStyle(demoFig);
+        var h = demoFig.getBoundingClientRect().height, cs = getComputedStyle(demoFig);   // not offsetHeight: it rounds, content below would jump
         var hold = document.createElement('div');
         hold.className = 'demo-hold';
         hold.style.height = h + 'px';
