@@ -1210,6 +1210,9 @@ def inline_flow(browser, vp_name, vp):
     check(f"{tag} progress visible in the hero card", c["live"] and c["title"] == "@demo.creator" and "Searching Google, step" in c["status"]
           and page.locator(".report-card .live-status").is_visible() and page.locator("#scan button").is_disabled(), c["status"])
     check(f"{tag} second scan state: no stale rows while scanning", not c["rows"] and not ill(page)["live"])
+    page.wait_for_timeout(400)   # bring()'s smooth scroll lands, the observer runs
+    qz = page.evaluate("(() => { const c = document.querySelector('.askai-launcher').classList; return [c.contains('in-quiet') || (c.contains('in-hero') && innerWidth < 720), document.querySelector('.report-card').hasAttribute('aria-busy'), c.value]; })()")
+    check(f"{tag} askai: launcher quiet while the scan runs (card skeleton on screen; phone: also hidden over the hero)", qz[:2] == [True, True], qz)
     shot(page, "2-progress", ".hero")
     check(f"{tag} body: onlyfans + handle + instagram from a pasted URL",
           net["bodies"] == [{"platform": "onlyfans.com", "handle": "demo.creator", "level": "low", "instagram": "demo.ig"}], net["bodies"])
@@ -1224,7 +1227,7 @@ def inline_flow(browser, vp_name, vp):
     an = page.evaluate("window.__anim.map(a => [a[0].map(k => parseFloat(k.height)), a[1]])")
     hf = page.evaluate("document.querySelector('.report-card').offsetHeight")
     check(f"{tag} hero: the card eases twice, no snap: at Scan up to the skeleton (about the report's height), then to the result's exact height (~320 ms each)",
-          len(an) == 2 and an[0][0][1] > an[0][0][0] + 300 and abs(an[1][0][1] - hf) <= 1 and abs(hf - an[0][0][1]) <= 0.15 * hf
+          len(an) == 2 and an[0][0][1] > an[0][0][0] + 200 and abs(an[1][0][1] - hf) <= 1 and abs(hf - an[0][0][1]) <= 0.15 * hf
           and all(200 <= a[1] <= 500 for a in an), [an, hf])
     slug = parse_qs(urlsplit(page.url).query).get("r", [""])[0]
     check(f"{tag} hero: no navigation, URL = index.html?r=<slug>", re.fullmatch(r"[A-Za-z0-9]{12}", slug or "") is not None
@@ -1252,11 +1255,23 @@ def inline_flow(browser, vp_name, vp):
     except Exception:
         pass
     page.wait_for_timeout(300)
-    fold = page.evaluate("() => { const pad = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;"
-                         " return [Math.round(document.querySelector('.report-card .live-send').getBoundingClientRect().bottom), innerHeight,"
-                         " Math.round(document.querySelector('.report-card .live-title').getBoundingClientRect().top), Math.round(pad)]; }")
+    SETTLE = "() => { const pad = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0, c = document.querySelector('.report-card').getBoundingClientRect();" \
+             " return [Math.round(c.top), Math.round(c.bottom), Math.round(document.querySelector('.report-card .live-send').getBoundingClientRect().bottom), innerHeight, Math.round(pad)]; }"
     if vp_name == "desktop":   # phone: the report is taller than the screen; its title stays in view, the buttons are a scroll away
-        check(f"{tag} hero: after the ease the page shows the card's 'Send me the report' buttons, title still under the header", fold[0] <= fold[1] and fold[2] >= fold[3], fold)
+        st = page.evaluate(SETTLE)
+        check(f"{tag} hero: settled at 1440x900: the whole card in view, its top not under the sticky nav", st[0] >= st[4] - 1 and st[1] <= st[3], st)
+        lctx = new_ctx()   # a 1440x800 laptop (own context: this page's localStorage stays as it is): same, the Send buttons included
+        lp = lctx.new_page()
+        lp.set_viewport_size({"width": 1440, "height": 800})
+        lp.goto(base, wait_until="load")
+        lp.wait_for_timeout(300)
+        submit(lp, "@demo.creator", "demo.ig")
+        settled(lp)
+        lp.wait_for_timeout(1500)   # the ease + the smooth scroll
+        st = lp.evaluate(SETTLE)
+        check(f"{tag} hero: settled at 1440x800: card top not under the sticky nav, whole card + Send buttons above the fold", st[0] >= st[4] - 1 and st[1] <= st[3] and st[2] <= st[3], st)
+        lp.screenshot(path=str(out / f"{vp_name}-i2s-settled-1440x800.png"))
+        lctx.close()
     IM = _images(FX)
     NI = len(IM)
     tile_href = lambda it: it[1] or base + "scan/?r=" + slug
@@ -1378,8 +1393,9 @@ def inline_flow(browser, vp_name, vp):
     fb = page.evaluate("""() => { const s2 = getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim(), probe = document.createElement('i');
         probe.style.background = s2; document.body.appendChild(probe); const want = getComputedStyle(probe).backgroundColor; probe.remove();
         const lone = [...document.querySelectorAll('.report-card .live-ico')].filter(e => !e.querySelector('img'));
-        return {n: lone.length, ok: lone.every(e => e.classList.contains('fav-none') && getComputedStyle(e).backgroundColor === want), bg: lone.map(e => getComputedStyle(e).backgroundColor), want}; }""")
-    check(f"{tag} hero: a failed row thumb falls back to a neutral theme-coloured letter", fb["n"] >= 1 and fb["ok"], fb)
+        return {n: lone.length, ok: lone.every(e => e.classList.contains('fav-none') && getComputedStyle(e).backgroundColor === want), bg: lone.map(e => getComputedStyle(e).backgroundColor), want,
+          hue: [...document.querySelectorAll('.report-card .live-ico')].filter(e => e.style.background).length}; }""")
+    check(f"{tag} hero: a failed row thumb falls back to a neutral theme-coloured letter; no letter hue anywhere in the card (neutral while thumbs load)", fb["n"] >= 1 and fb["ok"] and fb["hue"] == 0, fb)
     # hover looks only where there is hover (a tap leaves nothing tinted)
     page.locator(".report-card .live-link").first.hover()
     page.wait_for_timeout(250)
@@ -1395,6 +1411,14 @@ def inline_flow(browser, vp_name, vp):
         return page.evaluate(f"""() => {{ const L = document.querySelector('.askai-launcher'), b = L.getBoundingClientRect(), r = document.querySelector('{sel}').getBoundingClientRect();
             const over = r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom;
             return [over, getComputedStyle(L).visibility]; }}""")
+    if vp_name == "phone":   # the sticky "Free scan" bar steps aside while the showcase preview is behind it, and is back after
+        page.evaluate("document.querySelector('#showcase .browser-demo').scrollIntoView({block: 'center', behavior: 'instant'})")
+        page.wait_for_timeout(500)
+        on_demo = page.evaluate("document.querySelector('.mobile-cta').classList.contains('show')")
+        page.evaluate("document.getElementById('pricing').scrollIntoView({behavior: 'instant'})")
+        page.wait_for_timeout(500)
+        on_pricing = page.evaluate("document.querySelector('.mobile-cta').classList.contains('show')")
+        check(f"{tag} sticky scan bar: hidden over the showcase preview, shown again past it", not on_demo and on_pricing, [on_demo, on_pricing])
     pa, pb, ps = pill_clear(".report-card .live-actions"), pill_clear(".ba"), pill_clear("#showcase .browser-demo")
     check(f"{tag} askai: launcher hidden while it would cover the card's actions / the phones / the showcase preview", all(not o or v == "hidden" for o, v in (pa, pb, ps))
           and (pa[0] or pb[0]) and (ps[0] or vp_name != "phone"), (pa, pb, ps))

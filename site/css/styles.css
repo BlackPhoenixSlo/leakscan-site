@@ -491,6 +491,9 @@ strong { font-weight: 650; }
 .report-rows .lav { width: 40px; height: 40px; border-radius: 10px; font-size: 1.05rem; }
 .live-ico img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(5px) saturate(.8); transform: scale(1.25); transition: filter .25s, transform .25s; }
 .revealed .live-ico img { filter: none; transform: none; }
+.live-ico.fav-wait, .gi-fav.fav-wait { background: var(--surface-2); color: transparent; }
+.fav-wait img { opacity: 0; }
+.live-ico img { transition: filter .25s, transform .25s, opacity .25s; }
 .live-ico.fav-none, .gi-fav.fav-none { background: var(--surface-2); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
 .live-dom { font: 600 .9rem/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .live-ttl { font-size: .84rem; line-height: 1.35; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -654,4 +657,34 @@ a.gi-card:focus-visible .gi-go { opacity: 1; transform: none; }
   .live-strip-wrap:hover .live-strip-nav:not(:disabled) { opacity: 1; }
   .gmini .live-reveal:hover { border-color: #8ab4f8; color: #8ab4f8; }
   .gmini a.gi-card:hover .gi-box { box-shadow: 0 0 0 2px #8ab4f8; }
+}
+
+/* Desktop: the settled report (card top under the sticky nav) fits a 1440×800 laptop screen, Send buttons included */
+@media (min-width: 960px) {
+  .report-card.is-live { padding: 18px; }
+  .live .report-head { position: relative; padding-bottom: 8px; }
+  .live .report-head > div { min-width: 0; flex: 1; }
+  .live .report-kicker { padding-right: 130px; }
+  .live .live-count { position: absolute; top: -3px; right: 0; }
+  .live-socials, .live-aliases { line-height: 1.4; }
+  .live-tabs { margin-top: 6px; }
+  .live-tab { min-height: 40px; }
+  .live-link { min-height: 44px; padding-block: 2px; }
+  .live-more { margin: 2px 0 4px; }
+  .live-strip-box { margin: 2px 0 0; padding-top: 8px; }
+  .live-strip-head { margin-bottom: 6px; }
+  .live-strip { height: 76px; }
+  .live-strip .gi-card { height: 72px; }
+  .live-panel .live-grid .gi-box { aspect-ratio: 4 / 3; }
+  .live-imgs-head { margin: 6px 0 8px; }
+  .live-actions { padding: 8px 12px; margin-top: 8px; }
+  .live-actions .live-send-h { flex-basis: auto; margin: 0 0 0 6px; }
+  .live-actions .live-media { margin: 0; line-height: 1.4; }
+}
+@media (min-width: 960px) {   /* the skeleton mirrors that compact report: the card barely moves when the result lands */
+  .live-skel-row { min-height: 44px; padding-block: 2px; }
+  .live-skel-strip { margin-top: 26px; padding-top: 8px; gap: 6px; }
+  .live-skel-strip > b { margin: 4px 0 10px; }
+  .live-skel-strip i { height: 72px; }
+  .live-skel-act { margin-top: 8px; min-height: 112px; padding: 10px 12px; gap: 10px; }
 }

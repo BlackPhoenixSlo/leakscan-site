@@ -536,8 +536,8 @@
   }
 
   // ---------- scan ----------
-  // Brings the card into view once its height ease ends: its top under the header, and if the report runs past the
-  // fold, as far as its "Send me the report" buttons without scrolling its title away. Never after the visitor has
+  // Brings the card into view once its height ease ends: its top under the header (never under it), and if the report
+  // runs past the fold, as far as its "Send me the report" buttons allow without that. Never after the visitor has
   // scrolled / swiped / typed since pressing Scan.
   var asked = 0, intent = 0;
   ['wheel', 'touchstart', 'keydown'].forEach(function (t) { window.addEventListener(t, function () { intent = Date.now(); }, { passive: true }); });
@@ -547,10 +547,10 @@
     if (intent > asked) return;
     var r = card.getBoundingClientRect(), top = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
     var y = window.pageYOffset, to = r.top >= top && r.bottom <= window.innerHeight ? y : y + r.top - top;
-    var send = !card.hasAttribute('aria-busy') && q('.live-send'), title = q('.live-title');
-    if (send && title) {
+    var send = !card.hasAttribute('aria-busy') && q('.live-send');
+    if (send) {   // never past the card's top edge: it stays whole under the sticky nav
       var want = y + send.getBoundingClientRect().bottom + 16 - window.innerHeight;
-      if (want > to) to = Math.min(want, y + title.getBoundingClientRect().top - top);
+      if (want > to) to = Math.min(want, y + r.top - top);
     }
     if (Math.abs(to - y) > 2) window.scrollTo({ top: Math.max(0, to), behavior: reduce() ? 'auto' : 'smooth' });
   }
