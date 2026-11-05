@@ -143,7 +143,7 @@ a:hover > .g-go, a:focus-visible > .g-go { opacity: 1; transform: none; }
 .g-pack-row .g-img img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Images tab */
-.g-safe { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; color: var(--g-muted); font-size: 13px; opacity: .45; cursor: default; user-select: none; }   /* decorative, like .g-tab-deco */
+.g-safe { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; color: var(--g-muted); font-size: 13px; }   /* plain caption, no fake controls */
 .chip-g { padding: 6px 14px; border-radius: 999px; background: rgb(32 33 36); color: var(--g-muted); }
 .chip-g.on { background: rgb(26 115 232); color: #fff; }
 .g-grid { column-count: 8; column-gap: 8px; }

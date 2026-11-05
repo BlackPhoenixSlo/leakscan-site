@@ -130,7 +130,7 @@ strong { font-weight: 650; }
 }
 
 /* Hero */
-.hero { padding: clamp(36px, 7vw, 88px) 0 clamp(40px, 6vw, 72px); position: relative; overflow: hidden; }
+.hero { padding: clamp(36px, 7vw, 88px) 0 clamp(40px, 6vw, 72px); position: relative; overflow: hidden; overflow: clip; }   /* clip: not scrollable, so focus/scrollIntoView can't pan the hero sideways */
 .hero::before {
   content: ""; position: absolute; inset: -20% -10% auto auto; width: 720px; height: 720px; z-index: -1;
   background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
@@ -144,7 +144,7 @@ strong { font-weight: 650; }
 /* Free-scan form: OnlyFans + optional Instagram / X. With JS it scans in place (js/inline-scan.js); without, a plain GET
    to scan/. Stacked on phones, one row from 560px. */
 .scan-form { display: grid; gap: 10px; margin: 28px 0 10px; max-width: 680px; }
-@media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1.6fr) minmax(0, .9fr) auto; } .scan-form .btn-lg { padding-inline: 1.2em; } }
+@media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1.6fr) minmax(0, .9fr) auto; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
 .scan-prefix { display: flex; align-items: center; gap: 0; padding: 0 0 0 1.1em; cursor: text; }
 .scan-prefix:focus-within { border-color: var(--accent); }
 .scan-pre { color: var(--muted); font-size: .9rem; white-space: nowrap; user-select: none; }
@@ -544,6 +544,7 @@ a.gi-card:hover .gi-cap { color: #e8eaed; text-decoration: underline; }
   mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 16px), transparent); }
 .live-strip::-webkit-scrollbar { display: none; }
 .live-strip .gi-card { flex: none; width: 72px; height: 96px; }
+@media (max-width: 559px) { .live-strip .gi-card { width: 82px; } }   /* a cut-off 4th tile says "swipe" */
 .live-strip .gi-box { height: 100%; }
 .live-strip-nav { position: absolute; top: 50%; z-index: 3; display: grid; place-items: center; width: 32px; height: 32px; margin-top: -16px; padding: 0;
   border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); cursor: pointer;
@@ -597,6 +598,9 @@ a.gi-card:hover .gi-cap { color: #e8eaed; text-decoration: underline; }
   .gmini-top { flex-wrap: wrap; row-gap: 10px; }
   .gmini-q { flex: 1 1 100%; }
   .gmini-tools { flex: 1 1 100%; justify-content: space-between; }
+  .gmini-tools { min-height: 40px; }
+  /* before results the tabs hold the place of the count/Reveal row (10 gap + 40): no shift when results land */
+  .gmini:not(.is-live) .gmini-tabs { display: flex; height: 50px; margin: -12px 0 12px; align-items: flex-end; }
 }
 .live-empty, .live-error p { margin: 14px 0; }
 .live-empty strong { display: block; }

@@ -482,10 +482,12 @@ def personalize_flow(browser, vp_name, vp):
     check(f"{tag} phones: labelled groups, no aria-hidden over links, 'Tap a result to open it'",
           [r[0] for r in ph["roles"]] == ["group", "group"] and all(r[1] and not r[1].startswith("Illustration") for r in ph["roles"])
           and ph["hidden"] == [None, None] and ph["buried"] == 0 and ph["hint"] == "Tap a result to open it", ph)
-    page.locator('.ba [data-p="leak-1"] a').hover()
-    page.wait_for_timeout(300)
-    hov = page.eval_on_selector('.ba [data-p="leak-1"] a', "a => [getComputedStyle(a).backgroundColor, getComputedStyle(a.querySelector('.m-title')).textDecorationLine, getComputedStyle(a).cursor]")
-    check(f"{tag} phones: row hover = tint + underlined title + pointer", hov[0] != "rgba(0, 0, 0, 0)" and hov[1] == "underline" and hov[2] == "pointer", hov)
+    hov = None
+    if page.locator('.ba [data-p="leak-1"] a').count():   # absent under --break-phones: fail the check, don't crash the run
+        page.locator('.ba [data-p="leak-1"] a').hover()
+        page.wait_for_timeout(300)
+        hov = page.eval_on_selector('.ba [data-p="leak-1"] a', "a => [getComputedStyle(a).backgroundColor, getComputedStyle(a.querySelector('.m-title')).textDecorationLine, getComputedStyle(a).cursor]")
+    check(f"{tag} phones: row hover = tint + underlined title + pointer", bool(hov) and hov[0] != "rgba(0, 0, 0, 0)" and hov[1] == "underline" and hov[2] == "pointer", hov)
     page.locator("#website").screenshot(path=str(out / f"{vp_name}-p2b-phones-hover.png"))
     page.mouse.move(0, 0)
     check(f"{tag} profile: showcase url bar = site_domain", page.locator("[data-p=site-url]").inner_text() == sd)
@@ -1136,7 +1138,7 @@ def inline_flow(browser, vp_name, vp):
         return {live: s.classList.contains('is-live'), pill: n && n.textContent, label: s.getAttribute('aria-label'), role: s.getAttribute('role'),
           tiles: [...s.querySelectorAll('[data-live=band-grid] a.gi-card')].map(a => [a.href, a.target, a.rel, a.querySelector('img') ? a.querySelector('img').src : null]),
           visible_illus: [...s.querySelectorAll('.gmini-grid:not(.live-grid) .gi-card')].filter(e => e.offsetParent !== null).length,
-          send: send.getAttribute('href')};
+          send: send.getAttribute('href'), h: Math.round(s.getBoundingClientRect().height)};
     }""")
     strip = lambda page: page.evaluate("""() => {
         const s = document.querySelector('.report-card .live-strip'), c = document.querySelector('.report-card').getBoundingClientRect();
@@ -1159,6 +1161,7 @@ def inline_flow(browser, vp_name, vp):
     page.locator("#free").scroll_into_view_if_needed()
     page.wait_for_timeout(700)
     shot(page, "1-band-before", "#free")
+    band_h0 = ill(page)["h"]
     page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
     page.wait_for_timeout(300)
     net["nav"].clear()
@@ -1204,8 +1207,9 @@ def inline_flow(browser, vp_name, vp):
     check(f"{tag} band: #free mini Google Images = her first 10 image results (link → result in a new tab, else the report)",
           i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] is None
           and [t[:3] + [t[3]] for t in i["tiles"]] == want_tiles(10), i)
+    check(f"{tag} band: same height before/after results (row reserved, no shift)", abs(i["h"] - band_h0) <= 1, [band_h0, i["h"]])
     check(f"{tag} band: 'Send me the report' = Telegram with the report link", (i["send"] or "").startswith("https://t.me/jakabasej?text=")
-          and quote(REPORT_BASE + slug, safe="") in i["send"], i["send"])
+          and quote(base + "scan/?r=" + slug, safe="") in i["send"], i["send"])
     hero = page.evaluate("""() => {
         const c = document.querySelector('.report-card'), q = s => [...c.querySelectorAll(s)];
         return {tabs: q('.live-tab').map(b => [b.id, b.textContent, b.getAttribute('aria-selected'), b.tabIndex]),
@@ -1229,7 +1233,7 @@ def inline_flow(browser, vp_name, vp):
     check(f"{tag} hero: Sites tab = top 6 sites, each opens its first link in a new tab",
           hero["sites"] == [[by_dom[d], "_blank", "noopener noreferrer nofollow"] for d in [x[0] for x in sorted(_site_counts(rows), key=lambda x: -x[1])][:6]], hero["sites"])
     # tabs switch the body without moving anything; Reveal unblurs
-    cbox = lambda: page.evaluate("() => { const r = document.querySelector('.report-card').getBoundingClientRect(); return [Math.round(r.x + scrollX), Math.round(r.y + scrollY), r.width, r.height]; }")
+    cbox = lambda: page.evaluate("() => { const r = document.querySelector('.report-card').getBoundingClientRect(), d = document.documentElement.getBoundingClientRect(); return [Math.round(r.x - d.x), Math.round(r.y - d.y), r.width, r.height]; }")
     card0 = cbox()
     page.locator("#lt-images").click()
     page.wait_for_timeout(350)

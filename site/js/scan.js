@@ -245,7 +245,7 @@
     var items = imageItems(d);
     if (!items.length) return '<p class="g-empty">No image results indexed for this handle.</p>';
     var n = phone ? Math.min(state.more.images, items.length) : items.length;
-    var h = '<div class="g-safe" aria-hidden="true"><span>SafeSearch</span><span class="chip-g on">✓ Off</span><span class="chip-g">Blur</span><span class="chip-g">Filter</span></div>';
+    var h = '<div class="g-safe" aria-hidden="true"><span>SafeSearch off: what anyone searching your handle sees</span></div>';
     h += '<div class="g-grid">' + items.slice(0, n).map(function (it) {
       // an image no result has: same caption shape, credited to Google Images (nothing to open: this is the report)
       var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>'
