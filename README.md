@@ -45,8 +45,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   and `js/personalize.js`, overridden by `<body data-api>`), reads the
   SSE stream (progress → result → done), then renders the report: summary, a sticky section nav (Google / Sites N /
   Send report), a Google look-alike (All / Images / Videos, Phone / Computer, thumbnails via `/api/thumb`, blurred until
-  Reveal; the Phone frame is pinned while page scroll scrolls its screen 1:1, then the page moves on; each tab's first
-  look is fitted to <= 1.5 screens of that scrolling, More adds the rest; screens < 600 px tall get a short static
+  Reveal; the Phone frame, ~80% of the screen tall, is pinned while page scroll scrolls its screen 1:1, then the page
+  moves on; each tab's first look is fitted to <= 1.5 screens of that scrolling (Images: 3 columns, up to 2 screens for
+  6 rows, 24 max, +12 per More), More adds the rest; screens < 600 px tall get a short static
   preview, no inner scroll box), "Where the copies are" (every site, most links first: 10 sites, +25 per click; a
   site's links built only when opened, 10 then +50, removed again on close; one filter over domains + URLs; Copy all /
   .txt always carry every link) and the prefilled message CTAs. Built incrementally so 1,000 links on 100 sites stay
@@ -79,7 +80,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   (malicious values); `/api/profile`, `/api/avatar`, `/api/media` routes). It injects `data-api` pointing at itself (other loopback name, so CORS is exercised).
   E2E: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR` (starts its own stub; phone + desktop;
   form → progress → report, tab counts, device toggle, Reveal, CTAs, `?r=` reopen, error paths; `stub-huge` at CPU x4:
-  render < 1.5 s, DOM budget, show more / open / filter / export, pinned phone → sites scroll (<= 1.5 screens per tab), short screens, section nav (no history entries),
+  render < 1.5 s, DOM budget, show more / open / filter / export, pinned phone → sites scroll (frame >= 78% of the screen; <= 1.5 screens per tab, Images <= 2 with >= 18 tiles), short screens, section nav (no history entries),
   keyboard focus, CLS 0 over the whole flow,
   no sideways scroll at 320 / 360 px, no 5xx / console errors; never calls prod).
   `--only scan|personalize|askai|inline|tabs|removals` (`tabs`: phone tabs + demo pop-out; `removals`: the panels,
