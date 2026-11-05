@@ -24,7 +24,7 @@ class TestSiteRoutes(unittest.TestCase):
         os.makedirs(os.path.join(site, "css"))
         os.makedirs(os.path.join(site, "video"))
         for rel, body in {"index.html": "<h1>landing LeakScan</h1>", "scan/index.html": "scan page",
-                          "404.html": "custom 404", "css/a.css": "b{}", ".env": "SECRET=1",
+                          "404.html": "custom 404", "css/a.css": "b{}", "video/p.png": "png", ".env": "SECRET=1",
                           "scan/v.mp4": "0123456789", "video/jack.webm": "abcdefghij"}.items():
             with open(os.path.join(site, rel), "w") as f:
                 f.write(body)
@@ -63,11 +63,17 @@ class TestSiteRoutes(unittest.TestCase):
         r, _ = self.req("/scan?r=abc")
         self.assertEqual((r.status, r.getheader("Location")), (301, "/scan/?r=abc"))
 
-    def test_asset_cache(self):
+    def test_asset_cache(self):   # js / css revalidate (a deploy reaches returning visitors at once), images cache a day
         r, b = self.req("/css/a.css")
         self.assertEqual((r.status, b), (200, b"b{}"))
-        self.assertEqual(r.getheader("Cache-Control"), "public, max-age=86400")
+        self.assertEqual(r.getheader("Cache-Control"), "no-cache")
         self.assertTrue(r.getheader("Content-Type").startswith("text/css"))
+        lm = r.getheader("Last-Modified")
+        r, b = self.req("/css/a.css", headers={"If-Modified-Since": lm})
+        self.assertEqual((r.status, b, r.getheader("Cache-Control")), (304, b"", "no-cache"))
+        r, b = self.req("/css/a.css", headers={"If-Modified-Since": "Thu, 01 Jan 1970 00:00:00 GMT"})
+        self.assertEqual((r.status, b), (200, b"b{}"))
+        self.assertEqual(self.req("/video/p.png")[0].getheader("Cache-Control"), "public, max-age=86400")
 
     def test_video_ranges(self):   # site/video/: Safari plays <video> only with 206 ranges; seeking needs them
         r, b = self.req("/scan/v.mp4")

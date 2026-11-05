@@ -617,10 +617,11 @@
     } else put('images', empty('image'));
     put('videos', m.videos.length ? [make('div', 'm-head', [make('span', 'm-n', [plural(m.videos.length, 'video', 'videos')]), revealBtn(band)])]
       .concat(m.videos.slice(0, BAND_VIDEOS).map(function (v) {
-        var img = v.thumb && make('img', 'gi-img', [], { src: E.thumb(v.thumb), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
-        if (img) {   // a still that fails / loads blank: the grey 16:9 box with its play mark stays, never a black hole
-          img.addEventListener('load', function () { if (!shows(img)) img.remove(); }, { once: true });
-          img.addEventListener('error', function () { img.remove(); }, { once: true });
+        var img = v.thumb && make('img', 'gi-img', [], Object.assign(E.XO ? { crossorigin: 'anonymous' } : {}, { src: E.thumb(v.thumb), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' }));
+        if (img) {   // a still that fails / loads blank / is no person photo (a site logo): the grey 16:9 box with its play mark
+          // stays, never a black hole (the row is a result: counts unchanged). XO refused: loads once more plain, kept
+          img.addEventListener('load', function () { if (!shows(img) || !E.isPhoto(img)) img.remove(); }, { once: true });
+          img.addEventListener('error', function () { if (img.hasAttribute('crossorigin')) img.removeAttribute('crossorigin'); else img.remove(); });
         }
         return mRow('m-video bad', v.link, v.domain, rowTitle(v.title, v.link), make('span', 'm-vthumb', [img, make('span', 'm-play', [], { 'aria-hidden': 'true' })]));
       })) : empty('video'));

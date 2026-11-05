@@ -155,7 +155,7 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   the `# one-project` Vary line in `api_thumb`; `media_gather.py` carries one `# one-project` line: `PUBLIC_ORIGIN` defaults to empty = relative media src).
   The rest is the prod tree snapshot.
 - `app/site_static.py`: stdlib static server for `site/` (`SITE_DIR`, default `<repo>/site`; realpath-confined, no
-  dotfiles, dir → `index.html`, missing → `404.html`, html `no-cache`, assets `max-age=86400`, GET/HEAD, single
+  dotfiles, dir → `index.html`, missing → `404.html`, html / js / css `no-cache` + Last-Modified → 304 (a deploy reaches returning visitors at once), other assets `max-age=86400`, GET/HEAD, single
   `Range` → 206 for `<video>`). If
   `SITE_DIR` is missing it logs once and `/` falls back to the legacy UI.
 - Local run: `SITE_DIR=site PUBLIC_PORT=18084 python3 app/public_app.py` → http://127.0.0.1:18084/ (no API keys =
@@ -189,8 +189,9 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   `scan/`, which also reads `h=`, `ig=`, `x=` (and old `p=`).
 - `js/scan-engine.js` (`window.LeakScanEngine`): the one SSE / fetch transport, API origin rule, error mapping, message
   links and `leakscan.last` writer, used by `js/scan.js` and `js/inline-scan.js`. Its `isPhoto(img)` keeps image tiles
-  to people photos (strip, Images tab, #free phone, scan page strip / Images grid; not Videos): a thumb drawn at 48x48
+  to people photos (strip, Images tab, #free phone, scan page strip / Images grid): a thumb drawn at 48x48
   with little soft texture or almost no skin (a site logo, banner, icon, placeholder) is dropped like a failed one;
+  a video still (scan page Videos tab, #free Videos rows) likewise falls back to its grey box, the row stays;
   pixels read via a CORS load of `/api/thumb` (refused / unreadable = kept). Thresholds + measured confusion: comment there.
 - `js/inline-scan.js`: with JS the form never leaves the page. The hero card turns into the live report (progress →
   first 5 links: domain + title, badge Live = `live: true`, Indexed = Google result, else Found; "N links found";
