@@ -457,16 +457,21 @@ def huge_flow(browser, vp_name, vp):
             return {top: t.getBoundingClientRect().top + scrollY, pin: parseFloat(getComputedStyle(f).top), h: t.offsetHeight, fh: f.offsetHeight,
                     max: s.scrollHeight - s.clientHeight, vh: innerHeight}; }""")
         check(f"{tag} phone frame fits the screen under the nav", g["fh"] + g["pin"] <= g["vh"], g)
+        check(f"{tag} phone frame ~80% of the screen (>= 78%)", g["fh"] >= 0.78 * g["vh"], [g["fh"], g["vh"]])
         check(f"{tag} track = frame + screen overflow", abs(g["h"] - g["fh"] - g["max"]) <= 2 and g["max"] > 400, g)
         runs = {}   # each tab's first look: at most 1.5 screens of pinned scrolling before the sites, the rest behind More
         for t in ("images", "videos", "all"):
             page.locator(f"#g-tab-{t}").click()
             page.wait_for_timeout(300)
-            runs[t] = page.evaluate("""() => { const t = document.querySelector('.ph-track');
-                return [t.offsetHeight - t.firstElementChild.offsetHeight, !!document.querySelector('#g-panel [data-more]')]; }""")
+            runs[t] = page.evaluate("""() => { const t = document.querySelector('.ph-track'), tl = [...document.querySelectorAll('#g-panel .g-tile')];
+                return [t.offsetHeight - t.firstElementChild.offsetHeight, !!document.querySelector('#g-panel [data-more]'), tl.length,
+                        tl.filter(e => e.offsetTop === (tl[0] && tl[0].offsetTop)).length]; }""")
         page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
-        check(f"{tag} pin: every tab scrolls <= 1.5 screens before the sites (more behind More)",
-              all(v[0] <= 1.5 * g["vh"] and v[1] for v in runs.values()), [runs, g["vh"]])
+        check(f"{tag} pin: All / Videos scroll <= 1.5 screens, Images <= 2 (more behind More)",
+              all(v[0] <= (2 if k == "images" else 1.5) * g["vh"] and v[1] for k, v in runs.items()), [runs, g["vh"]])
+        check(f"{tag} pin: Images first look = 3 columns, 18-24 tiles in whole rows, over 1.5 screens only to reach 6 rows",
+              runs["images"][3] == 3 and 18 <= runs["images"][2] <= 24 and runs["images"][2] % 3 == 0
+              and (runs["images"][0] <= 1.5 * g["vh"] or runs["images"][2] == 18), runs["images"])
         page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
         page.wait_for_timeout(250)
         st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
@@ -691,11 +696,14 @@ def huge_flow(browser, vp_name, vp):
         p4.locator("#g-tab-images").click()
         p4.wait_for_timeout(300)
         rr["images"] = p4.evaluate(RUN)
+        rr["images_n"] = p4.locator("#g-panel .g-tile").count()
+        rr["frame_pct"] = p4.evaluate("Math.round(100 * document.querySelector('.frame-phone').offsetHeight / innerHeight)")
         p4.locator("#g-tab-videos").click()
         p4.wait_for_timeout(300)
         rr["videos_n"] = [nv, p4.locator("#g-panel .g-v").count()]
-        check(f"{tag} resize 390x844 → 360x640: untouched tabs refit (<= 1.5 screens), the tab grown by More keeps its items",
-              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["images"] <= 1.5 * 640 and rr["videos_n"][0] == rr["videos_n"][1] > 6, rr)
+        check(f"{tag} resize 390x844 → 360x640: untouched tabs refit (All <= 1.5 screens, Images <= 2 with >= 18 tiles), frame >= 78%, the tab grown by More keeps its items",
+              rr["all@844"] > 1.5 * 640 and rr["all"] <= 1.5 * 640 and rr["images"] <= 2 * 640 and rr["images_n"] >= 18 and rr["frame_pct"] >= 78
+              and rr["videos_n"][0] == rr["videos_n"][1] > 6, rr)
         # a grown tab shrinks back: "Show fewer" refits it, the view lands on its More button
         grown = p4.evaluate(RUN)
         has_less = p4.locator("[data-less=videos]").count() == 1
