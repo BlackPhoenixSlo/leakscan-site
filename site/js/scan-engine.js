@@ -76,7 +76,7 @@
     else {   // a plain neutral tile until the thumb loads; the letter (neutral, theme-coloured) only if it fails
       var im = document.createElement('img');
       el.classList.add('fav-wait');
-      im.src = src; im.alt = ''; im.loading = 'lazy'; im.decoding = 'async'; im.referrerPolicy = 'no-referrer';
+      im.src = src; im.alt = ''; im.loading = 'lazy'; im.referrerPolicy = 'no-referrer';
       im.addEventListener('load', function () { el.classList.remove('fav-wait'); }, { once: true });
       im.addEventListener('error', function () { im.remove(); el.classList.remove('fav-wait'); el.classList.add('fav-none'); }, { once: true });
       el.appendChild(im);

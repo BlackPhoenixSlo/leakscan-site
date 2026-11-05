@@ -157,7 +157,8 @@
         make('div', '', [make('p', 'report-kicker live-kicker', ['Free scan · ' + E.PLATFORMS[platform]]),
           make('p', 'report-title live-title', ['@' + handle], { tabindex: '-1' }), make('p', 'live-socials', [], { hidden: '' }),
           make('p', 'live-aliases', [], { hidden: '' })]),
-        make('span', 'chip chip-live live-count', [], { hidden: '' })]),
+        make('div', 'live-head-end', [make('span', 'chip chip-live live-count', [], { hidden: '' }),
+          make('a', 'live-open-top', ['Open full report ', make('span', '', ['→'], { 'aria-hidden': 'true' })], { hidden: '' })])]),
       make('p', 'live-status', [], { role: 'status' }),
       make('div', 'live-bar', [make('i')], { 'aria-hidden': 'true' }),
       // placeholder tabs, rows, image strip and actions while scanning, about the result's height (CSS hides them once
@@ -337,6 +338,9 @@
     count.textContent = plural(n, 'link found', 'links found');
     count.className = 'chip live-count ' + (n ? 'chip-live' : 'chip-dead');
     count.hidden = false;
+    var top = q('.live-open-top');
+    top.href = 'scan/?r=' + slugQ;
+    top.hidden = false;
     body.textContent = '';
     if (!n) {
       q('.live-status').textContent = '';

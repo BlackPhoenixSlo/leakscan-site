@@ -112,9 +112,10 @@
 /* "open ↗": on hover / focus; on touch screens a small ↗ that is always there */
 .g-go { display: inline-block; pointer-events: none; padding: 2px 8px; border-radius: 999px; background: rgb(0 0 0 / .72); color: #fff;
   font: 600 11px/1.4 Arial, sans-serif; letter-spacing: .02em; white-space: nowrap; opacity: 0; transition: opacity .15s, transform .15s; }
+.g-nw { white-space: nowrap; }
 .g-title .g-go { margin-left: 8px; vertical-align: 3px; background: var(--g-pill); color: var(--g-text); transform: translateX(-3px); }
 .g-tile-a .g-go, .g-vthumb .g-go { position: absolute; top: 6px; right: 6px; z-index: 2; transform: translateY(-2px); }
-@media (hover: hover) { a:hover > .g-go, a:focus-visible > .g-go { opacity: 1; transform: none; } }
+@media (hover: hover) { a:hover .g-go, a:focus-visible .g-go { opacity: 1; transform: none; } }
 @media (hover: none) {
   .g-dark .g-go { opacity: .92; transform: none; padding: 0; width: 22px; height: 22px; text-align: center; line-height: 22px; font-size: 12px; }
   .g-go-w { display: none; }

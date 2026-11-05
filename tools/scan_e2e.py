@@ -40,6 +40,7 @@ band's mini Google Images frame with her tiles; errors, reload, reset. --break-d
 drift speed 0: only `drift:` checks may go red. --break-phones serves personalize.js without the phone links: only
 `phones:` checks may go red.
 """
+import base64
 import json, pathlib, re, socket, subprocess, sys, time, urllib.request
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 from playwright.sync_api import sync_playwright
@@ -209,7 +210,9 @@ def scan_flow(browser, vp_name, vp):
             page.locator("[data-more=all]").click()
         n1 = page.locator("#g-panel .g-r").count()
         check(f"{vp_name}/{device} All tab count", (n0, n1) == (min(10, len(PAGES)), len(PAGES)), f"{n0}→{n1} want 10→{len(PAGES)}")
-        check(f"{vp_name}/{device} every result title carries open ↗", page.locator("#g-panel .g-r a.g-title > .g-go").count() == n1)
+        check(f"{vp_name}/{device} every result title carries open ↗", page.locator("#g-panel .g-r a.g-title .g-go").count() == n1)
+        alone = page.evaluate(GO_ALONE)
+        check(f"{vp_name}/{device} open ↗ never sits alone on a line (it rides on the title's last word)", not alone, alone[:3])
         check(f"{vp_name}/{device} tab aria-selected", page.locator("#g-tab-all").get_attribute("aria-selected") == "true"
               and page.locator("#g-tab-images").get_attribute("aria-selected") == "false")
         # Images
@@ -1069,6 +1072,41 @@ def askai(browser, vp_name, vp):
 # ---------------------------------------------------------------- inline
 # The hero form scans on the landing page itself (js/inline-scan.js + js/scan-engine.js). Checks named "hero: ..."
 # need a fresh scan `result` event; "profile: ..." need `profile`.
+def thumb_paint(pw, vp_name, vp):
+    """Row thumbs under reduced motion, as a visitor sees them: a fresh browser, three plain scans one after another (no e2e hooks),
+    scrolled the moment the report lands. Each thumb: neutral tile under it, opacity 1 at once, photo painted in a plain viewport
+    screenshot (an async-decoded thumb once stayed an empty slot here, from the 2nd context on)."""
+    b = pw.chromium.launch()
+    runs = []
+    for n in range(3):
+        ctx = b.new_context(viewport=vp, device_scale_factor=2 if vp_name == "phone" else 1, is_mobile=vp_name == "phone",
+                            has_touch=vp_name == "phone", reduced_motion="reduce")
+        ctx.route("**/*", lambda r, _q: r.continue_() if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost") else r.abort())
+        page = ctx.new_page()
+        page.goto(f"http://127.0.0.1:{port}/", wait_until="load")
+        page.wait_for_timeout(500)
+        page.locator("#scan input[name=h]").fill("@demo.creator")
+        btn = page.locator("#scan button[type=submit]")
+        btn.tap() if vp_name == "phone" else btn.click()
+        page.wait_for_function("() => { const c = document.querySelector('.report-card'); return c && !c.hasAttribute('aria-busy') && c.querySelector('.live-rows'); }", timeout=15000)
+        page.evaluate("document.querySelector('.report-card .live-strip-box').scrollIntoView({block: 'center', behavior: 'instant'})")
+        page.wait_for_timeout(3000)
+        st = page.evaluate("""() => [...document.querySelectorAll('.report-card .live-rows .live-ico')].map(e => { const i = e.querySelector('img'), r = e.getBoundingClientRect();
+          return [getComputedStyle(e).backgroundColor, i ? getComputedStyle(i).opacity : null, i ? i.complete && i.naturalWidth > 0 : null, [r.x + 4, r.y + 4, r.width - 8, r.height - 8]]; })""")
+        png = page.screenshot()
+        (out / f"{vp_name}-t{n}-rows-reduced-motion.png").write_bytes(png)
+        shot = base64.b64encode(png).decode()
+        for x in st:
+            x[3] = page.evaluate(PIX_SD, [shot, x[3]]) if x[1] is not None else None
+        runs.append(st)
+        ctx.close()
+    b.close()
+    bad = [[n, k, x] for n, st in enumerate(runs) for k, x in enumerate(st)
+           if x[1] is not None and (x[0] in ("rgba(0, 0, 0, 0)", "transparent") or x[1] != "1" or not x[2] or x[3] < 6)]
+    check(f"{vp_name} inline hero: reduced motion, 3 fresh scans → every row thumb on a neutral tile, opacity 1 at once, photo painted (no empty slot)",
+          all(len(st) == 5 for st in runs) and not bad, bad or [[x[3] for x in st] for st in runs])
+
+
 def _rows(fx):
     """Mirror of inline-scan.js model(): distinct valid links, hits first (Live / Found), then Google results (Indexed)."""
     rows, seen = [], set()
@@ -1257,6 +1295,18 @@ def inline_flow(browser, vp_name, vp):
     page.wait_for_timeout(300)
     SETTLE = "() => { const pad = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0, c = document.querySelector('.report-card').getBoundingClientRect();" \
              " return [Math.round(c.top), Math.round(c.bottom), Math.round(document.querySelector('.report-card .live-send').getBoundingClientRect().bottom), innerHeight, Math.round(pad)]; }"
+    # phone: a compact "Open full report" beside the count chip, in view after the result, same href as the main button, no taller head
+    top = page.evaluate("""() => { const t = document.querySelector('.report-card .live-open-top'), c = document.querySelector('.report-card .live-count'),
+        h = document.querySelector('.report-card .report-head'), o = document.querySelector('.report-card .live-open');
+      const vis = !!t && getComputedStyle(t).display !== 'none', r = t && t.getBoundingClientRect(), cr = c.getBoundingClientRect(), h1 = h.offsetHeight;
+      let h0 = h1; if (t) { t.hidden = true; h0 = h.offsetHeight; t.hidden = false; }
+      return {vis, same: !!t && !!o && t.getAttribute('href') === o.getAttribute('href'), row: vis ? Math.abs((r.top + r.bottom) / 2 - (cr.top + cr.bottom) / 2) <= 4 : null,
+        inview: vis ? r.top >= 0 && r.bottom <= innerHeight : null, grow: h1 - h0, open: o.getBoundingClientRect().bottom > innerHeight}; }""")
+    if vp_name == "phone":
+        check(f"{tag} hero: phone: 'Open full report' also beside the count chip (same href, same row, in view, head no taller)",
+              top["vis"] and top["same"] and top["row"] and top["inview"] and top["grow"] == 0, top)
+    else:
+        check(f"{tag} hero: desktop: no second 'Open full report' in the card head (the main button is in view)", not top["vis"] and not top["open"], top)
     if vp_name == "desktop":   # phone: the report is taller than the screen; its title stays in view, the buttons are a scroll away
         st = page.evaluate(SETTLE)
         check(f"{tag} hero: settled at 1440x900: the whole card in view, its top not under the sticky nav", st[0] >= st[4] - 1 and st[1] <= st[3], st)
@@ -1604,6 +1654,23 @@ stub.stdout.readline()
 base = f"http://127.0.0.1:{port}/"
 # every :hover rule of the page's own stylesheets sits inside @media (hover: hover): a tap on touch leaves nothing painted
 DEAD_THUMB = "DEMO0111"   # inline flow: this fixture thumb (a Sites-tab icon, past the 24 tiles) answers 404
+# titles whose "open ↗" pill wrapped onto a line with no title text (its vertical centre off the last text line)
+# std-dev of the luminance of a PNG screenshot (base64), decoded in the page: ~0 = a flat, empty slot
+PIX_SD = """async ([b64, r]) => { const im = new Image(); im.src = 'data:image/png;base64,' + b64; await im.decode();
+  const k = im.width / innerWidth, w = Math.max(1, Math.round(r[2] * k)), h = Math.max(1, Math.round(r[3] * k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.drawImage(im, r[0] * k, r[1] * k, w, h, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data; let n = 0, s = 0, s2 = 0;
+  for (let i = 0; i < d.length; i += 4) { const l = .2126 * d[i] + .7152 * d[i + 1] + .0722 * d[i + 2]; n++; s += l; s2 += l * l; }
+  return Math.round(Math.sqrt(Math.max(0, s2 / n - (s / n) ** 2)) * 10) / 10; }"""
+GO_ALONE = """() => [...document.querySelectorAll('#g-panel .g-title .g-go')].filter(go => {
+  const r = document.createRange(), host = go.closest('.g-title'), g = go.getBoundingClientRect();
+  if (!g.height) return false;
+  const w = document.createTreeWalker(host, NodeFilter.SHOW_TEXT); let last = null, t;
+  while ((t = w.nextNode())) if (!go.contains(t) && t.textContent.trim()) last = t;
+  if (!last) return true;
+  r.selectNodeContents(last); const rs = [...r.getClientRects()], lr = rs[rs.length - 1];
+  return Math.abs((lr.top + lr.bottom) / 2 - (g.top + g.bottom) / 2) > 12;
+}).map(go => go.closest('.g-title').textContent.slice(0, 50))"""
 BARE_HOVER = """() => { const out = [], walk = (rules, gated) => { for (const r of rules) {
     if (r.cssRules && !r.selectorText) walk(r.cssRules, gated || /hover:\\s*hover/.test(r.conditionText || (r.media && r.media.mediaText) || ''));
     else if (r.selectorText && /:hover/.test(r.selectorText) && !gated) out.push(r.selectorText); } };
@@ -1622,6 +1689,7 @@ try:
                 askai(browser, vp_name, vp)
             if "inline" in SCENARIOS:
                 inline_flow(browser, vp_name, vp)
+                thumb_paint(pw, vp_name, vp)
         browser.close()
 finally:
     stub.terminate()

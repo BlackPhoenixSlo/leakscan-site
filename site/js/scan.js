@@ -217,6 +217,12 @@
   }
   // "open ↗" on hover / focus; on touch screens a small ↗ that is always there (css: .g-go)
   var GO = '<span class="g-go" aria-hidden="true"><span class="g-go-w">open </span>↗</span>';
+  // the pill rides on the title's last word (never alone on a line); a long last word (a bare URL) wraps as before
+  function titled(t) {
+    t = esc(String(t).trim());
+    var i = t.lastIndexOf(' '), w = t.slice(i + 1);
+    return w.length > 24 ? t + GO : t.slice(0, i + 1) + '<span class="g-nw">' + w + GO + '</span>';
+  }
   function more(kind, label, left) {
     return left > 0 ? '<button type="button" class="g-more" data-more="' + kind + '">' + esc(label) + '</button>' : '';
   }
@@ -237,7 +243,7 @@
     h += pages.slice(0, n).map(function (r) {
       return '<div class="g-r"><div class="g-src">' + fav(r.domain) + '<div class="g-src-t"><span class="g-site">' + esc(siteName(r.domain)) +
         '</span><span class="g-cite">' + esc(crumbs(r.link)) + '</span></div></div>' +
-        a(r.link, 'g-title', esc(r.title || r.link) + GO) + (r.snippet ? '<p class="g-snip">' + esc(r.snippet) + '</p>' : '') + '</div>';
+        a(r.link, 'g-title', titled(r.title || r.link)) + (r.snippet ? '<p class="g-snip">' + esc(r.snippet) + '</p>' : '') + '</div>';
     }).join('');
     return h + more('all', 'More results', pages.length - n);
   }
@@ -261,7 +267,7 @@
     return vids.map(function (r) {
       var t = r.thumb && thumb(r.thumb) ? img(r.thumb, r.title) : '<span class="g-img g-img-none"></span>';
       return '<div class="g-v">' + a(r.link, 'g-vthumb', t + '<span class="g-play" aria-hidden="true"></span>' + GO) +
-        '<div class="g-vbody">' + a(r.link, 'g-title', esc(r.title || r.link) + GO) +
+        '<div class="g-vbody">' + a(r.link, 'g-title', titled(r.title || r.link)) +
         '<span class="g-cite">' + fav(r.domain, 'g-fav-s') + esc(r.domain) + esc(crumbs(r.link).replace(/^https?:\/\/[^ ]+/, '')) + '</span>' +
         (r.snippet ? '<p class="g-snip">' + esc(r.snippet) + '</p>' : '') + '</div></div>';
     }).join('');
