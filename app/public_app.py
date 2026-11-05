@@ -1448,7 +1448,7 @@ def _run_bio_verify(handle, code, platforms):
 # >>> one-project patch (leakscan-site) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # Same origin serves the landing site (SITE_DIR, default <repo>/site) and this API. Legacy scan UI
 # moves from / to /app/. Paths below that the API owns are untouched. Re-sync public_app.py from
-# bruquiextension, then re-apply this block + the two hooks marked "one-project" in Handler.
+# bruquiextension, then re-apply this block + the lines marked "one-project" in Handler (2 hooks, api_thumb Vary).
 import site_static
 
 _API_PREFIXES = ("/api/", "/static/", "/s/")
@@ -1598,6 +1598,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "public, max-age=86400")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        if not self._cors_origin():  # one-project: a plain and a CORS (pixel-reading) load never share a cache entry
+            self.send_header("Vary", "Origin")
         self.end_headers()
         try:
             self.wfile.write(data)

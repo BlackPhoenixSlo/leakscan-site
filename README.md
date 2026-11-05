@@ -105,7 +105,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   no sideways scroll at 320 / 360 px, no 5xx / console errors; never calls prod).
   `--only scan|personalize|askai|inline|tabs|removals` (`tabs`: phone tabs + demo pop-out; `removals`: the panels,
   toggle, drag, keys, `mega[]` / hit personalization). Break-it flags (each turns only its own checks red):
-  `--break-allowlist`, `--break-drift`, `--break-phones`, `--break-thumbs`, `--break-remove`, `--break-incremental`
+  `--break-allowlist`, `--break-drift`, `--break-phones`, `--break-thumbs`, `--break-people` (logo tiles kept), `--break-remove`, `--break-incremental`
   (every explorer step 1e9: only `incremental:` checks). `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
   blog: Orla's posts without a profile, starter cards + post pages with one,
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
@@ -151,8 +151,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   it spawns for deep scans + data files (`kb.json`, `bruqi_detection_map.json`, `aliases.txt`, `fake_aggregators.txt`,
   `public_static/`). `public_app.py`, `cse_scanner.py`, `profile_extract.py`, `media_gather.py` and `app/tests/` come
   from `bruquiextension` (re-sync: `git -C ~/bruquiextension show origin/main:public_app.py > app/public_app.py`, then
-  re-apply the block between `>>> one-project patch` / `<<< one-project patch` and the two `# one-project hook`
-  lines; `media_gather.py` carries one `# one-project` line: `PUBLIC_ORIGIN` defaults to empty = relative media src).
+  re-apply the block between `>>> one-project patch` / `<<< one-project patch`, the two `# one-project hook` lines and
+  the `# one-project` Vary line in `api_thumb`; `media_gather.py` carries one `# one-project` line: `PUBLIC_ORIGIN` defaults to empty = relative media src).
   The rest is the prod tree snapshot.
 - `app/site_static.py`: stdlib static server for `site/` (`SITE_DIR`, default `<repo>/site`; realpath-confined, no
   dotfiles, dir → `index.html`, missing → `404.html`, html `no-cache`, assets `max-age=86400`, GET/HEAD, single
@@ -188,7 +188,10 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   is sent as `instagram`. Body: `{platform: "onlyfans.com", handle, level: "low", instagram? | x?}`. Same two fields on
   `scan/`, which also reads `h=`, `ig=`, `x=` (and old `p=`).
 - `js/scan-engine.js` (`window.LeakScanEngine`): the one SSE / fetch transport, API origin rule, error mapping, message
-  links and `leakscan.last` writer, used by `js/scan.js` and `js/inline-scan.js`.
+  links and `leakscan.last` writer, used by `js/scan.js` and `js/inline-scan.js`. Its `isPhoto(img)` keeps image tiles
+  to people photos (strip, Images tab, #free phone, scan page strip / Images grid; not Videos): a thumb drawn at 48x48
+  with little soft texture or almost no skin (a site logo, banner, icon, placeholder) is dropped like a failed one;
+  pixels read via a CORS load of `/api/thumb` (refused / unreadable = kept). Thresholds + measured confusion: comment there.
 - `js/inline-scan.js`: with JS the form never leaves the page. The hero card turns into the live report (progress →
   first 5 links: domain + title, badge Live = `live: true`, Indexed = Google result, else Found; "N links found";
   Open full report `scan/?r=`; Send me the report; demo photo status), the "Free scan report" illustration shows the

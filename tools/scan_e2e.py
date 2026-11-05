@@ -2,7 +2,7 @@
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals]
-        [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-remove]
+        [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
@@ -47,13 +47,14 @@ drift speed 0: only `drift:` checks may go red. --break-phones serves personaliz
 `phones:` checks may go red.
 
 tabs (the owner's three asks): (1) report card ?r=demoBrokenT1 (stub: three page-result thumbs answer 404 / a 1×1
-blank, a video still leads images[]): failed / blank tiles leave the strip, the Images grid and the #free phone, the
+blank, two are a flat site logo, a video still leads images[]): failed / blank / logo tiles leave the strip, the Images grid and the #free phone, the
 next image takes the slot, the label / tab / "+N more" / phone counts say what shows, every tile is painted, no video
 still; (2) #website copy → demo iframe → Before / After phones (in #showcase), their All / Images / Videos tabs switch
 on click and keys without moving anything, the demo pops out to a full-screen layer (Esc / button / backdrop close,
 focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the #free phone: same
 tabs, the illustration without a scan, her handle / rows / tiles / videos + Reveal with ?r=; no horizontal overflow.
-Screenshots: <vp>-t*.png. --break-thumbs serves inline-scan.js with the drop disabled: only `thumbs:` checks may go red.
+Screenshots: <vp>-t*.png. --break-thumbs serves inline-scan.js with the drop disabled: only `thumbs:` checks may go red. --break-people serves
+scan-engine.js with E.isPhoto always true (logos kept): only `thumbs:` checks may go red.
 
 removals (js/removals.js, the #removals "Where I remove from" panels): section placed after #faq and directly before
 #contact; demo defaults (Orla Brennick); leak-side images blurred by default (+ Reveal); Remove flips all 4 panels
@@ -80,6 +81,7 @@ BREAK_ALLOWLIST = "--break-allowlist" in sys.argv
 BREAK_DRIFT = "--break-drift" in sys.argv
 BREAK_PHONES = "--break-phones" in sys.argv
 BREAK_THUMBS = "--break-thumbs" in sys.argv
+BREAK_PEOPLE = "--break-people" in sys.argv
 BREAK_REMOVE = "--break-remove" in sys.argv
 BREAK_INCREMENTAL = "--break-incremental" in sys.argv
 GS_RE = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
@@ -88,7 +90,7 @@ PEOPLE = {"imgs/portrait.webp", "imgs/hero-wide.webp", "imgs/studio-portrait.web
 
 VIDEO_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|embed|clips?|vod)(?:[/?#.-]|$)", re.I)
 is_video = lambda r: bool(r) and (r.get("kind") == "video" or bool(VIDEO_RE.search(r.get("link") or "")))
-dead_thumb = lambda u, extra=(): "DEAD" in u or "BLANK" in u or any(x in u for x in extra)
+dead_thumb = lambda u, extra=(): "DEAD" in u or "BLANK" in u or "LOGO" in u or any(x in u for x in extra)   # LOGO: no person photo (E.isPhoto)
 
 
 def _images(fx, alive=False, extra=()):
@@ -137,6 +139,7 @@ def break_routes(ctx):
     for flag, name, old, new in ((BREAK_DRIFT, "inline-scan.js", "DRIFT_SPEED = 24", "DRIFT_SPEED = 0"),
                                  (BREAK_PHONES, "personalize.js", "    phones(m, d);\n", "\n"),
                                  (BREAK_THUMBS, "inline-scan.js", "      if (g.dead[src]) return;\n", "      return;\n"),
+                                 (BREAK_PEOPLE, "scan-engine.js", "    return !s || !(", "    return true || !("),
                                  (BREAK_INCREMENTAL, "scan.js", "SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50",
                                   "SITES_STEP = 1e9, MORE_SITES = 1e9, LINKS_STEP = 1e9, MORE_LINKS = 1e9")):
         if not flag:
@@ -469,8 +472,8 @@ def huge_flow(browser, vp_name, vp):
           (rows(), page.locator("#lx-list a").count(), page.locator("#lx-more").inner_text()))
     first = page.locator("#lx-list .lx-name").first.inner_text()
     check(f"{tag} biggest site first", first == HUGE_TOP, first)
-    thumbs0 = len(thumbs)   # at load, before any scroll / tab / reopen
-    check(f"{tag} lazy thumbs: at load <= 24 of {HUGE_IMAGES} images fetched (strip + first screen only)", thumbs0 <= 24, thumbs0)
+    thumbs0 = len(set(thumbs))   # at load, before any scroll / tab / reopen; distinct images (a tile's people-photo probe re-reads its own thumb)
+    check(f"{tag} lazy thumbs: at load <= 24 of {HUGE_IMAGES} images fetched (strip + first screen only)", thumbs0 <= 24, (thumbs0, len(thumbs)))
 
     # 2. the scroll story: summary → pinned phone (screen scrolls 1:1) → the sites
     if phone:
@@ -2410,14 +2413,15 @@ def tabs_flow(browser, vp_name, vp):
     if vp_name == "phone":   # pinned phone: a failed tile's slot goes to the next image (same size), nothing moves
         ctx = new_ctx()
         page = ctx.new_page()
-        held = []   # the 404 / blank thumbs answer late: after the Images tab is up (the All tab's strip would fail them first)
-        page.route(lambda u: "/api/thumb" in u and dead_thumb(unquote(u)), lambda r: held.append(r))
+        held, hold = [], [True]   # the 404 / blank / logo thumbs answer late: after the Images tab is up (the All tab's strip would fail them first); later requests (a logo's pixel probe) pass
+        page.route(lambda u: "/api/thumb" in u and dead_thumb(unquote(u)), lambda r: held.append(r) if hold[0] else r.continue_())
         page.goto(base + "scan/?r=demoBrokenT1", wait_until="load")
         page.wait_for_selector("#g-tab-images", timeout=8000)
         page.wait_for_timeout(800)
         t0, s0 = page.evaluate("""() => { document.querySelector('#g-tab-images').click();
             return [performance.now(), [...document.querySelectorAll('.g-grid .g-tile img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1]))]; }""")
         page.wait_for_timeout(800)
+        hold[0] = False
         for r in held:
             r.continue_()
         page.wait_for_timeout(1500)
@@ -3017,7 +3021,7 @@ finally:
     stub.terminate()
 
 (out / "e2e-summary.json").write_text(json.dumps({"fails": fails, "omit_results": omit, "omit_profile": omit_profile,
-                                                  "scenarios": SCENARIOS, "break_allowlist": BREAK_ALLOWLIST, "break_thumbs": BREAK_THUMBS,
+                                                  "scenarios": SCENARIOS, "break_allowlist": BREAK_ALLOWLIST, "break_thumbs": BREAK_THUMBS, "break_people": BREAK_PEOPLE,
                                                   "break_incremental": BREAK_INCREMENTAL,
                                                   "measured": MEASURED}, indent=1))
 sys.exit(1 if fails else 0)
