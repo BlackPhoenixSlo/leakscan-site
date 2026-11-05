@@ -144,11 +144,14 @@
     return d;
   }
   function report(raw, fresh) {
+    mark('leakscan:report-start');
     var d = state.data = normalize(raw);
     state.handle = d.handle;
     state.platform = PLATFORMS[d.platform] ? d.platform : state.platform;
     if (d.slug && history.replaceState) history.replaceState(null, '', '?r=' + encodeURIComponent(d.slug));
     hideAll();
+    var lead = $('scan-lead');   // the report header is a new view: a fresh lead node, so its new text is not a layout shift
+    lead.replaceWith(lead.cloneNode(false));
     var name = PLATFORMS[state.platform] || state.platform;
     var empty = d.status === 'empty';
     setTitle('Free scan report', '@' + d.handle,
@@ -164,7 +167,8 @@
     $('summary').querySelector('[data-stat=google]').textContent = '~' + num(d.google_total);
     show('summary', true);
     show('empty', empty);
-    ['google', 'sites', 'links'].forEach(function (id) { show(id, !empty); });
+    ['rnav', 'google', 'sites'].forEach(function (id) { show(id, !empty); });
+    $('rnav-who').textContent = '@' + d.handle;
 
     E.sendReport($('send'), d.slug, d.handle, state.platform);
     $('deep-link').href = 'https://jackbase.me/scan?p=' + encodeURIComponent(state.platform) + '&h=' + encodeURIComponent(d.handle) + '&l=deep&go=1';
@@ -175,8 +179,23 @@
     E.remember(raw, d.slug, d.handle, state.platform);
     mediaStatus(raw.profile && typeof raw.profile === 'object' ? d.slug : null);
     show('report', true);
-    if (!empty) { renderGoogle(); renderSites(); renderLinks(); }
+    if (!empty) { renderGoogle(); renderSites(); $('rnav-n').textContent = num(lx.groups.length); }
     if (fresh) $('scan-title').focus({ preventScroll: true });
+    navCurrent();
+    painted();
+  }
+
+  // Render timing for tools/scan_e2e.py: leakscan:report = result event (js/scan-engine.js) or report start → the
+  // first frame after the report is built. Local performance entries only; nothing leaves the page.
+  function mark(n) { if (window.performance && performance.mark) performance.mark(n); }
+  function painted() {
+    requestAnimationFrame(function () {
+      setTimeout(function () {
+        if (!window.performance || !performance.measure) return;
+        var from = performance.getEntriesByName('leakscan:result').length ? 'leakscan:result' : 'leakscan:report-start';
+        try { performance.measure('leakscan:report', from); } catch (e) { /* marks cleared */ }
+      }, 0);
+    });
   }
 
   // Demo-site photos arrive after the scan: js/personalize.js polls /api/media/<slug>; this line mirrors it.
@@ -289,10 +308,10 @@
     var search = '<div class="g-search" aria-hidden="true"><svg class="icon"><use href="#i-search"/></svg><span>' + esc(q) + '</span></div>';
     var h;
     if (phone) {
-      h = '<div class="frame-phone" data-device="phone"><div class="ph-screen g-dark g-' + state.tab + '">' +
+      h = '<div class="ph-track"><div class="frame-phone" data-device="phone"><div class="ph-screen g-dark g-' + state.tab + '">' +
         '<div class="ph-status" aria-hidden="true"><span>9:41</span><span class="ph-icons"><i class="ph-sig"></i><i class="ph-wifi"></i><i class="ph-bat"></i></span></div>' +
-        '<div class="gm-head" aria-hidden="true"><span class="gm-burger"><i></i><i></i><i></i></span>' + gLogo() + '<span class="g-av"></span></div>' +
-        search + tabRow() + body + '<div class="ph-home" aria-hidden="true"></div></div></div>';
+        '<div class="ph-scroll"><div class="ph-page"><div class="gm-head" aria-hidden="true"><span class="gm-burger"><i></i><i></i><i></i></span>' + gLogo() + '<span class="g-av"></span></div>' +
+        search + tabRow() + body + '</div></div><span class="ph-fade" aria-hidden="true"></span><div class="ph-home" aria-hidden="true"></div></div></div></div>';
     } else {
       var path = 'google.com/search?q=' + encodeURIComponent(d.handle).replace(/%20/g, '+') + '+leaks' +
         (state.tab === 'images' ? '&udm=2' : state.tab === 'videos' ? '&tbm=vid' : '');
@@ -316,8 +335,57 @@
       im.addEventListener('load', function () { if (im.naturalWidth < 16 || im.naturalHeight < 16) drop(); }, { once: true });
     });
     if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
-    if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus(); }
+    if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus({ preventScroll: true }); }
+    pinPhone();
   }
+
+  // ---------- the phone frame stays put while its screen scrolls ----------
+  // .ph-track is as tall as the frame + the overflow of its Google page; the frame is sticky inside it (css), so page
+  // scroll moves the screen 1:1 (.ph-scroll, overflow hidden, scrollTop set here) and, at its end, carries on to the
+  // sites below. Short screens (css: frame not sticky) scroll the screen by itself. A scroll of the screen itself (focus,
+  // find in page) moves the page to match. A new tab starts at its top.
+  var pin = null, pinTab = null, pinRo = null;
+  function pinPhone() {
+    var track = document.querySelector('.ph-track'), reset = pinTab !== state.tab;
+    if (pinRo) { pinRo.disconnect(); pinRo = null; }
+    pin = track && { track: track, frame: track.firstElementChild, scr: track.querySelector('.ph-scroll'), set: -1 };
+    pinTab = pin ? state.tab : null;
+    if (!pin) return;
+    pin.scr.addEventListener('scroll', onScreenScroll, { passive: true });
+    measurePin();
+    var off = pin.track.getBoundingClientRect().top - pin.top;   // < 0: scrolled into / past the phone
+    if (reset && pin.on && off < 0) window.scrollTo({ top: window.pageYOffset + off, behavior: 'instant' });
+    if (window.ResizeObserver) { pinRo = new ResizeObserver(measurePin); pinRo.observe(pin.scr.firstElementChild); pinRo.observe(pin.frame); }
+  }
+  function measurePin() {
+    if (!pin || !pin.track.isConnected) return;
+    var cs = getComputedStyle(pin.frame);
+    pin.on = cs.position === 'sticky';
+    pin.top = parseFloat(cs.top) || 0;
+    pin.max = Math.max(0, pin.scr.scrollHeight - pin.scr.clientHeight);
+    pin.track.style.height = pin.on ? pin.frame.offsetHeight + pin.max + 'px' : '';
+    syncPin();
+  }
+  function pinWant() { return Math.min(pin.max, Math.max(0, pin.top - pin.track.getBoundingClientRect().top)); }
+  function pinEnd() { pin.frame.classList.toggle('ph-end', pin.scr.scrollTop >= pin.scr.scrollHeight - pin.scr.clientHeight - 4); }
+  function syncPin() {
+    if (!pin || !pin.on) { if (pin) pinEnd(); return; }
+    var p = Math.round(Math.min(pinWant(), pin.scr.scrollHeight - pin.scr.clientHeight));
+    if (Math.abs(pin.scr.scrollTop - p) >= 1) { pin.scr.scrollTop = p; pin.set = pin.scr.scrollTop; }
+    pinEnd();
+  }
+  function onScreenScroll() {
+    if (!pin) return;
+    var t = pin.scr.scrollTop;
+    if (pin.on && Math.abs(t - pin.set) > 2) {   // not ours: bring the page along
+      var d = t - pinWant();
+      pin.set = t;
+      if (Math.abs(d) > 2) window.scrollTo({ top: window.pageYOffset + d, behavior: 'instant' });
+    }
+    pinEnd();
+  }
+  window.addEventListener('scroll', syncPin, { passive: true });
+  window.addEventListener('resize', measurePin);
   var ro = null;
   function fitComputer() {
     var wrap = document.querySelector('.cw-scale'), frame = wrap && wrap.firstElementChild;
@@ -373,7 +441,12 @@
     $('g-stage').classList.toggle('revealed', state.revealed);
   });
 
-  // ---------- per-site breakdown + all links ----------
+  // ---------- "Where the copies are": every site and link, built only as far as it is looked at ----------
+  // 1000 links on 100 sites must not mean 1000 rows on load: SITES_STEP sites first (then MORE_SITES per click), a
+  // site's links only once it is opened (LINKS_STEP, then MORE_LINKS per click), one filter over domains + URLs.
+  // Copy / .txt always carry everything. Built with elements + textContent only.
+  var SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50, AUTO_OPEN = 3;
+  var lx = { groups: [], view: [], q: '', shown: 0, timer: 0 };
   function groups(d) {
     var by = {}, order = [];
     var add = function (dom, url, occ) {
@@ -386,28 +459,122 @@
     };
     d.hits.forEach(function (h) { add(h.domain, h.url, +h.occurrences || 1); });
     d.results.forEach(function (r) { add(r.domain, r.link, 0); });
-    return order.map(function (k) { return by[k]; }).sort(function (x, y) {
-      return y.links.length - x.links.length || y.occ - x.occ;
-    });
+    return order.map(function (k) {   // the top link first, then the order the scan found them in
+      var g = by[k];
+      g.links = [g.top].concat(g.links.filter(function (u) { return u !== g.top; }));
+      return g;
+    }).sort(function (x, y) { return y.links.length - x.links.length || y.occ - x.occ; });
+  }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  // a link shown without scheme + its site, which is the row heading (another host of the site keeps its name)
+  function shortUrl(u, dom) {
+    var s = u.replace(/^https?:\/\//i, ''), i = s.search(/[\/?#]/), h = i < 0 ? s : s.slice(0, i), rest = i < 0 ? '' : s.slice(i);
+    h = h.replace(/^www\./i, '');
+    return (h.toLowerCase() === dom ? '' : h) + (rest && rest !== '/' ? rest : (h.toLowerCase() === dom ? '/' : ''));
+  }
+  function marked(parent, text, q) {   // text with the first match of q in <mark>
+    var i = q ? text.toLowerCase().indexOf(q) : -1;
+    if (i < 0) { parent.textContent = text; return parent; }
+    parent.append(text.slice(0, i), el('mark', '', text.slice(i, i + q.length)), text.slice(i + q.length));
+    return parent;
   }
   function renderSites() {
-    $('sites-body').innerHTML = groups(state.data).map(function (g) {
-      return '<tr><th scope="row">' + fav(g.domain, 'g-fav-s') + esc(g.domain) + '</th><td data-label="Links">' + g.links.length +
-        '</td><td class="top-link">' + a(g.top, 'mono', esc(g.top.replace(/^https?:\/\/(www\.)?/, ''))) + '</td></tr>';
-    }).join('');
+    lx.groups = groups(state.data);
+    lx.q = '';
+    $('lx-q').value = '';
+    var n = lx.groups.length, links = lx.groups.reduce(function (t, g) { return t + g.links.length; }, 0);
+    lx.max = lx.groups.length ? lx.groups[0].links.length : 1;
+    $('lx-sub').textContent = num(n) + ' ' + plural(n, 'site', 'sites') + ' · ' + num(links) + ' ' + plural(links, 'link', 'links') + (n > 1 ? ' · most copies first' : '');
+    $('lx-q').closest('.lx-tools').hidden = links < 8;   // nothing to filter on a short report
+    filterSites();
   }
-  function renderLinks() {
-    $('links-list').innerHTML = groups(state.data).map(function (g) {
-      return '<details><summary><span>' + fav(g.domain, 'g-fav-s') + esc(g.domain) + '</span><span class="count">' + g.links.length + ' ' +
-        plural(g.links.length, 'link', 'links') + '</span></summary><ul>' + g.links.map(function (u) {
-        return '<li>' + a(u, 'mono', esc(u)) + '</li>';
-      }).join('') + '</ul></details>';
-    }).join('');
+  function filterSites() {
+    var q = lx.q;
+    lx.view = !q ? lx.groups.map(function (g) { return { g: g, links: g.links }; }) : lx.groups.reduce(function (out, g) {
+      if (g.domain.indexOf(q) >= 0) out.push({ g: g, links: g.links });
+      else {
+        var m = g.links.filter(function (u) { return u.toLowerCase().indexOf(q) >= 0; });
+        if (m.length) out.push({ g: g, links: m, inside: true });
+      }
+      return out;
+    }, []);
+    $('lx-list').textContent = '';
+    lx.shown = 0;
+    showSites(SITES_STEP);
+    var v = lx.view, nl = v.reduce(function (t, it) { return t + it.links.length; }, 0);
+    $('lx-status').textContent = !q ? '' : v.length ? num(v.length) + ' ' + plural(v.length, 'site', 'sites') + ' · ' + num(nl) + ' ' +
+      plural(nl, 'link matches', 'links match') + ' “' + q + '”' : 'No site or link contains “' + q + '”.';
   }
+  function showSites(n) {
+    var v = lx.view, to = Math.min(v.length, lx.shown + n), frag = document.createDocumentFragment();
+    for (var i = lx.shown; i < to; i++) frag.appendChild(siteRow(v[i], i < AUTO_OPEN && v[i].inside));
+    $('lx-list').appendChild(frag);
+    lx.shown = to;
+    var left = v.length - to, b = $('lx-more');
+    b.hidden = left <= 0;
+    b.textContent = 'Show ' + Math.min(MORE_SITES, left) + ' more ' + plural(Math.min(MORE_SITES, left), 'site', 'sites') + ' · ' + num(left) + ' left';
+  }
+  function siteRow(it, open) {
+    var g = it.g, li = el('li', 'lx-site'), det = el('details'), sum = el('summary', 'lx-sum'), q = lx.q;
+    var name = el('span', 'lx-dom');
+    name.append(E.fav(g.domain, 'g-fav-s'), marked(el('span', 'lx-name'), g.domain, q));
+    var cnt = el('span', 'lx-n');
+    cnt.append(el('b', '', num(it.links.length)), ' ' + (it.inside ? 'of ' + num(g.links.length) + ' ' : '') + plural(g.links.length, 'link', 'links'));
+    var bar = el('span', 'lx-bar');
+    bar.setAttribute('aria-hidden', 'true');
+    bar.appendChild(el('i')).style.width = Math.max(2, Math.round(100 * g.links.length / lx.max)) + '%';
+    sum.append(name, cnt, el('span', 'lx-top mono', shortUrl(g.top, g.domain)), bar);
+    det.appendChild(sum);
+    det.addEventListener('toggle', function () {
+      if (det.open && !det.querySelector('.lx-links')) { var ul = el('ul', 'lx-links'); det.appendChild(ul); showLinks(det, it, LINKS_STEP); }
+      else if (!det.open) det.querySelectorAll('.lx-links, .lx-lmore').forEach(function (x) { x.remove(); });   // closed = gone from the DOM
+    });
+    li.appendChild(det);
+    if (open) det.open = true;
+    return li;
+  }
+  function showLinks(det, it, n) {
+    var ul = det.querySelector('.lx-links'), from = ul.children.length, to = Math.min(it.links.length, from + n), frag = document.createDocumentFragment();
+    for (var i = from; i < to; i++) {
+      var u = it.links[i], a = el('a', 'lx-a mono');
+      a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer nofollow'; a.title = u;
+      marked(a, shortUrl(u, it.g.domain), lx.q);
+      frag.appendChild(el('li')).appendChild(a);
+    }
+    ul.appendChild(frag);
+    var left = it.links.length - to, mb = det.querySelector('.lx-lmore');
+    if (left <= 0) { if (mb) mb.remove(); return; }
+    if (!mb) {
+      mb = el('button', 'lx-lmore');
+      mb.type = 'button';
+      mb.addEventListener('click', function () { showLinks(det, it, MORE_LINKS); });
+      det.appendChild(mb);
+    }
+    mb.textContent = 'Show ' + Math.min(MORE_LINKS, left) + ' more of ' + num(it.links.length) + ' on ' + it.g.domain;
+  }
+  $('lx-more').addEventListener('click', function () {
+    var had = document.activeElement === $('lx-more'), nx = lx.shown;
+    showSites(MORE_SITES);
+    nx = $('lx-list').children[nx];   // keyboard: carry on at the first new site (the button may be gone now)
+    if (had && nx) nx.querySelector('summary').focus({ preventScroll: true });
+  });
+  $('lx-q').addEventListener('input', function () {
+    clearTimeout(lx.timer);
+    lx.timer = setTimeout(function () {
+      var q = $('lx-q').value.trim().toLowerCase();
+      if (q !== lx.q) { lx.q = q; filterSites(); }
+    }, 120);
+  });
+  $('lx-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
   function linksText() {
     var d = state.data, out = ['Abolita free scan report: ' + who(), 'Report: ' + REPORT_BASE + d.slug,
       d.domain_count + ' sites, ' + d.hit_count + ' indexed pages, Google index ~' + num(d.google_total), ''];
-    groups(d).forEach(function (g) { out.push(g.domain + ' (' + g.links.length + ')'); out = out.concat(g.links); out.push(''); });
+    lx.groups.forEach(function (g) { out.push(g.domain + ' (' + g.links.length + ')'); out = out.concat(g.links); out.push(''); });
     return out.join('\n');
   }
   function status(t) { var s = $('copy-status'); s.textContent = t; setTimeout(function () { s.textContent = ''; }, 4000); }
@@ -433,6 +600,18 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     status('Downloaded');
   });
+
+  // ---------- section nav: current = the last section whose top has passed the middle of the screen (none above) ----------
+  var navRaf = 0;
+  function navCurrent() {
+    navRaf = 0;
+    var cur = null;
+    ['google', 'sites', 'send'].forEach(function (id) { var e = $(id); if (!e.hidden && e.getBoundingClientRect().top < innerHeight / 2) cur = id; });
+    document.querySelectorAll('.rnav-a').forEach(function (a) {
+      if (a.getAttribute('data-sec') === cur) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+  }
+  window.addEventListener('scroll', function () { if (!navRaf && !$('report').hidden) navRaf = requestAnimationFrame(navCurrent); }, { passive: true });
 
   // ---------- boot ----------
   $('scan-title').setAttribute('tabindex', '-1');

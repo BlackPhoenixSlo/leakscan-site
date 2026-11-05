@@ -102,6 +102,14 @@
 </section>
 
 <div id="report" hidden>
+  <nav class="rnav" id="rnav" aria-label="Report sections">
+    <div class="container rnav-row">
+      <span class="rnav-who" id="rnav-who"></span>
+      <a class="rnav-a" href="#google" data-sec="google">Google</a>
+      <a class="rnav-a" href="#sites" data-sec="sites">Sites <span class="rnav-n" id="rnav-n"></span></a>
+      <a class="rnav-a rnav-cta" href="#send" data-sec="send">Send report</a>
+    </div>
+  </nav>
   <section class="scan-section" id="google" aria-labelledby="google-title">
     <div class="container">
       <div class="section-head">
@@ -119,13 +127,28 @@
       <p class="g-hint" id="g-hint"><svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg><span class="g-hint-tap">Tap All · Images · Videos to switch, tap any result to open it.</span><span class="g-hint-click">Click All · Images · Videos to switch, click any result to open it.</span><span class="g-hint-small">Shrunk to fit this screen. <button class="linkish" type="button" data-device-go="phone">Switch to Phone</button> to tap results.</span></p>
       <div id="g-stage" class="g-stage"></div>
       <p class="g-note" id="g-note">Rendered from Google's index. Not a live screenshot.</p>
-      <div class="after-card" id="after-card">
-        <p class="after-kicker">Your website</p>
-        <p class="after-title"><a id="after-link" href="../#website">See how it looks after cleanup — your name, your pages on top</a></p>
-        <p class="after-text">The Abolita homepage and the demo site now show your name, your accounts and the leak sites from this scan.</p>
-        <a class="btn btn-ghost btn-sm" id="demo-link" href="../showcase/">Open your demo site<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a>
-        <p class="after-media" id="after-media" role="status" hidden></p>
+    </div>
+  </section>
+
+  <section class="scan-section" id="sites" aria-labelledby="sites-title">
+    <div class="container">
+      <div class="links-head">
+        <div>
+          <h2 id="sites-title">Where the copies are</h2>
+          <p class="lx-sub" id="lx-sub"></p>
+        </div>
+        <p class="links-actions">
+          <button class="btn btn-ghost btn-sm" type="button" id="copy-all"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy all</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="download"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download .txt</button>
+          <span class="copy-status" id="copy-status" role="status"></span>
+        </p>
       </div>
+      <div class="lx-tools">
+        <label class="lx-search"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">Filter sites and links</span><input id="lx-q" type="search" placeholder="Filter sites or links" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" aria-controls="lx-list" aria-describedby="lx-status"></label>
+        <p class="lx-status" id="lx-status" role="status" aria-live="polite"></p>
+      </div>
+      <ol class="lx-list" id="lx-list"></ol>
+      <p class="lx-foot"><button class="btn btn-ghost" type="button" id="lx-more" hidden></button></p>
     </div>
   </section>
 
@@ -152,34 +175,16 @@
         <p class="price-line">Then €250/month or €500 one-time, only if you continue.</p>
         <p class="deep"><a id="deep-link" href="https://jackbase.me/scan">Run a deep scan (takes minutes)<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a></p>
       </div>
-    </div>
-  </section>
-
-  <section class="scan-section" id="sites" aria-labelledby="sites-title">
-    <div class="container">
-      <h2 id="sites-title">Where the copies are</h2>
-      <div class="sites-wrap">
-        <table class="sites">
-          <thead><tr><th scope="col">Site</th><th scope="col">Links</th><th scope="col">Top link</th></tr></thead>
-          <tbody id="sites-body"></tbody>
-        </table>
+      <div class="after-card" id="after-card">
+        <p class="after-kicker">Your website</p>
+        <p class="after-title"><a id="after-link" href="../#website">See how it looks after cleanup — your name, your pages on top</a></p>
+        <p class="after-text">The Abolita homepage and the demo site now show your name, your accounts and the leak sites from this scan.</p>
+        <a class="btn btn-ghost btn-sm" id="demo-link" href="../showcase/">Open your demo site<svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg></a>
+        <p class="after-media" id="after-media" role="status" hidden></p>
       </div>
     </div>
   </section>
 
-  <section class="scan-section" id="links" aria-labelledby="links-title">
-    <div class="container">
-      <div class="links-head">
-        <h2 id="links-title">All detected links</h2>
-        <p class="links-actions">
-          <button class="btn btn-ghost btn-sm" type="button" id="copy-all"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy all</button>
-          <button class="btn btn-ghost btn-sm" type="button" id="download"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download .txt</button>
-          <span class="copy-status" id="copy-status" role="status"></span>
-        </p>
-      </div>
-      <div id="links-list" class="links-list"></div>
-    </div>
-  </section>
 </div>
 </main>
 

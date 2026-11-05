@@ -76,6 +76,7 @@ BREAK_DRIFT = "--break-drift" in sys.argv
 BREAK_PHONES = "--break-phones" in sys.argv
 BREAK_THUMBS = "--break-thumbs" in sys.argv
 BREAK_REMOVE = "--break-remove" in sys.argv
+BREAK_INCREMENTAL = "--break-incremental" in sys.argv
 GS_RE = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 PEOPLE = {"imgs/portrait.webp", "imgs/hero-wide.webp", "imgs/studio-portrait.webp"}   # showcase hero defaults: Pexels people photos (tools/showcase/CREDITS.md)
 
@@ -113,7 +114,9 @@ def break_routes(ctx):
     """--break-drift / --break-phones: serve the script with the feature disabled (wire boundary, same bytes otherwise)."""
     for flag, name, old, new in ((BREAK_DRIFT, "inline-scan.js", "DRIFT_SPEED = 24", "DRIFT_SPEED = 0"),
                                  (BREAK_PHONES, "personalize.js", "    phones(m, d);\n", "\n"),
-                                 (BREAK_THUMBS, "inline-scan.js", "      if (g.dead[src]) return;\n", "      return;\n")):
+                                 (BREAK_THUMBS, "inline-scan.js", "      if (g.dead[src]) return;\n", "      return;\n"),
+                                 (BREAK_INCREMENTAL, "scan.js", "SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50",
+                                  "SITES_STEP = 1e9, MORE_SITES = 1e9, LINKS_STEP = 1e9, MORE_LINKS = 1e9")):
         if not flag:
             continue
         body = (ROOT / "site" / "js" / name).read_text(encoding="utf-8")
@@ -154,6 +157,7 @@ def scan_flow(browser, vp_name, vp):
             r.abort()
 
     ctx.route("**/*", route)
+    break_routes(ctx)
     page = ctx.new_page()
     page.on("request", lambda q, posts=posts: q.method == "POST" and posts.append(q.url))
     page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
@@ -310,10 +314,10 @@ def scan_flow(browser, vp_name, vp):
           and hrefs[2].startswith("mailto:me@jackbase.dev?") and "body=" in hrefs[2], hrefs)
     deep = page.locator("#deep-link").get_attribute("href")
     check(f"{vp_name} deep-scan link", deep == "https://jackbase.me/scan?p=fansly.com&h=demo.creator&l=deep&go=1", deep)
-    listed = set(page.eval_on_selector_all("#links-list a", "els => els.map(e => e.href)"))
+    listed = open_all_sites(page)
     check(f"{vp_name} every hit url listed", all(h["url"] in listed for h in FX["hits"]),
           f"{sum(h['url'] in listed for h in FX['hits'])}/{len(FX['hits'])}")
-    check(f"{vp_name} per-site rows == domain_count", page.locator("#sites-body tr").count() == FX["domain_count"])
+    check(f"{vp_name} per-site rows == domain_count", page.locator("#lx-list .lx-site").count() == FX["domain_count"])
     page.locator("#send").scroll_into_view_if_needed()
     page.locator("#send").screenshot(path=str(out / f"{vp_name}-7-cta.png"))
 
@@ -366,6 +370,173 @@ def scan_flow(browser, vp_name, vp):
     ctx.close()
 
 
+
+def open_all_sites(page):
+    """Show every site row, open each, press every "Show N more" → every link href in the list."""
+    while page.locator("#lx-more").is_visible():
+        page.locator("#lx-more").click()
+    page.evaluate("document.querySelectorAll('#lx-list details').forEach(d => d.open = true)")
+    page.wait_for_timeout(100)
+    while page.locator(".lx-lmore").count():
+        page.evaluate("document.querySelectorAll('.lx-lmore').forEach(b => b.click())")
+    return set(page.eval_on_selector_all("#lx-list a", "els => els.map(e => e.href)"))
+
+
+sys.path.insert(0, str(ROOT / "tools"))
+from scan_stub import huge_result   # noqa: E402  (the stub's own generator: the e2e expects what it serves)
+HUGE = huge_result("stub-huge")
+HUGE_SITES = {}
+for _u, _d in [(h["url"], h["domain"]) for h in HUGE["hits"]] + [(r["link"], r["domain"]) for r in HUGE["results"]]:
+    HUGE_SITES.setdefault(_d, {})[_u] = 1
+HUGE_LINKS = sum(len(v) for v in HUGE_SITES.values())
+HUGE_TOP = max(HUGE_SITES, key=lambda d: len(HUGE_SITES[d]))
+NODE_BUDGET = 900   # whole page after the report renders (main before this change: ~3,800 at this size)
+
+
+def huge_flow(browser, vp_name, vp):
+    """stub-huge (1000 hit links on 100 sites): render time, DOM size, incremental sites / links, filter, the pinned
+    phone scroll story, CLS, lazy thumbs, export, no 5xx / console errors. Checks named "incremental: …" are the ones
+    --break-incremental (scan.js with every step = 1e9, everything rendered) must turn red; nothing else may."""
+    phone = vp_name == "phone"
+    tag = f"{vp_name} huge:"
+    ctx = browser.new_context(viewport=vp, device_scale_factor=2 if phone else 1, is_mobile=phone, has_touch=phone, accept_downloads=True)
+    outside, errors, bad, thumbs = [], [], [], []
+    ctx.route("**/*", lambda r, _q: r.continue_() if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost") else (outside.append(r.request.url), r.abort()))
+    break_routes(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+    page.on("response", lambda r: r.status >= 500 and bad.append(f"{r.status} {r.url}"))
+    page.on("request", lambda q: "/api/thumb" in q.url and thumbs.append(q.url))
+    # layout shifts once the report is built (the progress card → report swap before it is the scan page's, not the report's)
+    page.add_init_script("""window.__ls = []; new PerformanceObserver(l => l.getEntries().forEach(e => { if (!e.hadRecentInput) window.__ls.push(e); }))
+      .observe({type: 'layout-shift', buffered: true});""")
+    CLS = """() => { const m = performance.getEntriesByName('leakscan:report-start')[0], t = m ? m.startTime : 0;
+      const ls = window.__ls.filter(e => e.startTime > t);
+      return [+ls.reduce((a, e) => a + e.value, 0).toFixed(4), ls.slice(0, 3).map(e => e.sources.map(s => s.node && s.node.nodeType === 1 ? s.node.tagName + '.' + s.node.className : '?').join(','))]; }"""
+    cdp = ctx.new_cdp_session(page)
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})   # a mid-range phone, not this machine
+
+    # 1. a fresh scan: result event → painted report
+    page.goto(base + "scan/?h=stub-huge", wait_until="load")
+    page.wait_for_selector("#report:not([hidden])", timeout=20000)
+    page.wait_for_function("performance.getEntriesByName('leakscan:report').length > 0", timeout=5000)
+    ms = page.evaluate("performance.getEntriesByName('leakscan:report')[0].duration")
+    check(f"{tag} report painted < 1500 ms after the result event (CPU x4)", ms < 1500, f"{ms:.0f} ms")
+    nodes = page.evaluate("document.getElementsByTagName('*').length")
+    check(f"{tag} incremental: page DOM <= {NODE_BUDGET} elements after render", nodes <= NODE_BUDGET, nodes)
+    check(f"{tag} summary + section nav say 100 sites / 1,000 pages", (digits(page.locator("[data-stat=domains]").inner_text()),
+          digits(page.locator("[data-stat=pages]").inner_text()), page.locator("#rnav-n").inner_text()) == (100, 1000, "100"))
+    check(f"{tag} heading line: every site + link counted", page.locator("#lx-sub").inner_text() == f"100 sites · {HUGE_LINKS:,} links · most copies first",
+          page.locator("#lx-sub").inner_text())
+    rows = lambda: page.locator("#lx-list .lx-site").count()
+    check(f"{tag} incremental: 10 sites, no link rows until a site is opened, 'Show 25 more sites · 90 left'",
+          (rows(), page.locator("#lx-list a").count(), page.locator("#lx-more").inner_text()) == (10, 0, "Show 25 more sites · 90 left"),
+          (rows(), page.locator("#lx-list a").count(), page.locator("#lx-more").inner_text()))
+    first = page.locator("#lx-list .lx-name").first.inner_text()
+    check(f"{tag} biggest site first", first == HUGE_TOP, first)
+    check(f"{tag} no thumbnail fetched beyond the first screen (lazy)", len(thumbs) <= 8, len(thumbs))
+
+    # 2. the scroll story: summary → pinned phone (screen scrolls 1:1) → the sites
+    if phone:
+        g = page.evaluate("""() => { const t = document.querySelector('.ph-track'), f = t.firstElementChild, s = t.querySelector('.ph-scroll');
+            return {top: t.getBoundingClientRect().top + scrollY, pin: parseFloat(getComputedStyle(f).top), h: t.offsetHeight, fh: f.offsetHeight,
+                    max: s.scrollHeight - s.clientHeight, vh: innerHeight}; }""")
+        check(f"{tag} phone frame fits the screen under the nav", g["fh"] + g["pin"] <= g["vh"], g)
+        check(f"{tag} track = frame + screen overflow", abs(g["h"] - g["fh"] - g["max"]) <= 2 and g["max"] > 400, g)
+        page.evaluate(f"window.scrollTo({{top: {g['top'] - g['pin'] + 400}, behavior: 'instant'}})")
+        page.wait_for_timeout(250)
+        st = page.evaluate("() => [document.querySelector('.frame-phone').getBoundingClientRect().top, document.querySelector('.ph-scroll').scrollTop]")
+        check(f"{tag} pin: mid-scroll the frame stays put and its screen scrolls 1:1", abs(st[0] - g["pin"]) <= 1 and abs(st[1] - 400) <= 2, st)
+        page.screenshot(path=str(out / f"{vp_name}-h2-pinned.png"))
+        page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+        page.wait_for_timeout(150)
+    page.mouse.move(vp["width"] / 2, vp["height"] / 2)
+    steps = 0
+    while page.evaluate("document.getElementById('sites-title').getBoundingClientRect().top") > vp["height"] * .4 and steps < 200:
+        page.mouse.wheel(0, 240)
+        page.wait_for_timeout(30)
+        steps += 1
+    page.wait_for_timeout(300)
+    end = page.evaluate("() => { const s = document.querySelector('.ph-scroll'); return s ? s.scrollHeight - s.clientHeight - s.scrollTop : 0; }")
+    sec = page.evaluate("document.querySelector('.rnav-a[aria-current]') && document.querySelector('.rnav-a[aria-current]').dataset.sec")
+    check(f"{tag} scroll: wheeling down past the Google frame reaches the sites ({steps} steps), frame scrolled to its end, nav on Sites",
+          steps < 200 and end <= 2 and sec == "sites", [steps, end, sec])
+    page.evaluate("window.scrollBy({top: -Math.round(innerHeight * .3), behavior: 'instant'})")   # just past the mock
+    page.wait_for_timeout(300)
+    page.screenshot(path=str(out / f"{vp_name}-h3-past-mock.png"))
+    cls0 = page.evaluate(CLS)   # report built + the whole scroll story, no clicks yet
+
+    # 3. show more sites, open a site, its links in steps, close = gone
+    if page.locator("#lx-more").is_visible():
+        page.locator("#lx-more").click()
+    check(f"{tag} incremental: Show more adds 25 sites", rows() == 35 and page.locator("#lx-more").inner_text() == "Show 25 more sites · 65 left", rows())
+    top = page.locator("#lx-list .lx-site").first
+    top.locator("summary").click()
+    n_top = len(HUGE_SITES[HUGE_TOP])
+    page.wait_for_timeout(150)
+    lm = top.locator(".lx-lmore")
+    got = (top.locator("a").count(), lm.inner_text() if lm.count() else None)
+    check(f"{tag} incremental: an opened site shows 10 links + 'Show 50 more of {n_top}'", got == (10, f"Show 50 more of {n_top} on {HUGE_TOP}"), got)
+    hrefs = top.locator("a").evaluate_all("els => els.map(e => e.href)")
+    check(f"{tag} opened site lists its own links, external + safe", set(hrefs) <= set(HUGE_SITES[HUGE_TOP]) and top.locator("a").first.get_attribute("rel") == "noopener noreferrer nofollow"
+          and top.locator("a").first.get_attribute("target") == "_blank", hrefs[:2])
+    while top.locator(".lx-lmore").count():
+        top.locator(".lx-lmore").click()
+    check(f"{tag} every link of the site reachable", top.locator("a").count() == n_top, top.locator("a").count())
+    top.locator("summary").scroll_into_view_if_needed()
+    page.screenshot(path=str(out / f"{vp_name}-h4-open-site.png"))
+    top.locator("summary").click()
+    page.wait_for_timeout(100)
+    check(f"{tag} closing a site drops its links from the DOM", top.locator("a").count() == 0)
+
+    # 4. filter: by site, by URL part, nothing; clear
+    def filt(q):
+        page.locator("#lx-q").fill(q)
+        page.wait_for_timeout(350)
+        return page.locator("#lx-status").inner_text()
+    q = "thread/1"
+    want = {d: [u for u in us if q in u.lower()] for d, us in HUGE_SITES.items()}
+    want = {d: v for d, v in want.items() if v}
+    st = filt(q)
+    check(f"{tag} filter by URL part: status counts sites + links", st == f"{len(want)} sites · {sum(map(len, want.values()))} links match “{q}”", st)
+    shown = page.locator("#lx-list a").evaluate_all("els => els.map(e => e.href)")
+    check(f"{tag} filter: only matching links shown, highlighted", shown and all(q in u.lower() for u in shown)
+          and page.locator("#lx-list a mark").count() == len(shown), len(shown))
+    check(f"{tag} incremental: filter shows 10 sites + Show more, opens the first 3", rows() == min(10, len(want))
+          and page.locator("#lx-list details[open]").count() == min(3, len(want)), [rows(), page.locator("#lx-list details[open]").count()])
+    page.screenshot(path=str(out / f"{vp_name}-h5-filter.png"))
+    st = filt("FANZONE")
+    check(f"{tag} filter by site name (any case)", st.startswith("1 site · ") and page.locator("#lx-list .lx-name").all_inner_texts() == ["fanzone.example"], st)
+    st = filt("zzqx")
+    check(f"{tag} filter: nothing → says so, empty list hidden", st == "No site or link contains “zzqx”." and rows() == 0 and page.locator("#lx-more").is_hidden(), st)
+    filt("")
+    check(f"{tag} incremental: clearing the filter → first 10 sites again", rows() == 10 and page.locator("#lx-status").inner_text() == "")
+
+    # 5. export carries everything, whatever is shown
+    with page.expect_download() as dl:
+        page.locator("#download").click()
+    txt = pathlib.Path(dl.value.path()).read_text()
+    got = {ln for ln in txt.splitlines() if ln.startswith("https://") and "/scan/?r=" not in ln}
+    check(f"{tag} Download .txt carries every link ({HUGE_LINKS})", got == {u for us in HUGE_SITES.values() for u in us}, len(got))
+
+    # 6. reopen ?r= (stored huge report) renders the same way
+    slug = parse_qs(urlsplit(page.url).query).get("r", [""])[0]
+    page.goto(base + "scan/?r=" + slug)
+    page.wait_for_selector("#report:not([hidden])", timeout=8000)
+    page.wait_for_function("performance.getEntriesByName('leakscan:report').length > 0", timeout=5000)
+    ms2 = page.evaluate("performance.getEntriesByName('leakscan:report')[0].duration")
+    check(f"{tag} ?r= reopen: built + painted < 1500 ms (CPU x4)", ms2 < 1500, f"{ms2:.0f} ms")
+    check(f"{tag} incremental: ?r= reopen shows the first 10 sites", rows() == 10, rows())
+    page.screenshot(path=str(out / f"{vp_name}-h1-top.png"))
+    cls = [cls0, page.evaluate(CLS)]
+    check(f"{tag} no layout shift without input once the report is built (CLS 0: fresh scan + scroll story, ?r= reopen)", cls[0][0] == 0 and cls[1][0] == 0, cls)
+    check(f"{tag} no 5xx", not bad, bad)
+    check(f"{tag} no request left loopback", not outside, outside)
+    check(f"{tag} no JS / console errors", not errors, errors)
+    (out / f"{vp_name}-huge-metrics.json").write_text(json.dumps({"render_ms": round(ms), "reopen_ms": round(ms2), "dom_elements": nodes,
+                                                                  "wheel_steps_to_sites": steps, "cls": [cls[0][0], cls[1][0]], "thumbs_at_load": len(thumbs)}))
+    ctx.close()
 
 # ---------------------------------------------------------------- personalize
 # Checks named "profile: ..." need the scan result's `profile` (and the media it unlocks); every other check must stay
@@ -2209,6 +2380,7 @@ try:
         for vp_name, vp in VIEWPORTS:
             if "scan" in SCENARIOS:
                 scan_flow(browser, vp_name, vp)
+                huge_flow(browser, vp_name, vp)
             if "personalize" in SCENARIOS:
                 personalize_flow(browser, vp_name, vp)
             if "askai" in SCENARIOS:
@@ -2226,5 +2398,6 @@ finally:
 
 (out / "e2e-summary.json").write_text(json.dumps({"fails": fails, "omit_results": omit, "omit_profile": omit_profile,
                                                   "scenarios": SCENARIOS, "break_allowlist": BREAK_ALLOWLIST, "break_thumbs": BREAK_THUMBS,
+                                                  "break_incremental": BREAK_INCREMENTAL,
                                                   "measured": MEASURED}, indent=1))
 sys.exit(1 if fails else 0)
