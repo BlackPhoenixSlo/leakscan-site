@@ -26,9 +26,10 @@
   var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone', revealed: false,
     more: null, fitted: null, expanded: null, dead: {}, log: [], retry: null };
   // phone preview: items per tab (fitPhone trims All's first look), tabs fitted / grown by More (per device + report).
-  // Phone Images / Videos: everything (up to 60) in the pinned screen's own scroll. Desktop Images: 3 rows of 8 to
-  // start (spares for a failed thumb's slot, see watchThumb), +3 rows per More
-  var MORE0 = { all: 10, images: 60, videos: 60 }, DESK = { images: 24 };
+  // Phone Images: everything (up to 60) in the pinned screen's own scroll. Desktop Images: 3 rows of 8 to start (spares
+  // for a failed thumb's slot, see watchThumb), +3 rows per More. Videos: a short first look (phone 4 = <= 1.5 screens of
+  // scrolling like All's, a video card is ~300px tall; desktop 8), +12 per More
+  var MORE0 = { all: 10, images: 60, videos: 4 }, DESK = { images: 24, videos: 8 }, DESK_STEP = { images: 24, videos: 12 };
   function more0(k) { return (state.device === 'phone' ? 0 : DESK[k]) || MORE0[k]; }
   function resetPreview() { state.more = {}; Object.keys(MORE0).forEach(function (k) { state.more[k] = more0(k); }); state.fitted = {}; state.expanded = {}; state.first = {}; }
   resetPreview();
@@ -307,14 +308,14 @@
   function panelVideos(d, phone) {
     var vids = d.results.filter(function (r) { return r.kind === 'video'; });
     if (!vids.length) return '<p class="g-empty">No video results indexed for this handle</p>';
-    var n = phone ? Math.min(state.more.videos, vids.length) : vids.length;   // phone: up to 60, the pinned screen scrolls through
+    var n = Math.min(state.more.videos, vids.length);   // a short first look (phone 4, desktop 8), +12 per More
     return vids.slice(0, n).map(function (r) {
       var t = r.thumb && thumb(r.thumb) ? img(r.thumb, r.title) : '<span class="g-img g-img-none"></span>';
       return '<div class="g-v">' + a(r.link, 'g-vthumb', t + '<span class="g-play" aria-hidden="true"></span>' + GO) +
         '<div class="g-vbody">' + a(r.link, 'g-title', titled(r.title || r.link)) +
         '<span class="g-cite">' + fav(r.domain, 'g-fav-s') + esc(r.domain) + esc(crumbs(r.link).replace(/^https?:\/\/[^ ]+/, '')) + '</span>' +
         (r.snippet ? '<p class="g-snip">' + esc(r.snippet) + '</p>' : '') + '</div></div>';
-    }).join('') + more('videos', 'More videos', vids.length - n);
+    }).join('') + more('videos', 'Show more videos', vids.length - n);
   }
   var TABS = [['all', 'All'], ['images', 'Images'], ['videos', 'Videos']];
   function tabRow() {
@@ -434,10 +435,10 @@
   }
   // The phone's first look at a tab is at most ~1.5 screens of scrolling (pinned) or ~1.5 screens tall (short screens,
   // not pinned): fewer results to start with, "More …" adds the rest. Once per tab and device; a click on More is the user's.
-  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 60, videos: 60 };
+  var ITEM = { all: '.g-r', images: '.g-tile', videos: '.g-v' }, MORE_STEP = { all: 10, images: 60, videos: 12 };
   function fitPhone(focusTab) {
     var t = state.tab, page = pin.scr.firstElementChild;
-    if (state.fitted[t] || t !== 'all') return;   // Images / Videos: all of them, the pinned screen scrolls through
+    if (state.fitted[t] || t !== 'all') return;   // Images: all (<= 60), the pinned screen scrolls through; Videos: fixed first look
     state.fitted[t] = true;
     var items = page.querySelectorAll(ITEM[t]), last = items[items.length - 1];
     if (items.length <= 1) return;
@@ -525,7 +526,7 @@
     else if (t.dataset.goto) { state.tab = t.dataset.goto; renderGoogle(true); }
     else {
       var k = t.dataset.more, sel = '#g-panel ' + ITEM[k], had = document.querySelectorAll(sel).length;
-      state.more[k] += (state.device === 'phone' ? 0 : DESK[k]) || MORE_STEP[k];
+      state.more[k] += (state.device === 'phone' ? 0 : DESK_STEP[k]) || MORE_STEP[k];
       state.expanded[k] = true;
       renderGoogle(false);
       var nx = document.querySelectorAll(sel)[had];   // keyboard: carry on at the first new result
