@@ -5,6 +5,8 @@ Checks every HTML file under site/ (except site/showcase/**):
 - local href/src/srcset/poster targets exist (pages under site/showcase/ have their own gates in tools/showcase/)
 - absolute URLs under SITE_URL resolve to local files too; no leading-slash internal links
 - no third-party resource loads (scripts, styles, images, frames, icons)
+- no resource load by absolute SITE_URL either: the same files are served from the VPS origin too, where it would be
+  a cross-origin request to github.io (404.html inlines its icon instead)
 - #fragment links point at an existing id
 - <html lang>, viewport meta, <title>, meta description, og:title/description/image, twitter:card
 - <title> <= 65 chars, meta description <= 160 chars (longer gets cut in Google results)
@@ -236,11 +238,13 @@ def main():
                     bad(f"{rel}: #{v[1:]} does not match any id")
                 continue
             tgt = local_target(rel, v)
+            loads = tag in RESOURCE_TAGS or (tag == "link" and linkrel not in ("canonical", "alternate"))
             if tgt is None:
-                loads = tag in RESOURCE_TAGS or (tag == "link" and linkrel not in ("canonical", "alternate"))
                 if loads and attr != "content":
                     bad(f"{rel}: third-party resource <{tag} {attr}={v}>")
                 continue
+            if loads and v.startswith(SITE_URL):
+                bad(f"{rel}: <{tag} {attr}={v}> loads by absolute URL (cross-origin on the VPS host; use a relative path)")
             path, frag = tgt
             f = SITE / path
             if path.startswith("../") or not f.is_file():
