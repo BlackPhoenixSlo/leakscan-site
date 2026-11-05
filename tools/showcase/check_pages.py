@@ -67,6 +67,8 @@ class Page(HTMLParser):
         self.headings: list[int] = []
         self.fades = False
         self.js_flag = False
+        self.anchors: list[list] = []  # [href, visible text, has aria-label/-labelledby]
+        self._a_open = False
         self._inline_script = False
         self._depth = {"nav": 0, "footer": 0}
         self._ribbon_tag: str | None = None
@@ -97,6 +99,8 @@ class Page(HTMLParser):
 
         if tag == "a" and a.get("href"):
             self.links.append(a["href"])
+            self.anchors.append([a["href"], "", bool(a.get("aria-label") or a.get("aria-labelledby"))])
+            self._a_open = True
             if self._depth["nav"]:
                 self.nav.append(a["href"])
             elif self._depth["footer"]:
@@ -116,12 +120,16 @@ class Page(HTMLParser):
             self._depth[tag] -= 1
 
     def handle_data(self, data):
+        if self._a_open:
+            self.anchors[-1][1] += data
         if self._inline_script and "classList.add('js')" in data:
             self.js_flag = True
 
     def handle_endtag(self, tag):
         if tag == "script":
             self._inline_script = False
+        if tag == "a":
+            self._a_open = False
         if tag in self._depth and self._depth[tag]:
             self._depth[tag] -= 1
         if self._ribbon_tag == tag:
@@ -293,6 +301,22 @@ def check_fade_css():
     return errors
 
 
+def check_link_purpose(parsed):
+    """Same visible link text to different targets ("Read More" x3) needs an aria name per link."""
+    errors = []
+    for rel, page in parsed.items():
+        by_text: dict[str, list] = {}
+        for href, text, named in page.anchors:
+            key = " ".join("".join(c for c in text.casefold() if c.isalnum() or c.isspace()).split())
+            if key:
+                by_text.setdefault(key, []).append((href, named))
+        for key, hits in sorted(by_text.items()):
+            if len({h for h, _ in hits}) > 1 and not all(n for _, n in hits):
+                errors.append(f"{rel}: {len(hits)} links read \"{key}\" but go to different pages; "
+                              f"give each aria-labelledby (link + its title)")
+    return errors
+
+
 def check_image_dims(parsed):
     """A declared width/height must match the placeholder it was designed for."""
     return [
@@ -313,6 +337,7 @@ def main() -> int:
     errors += check_ld_nav(site.PUBLIC / "index.html", nav_set)
     errors += check_blog(parsed)
     errors += check_image_dims(parsed)
+    errors += check_link_purpose(parsed)
     errors += check_showcase(parsed, paths)
     errors += check_fade_css()
 
