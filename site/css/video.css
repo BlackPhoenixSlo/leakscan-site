@@ -32,7 +32,7 @@
 .vo-panel { width: 100%; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 10px 40px rgb(0 0 0 / .28); }
 .vo-rs { height: 350px; border: 0; border-radius: 0; cursor: auto; touch-action: auto; }
 .vo .rm-handle { opacity: var(--h); }
-.vo-stamp { position: absolute; top: 58px; right: -10px; display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px 9px 14px; border-radius: 999px;
+.vo-stamp { position: absolute; bottom: -16px; right: -10px; display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px 9px 14px; border-radius: 999px;
   background: #23704f; color: #fff; font: 800 1.1rem/1 var(--sans); box-shadow: 0 6px 20px rgb(0 0 0 / .25);
   opacity: var(--s); transform: rotate(-6deg) scale(calc(.6 + var(--s) * .4)); }
 .vo-stamp .icon { width: 20px; height: 20px; stroke-width: 3; }

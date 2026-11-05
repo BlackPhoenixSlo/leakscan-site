@@ -23,8 +23,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     fails = []
     html = (pathlib.Path(__file__).resolve().parents[2] / "site/video/index.html").read_text(encoding="utf-8")
-    cues = [(m[1], float(m[2]), float(m[3])) for m in
-            re.finditer(r'data-prefab="(\w+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)"', html)]
+    cues = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
+        r'data-prefab="(\w+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     with serve() as base, sync_playwright() as p:
         b = p.chromium.launch()
         for vp, opts in VIEWPORTS.items():
@@ -34,12 +34,12 @@ def main():
             pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
             pg.on("pageerror", lambda e: errs.append(str(e)))
             pg.on("request", lambda r: ext.append(r.url) if not r.url.startswith(base) else None)
-            for pid, live, rem in cues:
-                for state, t in (("live", live + 0.8), ("removed", rem + 2.0)):
+            for pid, live, rem, out in cues:
+                for state, t in (("live", live + 0.8), ("removed", min(rem + 2.0, out - 0.4))):
                     pg.goto(f"{base}video/?name={a.name}&t={t:g}")
                     pg.wait_for_function("t => { const v = document.querySelector('video'); return v.readyState >= 3"
                                          " && !v.seeking && Math.abs(v.currentTime - t) < 0.05 }", arg=t, timeout=15000)
-                    pg.wait_for_timeout(400)
+                    pg.wait_for_timeout(1500)   # the native loading spinner fades out
                     shot = out / f"{vp}-t{t:05.2f}-{pid}-{state}.png"
                     if vp == "phone":
                         pg.locator(".vo-stage").screenshot(path=str(shot))
