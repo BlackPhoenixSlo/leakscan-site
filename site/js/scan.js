@@ -241,9 +241,10 @@
       return '<span style="color:' + G_COLORS[i] + '">' + c + '</span>';
     }).join('') + '</span>';
   }
-  function imageItems(d) { return E.imageItems(d.images, d.imgResults, function (u) { var t = thumb(u); return t && !state.dead[t]; }, Infinity); }   // every image Google shows (images[] + result thumbs, deduped)
-  function img(u, alt) {
-    return '<span class="g-img"><img src="' + esc(thumb(u)) + '" alt="' + esc(alt || '') + '" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';
+  function imageItems(d) { return E.imageItems(d.images, d.imgResults, function (u) { var t = thumb(u); return t && !state.dead[t]; }, Infinity, true); }   // every image Google shows (images[] + result thumbs, deduped)
+  function img(u, alt, video) {   // video: a video result's still, play badge (css: .g-vid)
+    return '<span class="g-img' + (video ? ' g-vid' : '') + '"><img src="' + esc(thumb(u)) + '" alt="' + esc(video ? 'Video: ' + (alt || 'video result') : alt || '') +
+      '" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';
   }
   function a(u, cls, inner) {
     return '<a class="' + cls + '" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer nofollow">' + inner + '</a>';
@@ -285,14 +286,14 @@
     return h + more('all', 'More results', pages.length - n);
   }
   function packB(it) {   // opens the page the image is on; an image no result has opens the Images tab
-    return it.link ? '<a class="g-pack-b" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer nofollow">' + img(it.src, it.title || it.domain) + '</a>'
+    return it.link ? '<a class="g-pack-b" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer nofollow">' + img(it.src, it.title || it.domain, it.video) + '</a>'
       : '<button type="button" class="g-pack-b" data-goto="images" aria-label="Show image results">' + img(it.src, '') + '</button>';
   }
   function gTile(it) {
     // an image no result has: same caption shape, credited to Google Images (nothing to open: this is the report)
     var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>'
       : '<span class="g-ct">Image result</span><span class="g-cs">' + fav('google.com', 'g-fav-s') + 'Google Images</span>';
-    var tile = img(it.src, it.title || 'Image result');
+    var tile = img(it.src, it.title || 'Image result', it.video);
     return '<figure class="g-tile">' + (it.link ? a(it.link, 'g-tile-a', tile + GO) : tile) + '<figcaption>' + cap + '</figcaption></figure>';
   }
   function panelImages(d, phone) {

@@ -10,9 +10,10 @@ Serves site/ and the API routes of the contract the scan page talks to:
   when sent; a bad instagram / x value → 400 bad_handle), `done`. Magic handles drive the error paths:
   stub-fail → `failed` + `done`; stub-429 → 429 rate_limited; stub-busy → 429 busy; stub-empty → status empty;
   stub-mixed → 3 hits (live true / false / missing) + the results; stub-huge → huge_result(): 1000 hit links on 100
-  domains (deterministic, long-tail counts), 80 Google results, 30 images (report-view scale test).
+  domains (deterministic, long-tail counts), 80 Google results, 30 images (report-view scale test); stub-videos →
+  videos_result(): 45 results (34 video), 18 images[] (12 = video stills), 33 unique thumbs (video stills in the image views).
 - GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise. Preloaded: demoR3port01 (the
-  fixture, with its synthetic `profile`), demoHuge0001 (huge_result()), demoNoProf01 (same, `profile` null: scan-only personalization, no leak-page
+  fixture, with its synthetic `profile`), demoHuge0001 (huge_result()), demoVideos01 (videos_result()), demoNoProf01 (same, `profile` null: scan-only personalization, no leak-page
   Instagram), demoFoundIG1 (`profile` null, leak-page Instagram fills the IG rows) and evilR3port01
   (fixture overlaid with tools/fixtures/scan-evil.json: script tags, javascript: urls, oversized strings).
   `aliases` {declared, discovered, socials} (alias enrichment) comes from the fixture: discovered handles + the
@@ -132,6 +133,8 @@ def make_result(handle, platform, empty=False):
     r["mega"] = json.loads(json.dumps(MEGA))
     if handle == "stub-huge":
         r.update(huge_result(handle))
+    if handle == "stub-videos":
+        r.update(videos_result(handle))
     if empty:
         r["mega"] = []
         r.update(status="empty", hit_count=0, domain_count=0, google_total=0, images=[], hits=[], results=[],
@@ -153,6 +156,28 @@ THUMB_FILES = sorted(f for f in (ROOT / "site" / "showcase" / "imgs").glob("*.we
 
 
 BLANK_GIF = bytes.fromhex("47494638396101000100800000000000ffffff21f90401000000002c00000000010001000002024401003b")
+
+
+def videos_result(handle):
+    """stub-videos / demoVideos01, shaped like a real report (2_YPj7TbK4rm): 45 Google results, 34 video + 11 page, 5 without a
+    thumb; 40 result thumbs on 27 unique (Google reuses video stills); 18 images[], 12 of them a video result's still.
+    33 unique thumbs: 6 image-only + 12 shared with videos + 6 video-only + 9 page. Video-sourced: 18."""
+    g = lambda tag: f"https://encrypted-tbn0.gstatic.com/images?q=tbn:VID{tag}"
+    vstill = [g(f"S{k:02d}") for k in range(12)] + [g(f"V{k:02d}") for k in range(6)]   # 18 unique video stills
+    results = []
+    for j in range(34):
+        d = ["tubeleak", "clipdump", "vidhoard"][j % 3] + ".example"
+        results.append({"title": f"{handle} video {j + 1} - {d.split('.')[0].title()}", "link": f"https://{d}/watch/{7000 + j}/{handle}",
+                        "snippet": f"{handle} clip on {d.split('.')[0].title()}. Synthetic fixture text.", "domain": d, "kind": "video",
+                        "thumb": None if j in (30, 32, 33) else vstill[j % 18]})
+    for j in range(11):
+        d = ["leakvault", "fanzone", "onlybase", "picstash"][j % 4] + ".example"
+        results.append({"title": f"{handle} gallery {j + 1} - {d.split('.')[0].title()}", "link": f"https://{d}/free/{8000 + j}/{handle}",
+                        "snippet": f"{handle} on {d.split('.')[0].title()}. Synthetic fixture text.", "domain": d, "kind": "page",
+                        "thumb": None if j in (3, 8) else g(f"P{j:02d}")})
+    images = [g(f"I{k:02d}") for k in range(6)]
+    images = [images[0], vstill[0], vstill[1], images[1], *vstill[2:6], images[2], *vstill[6:9], images[3], images[4], *vstill[9:12], images[5]]
+    return {"results": results, "images": images}
 
 
 def broken_thumbs(fx):
@@ -402,7 +427,8 @@ def main():
                           ("demoFoundIG1", {"profile": None, "mega": []}), (EVIL["slug"], {**EVIL, "mega": EVIL_MEGA}),
                           ("demoBrokenT1", {**broken_thumbs(FIXTURE), "mega": []}),
                           ("demoRemove1", {"mega": MEGA, "hits": FIXTURE["hits"] + SOCIAL_HITS}),
-                          ("demoHuge0001", {**huge_result(FIXTURE["handle"]), "mega": []})):
+                          ("demoHuge0001", {**huge_result(FIXTURE["handle"]), "mega": []}),
+                          ("demoVideos01", {**videos_result(FIXTURE["handle"]), "mega": []})):
         seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
         if OPTS.omit_results:
             seed.pop("results", None)
