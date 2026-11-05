@@ -2402,10 +2402,14 @@ def tabs_flow(browser, vp_name, vp):
         page.locator("#g-panel [data-more=all]").click()
     pages_n = page.locator("#g-panel .g-r").count()
     page.locator("#g-tab-images").click()
+    isteps = [page.locator("#g-panel .g-tile").count()]
     while page.locator("#g-panel [data-more=images]").count():
         page.locator("#g-panel [data-more=images]").click()
-    tab_n = page.locator("#g-panel .g-tile").count()
-    check(f"{tag} thumbs: > 80 results: every result's thumb in the strip and the Images tab (pages stay capped at 80)", strip_n == tab_n == many.n > 80 and pages_n == many.pages, [strip_n, tab_n, many.n, pages_n, many.pages])
+        isteps.append(page.locator("#g-panel .g-tile").count())
+    tab_n = isteps[-1]
+    i0 = 24 if vp_name == "desktop" else 60   # Images: desktop 24, +24; phone 60, +60
+    check(f"{tag} thumbs: > 80 results: every result's thumb in the strip and the Images tab ({i0}, +{i0} per More; pages stay capped at 80)",
+          strip_n == tab_n == many.n > 80 and pages_n == many.pages and isteps == [min(i0 * k, many.n) for k in range(1, len(isteps) + 1)], [strip_n, isteps, many.n, pages_n, many.pages])
     ctx.close()
     # a report that is mostly video results (real 2_YPj7TbK4rm shape): every unique thumb in the strip and the Images tab,
     # video results' stills with a play badge; images[] entries that share a video still stay image results. Fresh scan + reopen
@@ -2439,13 +2443,16 @@ def tabs_flow(browser, vp_name, vp):
             page.wait_for_timeout(300)
             kb = page.evaluate("() => { const v = [...document.querySelectorAll('#g-panel .g-v')]; return v.findIndex(e => e.contains(document.activeElement)); }")
             steps.append(vcount())
+        names = set()
         while page.locator("#g-panel [data-more=videos]").count():
+            names.add(page.locator("#g-panel [data-more=videos]").inner_text())
             page.locator("#g-panel [data-more=videos]").click()
             page.wait_for_timeout(100)
             steps.append(vcount())
         vn = vcount()
         if how.endswith("demoVideos01"):   # Show fewer: back to the first look, focus on Show more videos, in view
             if page.locator("#g-panel [data-less=videos]").count():
+                names.add(page.locator("#g-panel [data-less=videos]").inner_text())
                 page.locator("#g-panel [data-less=videos]").click()
                 page.wait_for_timeout(300)
             fw = [vcount(), page.evaluate("document.activeElement.matches('[data-more=videos]')"), page.evaluate(IN_VIEW)]
@@ -2453,7 +2460,7 @@ def tabs_flow(browser, vp_name, vp):
             f0 = 4 if vp_name == "phone" else 8
             check(f"{tag} Videos: first look {f0}, 'Show more videos' +12 (Enter: focus on the first new one) up to all 34, Show fewer → {f0}, focus on Show more, in view",
                   first == f0 and steps == [min(f0 + 12 * k, 34) for k in range(1, len(steps) + 1)] and steps[-1:] == [34] and kb == f0
-                  and fw == [f0, True, True], [first, steps, kb, fw])
+                  and fw == [f0, True, True] and names == {'Show more videos', 'Show fewer'}, [first, steps, kb, fw, sorted(names)])
             page.locator("#g-tab-all").click()
             page.evaluate("document.querySelector('#g-panel .g-strip').scrollIntoView({block: 'center', behavior: 'instant'})")
             page.wait_for_timeout(500)
