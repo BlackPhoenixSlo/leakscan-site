@@ -19,7 +19,8 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
   Without JS it links to https://jackbase.me/scan.
 - Personalization (`js/personalize.js`): after a scan the landing page and the demo site (`showcase/`) show her data.
   Slug: `?r=` → `localStorage['leakscan.last']` (written by `scan.js`) → none (page unchanged, no API call). One
-  `GET /api/scan-result/<slug>` per tab (sessionStorage cache, 8 s timeout, failure = defaults); every value is
+  `GET /api/scan-result/<slug>` per tab (sessionStorage cache, 8 s timeout, failure = defaults; on the landing the hero
+  card's request from `js/scan-engine.js` is shared, and a `?r=` link opened with the card below the fold scrolls it up); every value is
   validated and rendered with textContent / built elements, never leak titles or snippets. Landing: hero line +
   Reset, both "Your website" phones (name, top-4 leak domains by occurrences, blurred `/api/thumb` thumbs, IG / TikTok /
   site rows hidden when unknown), hero card handles, showcase url bar + iframe `showcase/?r=`. Slots are `data-p="…"`.

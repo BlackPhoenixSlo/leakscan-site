@@ -36,7 +36,8 @@ inline (js/inline-scan.js): the hero form scans in place; the card becomes the r
 (counts from the fixture, switching never resizes the card), whole-row links, a film strip of what Google Images shows
 (blurred, ↗, links to its result or the full report) that drifts by itself after ~4 s idle, stops for good on a
 pointerdown and never moves under prefers-reduced-motion (no layout shift: card box + PerformanceObserver), the #free
-band's mini Google Images frame with her tiles; errors, reload, reset. --break-drift serves inline-scan.js with the
+band's mini Google Images frame with her tiles; errors, reload, reset; a shared ?r= link makes one /api/scan-result
+request and (phone) scrolls the card under the nav, not with #website. --break-drift serves inline-scan.js with the
 drift speed 0: only `drift:` checks may go red. --break-phones serves personalize.js without the phone links: only
 `phones:` checks may go red.
 """
@@ -1628,6 +1629,40 @@ def inline_flow(browser, vp_name, vp):
     r = strip(page)
     check(f"{tag} hero: reduced motion → strip still, no drift after 6.5 s idle", r and r["x"] == 0 and r["drift"] is None and r["max"] > 0 and r["pause"] == "none", r and (r["x"], r["drift"], r["max"], r["pause"]))
     page.locator(".report-card .live-strip-box").screenshot(path=str(out / f"{vp_name}-i3d-strip-reduced-motion.png"))
+    ctx.close()
+
+    # 7c. a shared ?r= link in a fresh browser: ONE /api/scan-result request (inline-scan.js + personalize.js share it);
+    # phone: the card (below the hero text) is brought under the nav; desktop: it is already in view, no scroll;
+    # ?r=…#website: the anchor wins, the card is not brought
+    ctx = new_ctx()
+    page = ctx.new_page()
+    reqs = []
+    page.on("request", lambda q: "/api/scan-result/" in q.url and reqs.append(q.url))
+    page.goto(base + "?r=" + slug, wait_until="load")
+    try:
+        page.wait_for_selector(".report-card .live-rows li", timeout=8000)
+        page.wait_for_function("() => document.querySelector('[data-p=search]').textContent !== 'yourname'", timeout=8000)
+    except Exception:
+        pass
+    page.wait_for_timeout(1500)   # personalize.js has applied too (smooth scroll settled)
+    pos = page.evaluate("() => { const r = document.querySelector('.report-card').getBoundingClientRect(); return {top: Math.round(r.top), y: Math.round(scrollY), ih: innerHeight, pad: parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0, name: document.querySelector('[data-p=search]').textContent}; }")
+    check(f"{tag} shared ?r= link: one /api/scan-result request (hero card + personalize share it)", len(reqs) == 1 and pos["name"] != "yourname", (len(reqs), pos["name"]))
+    if vp_name == "phone":
+        check(f"{tag} shared ?r= link: phone scrolls the report card up under the nav", pos["y"] > 0 and pos["pad"] - 2 <= pos["top"] <= pos["pad"] + 40, pos)
+    else:
+        check(f"{tag} shared ?r= link: desktop card already in view, page not scrolled", pos["y"] == 0 and 0 <= pos["top"] < pos["ih"] - 200, pos)
+    page.screenshot(path=str(out / f"{vp_name}-i3e-shared-link.png"))
+    ctx.close()
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.goto(base + "?r=" + slug + "#website", wait_until="load")
+    try:
+        page.wait_for_selector(".report-card .live-rows li", timeout=8000)
+    except Exception:
+        pass
+    page.wait_for_timeout(1500)
+    pos = page.evaluate("() => { const c = document.querySelector('.report-card').getBoundingClientRect(), w = document.getElementById('website').getBoundingClientRect(); return {card: Math.round(c.top), website: Math.round(w.top), ih: innerHeight}; }")
+    check(f"{tag} shared ?r=…#website link: no jump to the card", not (0 <= pos["card"] < pos["ih"]) and pos["website"] < pos["ih"], pos)
     ctx.close()
 
     # 8. no JS: plain GET to scan/ with h + ig; scan/ reads h / ig / x and posts the socials

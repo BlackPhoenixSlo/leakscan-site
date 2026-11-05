@@ -607,12 +607,16 @@
   else { try { slug = (JSON.parse(localStorage.getItem('leakscan.last') || 'null') || {}).slug; } catch (e) { slug = null; } }
   if (typeof slug === 'string' && E.SLUG_RE.test(slug)) {
     var tok0 = token;
+    asked = Date.now();
     E.fetchResult(slug).then(function (raw) {
       var m = tok0 === token && model(raw, {});
       if (!m || m.slug !== slug) return;
       heroOpen(m.handle, m.platform).setAttribute('data-handle', m.handle);
       heroResult(m);
       bandResult(m);
+      // A shared report link (?r=, no #section) opened where the card sits below the fold (phones: under the hero
+      // text): bring it up, unless she already scrolled / typed. A restored scroll position or a #link is left alone.
+      if (mr && !location.hash && card.getBoundingClientRect().top >= window.innerHeight) bring();
     }, function () { /* unknown / unreachable: the page keeps its illustration */ });
   }
 })();

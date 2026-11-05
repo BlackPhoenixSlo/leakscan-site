@@ -1,7 +1,8 @@
 // After a free scan, fills the landing mockups ("Your website", showcase frame) and the demo site (showcase/) with the
 // scanned creator's data. Plain ES5-ish, no deps, no third parties (only the scan API host).
 // Slug: ?r=<slug> -> localStorage['leakscan.last'].slug (written by js/scan.js) -> nothing: page keeps its defaults.
-// One fetch of GET <API>/api/scan-result/<slug> per page (sessionStorage cache, 8s timeout); any failure = defaults.
+// One fetch of GET <API>/api/scan-result/<slug> per page (sessionStorage cache, 8s timeout, shared with js/scan-engine.js
+// where that is loaded); any failure = defaults.
 // Every API value is validated in clean(); rendering uses textContent / createElement only, never innerHTML.
 (function () {
   'use strict';
@@ -144,10 +145,12 @@
       if (c && c.m && (c.m.profile || Date.now() - c.ts < 60000)) return cb(c.m);
     } catch (e) { /* ignore */ }
     if (!window.fetch) return;
-    var ctrl = window.AbortController ? new AbortController() : null, late = false;
+    // On the landing, js/scan-engine.js already fetches this result for the hero card: share its one request.
+    var E = window.LeakScanEngine, shared = E && E.fetchResult && E.API === API;
+    var ctrl = !shared && window.AbortController ? new AbortController() : null, late = false;
     var timer = setTimeout(function () { late = true; if (ctrl) ctrl.abort(); }, 8000);
-    fetch(API + '/api/scan-result/' + encodeURIComponent(slug), { credentials: 'omit', signal: ctrl ? ctrl.signal : undefined })
-      .then(function (res) { if (!res.ok) throw new Error('http ' + res.status); return res.json(); })
+    (shared ? E.fetchResult(slug) : fetch(API + '/api/scan-result/' + encodeURIComponent(slug), { credentials: 'omit', signal: ctrl ? ctrl.signal : undefined })
+      .then(function (res) { if (!res.ok) throw new Error('http ' + res.status); return res.json(); }))
       .then(function (j) {
         clearTimeout(timer);
         var m = late ? null : clean(j, slug);
