@@ -379,7 +379,7 @@ def cta_steps(pg, base, out, cta, name_q):
     for dt in (4.5, 5.0, 5.5, 6.0, 6.4, 7.4):
         pg.evaluate(DRAW, cta + dt)
         s = pg.evaluate(STEPS)
-        walk.append((s["ms"], s["count"]))
+        walk.append((s["ms"], s["count"]) if s else (None, ""))
     m = [PROGRESS.fullmatch(w[0] or "") for w in walk[:-1]]
     roll = re.fullmatch(r"(\d+) links found", walk[-1][1])
     check(f"cta-steps: the scan walks Google → … → Mega, step N rising; at + 7.4 'N links found' rolling to {LEAKS}",
