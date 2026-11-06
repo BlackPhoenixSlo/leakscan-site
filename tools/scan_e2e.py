@@ -2412,6 +2412,18 @@ def tabs_flow(browser, vp_name, vp):
     check(f"{tag} videos: #free Videos rows: logo still dropped (grey box + play kept, row stays), the rest painted",
           [x[0] for x in bv] == [r["link"] for r in BV] and [x[1] for x in bv] == [None if dead_thumb(r.get("thumb") or "DEAD") else True for r in BV]
           and all(x[2] for x in bv) and any("LOGO" in (r.get("thumb") or "") for r in BV), bv)
+    # row icons (Links + Sites): a person photo of the row's own site or the neutral letter: never a logo / dead thumb,
+    # never another site's photo; a site whose own thumb fails borrows one of its other results' photos
+    tdom = {}
+    for r in BROKEN["results"]:
+        if r.get("thumb"):
+            tdom.setdefault(r["thumb"], set()).add(r["domain"])
+    ri = page.evaluate("""() => [...document.querySelectorAll('.report-card .live-rows a.live-link, .report-card .live-sites a.live-link')].map(a => {
+        const i = a.querySelector('.live-ico img'); return [a.querySelector('.live-dom').textContent, i ? decodeURIComponent(i.getAttribute('src').split('u=')[1] || '') : '']; })""")
+    bad_doms = {d for t, ds in tdom.items() if dead_thumb(t) for d in ds}
+    check(f"{tag} thumbs: row icons (Links + Sites): own-site person photos or the letter, no logo / failed thumb, a failed site borrows its own other photo",
+          ri and not any(dead_thumb(u) for _d, u in ri if u) and all(d in tdom.get(u, ()) for d, u in ri if u)
+          and any(d in bad_doms and u for d, u in ri), [x for x in ri if x[1] and (dead_thumb(x[1]) or x[0] not in tdom.get(x[1], ()))] or [x[0] for x in ri if x[0] in bad_doms])
     # the same report on the scan page: failed tiles leave its Images grid too
     ctx.close()
     ctx = new_ctx()
