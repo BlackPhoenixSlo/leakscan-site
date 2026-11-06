@@ -4,7 +4,7 @@ import json
 import types
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from .common import (COUNTS, FX, MEASURED, PIP_AWAY, TILES, bring, cfg, check, dead_thumb, digits, links, new_ctx, scan_images, served, settled_count, swipe,
+from .common import (COUNTS, FX, MEASURED, PIP_AWAY, PROFILE, TILES, bring, cfg, check, dead_thumb, digits, links, new_ctx, scan_images, served, settled_count, swipe,
                      tiles_ok, video_stills)
 from .huge import IN_VIEW
 
@@ -55,6 +55,7 @@ def tabs_flow(browser, vp_name, vp):
     scan_page(t)
     free_phone(t)
     order_popout(t)
+    ba_phones(t)
     hosts = {urlsplit(u).hostname for u in net["outside"]}
     check(f"{tag} no request left loopback (the demo iframe included: no Google Fonts)", not hosts, sorted(hosts))
     check(f"{tag} no JS errors, no console errors (the stub's 404 thumbs and STALE CORS refusals aside)", not net["errors"] and not net["console"], net["errors"] + net["console"])
@@ -540,6 +541,72 @@ def free_phone(t):
     ctx.close()
 
 
+def ba_phones(t):
+    """(4) Before / After phones: '<name> nude leaks' in both; each tab fills the screen, scrolls inside it and its
+    "Show more" adds the next group up to the last, then goes. Without a scan (illustration) and with ?r= (her name)."""
+    tag, shot = t.tag, t.shot
+    ITEMS = """(id) => { const p = document.getElementById(id), b = p.querySelector('.m-more'), ph = p.closest('.phone').getBoundingClientRect();
+        const ids = [...p.querySelectorAll('.m-result, .gi-card, .m-video')].filter(e => e.getClientRects().length)
+          .map(e => e.textContent.trim() + '|' + ((e.querySelector('img') || {}).getAttribute ? e.querySelector('img').getAttribute('src') : (e.querySelector('.thumb') || {}).className));
+        return {ids, more: !!b && !b.hidden, scroll: [p.scrollTop, p.scrollHeight, p.clientHeight], y: scrollY, phone: [ph.x, ph.y, ph.width, ph.height].map(Math.round)}; }"""
+    for q, who in (("", "yourname"), ("?r=" + FX["slug"], PROFILE["display_name"])):
+        how = "report" if q else "no scan"
+        ctx = t.ctx_()
+        page = ctx.new_page()
+        page.goto(cfg.base + q, wait_until="load")
+        if q:
+            page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=9000)
+        bring(page, "#showcase .ba", "center")
+        # until the phones stop moving on the page (what loads above them settles: scroll anchoring moves scrollY)
+        page.wait_for_function("""() => { const y = Math.round(document.querySelector('.ba').getBoundingClientRect().top + scrollY), w = window.__baY || (window.__baY = []);
+            w.push(y); return w.length > 4 && w.slice(-5).every(v => v === y); }""", polling=250, timeout=10000)
+        lay = page.evaluate("""() => { const ps = [...document.querySelectorAll('.ba .phone')].map(p => p.getBoundingClientRect());
+            return {search: [...document.querySelectorAll('.ba [data-p=search]')].map(e => e.textContent), h: ps.map(r => Math.round(r.height)),
+              top: ps.map(r => Math.round(r.top)), side: ps[1].left > ps[0].right}; }""")
+        check(f"{tag} ba: {how}: both phones search '{who} nude leaks', equal height (desktop: side by side, same top)",
+              lay["search"] == [f"{who} nude leaks"] * 2 and lay["h"][0] == lay["h"][1] and (lay["side"] and lay["top"][0] == lay["top"][1]) == (t.vp_name == "desktop"), lay)
+        for side in ("before", "after"):
+            fig = f".ba-item:has(#panel-{side}-all)"
+            for k in ("all", "images", "videos"):
+                pid = f"panel-{side}-{k}"
+                bring(page, fig, "center")
+                page.locator(f"#tab-{side}-{k}").click()
+                page.wait_for_timeout(300)
+                p0 = page.evaluate(ITEMS, pid)
+                bx = page.locator(f"#{pid}").bounding_box()
+                page.mouse.move(bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2)
+                page.mouse.wheel(0, 200)
+                page.wait_for_timeout(500)
+                p1 = page.evaluate(ITEMS, pid)
+                check(f"{tag} ba: {how}: {side} {k}: the first items overflow the screen, a wheel scrolls the list inside the phone, not the page",
+                      p0["scroll"][1] > p0["scroll"][2] + 40 and p1["scroll"][0] > p0["scroll"][0] and p1["y"] == p0["y"] and p1["phone"] == p0["phone"],
+                      (p0["scroll"], p1["scroll"], p0["y"], p1["y"]))
+                page.evaluate("id => { const p = document.getElementById(id); p.scrollTop = p.scrollHeight; }", pid)
+                page.wait_for_timeout(300)
+                shot(page, f"4-ba-{'r-' if q else ''}{side}-{k}-more", fig)   # the trigger: the list's end, "Show more"
+                seen, last = [p0], p0
+                while last["more"] and len(seen) < 10:
+                    page.locator(f"#{pid} .m-more").click()
+                    page.wait_for_timeout(250)
+                    last = page.evaluate(ITEMS, pid)
+                    seen.append(last)
+                n = [len(x["ids"]) for x in seen]
+                kept = all(x["ids"][:len(y["ids"])] == y["ids"] for y, x in zip(seen, seen[1:]))
+                check(f"{tag} ba: {how}: {side} {k}: Show more adds the next items per click (earlier ones kept, no repeat) until it goes; the page / phone never move",
+                      len(n) >= 3 and all(b > a for a, b in zip(n, n[1:])) and kept and len(set(last["ids"])) == len(last["ids"]) and not last["more"]
+                      and {x["y"] for x in seen} == {p0["y"]} and {tuple(x["phone"]) for x in seen} == {tuple(p0["phone"])},
+                      (n, kept, [x["y"] for x in seen]))
+                page.evaluate("id => { const p = document.getElementById(id); p.scrollTop = p.scrollHeight; }", pid)
+                page.wait_for_timeout(500)
+                shot(page, f"4-ba-{'r-' if q else ''}{side}-{k}-end", fig)   # settled: every item, no button
+        if q:   # the after phone's Removed rows (the later ones under "Show more") = the before phone's leak sites
+            page.locator("#tab-after-all").click()
+            g = page.evaluate("""() => [1, 2, 3, 4].map(i => [(document.querySelector(`.ba [data-p=leak-${i}] .m-site`) || {}).textContent,
+                (document.querySelector(`.ba [data-p=gone-${i}] .m-site`) || {}).textContent, !!document.querySelector(`.ba [data-p=gone-${i}]`)?.getClientRects().length])""")
+            check(f"{tag} ba: report: after phone's Removed rows (all shown after Show more) = the before phone's 4 leak sites", all(x[0] and x[0] == x[1] and x[2] for x in g), g)
+        ctx.close()
+
+
 def order_popout(t):
     """(2) section order, Before / After tabs, pop-out, no horizontal overflow."""
     vp_name, vp, tag, m, ctx_, shot, overflow = t.vp_name, t.vp, t.tag, t.m, t.ctx_, t.shot, t.overflow
@@ -564,7 +631,9 @@ def order_popout(t):
             shifts += page.evaluate("t0 => window.__ls.filter(x => x[0] >= t0 && x[1] > 0 && !x[3].every(n => n.startsWith('BUTTON.askai-launcher'))).map(x => [x[1], x[3]])", t0)
             r = page.evaluate("(id) => document.getElementById(id).closest('.phone').getBoundingClientRect().height", f"panel-{side}-{k}")
             vis = page.evaluate(f"[...document.querySelectorAll('[id^=panel-{side}-]')].filter(p => !p.hidden).map(p => p.id)")
-            imgs = page.evaluate(f"[...document.querySelectorAll('#panel-{side}-{k} img')].map(i => i.complete && i.naturalWidth > 0)")
+            # the ones on screen (the rest are lazy: below the list's fold or in a later "Show more" group)
+            imgs = page.evaluate(f"""[...document.querySelectorAll('#panel-{side}-{k} img')].filter(i => {{ const r = i.getBoundingClientRect(), p = i.closest('.m-panel').getBoundingClientRect();
+                return r.height && r.top < p.bottom && r.bottom > p.top; }}).map(i => i.complete && i.naturalWidth > 0)""")
             ok.append([side, k, vis == [f"panel-{side}-{k}"], all(imgs), round(r)])
             if k != "all":
                 shot(page, f"2-ba-{side}-{k}", "#showcase .ba")

@@ -236,7 +236,7 @@
         if (site == null) return hide(r);
         if (site) text(r.querySelector('.m-site'), site);
         if (title) text(r.querySelector('.m-title'), title);
-        var f = site && /^(leak-\d|gone)$/.test(k) && r.querySelector('.fav');
+        var f = site && /^(leak|gone)-\d$/.test(k) && r.querySelector('.fav');
         if (f) { // a letter avatar per leak site, like the hero card's rows
           f.textContent = site.charAt(0).toUpperCase();
           f.classList.add('fav-l');
@@ -244,12 +244,13 @@
         }
       });
     };
-    each($$('[data-p="search"], [data-p="name"]'), function (el) { text(el, name); });
+    each($$('[data-p="name"]'), function (el) { text(el, name); });
+    each($$('[data-p="search"]'), function (el) { text(el, name + ' nude leaks'); });   // both phones' Google query
     each($$('[data-p="site"]'), function (el) { text(el, d.site); });
-    if (m.leaks.length) {
-      LEAK_TITLES.forEach(function (t, i) { row('leak-' + (i + 1), m.leaks[i] || null, t.replace('{n}', name)); });
-      row('gone', m.leaks[0]);
-    } // no leak domains: the leak rows stay the generic illustration
+    if (m.leaks.length) LEAK_TITLES.forEach(function (t, i) {   // the after phone's Removed rows: the same leak sites
+      row('leak-' + (i + 1), m.leaks[i] || null, t.replace('{n}', name));
+      row('gone-' + (i + 1), m.leaks[i] || null);
+    }); // no leak domains: the leak rows stay the generic illustration
     each($$('[data-p="thumbs"] .thumb'), function (span, i) {
       var u = m.images[i];
       if (!u) return;
@@ -304,7 +305,7 @@
     }
   }
 
-  // Before / after phones: after a scan every row of their All tab is a real link (leak rows → her leak pages,
+  // Before / after phones: after a scan every marked row of their All tab is a real link (leak rows → her leak pages,
   // Instagram / TikTok → her accounts, her site / blog → the demo site above, Removed → pricing) and the label drops
   // "Illustration:". The phones are labelled groups either way (their All / Images / Videos tabs are real buttons).
   var PHONES = null;
@@ -318,7 +319,8 @@
     if (hint) hint.remove();
     var urls = m.urls || {}, acc = function (k) { return d.acc[k] && d.acc[k].url; };
     var to = {
-      own: '#showcase', blog: '#showcase', gone: '#pricing', ig: acc('instagram'), tt: acc('tiktok'),
+      own: '#showcase', blog: '#showcase', 'gone-1': '#pricing', 'gone-2': '#pricing', 'gone-3': '#pricing', 'gone-4': '#pricing',
+      ig: acc('instagram'), tt: acc('tiktok'),
       'leak-1': urls[m.leaks[0]], 'leak-2': urls[m.leaks[1]], 'leak-3': urls[m.leaks[2]], 'leak-4': urls[m.leaks[3]]
     };
     var n = 0;

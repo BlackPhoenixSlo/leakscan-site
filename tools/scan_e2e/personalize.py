@@ -144,7 +144,7 @@ def landing(t):
     tg_shot(page, f"{vp_name}-p1-bar-telegram.png")
     d = served(FX["slug"])   # the oracle: what the API sent
     occ = occurrences(d["hits"])
-    check(f"{tag} profile: both phones search for the name", texts(page, "[data-p=search]") == [NAME, NAME], texts(page, "[data-p=search]"))
+    check(f"{tag} profile: both phones search for '<name> nude leaks'", texts(page, "[data-p=search]") == [NAME + " nude leaks"] * 2, texts(page, "[data-p=search]"))
     sites = [page.locator(f'[data-p="leak-{i}"] .m-site').inner_text() for i in range(1, 5)]
     check(f"{tag} before phone: top 4 leak domains by the served hits' occurrences", top_ok(sites, occ, 4), (sites, occ))
     titles = [page.locator(f'[data-p="leak-{i}"] .m-title').inner_text() for i in range(1, 5)]
@@ -161,14 +161,15 @@ def landing(t):
     after = [page.locator(f'[data-p="{k}"] .m-site').inner_text() for k in ("own", "blog")] + [
         page.locator('[data-p="own"] .m-title').inner_text(), page.locator('[data-p="tt"] .m-title').inner_text()]
     check(f"{tag} profile: after phone site / blog / TikTok", after == [SD, f"{SD} › blog", f"{NAME}: Official site", "@" + ACC["tiktok"]["handle"]], after)
-    check(f"{tag} after phone: removed row = the top leak domain (before phone's first)", page.locator('[data-p="gone"] .m-site').inner_text() == sites[0])
+    gone = page.eval_on_selector_all('.ba [data-p^="gone-"] .m-site', "els => els.map(e => e.textContent)")
+    check(f"{tag} after phone: removed rows = the before phone's 4 leak domains, in order", gone == sites, (gone, sites))
     lav = page.eval_on_selector_all('.ba [data-p^="leak-"] .fav', "els => els.map(e => [e.textContent, getComputedStyle(e).backgroundColor])")
     check(f"{tag} before phone: leak rows get letter avatars like the hero card", [l[0] for l in lav] == [s[0].upper() for s in sites]
           and all(l[1] != "rgb(215, 210, 204)" for l in lav), lav)
     page.locator("#showcase .ba").screenshot(path=str(cfg.out / f"{vp_name}-p2-before-after.png"))
     ph = page.evaluate("""() => {
         const r = k => [...document.querySelectorAll(`.ba [data-p="${k}"] > a.m-link`)].map(a => [a.getAttribute('href'), a.target, a.rel]);
-        return {rows: Object.fromEntries(['leak-1', 'leak-2', 'leak-3', 'leak-4', 'ig', 'tt', 'own', 'blog', 'gone'].map(k => [k, r(k)])),
+        return {rows: Object.fromEntries(['leak-1', 'leak-2', 'leak-3', 'leak-4', 'ig', 'tt', 'own', 'blog', 'gone-1', 'gone-2', 'gone-3', 'gone-4'].map(k => [k, r(k)])),
           roles: [...document.querySelectorAll('.ba .phone')].map(p => [p.getAttribute('role'), p.getAttribute('aria-label')]),
           hidden: [...document.querySelectorAll('.ba .phone-screen')].map(s => s.getAttribute('aria-hidden')),
           buried: document.querySelectorAll('.ba [aria-hidden=true] a, .ba [role=img] a').length,
@@ -179,7 +180,7 @@ def landing(t):
     most = lambda dom, url: any(x["url"] == url and (x.get("occurrences") or 1) == max((y.get("occurrences") or 1) for y in d["hits"] if y["domain"] == dom)
                                 for x in d["hits"] if x["domain"] == dom)
     want_rows = {"ig": [[ACC["instagram"]["url"]] + NT] * 2, "tt": [[ACC["tiktok"]["url"]] + NT], "own": [["#showcase", "", ""]],
-                 "blog": [["#showcase", "", ""]], "gone": [["#pricing", "", ""]]}
+                 "blog": [["#showcase", "", ""]], **{f"gone-{i}": [["#pricing", "", ""]] for i in range(1, 5)}}
     leaks = [ph["rows"][f"leak-{i + 1}"] for i in range(4)]
     check(f"{tag} phones: profile: every row links (leaks → her leak pages, IG / TikTok → her accounts, site → #showcase, Removed → #pricing)",
           {k: v for k, v in ph["rows"].items() if not k.startswith("leak-")} == want_rows
@@ -363,7 +364,7 @@ def scan_only(t):
     got = (texts(page, "[data-p=search]"), page.locator('[data-p="leak-1"] .m-title').inner_text(), shown(page, '[data-p="ig"], [data-p="tt"]'),
            page.locator('[data-p="own"] .m-site').inner_text(), page.locator("[data-p=site-url]").inner_text())
     check(f"{tag} scan-only: phones use the handle, unknown IG/TikTok rows hidden, url bar default",
-          got == ([H, H], f"{H}: full gallery", 0, re.sub(r"[^a-z0-9-]", "", H.lower()) + ".com", "yourname.com"), got)
+          got == ([H + " nude leaks"] * 2, f"{H}: full gallery", 0, re.sub(r"[^a-z0-9-]", "", H.lower()) + ".com", "yourname.com"), got)
     bring(page, "#showcase")
     wait_demo(page)
     frame = page.frame(url=re.compile(r"/showcase/\?r=demoNoProf01"))
@@ -505,7 +506,7 @@ def malicious(t):
                 if needle in d:
                     bad.append(f"{path}: {needle}")
         if path.startswith("?"):
-            check(f"{tag} profile: malicious profile falls back to the valid username", texts(page, "[data-p=search]") == ["evil.user"] * 2,
+            check(f"{tag} profile: malicious profile falls back to the valid username", texts(page, "[data-p=search]") == ["evil.user nude leaks"] * 2,
                   texts(page, "[data-p=search]"))
             check(f"{tag} malicious hits: only the valid domain is shown", page.locator('[data-p="leak-1"] .m-site').inner_text() == "safe-leak.example"
                   and shown(page, '[data-p^="leak-"]') == 1 and page.locator("[data-p=thumbs] img").count() == 0)
@@ -540,13 +541,13 @@ def real_flow(t):
     check(f"{tag} card → landing #website", page.url.endswith(f"/?r={slug}#website"), page.url)
     page.goto(cfg.base, wait_until="load")
     page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=9000)
-    check(f"{tag} profile: landing without ?r= personalizes from localStorage", texts(page, "[data-p=search]") == [NAME, NAME])
+    check(f"{tag} profile: landing without ?r= personalizes from localStorage", texts(page, "[data-p=search]") == [NAME + " nude leaks"] * 2)
     page.locator("#website").screenshot(path=str(cfg.out / f"{vp_name}-p9-landing-from-localstorage.png"))
     if page.locator("[data-p=scanned] button").is_visible():
         page.locator("[data-p=scanned] button").click()
     page.wait_for_load_state("load")
     page.wait_for_timeout(1000)
-    check(f"{tag} Reset restores the defaults", texts(page, "[data-p=search]") == ["yourname", "yourname"]
+    check(f"{tag} Reset restores the defaults", texts(page, "[data-p=search]") == ["yourname nude leaks"] * 2
           and page.evaluate("localStorage.getItem('leakscan.last')") is None and page.locator("[data-p=scanned]").is_hidden())
     check(f"{tag} tgcta: Reset → the original sticky bar", tg_bar(page) == TG_DEFAULT, tg_bar(page))
     tg_shot(page, f"{vp_name}-p9-bar-after-reset.png")
@@ -580,12 +581,12 @@ def public_api(t):
           api_res["keys"] == ["pollMedia"] and api_res["junk"] == api_res["before"] and not api_res["junk"]["on"], api_res)
     a, b2 = api_res["a"], api_res["b"]
     check(f"{tag} phones: event twice = same links, other data re-wires (no IG / TikTok rows without a profile)",
-          (a["links"], a["hints"], b2["links"], b2["hints"]) == (10, 1, 7, 1), (a["links"], a["hints"], b2["links"], b2["hints"]))
+          (a["links"], a["hints"], b2["links"], b2["hints"]) == (13, 1, 10, 1), (a["links"], a["hints"], b2["links"], b2["hints"]))
     check(f"{tag} profile: event personalizes in place, twice = same DOM (3 thumbs, not 6)",
-          a["search"] == [NAME, NAME] and a["url"] == SD and a["ig"] == 2 and a["thumbs"] == 3, a)
+          a["search"] == [NAME + " nude leaks"] * 2 and a["url"] == SD and a["ig"] == 2 and a["thumbs"] == 3, a)
     occ = occurrences(served("demoNoProf01")["hits"])
     check(f"{tag} event again with other data resets the slots first",
-          b2["search"] == [H, H] and b2["url"] == "yourname.com" and b2["ig"] == 0 and b2["thumbs"] == 3
+          b2["search"] == [H + " nude leaks"] * 2 and b2["url"] == "yourname.com" and b2["ig"] == 0 and b2["thumbs"] == 3
           and b2["handles"] == ["@" + H, H + " nude leaks"] and b2["line"] == 1 and occ.get(b2["leak1"]) == max(occ.values()), b2)
     ctx.close()
 

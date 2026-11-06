@@ -421,6 +421,24 @@
     });
   }
 
+  // ---------- "Show more" under a phone tab's list ----------
+  // pager(box, step, grow, left): grow(n) shows its first n (step more per click); the button is gone once left(n) says
+  // none are left. → {el: the button (put it under the list), sync: call when left() may have changed}
+  function pager(box, step, grow, left) {
+    var n = step, b = make('button', 'm-more', ['Show more'], { type: 'button' });
+    var sync = function () {
+      b.hidden = !left(n);
+      if (!b.hidden || b !== document.activeElement) return;
+      var a = box.querySelectorAll('a'), to = a[a.length - 1] || box;   // focus stays in the tab: its last link, else the list
+      if (to === box && !box.hasAttribute('tabindex')) box.tabIndex = -1;
+      to.focus({ preventScroll: true });
+    };
+    b.addEventListener('click', function () { grow(n += step); sync(); });
+    grow(n);
+    sync();
+    return { el: b, sync: sync };
+  }
+
   // ---------- Reveal: one delegated handler ----------
   // A [data-reveal] button toggles .revealed on its closest [data-reveal-scope]; every [data-reveal] button in that scope
   // follows (aria-pressed + its .reveal-t label). Leak-side images are blurred by CSS (--leak-blur) before any JS runs.
@@ -699,7 +717,7 @@
     clean: clean, under: under, currentSlug: currentSlug, rankHosts: rankHosts, thumb: thumb, fresh: fresh, unfresh: unfresh,
     who: who, setMessages: setMessages, reportLinks: reportLinks, sendReport: sendReport, remember: remember, forget: forget, runScan: runScan,
     fetchResult: fetchResult, progressInfo: progressInfo, favColor: favColor, fav: fav, imageItems: imageItems, isVideo: isVideo,
-    watchThumb: watchThumb, tablist: tablist, revealButton: revealButton, make: make, icon: icon,
+    watchThumb: watchThumb, tablist: tablist, pager: pager, revealButton: revealButton, make: make, icon: icon,
     siteGroups: siteGroups, reportModel: reportModel, gallery: gallery, linked: linked, plural: plural,
     photoStats: photoStats, isPhoto: isPhoto, photo: photo, put: put, XO: XO
   };

@@ -12,7 +12,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
 - Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card) · `#free` one Google
   phone (All / Images / Videos tabs; after a scan her real results, `js/inline-scan.js`) · `#why` · `#how` (7 steps) ·
   `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop close, page
-  behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs, `js/main.js`) ·
+  behind inert, focus back to the button; then the Before / After Google phones for "<name> nude leaks", real ARIA tabs,
+  each tab scrolling inside the fixed screen with "Show more" for its next `.m-batch`, `js/main.js`) ·
   `#pricing` · `#faq` · `#removals` · `#contact`. `tools/check.py` fails if a section id is missing here.
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
@@ -96,7 +97,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   card's request from `js/scan-engine.js` is shared, and a `?r=` link opened with the card below the fold scrolls it up); every value is
   validated and rendered with textContent / built elements, never leak titles or snippets. Landing: hero line +
   Reset, the phone sticky bar ("Free scan: type your handle" → "DM me on Telegram", `t.me/jakabasej` prefilled like
-  #contact's with her report link + @handle), both "Your website" phones (name, top-4 leak domains by occurrences, blurred `/api/thumb` thumbs, IG / TikTok /
+  #contact's with her report link + @handle), both "Your website" phones (search "<name> nude leaks", top-4 leak domains by occurrences, the after phone's Removed rows = the same 4, blurred `/api/thumb` thumbs, IG / TikTok /
   site rows hidden when unknown), hero card handles, showcase url bar + iframe `showcase/?r=` (until the iframe has
   loaded a page with `?r=`, a load without it, the lazy iframe's own first load of `showcase/` landing after the src
   change: Chrome's race, is sent on to its `?r=` src; after that first `?r=` load nothing in it is redirected). Slots are `data-p="…"`.
