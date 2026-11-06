@@ -24,7 +24,7 @@
 ## Pricing (prices in EUR)
 Your free scan and one free removal come first either way. Both plans include your official website and blog posts. Every removal starts with a signed one-page Copyright Enforcement Authorization; it's free, and it lets Jaka file in your name.
 
-Monthly removal: €250 / month (ongoing protection). Covers: everything the weekly re-scans find. Runs: month to month, cancel anytime. Re-uploads: filed every week, as Jaka finds them. Website: official site + blog posts, included.
+Monthly removal: €250 / month (ongoing protection). Covers: everything the weekly re-scans find. Runs: month to month, cancel anytime. Re-uploads: filed every week, as Jaka finds them.
 - Weekly re-scans
 - DMCA notices to sites and hosts
 - Google de-indexing and "remove outdated content" filings
@@ -33,7 +33,7 @@ Monthly removal: €250 / month (ongoing protection). Covers: everything the wee
 - Your official website + blog posts
 - Cancel anytime
 
-One-time clean: €500 one-time (one big clean-up). Covers: everything found, all filed in week 1. Runs: 40 days, no auto-renewal. Re-uploads: filed for 40 days; on day 40 you decide. Website: official site + blog posts, included.
+One-time clean: €500 one-time (one big clean-up). Covers: everything found, all filed in week 1. Runs: 40 days, no auto-renewal. Re-uploads: filed for 40 days; on day 40 you decide.
 - Everything found is filed in week 1
 - Re-uploads filed for 40 days
 - Site, host, registrar and Google filings
@@ -101,13 +101,14 @@ A: No. There's no account, no app and no card. The free scan runs right here fro
 - #top: hero: "Leaked content, taken down by a real person. Me." Intro by Jaka, free-offer summary.
 - #scan: the free scan box at the top (pick platform, type handle, "Scan for free").
 - #free: "Free, before you pay anything": the free scan + one page removed free.
-- #why: "Why a person, and not a bot": accounts-first approach, track record.
-- #how: "How it works": the seven steps.
+- #why: "Why a person, and not a bot": accounts-first approach.
+- #removals: "Where I remove from": re-enacted removals on Mega, X, Reddit and a leak site.
+- #how: "How it works": the seven steps in three stages; nobody can honestly promise every page comes down.
 - #pricing: "What's included": both plans and prices.
 - #plan-monthly: Monthly removal plan (€250 / month).
 - #plan-once: One-time clean plan (€500 one-time).
-- #website: "Your official website + blog": website and blog posts so Google ranks real pages.
-- #showcase: preview of the demo creator website.
+- #website: "Included in both plans: your website": website and blog posts so Google ranks real pages, the demo and before / after.
+- #showcase: preview of the demo creator website (inside #website).
 - #faq: FAQ, straight answers.
 - #contact: "Ran the scan? Send me the report link." Telegram, WhatsApp, email.
 - showcase/: the full live demo site (separate page).

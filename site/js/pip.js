@@ -119,9 +119,9 @@
     if (!pip || pip.classList.contains('drag')) return;
     var d = docking() ? dockAt() : null;
     if (d) {
-      setMode('dock');
-      pip.style.setProperty('--w', d.w + 'px');
+      pip.style.setProperty('--w', d.w + 'px');   // size + spot before the mode swap: no frame where the old spot + new width overflow
       move(d.x + scrollX, d.y + scrollY);
+      setMode('dock');
       pip.setAttribute('data-mode', 'dock');
     } else {
       setMode('float');
@@ -300,6 +300,8 @@
     place();
 
     pip.addEventListener('pointerdown', down);
+    var shown = 0;   // a tap / click on the player shows its controls for a few seconds (css/pip.css: calm caption at rest)
+    pip.addEventListener('pointerdown', function () { pip.classList.add('touched'); clearTimeout(shown); shown = setTimeout(function () { pip.classList.remove('touched'); }, 4000); });
     pip.addEventListener('pointermove', over);
     pip.addEventListener('pointerup', up);
     pip.addEventListener('pointercancel', cancel);

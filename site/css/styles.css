@@ -36,8 +36,8 @@
   --v-on-accent: #2a1531;
   --v-good: #8fe0c0;
   --v-bad: #ffa3b8;
-  --shadow: 0 1px 2px rgb(42 21 49 / .06), 0 10px 30px -6px rgb(42 21 49 / .12);
-  --shadow-lg: 0 2px 4px rgb(42 21 49 / .08), 0 30px 70px -12px rgb(42 21 49 / .28);
+  --shadow: 0 6px 20px rgb(35 20 40 / .08);   /* light: a 1px muted line does the edge, this only lifts */
+  --shadow-lg: 0 6px 20px rgb(35 20 40 / .08);
   --radius: 20px;
   --radius-sm: 12px;
   --display: Didot, "Bodoni 72", "Bodoni MT", "Didot LT STD", "Libre Bodoni", Georgia, serif;
@@ -187,10 +187,10 @@ strong { font-weight: 600; }
     var(--bg); }   /* clip: not scrollable, so focus/scrollIntoView can't pan the hero sideways */
 @media (prefers-color-scheme: light) {   /* light: blush paper, the card and fields lifted by line + soft shadow */
   .hero { background: radial-gradient(60% 70% at 88% 12%, #f2d4e4, transparent 70%), radial-gradient(55% 60% at 0% 100%, #ece2f0, transparent 70%), #f9f2f6; border-bottom: 1px solid var(--line); }
-  .hero .scan-field { border-color: #d9c9df; box-shadow: 0 10px 26px -16px rgb(42 21 49 / .35); }
-  .hero .scan-form .btn-primary { box-shadow: 0 12px 26px -12px rgb(140 42 98 / .55); }
-  .hero .report-card { box-shadow: 0 30px 60px -28px rgb(42 21 49 / .35), 0 0 0 6px rgb(140 42 98 / .06); }
-  .meet-pic { box-shadow: 0 10px 24px -10px rgb(42 21 49 / .35); }
+  .hero .scan-field { border: 1px solid #d9c9df; box-shadow: var(--shadow); }
+  .hero .scan-form .btn-primary { box-shadow: var(--shadow); }
+  .hero .report-card { border: 1px solid #e0d2e5; box-shadow: var(--shadow); }   /* one line, no halo */
+  .meet-pic { box-shadow: var(--shadow); }
 }
 .hero-grid { display: grid; gap: 40px; align-items: center; }
 .hero-grid > * { min-width: 0; }   /* no child (the scanned line, the report card) can widen the column */
@@ -225,13 +225,23 @@ strong { font-weight: 600; }
 .meet-cap a { color: var(--accent); font-weight: 600; text-underline-offset: 3px; justify-self: start; }
 .meet-pic { flex: 0 0 55%; padding-bottom: 30px; border-radius: 12px; overflow: hidden; background: #16181c; box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
 .meet-pic img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
-.hero-side .assurances { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
+/* under the form: who runs it + what happens to the handle (privacy.html's facts), then the free start */
+.hero-trust { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); max-width: 36em; }
+.trust-who { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; font-size: .95rem; line-height: 1.45; color: color-mix(in srgb, var(--ink) 82%, var(--bg)); }
+.trust-who img { flex: none; border-radius: 50%; }
+.trust-who strong { color: var(--ink); }
+.hero-trust .assurances { margin: 0; }
 /* Free-scan form: OnlyFans + optional Instagram / X. With JS it scans in place (js/inline-scan.js); without, a plain GET
    to scan/. Stacked on phones; from 560px the OnlyFans field gets its own row, Instagram / X + button share the next
    (one row of three clipped both placeholders and a typed handle at every width up to the 680px cap). */
 .scan-form { display: grid; gap: 10px; margin: 30px 0 12px; max-width: 640px; }
 @media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1fr) auto; } .scan-form > :first-child { grid-column: 1 / -1; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
-.scan-prefix { display: flex; align-items: center; gap: 0; padding: 0 0 0 1.1em; cursor: text; }
+.scan-prefix { display: flex; flex-wrap: wrap; align-items: center; gap: 0; padding: 0 0 0 1.1em; cursor: text; }
+/* the field's own name, always shown (the placeholder is only an example) */
+.scan-lbl { flex: 0 0 100%; padding-top: 9px; font: 600 .76rem/1.2 var(--sans); letter-spacing: .02em; color: var(--muted); user-select: none; }
+.scan-lbl i { font-style: normal; font-weight: 500; }
+.scan-prefix .scan-lbl ~ .scan-pre, .scan-prefix .scan-lbl ~ input { height: 38px; line-height: 38px; }
+.scan-prefix:has(.scan-lbl) { padding-bottom: 3px; }
 .scan-prefix:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 .scan-pre { color: var(--muted); font-size: .95rem; white-space: nowrap; user-select: none; }
 .scan-prefix input { flex: 1; min-width: 0; height: 52px; padding: 0 1em 0 .1em; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; }
@@ -243,11 +253,11 @@ strong { font-weight: 600; }
   border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
   font: 500 1.05rem/1.2 var(--sans); box-shadow: var(--shadow);
 }
-.hero .scan-field { border-color: transparent; box-shadow: 0 14px 34px -14px rgb(0 0 0 / .55); }
+@media (prefers-color-scheme: dark) { .hero .scan-field { border-color: transparent; box-shadow: 0 14px 34px -14px rgb(0 0 0 / .55); } }   /* on velvet */
 .scan-field::placeholder { color: var(--muted); opacity: .8; }
 @media (hover: hover) { .scan-field:hover { border-color: var(--muted); } }
 .scan-field:focus { border-color: var(--accent); }
-.hero .scan-form .btn-primary { box-shadow: 0 14px 34px -14px rgb(0 0 0 / .6); }
+@media (prefers-color-scheme: dark) { .hero .scan-form .btn-primary { box-shadow: 0 14px 34px -14px rgb(0 0 0 / .6); } }   /* on velvet */
 .scan-platform {
   -webkit-appearance: none; appearance: none; cursor: pointer; padding-right: 2.6em;
   background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23948779' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 1em center / 18px;
@@ -340,11 +350,11 @@ strong { font-weight: 600; }
 .t6::after { background: radial-gradient(circle at 65% 55%, #ebe2e6 0 24%, transparent 46%), radial-gradient(circle at 20% 25%, #5f5168 0 22%, transparent 42%), linear-gradient(150deg, #cdc2cc, #3d3346); }
 
 /* Sections: left-aligned heads, Didot h2, generous rhythm */
-.section { padding: clamp(44px, 8.5vw, 112px) 0; }
+.section { padding: clamp(40px, 8.5vw, 112px) 0; }
 .section-alt { background: var(--p-alt); }
 @media (prefers-color-scheme: dark) {   /* dark: sections keep their edges; the white mock screens are dimmed, not glaring */
   .section-alt { box-shadow: inset 0 1px 0 var(--p-line), inset 0 -1px 0 var(--p-line); }
-  .phone-screen, .rm-stage { filter: brightness(.86) saturate(.95); }
+  .rm-stage { filter: brightness(.86) saturate(.95); }
 }
 /* Where I remove from: the other velvet room, centred, the four mock-ups on paper */
 .rm.section-alt { background: radial-gradient(70% 50% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%), var(--bg); box-shadow: none; color: var(--ink); }
@@ -517,13 +527,19 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .ticks-3 li { gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 1.02rem; line-height: 1.55; }
 .ticks-3 strong { color: var(--ink); }
 .ticks-3 .icon { flex: none; color: var(--accent); width: 26px; height: 26px; margin-top: 0; }
-/* #website, desktop: the argument on the left, what you get on the right (no empty half) */
+/* #website (the add-on under pricing): the argument + the three things on top, then #showcase: the demo, before / after */
 @media (min-width: 960px) {
-  #website > .container { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 80px; align-items: center; }
-  #website .section-head { margin-bottom: 0; }
-  #website .ticks-3 { border-top: 1px solid var(--ink); }
-  #website .ticks-3 li { padding: 26px 0; font-size: 1.08rem; }
+  .web-top { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 80px; align-items: center; }
+  .web-top .section-head { margin-bottom: 0; }
+  .web-top .ticks-3 { border-top: 1px solid var(--ink); }
+  .web-top .ticks-3 li { padding: 22px 0; font-size: 1.08rem; }
 }
+.showcase { margin-top: clamp(40px, 6vw, 80px); }
+.showcase-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 32px; }
+.showcase-head h3 { margin: 0; font: 400 clamp(1.6rem, 3vw, 2.2rem)/1.15 var(--display); }
+.showcase-head p { margin: 0; max-width: 34em; color: var(--muted); }
+.showcase .browser { margin-top: clamp(18px, 3vw, 28px); }
+.showcase .ba { margin-top: clamp(28px, 5vw, 56px); }
 
 /* Why */
 .why-grid { display: grid; gap: 36px; }
@@ -539,16 +555,27 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .why-points .icon-badge { margin: 0; }
 .why-points h3 { font-size: 1.2rem; margin-bottom: .3em; }
 .why-points p { margin: 0; color: var(--muted); }
-@media (max-width: 559px) {   /* phone: the four reasons as a tight ruled list */
+@media (max-width: 559px) {   /* phone: the reasons as a tight ruled list; the website list, the trial, the steps compact */
+  .ticks-3 li { padding: 14px 0; font-size: .97rem; line-height: 1.5; }
+  .ticks-3 .icon { width: 22px; height: 22px; }
+  .showcase-head h3 { font-size: 1.55rem; }
+  .showcase-head p { font-size: .97rem; }
+  .price { margin: 10px 0 18px; padding-bottom: 18px; }
+  #pricing .trial { display: none; }   /* phone: the free start is the heading, #free and stage 1 above; the plans come straight after */
+  .stage h3 { margin-bottom: 14px; }
+  .steps { gap: 14px; }
+  .record { padding: 26px 22px; border-radius: 22px; }
+  .record p { font-size: 1.55rem; }
+  .record footer { font-size: .95rem; }
   .why-intro .person { display: none; }   /* Jaka is introduced in the hero and the contact card */
   .why-points .card { gap: 14px; padding: 18px 0; }
   .why-points .icon-badge { width: 36px; height: 36px; }
   .why-points h3 { font-size: 1.08rem; }
   .why-points p { font-size: .95rem; line-height: 1.55; }
-  .plan .ticks { gap: 8px; font-size: .97rem; }
+  .plan .ticks { gap: 8px; font-size: 1rem; }
   .faq summary { padding: 18px 4px; font-size: 1.04rem; }
 }
-.record { grid-column: 1 / -1; position: relative; margin: 16px 0 0; padding: clamp(32px, 5vw, 60px) clamp(28px, 5vw, 64px); border-radius: 28px; background: var(--bg);
+.record { grid-column: 1 / -1; position: relative; margin: clamp(32px, 5vw, 56px) 0 0; padding: clamp(32px, 5vw, 60px) clamp(28px, 5vw, 64px); border-radius: 28px; background: var(--bg);
   background-image: radial-gradient(70% 120% at 100% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%); overflow: hidden; }
 .record p { font: 400 clamp(1.75rem, 4vw, 2.9rem)/1.12 var(--display); margin-bottom: .6em; max-width: 22em; text-wrap: balance; }
 .record footer { font-size: 1.02rem; color: var(--muted); max-width: 52em; }
@@ -557,11 +584,20 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* How it works: three stages (free / start / weekly), each a short numbered run of steps */
 .stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 40px; }
 @media (min-width: 900px) { .stages { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px; } }
+/* phone + tablet: one stage per view, the next peeking in, arrows + dots under it (js/swipe.js) */
+@media (max-width: 819px) {
+  .stages { --cw: min(520px, calc(100vw - 52px)); --pad: calc((100vw - var(--cw)) / 2);
+    display: flex; align-items: flex-start; gap: calc(var(--pad) - 14px); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none;
+    margin-inline: calc(50% - 50vw); padding: 0 var(--pad) 4px; }
+  .stages::-webkit-scrollbar { display: none; }
+  .stage { flex: 0 0 var(--cw); scroll-snap-align: center; }
+}
 .stage { padding-top: 22px; border-top: 2px solid color-mix(in srgb, var(--ink) 20%, transparent); }
 .stage-free { border-top-color: var(--good); }
 .stage-k { display: flex; align-items: center; gap: 10px; min-height: 26px; margin: 0 0 8px; color: var(--muted); font-size: .95rem; font-weight: 600; }
 .stage-k .tag { margin: 0; }
 .stage h3 { font: 400 clamp(1.6rem, 2.6vw, 2rem)/1.1 var(--display); margin: 0 0 18px; }
+@media (min-width: 900px) { .stage h3 { min-height: 2.2em; } }   /* two lines each: the step runs start level */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
 .step { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; }
 .step-n { color: var(--accent); font: 400 1.7rem/1 var(--display); }
@@ -571,7 +607,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 
 /* Showcase */
 .browser-demo iframe { width: 100%; height: clamp(480px, 70vh, 720px); border: 0; background: var(--surface-2); }
-@media (max-width: 559px) { .browser-demo iframe { height: 440px; } }
+@media (max-width: 559px) { .browser-demo iframe { height: 500px; } }   /* the demo's hero to below its button */
 .browser-demo + .center { margin-top: 28px; }
 
 /* Pricing: the monthly plan in velvet, the one-time on paper */
@@ -587,20 +623,13 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .plan-feature .amount { color: var(--accent); }
 .per { color: var(--muted); font-weight: 500; }
 .plan .ticks { margin-bottom: 30px; flex: 1; align-content: start; font-size: 1rem; line-height: 1.5; }
-/* Pricing, the one centred section: the head and the free start read as one line of sight above the two plans */
-@media (min-width: 720px) {   /* phone: left like every other head */
-  #pricing .section-head { margin-inline: auto; text-align: center; }
-  #pricing .section-head .eyebrow { justify-content: center; }
-  #pricing .section-head .eyebrow::before { display: none; }
-  #pricing .section-head p:not(.eyebrow) { margin-inline: auto; }
-}
 /* under each price: what the plan covers, how long, re-uploads, the website (same four rows in both, so they compare) */
 .spec { margin: -8px 0 22px; display: grid; gap: 0; }
 .spec div { display: grid; grid-template-columns: 7.2em minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .spec dt { color: var(--muted); font-size: .9rem; font-weight: 600; letter-spacing: .02em; padding-top: .1em; }
 .spec dd { margin: 0; color: var(--ink); font-size: 1rem; line-height: 1.45; font-weight: 550; }
-@media (max-width: 559px) { .spec div { grid-template-columns: 5.6em minmax(0, 1fr); gap: 10px; } .spec dt { font-size: .86rem; } .spec dd { font-size: .97rem; } }
-.trial { list-style: none; display: grid; gap: 14px; max-width: 980px; margin: 0 auto clamp(32px, 4vw, 48px); padding: 0; }
+@media (max-width: 559px) { .spec div { grid-template-columns: 5.6em minmax(0, 1fr); gap: 10px; } .spec dt { font-size: .86rem; } .spec dd { font-size: 1rem; } }
+.trial { list-style: none; display: grid; gap: 14px; margin: 0 0 clamp(28px, 4vw, 48px); padding: 0; }
 @media (min-width: 820px) { .trial { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; } }
 .trial li { display: flex; gap: 14px; align-items: flex-start; }
 @media (min-width: 820px) { .trial li { padding: 0 24px; border-left: 1px solid var(--line); } .trial li:first-child { border-left: 0; padding-left: 0; } }
@@ -608,14 +637,15 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .trial li:last-child .trial-n { border-color: var(--accent); color: var(--accent); }
 .trial p { margin: 0; color: var(--muted); font-size: .97rem; line-height: 1.5; }
 .trial strong { display: block; color: var(--ink); font-size: 1.02rem; }
-.plans { max-width: 980px; margin-inline: auto; }
-#pricing .fineprint { margin-inline: auto; justify-content: center; }
 .fineprint { display: flex; gap: 12px; align-items: flex-start; max-width: 760px; margin: 32px 0 0; color: var(--muted); font-size: .97rem; }
 .fineprint .icon { color: var(--accent); margin-top: .2em; }
 
 /* FAQ: ruled list, a + that turns into − */
 .faq { display: grid; gap: 0; border-top: 1px solid var(--ink); }
-#faq > .container { max-width: calc(980px + 72px); }   /* one reading column on the pricing plans' 980px axis: same left edge */
+@media (min-width: 960px) {   /* desktop: the head on the left, the questions beside it, one container like every section */
+  #faq > .container { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1.6fr); gap: 72px; align-items: start; }
+  #faq .section-head { position: sticky; top: calc(var(--header-h) + 32px); }
+}
 .faq details { border-bottom: 1px solid var(--line); }
 .faq summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 4px; cursor: pointer; list-style: none; font: 600 1.12rem/1.35 var(--sans); border-radius: 8px; }
 .faq summary::-webkit-details-marker { display: none; }
@@ -625,7 +655,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .faq details p { margin: 0; padding: 0 56px 24px 4px; color: var(--muted); max-width: 46em; }
 
 /* Contact: a velvet letter, signed */
-.contact { padding-top: clamp(56px, 8vw, 96px); }   /* clear of the velvet removals room above */
+.contact { padding-top: clamp(56px, 8vw, 96px); }
 .contact-card { position: relative; max-width: 960px; margin-inline: auto; text-align: center; padding: clamp(40px, 7vw, 80px) clamp(20px, 5vw, 64px); border-radius: 32px; background: var(--bg);
   background-image: radial-gradient(60% 80% at 50% 0%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 70%); box-shadow: var(--shadow-lg); }
 .contact-avatar { margin: 0 auto 22px; border-radius: 50%; box-shadow: 0 0 0 4px var(--bg), 0 0 0 5px color-mix(in srgb, var(--accent) 50%, transparent); }
@@ -636,6 +666,13 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .channel { display: flex; align-items: center; gap: 14px; padding: 16px 18px; min-height: 68px; border-radius: 16px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none; transition: border-color .15s, transform .15s; }
 @media (hover: hover) { .channel:hover { border-color: var(--accent); color: var(--ink); transform: translateY(-2px); } }
 .channel .icon { width: 26px; height: 26px; color: var(--accent); }
+@media (max-width: 559px) {   /* phone: the letter, compact */
+  .contact-card { padding: 32px 18px 26px; border-radius: 24px; }
+  .contact-avatar { width: 64px; height: 64px; margin-bottom: 16px; }
+  .contact-card > p { font-size: 1rem; }
+  .channels { gap: 8px; margin: 22px 0 16px; }
+  .channel { min-height: 58px; padding: 10px 16px; }
+}
 .channel strong { display: block; }
 .channel span span { color: var(--muted); font-size: .92rem; }
 .channel-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -662,6 +699,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .site-footer { background: var(--bg); padding: 56px 0 28px; font-size: .95rem; color: var(--muted); }
 .footer-grid { display: grid; gap: 28px; }
 @media (min-width: 820px) { .footer-grid { grid-template-columns: 1.4fr 1fr 1fr; } }
+@media (max-width: 819px) { .footer-grid { grid-template-columns: 1fr 1fr; gap: 24px 20px; } .footer-grid > :first-child { grid-column: 1 / -1; } }
 .footer-grid p { margin: 14px 0 0; }
 .site-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .site-footer a:not(.brand) { color: var(--ink); text-decoration: none; }

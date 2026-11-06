@@ -35,16 +35,20 @@
 .pip-tab svg { width: 20px; height: 20px; fill: none; stroke: #ffd400; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 @media (prefers-reduced-motion: reduce) { .pip, .pip.on, .pip.on.tucked { transition: none; } .pip.pop { animation: none; } }
 .pip-bar .pip-rs { cursor: nwse-resize; touch-action: none; }
-/* desktop (docked or floating): calm at rest, a caption bar ("Meet Jaka") instead of the toolbar; the same controls come
-   back on hover or keyboard focus (same buttons, same places: nothing moves, nothing is removed) */
+/* calm at rest (docked or floating, every device): a caption bar ("Meet Jaka") instead of the toolbar; the same controls
+   come back on hover, keyboard focus or a tap on the player (.touched, js/pip.js, a few seconds): nothing moves, nothing
+   is removed, and the buttons answer the first tap too */
+.pip .pip-bar { position: relative; background: #1d1022; }
+.pip .pip-bar::after { content: "Meet Jaka"; position: absolute; inset: 0; display: flex; align-items: center; padding: 0 12px;
+  color: #f6dcea; font: 600 12px/1 "Avenir Next", Avenir, system-ui, sans-serif; letter-spacing: .03em; pointer-events: none; transition: opacity .15s; }
+.pip.muted .pip-bar::after { content: "Meet Jaka \00b7  sound off"; }
+.pip .pip-bar > * { opacity: 0; transition: opacity .15s; }
+.pip.touched .pip-bar > *, .pip:focus-within .pip-bar > * { opacity: 1; }
+.pip.touched .pip-bar::after, .pip:focus-within .pip-bar::after { opacity: 0; }
+.pip.muted .pip-snd { background: #f3b6d2; color: #2a1531; }
 @media (hover: hover) and (pointer: fine) {
-  .pip .pip-bar { position: relative; background: #1d1022; }
-  .pip .pip-bar::after { content: "Meet Jaka"; position: absolute; inset: 0; display: flex; align-items: center; padding: 0 12px;
-    color: #f6dcea; font: 600 12px/1 "Avenir Next", Avenir, system-ui, sans-serif; letter-spacing: .03em; pointer-events: none; transition: opacity .15s; }
-  .pip.muted .pip-bar::after { content: "Meet Jaka \00b7  sound off"; }
-  .pip .pip-bar > * { opacity: 0; transition: opacity .15s; }
-  .pip:hover .pip-bar > *, .pip:focus-within .pip-bar > * { opacity: 1; }
-  .pip:hover .pip-bar::after, .pip:focus-within .pip-bar::after { opacity: 0; }
-  .pip.muted .pip-snd, .pip.muted .pip-snd:hover { background: #f3b6d2; color: #2a1531; }
+  .pip:hover .pip-bar > * { opacity: 1; }
+  .pip:hover .pip-bar::after { opacity: 0; }
+  .pip.muted .pip-snd:hover { background: #f3b6d2; color: #2a1531; }
 }
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) { .pip .pip-bar > *, .pip .pip-bar::after { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pip .pip-bar > *, .pip .pip-bar::after { transition: none; } }
