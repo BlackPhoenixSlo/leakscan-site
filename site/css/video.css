@@ -131,9 +131,9 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 .vo-phone .vo-rs { flex: 1; height: auto; }
 .vo-g { background: #fff; }
 .vo-g .thumb .rm-img { position: relative; z-index: 1; }   /* the scan's thumbs (or the defaults) over the gradient tile */
-/* leak images on the video cards: lighter than removals.css / the report (5px = styles.css .live-ico, the site's lightest rule;
-   the floor), scale kept; never on the after state's own photos (.vo-own) */
-.vo .rm-img { filter: blur(5px) saturate(.95); }
+/* leak images on the video cards: blur(2px) (owner's call; lighter than removals.css / the report / styles.css .live-ico),
+   scale kept; never on the after state's own photos (.vo-own) */
+.vo .rm-img { filter: blur(2px) saturate(.95); }
 .vo .rm-live { isolation: isolate; }   /* keeps that z-index inside the live layer: the after layer (clip-path wipe) stays on top */
 
 /* Google Images prefab: "All" results, a tap on "Images" (--tap 0..1), the leak grid fades in (--g 0..1), then the wipe to her
@@ -277,10 +277,10 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 .vo-ttl { overflow: hidden; color: var(--muted); font-size: .84rem; line-height: 1.35; white-space: nowrap; text-overflow: ellipsis; }
 .vo-go { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); }
 .vo-go::after { content: "↗"; display: grid; place-items: center; height: 100%; color: var(--accent); font: 700 .8rem/1 var(--sans); }
-/* placeholder thumbs: blurred grey blobs; named + a scan result: her real thumbs (.vo-real, blurred 5px like the landing's .live-ico) */
+/* placeholder thumbs: blurred grey blobs; named + a scan result: her real thumbs (.vo-real, blurred 2px like .vo .rm-img) */
 .vo-th { width: 36px; height: 36px; border-radius: 10px; }
 .vo-th, .vo-strip i { overflow: hidden; }
-.vo-real { display: block; width: 100%; height: 100%; object-fit: cover; filter: blur(5px) saturate(.95); transform: scale(1.2); }
+.vo-real { display: block; width: 100%; height: 100%; object-fit: cover; filter: blur(2px) saturate(.95); transform: scale(1.2); }
 .vo-th0 { background: radial-gradient(60% 70% at 40% 40%, #a39d97, #5d5853 80%); }
 .vo-th1 { background: radial-gradient(55% 65% at 60% 45%, #8b8681, #3f3b38 85%); }
 .vo-th2 { background: radial-gradient(60% 60% at 45% 55%, #b5afa9, #6b6661 80%); }
