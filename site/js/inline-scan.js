@@ -194,12 +194,15 @@
   // comes back as a tiny placeholder), is dropped everywhere: its tile leaves the strip / grid / #free phone, the next
   // image takes the slot (the grid reflows, no gap) and every count says what is left. No dark empty squares. So is one
   // that is no person photo (a site logo, banner, icon: E.isPhoto); a tile fades in only once its probe passed.
-  // g.photo(src, fn): the same one probe per src for anything else (row icons): fn(true) person photo, fn(false) not.
+  // g.photo(src, fn): the same one probe per src for anything else (row icons, video stills): fn(true) person photo,
+  // fn(false) not. g.put(img, src): an <img> shows the exact URL + mode the probe passed with (XO: crossOrigin, plain
+  // or fresh, or plain if it fell back): the probe's cached copy, no second request (a plain load of a CORS-probed URL
+  // is another cache entry: twice the thumb requests, past the API's thumb burst → 429, photos dropped).
   var BLANK = 16;   // px: a real thumb is larger on both sides
   var shows = function (im) { return im.naturalWidth >= BLANK && im.naturalHeight >= BLANK; };
   function gallery(m) {
     if (m.pics) return m.pics;
-    var g = m.pics = { views: [], subs: [], dead: {}, ok: {}, wait: {}, cb: {}, sent: {} };
+    var g = m.pics = { views: [], subs: [], dead: {}, ok: {}, wait: {}, cb: {}, sent: {}, url: {} };
     var settle = function (src, ok) { (g.cb[src] || []).forEach(function (fn) { fn(ok); }); delete g.cb[src]; };
     g.kill = function (src) {
       if (g.dead[src]) return;
@@ -216,12 +219,13 @@
       var im = new Image();                 // URL (a stale cached copy without ACAO), then a plain load, kept
       im.referrerPolicy = 'no-referrer';
       if (cors) im.crossOrigin = 'anonymous';
-      im.onload = function () { if (shows(im) && E.isPhoto(im)) pass(src); else g.kill(src); };
+      im.onload = function () { if (shows(im) && E.isPhoto(im)) { g.url[src] = { u: im.src, cors: cors }; pass(src); } else g.kill(src); };
       im.onerror = function () { if (cors && !f) probe(src, true, 1); else if (cors) probe(src, false); else g.kill(src); };
       im.src = f ? E.fresh(E.thumb(src)) : E.thumb(src);
     };
     var start = function (src) { if (!g.sent[src]) { g.sent[src] = 1; probe(src, E.XO); } };
     m.images.slice().forEach(function (it) { start(it.src); });
+    g.put = function (img, src) { var p = g.url[src]; if (p.cors) img.crossOrigin = 'anonymous'; img.src = p.u; };
     g.photo = function (src, fn) { if (g.ok[src] || g.dead[src]) fn(!!g.ok[src]); else { (g.cb[src] = g.cb[src] || []).push(fn); start(src); } };
     return g;
   }
@@ -245,7 +249,8 @@
   // Blurred until Reveal; ↗ on hover / focus (always on touch screens). A tile links to the result that has that image
   // (new tab); an image no result has links to the full report.
   function tile(it, slug, cap, g) {
-    var img = make('img', 'gi-img', [], { src: E.thumb(it.src), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+    var img = make('img', 'gi-img', [], { alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+    if (E.XO) g.when(it.src, function () { g.put(img, it.src); }); else img.src = E.thumb(it.src);   // XO: the probe's own copy
     var box = make('span', 'gi-box gi-wait', [img, make('span', 'gi-go', [icon(it.link ? 'i-external-link' : 'i-arrow-right')])]);
     img.addEventListener('load', function () { if (shows(img)) g.when(it.src, function () { box.classList.remove('gi-wait'); }); else g.kill(it.src); }, { once: true });   // fades in (CSS)
     img.addEventListener('error', function () { g.kill(it.src); }, { once: true });
@@ -278,7 +283,8 @@
       if (i >= cands.length) { if (cands.length) { ico.classList.remove('fav-wait'); ico.classList.add('fav-none'); } return; }
       g.photo(cands[i], function (ok) {
         if (!ok) return next(i + 1);
-        var im = make('img', '', [], { src: E.thumb(cands[i]), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', 'data-src': cands[i] });
+        var im = make('img', '', [], { alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', 'data-src': cands[i] });
+        g.put(im, cands[i]);
         im.addEventListener('load', function () { ico.classList.remove('fav-wait'); }, { once: true });
         im.addEventListener('error', function () { im.remove(); ico.classList.remove('fav-wait'); ico.classList.add('fav-none'); }, { once: true });
         ico.appendChild(im);
@@ -640,17 +646,15 @@
     } else put('images', empty('image'));
     put('videos', m.videos.length ? [make('div', 'm-head', [make('span', 'm-n', [plural(m.videos.length, 'video', 'videos')]), revealBtn(band)])]
       .concat(m.videos.slice(0, BAND_VIDEOS).map(function (v) {
-        var img = v.thumb && make('img', 'gi-img', [], Object.assign(E.XO ? { crossorigin: 'anonymous' } : {}, { src: E.thumb(v.thumb), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' }));
-        if (img) {   // a still that fails / loads blank / is no person photo (a site logo): the grey 16:9 box with its play mark
-          // stays, never a black hole (the row is a result: counts unchanged). XO refused: once more on a fresh URL (a stale
-          // cached copy without ACAO), then plain, kept
-          img.addEventListener('load', function () { if (!shows(img) || !E.isPhoto(img)) img.remove(); }, { once: true });
-          img.addEventListener('error', function () {
-            var s = img.getAttribute('src');
-            if (!img.hasAttribute('crossorigin')) img.remove(); else if (s !== E.fresh(s)) img.setAttribute('src', E.fresh(s)); else img.removeAttribute('crossorigin');
-          });
+        var img = v.thumb && make('img', 'gi-img', [], { alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+        // a still that fails / loads blank / is no person photo (a site logo): the grey 16:9 box with its play mark stays,
+        // never a black hole (the row is a result: counts unchanged). Shown only once its probe passed, from its copy
+        var row = mRow('m-video bad', v.link, v.domain, rowTitle(v.title, v.link), make('span', 'm-vthumb', [img, make('span', 'm-play', [], { 'aria-hidden': 'true' })]));
+        if (img) {
+          img.addEventListener('error', function () { img.remove(); }, { once: true });
+          gallery(m).photo(v.thumb, function (ok) { if (ok) gallery(m).put(img, v.thumb); else img.remove(); });
         }
-        return mRow('m-video bad', v.link, v.domain, rowTitle(v.title, v.link), make('span', 'm-vthumb', [img, make('span', 'm-play', [], { 'aria-hidden': 'true' })]));
+        return row;
       })) : empty('video'));
   }
 
