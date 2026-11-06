@@ -62,7 +62,10 @@ thumbs failing late on the strip: every thumb in strip + Images tab, nothing on 
 on click and keys without moving anything, the demo pops out to a full-screen layer (Esc / button / backdrop close,
 focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the #free phone: same
 tabs, the illustration without a scan, her "<handle> nude leaks" search / rows / tiles / videos + Reveal with ?r=, each tab
-scrolling inside the phone (no trap at its end) with "Show more" batches up to every item; no horizontal overflow.
+scrolling inside the phone (no trap at its end) with "Show more" batches up to every item; (4) the Before / After phones,
+without a scan and with ?r=: both search "<name> nude leaks", equal height, each tab's first items overflow the screen and
+scroll inside it, "Show more" adds groups (kept, no repeat) until it goes, the page never moves; with ?r= the after phone's
+Removed rows = the before phone's 4 leak sites; no horizontal overflow.
 Screenshots: <vp>-t*.png. --break-thumbs serves scan-engine.js with the gallery drop disabled: only `thumbs:` checks may go red.
 --break-people serves scan-engine.js with E.isPhoto always true (logos kept): only `thumbs:` checks may go red.
 

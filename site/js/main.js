@@ -24,6 +24,13 @@
   // height, so a switch never moves the page.
   var E = window.LeakScanEngine;
   if (E) document.querySelectorAll('.phone').forEach(function (phone) { E.tablist(phone); });
+  // Before / after phones: each tab's list scrolls inside the screen; "Show more" (like #free) shows its next .m-batch,
+  // gone after the last
+  if (E) document.querySelectorAll('.ba .m-panel').forEach(function (p) {
+    var bs = p.querySelectorAll('.m-batch');
+    if (bs.length) p.appendChild(E.pager(p, 1, function (n) { bs.forEach(function (b, i) { b.hidden = i >= n - 1; }); },
+      function (n) { return n <= bs.length; }).el);
+  });
 
   // Demo site: "Full screen" pops the frame out to a layer over the page (same iframe, no reload: it keeps its scroll).
   // Its slot keeps its height and the scrollbar gutter stays, so nothing behind it moves. Esc / the button / the

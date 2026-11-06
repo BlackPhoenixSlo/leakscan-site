@@ -448,8 +448,8 @@ def hero_personalize(run):
     name = PROFILE["display_name"]
     check(f"{tag} hero: personalize line + phones' leak domains", "Scanned @demo.creator" in page.locator("[data-p=scanned]").inner_text()
           and top_ok([page.locator(f'[data-p="leak-{k}"] .m-site').inner_text() for k in range(1, 5)], occurrences(d["hits"]), 4))
-    check(f"{tag} profile: phones search for the name, IG row = the typed Instagram", texts("[data-p=search]") == [name, name]
-          and texts('[data-p="ig"] .m-title') == [f"{name} (@demo.ig)"] * 2, texts('[data-p="ig"] .m-title'))
+    check(f"{tag} profile: phones search for '<name> nude leaks', IG row = the typed Instagram", texts("[data-p=search]") == [name + " nude leaks"] * 2
+          and texts('[data-p="ig"] .m-title') == [f"{name} (@demo.ig)"] * 2, (texts("[data-p=search]"), texts('[data-p="ig"] .m-title')))
     check(f"{tag} hero: showcase iframe + button carry the slug", page.locator("iframe[data-p=demo]").get_attribute("src") == "showcase/?r=" + slug
           and page.locator("a[data-p=demo]").get_attribute("href") == "showcase/?r=" + slug)
     try:
@@ -593,12 +593,12 @@ def shared_links(run):
     page.goto(cfg.base + "?r=" + slug, wait_until="load")
     try:
         page.wait_for_selector(".report-card .live-rows li", timeout=8000)
-        page.wait_for_function("() => document.querySelector('[data-p=search]').textContent !== 'yourname'", timeout=8000)
+        page.wait_for_function("() => document.querySelector('[data-p=search]').textContent !== 'yourname nude leaks'", timeout=8000)
     except Exception:
         pass
     page.wait_for_timeout(1500)   # personalize.js has applied too (smooth scroll settled)
     pos = page.evaluate("() => { const r = document.querySelector('.report-card').getBoundingClientRect(); return {top: Math.round(r.top), y: Math.round(scrollY), ih: innerHeight, pad: parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0, name: document.querySelector('[data-p=search]').textContent}; }")
-    check(f"{tag} shared ?r= link: one /api/scan-result request (hero card + personalize share it)", len(reqs) == 1 and pos["name"] != "yourname", (len(reqs), pos["name"]))
+    check(f"{tag} shared ?r= link: one /api/scan-result request (hero card + personalize share it)", len(reqs) == 1 and pos["name"] != "yourname nude leaks", (len(reqs), pos["name"]))
     if vp_name == "phone":
         check(f"{tag} shared ?r= link: phone scrolls the report card up under the nav", pos["y"] > 0 and pos["pad"] - 2 <= pos["top"] <= pos["pad"] + 40, pos)
     else:

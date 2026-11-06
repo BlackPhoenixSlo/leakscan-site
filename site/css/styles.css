@@ -297,6 +297,8 @@ strong { font-weight: 650; }
 .fav { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #d7d2cc; margin-top: 2px; }
 .fav.ig { background: linear-gradient(45deg, #f5a623, #e1306c, #833ab4); }
 .fav.tt { background: #111; box-shadow: inset 2px 0 0 #25f4ee, inset -2px 0 0 #fe2c55; }
+.fav.yt { background: #f00; }
+.fav.x, .fav.th { background: #000; }
 .fav.own { background: var(--accent); background: #a8431c; }
 .fav.fav-l { display: grid; place-items: center; color: #fff; font: 700 .68rem/1 var(--sans); }   /* leak site letter (personalize.js) */
 .m-site { display: block; font-size: .7rem; color: #4d5156; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -351,12 +353,16 @@ strong { font-weight: 650; }
 /* #free: one phone, Google for her handle; js/inline-scan.js fills it with her results (links, Reveal) */
 .free-phone { margin: 0; display: grid; justify-items: center; min-width: 0; }
 .phone-free { width: 288px; aspect-ratio: 9 / 16; }
-/* its tabs scroll inside the fixed screen (the page never moves on a switch). No overscroll-behavior: contain: the phone
-   is most of a 390 px screen, and past a list's end a new swipe / wheel on it must still scroll the page */
-.phone-free .phone-screen { display: flex; flex-direction: column; }
-.phone-free .m-search { flex: none; }
-.phone-free .m-search span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.phone-free .m-panel { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; margin: 0 -6px; padding: 0 6px; }
+/* its tabs (and the before / after phones') scroll inside the fixed screen (the page never moves on a switch). No
+   overscroll-behavior: contain: the phone is most of a 390 px screen, and past a list's end a new swipe / wheel on it
+   must still scroll the page */
+:is(.phone-free, .ba .phone) .phone-screen { display: flex; flex-direction: column; }
+:is(.phone-free, .ba .phone) .m-search { flex: none; }
+:is(.phone-free, .ba .phone) .m-search span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(.phone-free, .ba .phone) .m-panel { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; margin: 0 -6px; padding: 0 6px; }
+/* before / after: a tab's next items, one group per "Show more" (js/main.js); in the list / grid as if ungrouped */
+.m-batch { display: contents; }
+.m-batch[hidden] { display: none; }
 .phone-free .m-head { position: sticky; top: 0; z-index: 3; margin-top: 0; background: #fff; }
 .m-more { display: block; width: 100%; min-height: 36px; margin: 8px 0 6px; border: 1px solid #dadce0; border-radius: 999px; background: #fff; color: #1a73e8; font: inherit; font-size: .78rem; cursor: pointer; }
 .m-more[hidden] { display: none; }

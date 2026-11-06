@@ -6,7 +6,7 @@
   'use strict';
   var E = window.LeakScanEngine, phone = document.querySelector('.phone-free');
   if (!E || !phone) return;
-  var make = E.make;
+  var make = E.make, pager = E.pager;
   var panel = function (k) { return document.getElementById('panel-free-' + k); };
   var fits = function (k, sel, dflt) { var p = panel(k); return (p && p.querySelectorAll('.m-illus ' + sel).length) || dflt; };
   var ROWS = 2 * fits('all', '.m-result', 4), TILES = 2 * fits('images', '.gi-card', 9), VIDEOS = 2 * fits('videos', '.m-video', 3);
@@ -26,19 +26,6 @@
       make('span', 'm-go', ['↗'], { 'aria-hidden': 'true' })], Object.assign({ href: url, 'aria-label': dom + ': ' + title + ' (opens in a new tab)' }, E.NEW_TAB))]);
   }
   var titleOf = function (t, url) { return t || url.replace(/^https?:\/\/(www\.)?/, ''); };
-  // "Show more" under a tab's list: grow(n) shows its first n (step more per click); gone once left(n) says none are left
-  function pager(box, step, grow, left) {
-    var n = step, b = make('button', 'm-more', ['Show more'], { type: 'button' });
-    var sync = function () {
-      b.hidden = !left(n);
-      var a = b.hidden && b === document.activeElement && box.querySelectorAll('a');
-      if (a && a.length) a[a.length - 1].focus({ preventScroll: true });   // focus stays in the tab: its last item
-    };
-    b.addEventListener('click', function () { grow(n += step); sync(); });
-    grow(n);
-    sync();
-    return { el: b, sync: sync };
-  }
   // a plain list (All, Videos): its next items appended, mk(item) each
   var list = function (box, items, mk) { return function (n) { items.slice(box.children.length, n).forEach(function (it) { box.appendChild(mk(it)); }); }; };
   // m: E.reportModel(...); the images are its own E.gallery (thumb verdicts are shared page-wide: one dies, it leaves all):
