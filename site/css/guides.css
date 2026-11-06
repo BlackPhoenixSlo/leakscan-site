@@ -1,0 +1,27 @@
+.guide .lead { font-size: 1.12rem; color: var(--ink); }
+.guide h3 { margin-top: 1.4em; }
+.guide ol { padding-left: 1.4em; }
+.guide ol li { margin-bottom: .6em; color: var(--muted); }
+.crumbs ol { display: flex; flex-wrap: wrap; gap: 4px 8px; list-style: none; padding: 0; margin: 0 0 20px; font-size: .92rem; color: var(--muted); }
+.crumbs li { margin: 0; }
+.crumbs li + li::before { content: "/"; margin-right: 8px; color: var(--muted); }
+.guide .note { padding: 14px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); font-size: .95rem; margin: 1.4em 0; }
+.guide .note p { margin: 0; }
+.guide .note-first { margin-top: 0; }
+.legal .hub { list-style: none; padding: 0; display: grid; gap: 12px; }
+.legal .hub li { margin: 0; padding: 16px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.hub a { display: block; font-weight: 620; color: var(--ink); }
+.hub span { display: block; margin-top: 4px; font-size: .95rem; }
+.table-wrap { overflow-x: auto; margin: 1em 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.guide table { width: 100%; min-width: 480px; border-collapse: collapse; font-size: .95rem; }
+.guide th, .guide td { padding: 12px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); color: var(--muted); }
+.guide th { color: var(--ink); font-weight: 620; }
+.guide tbody tr:last-child > * { border-bottom: 0; }
+.template { white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); font-size: .88rem; line-height: 1.5; color: var(--ink); }
+.guide .faq { margin-top: 1em; }
+.sources { font-size: .95rem; }
+.guide-cta { margin-top: 2.6em; padding: clamp(24px, 5vw, 40px) clamp(18px, 4vw, 32px); border-radius: 22px; background: var(--surface); border: 1px solid var(--line); }
+.guide-cta h2 { margin-top: 0; }
+.guide-cta .channels { margin-bottom: 0; }
+.guide-cta .channel { color: var(--ink); }
+.guide-cta .channel-primary { color: var(--on-accent); }
