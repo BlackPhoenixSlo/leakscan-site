@@ -34,7 +34,7 @@
    layers; dark: a 14 % black veil (= brightness .86); phones: no filter at all */
 #removals .rm-stage { filter: none; transition: none; }
 @media (min-width: 820px) { #removals .rm-layer { filter: saturate(var(--rm-sat)); } }
-@media (min-width: 820px) and (prefers-reduced-motion: no-preference) { #removals .rm-layer { transition: filter .25s; } }
+@media (min-width: 820px) and (prefers-reduced-motion: no-preference) { :where(#removals) .rm-layer { transition: filter .25s; } }   /* :where: the edge's clip-path transition (.rm-anim .rm-gone) still wins */
 @media (prefers-color-scheme: dark) { #removals .rm-stage::after { content: ""; position: absolute; inset: 0; z-index: 2; background: rgb(0 0 0 / .14); pointer-events: none; } }
 html:not(.js) .rm-stage { cursor: auto; }
 .rm-layer { position: absolute; inset: 0; overflow: hidden; }

@@ -364,6 +364,7 @@ def removals_flow(browser, vp_name, vp):
                 mids = []
                 for i, x in enumerate(xs[1:]):
                     tp("touchMove", x)
+                    page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")   # Chromium hands touch moves over per frame
                     mids.append([round(x, 1), page.evaluate(RM_MID, "reddit")])
                     if i == 5:
                         page.locator(sel).screenshot(path=str(cfg.out / f"removals-{vp_name}-touch-drag-1-mid.png"))
@@ -377,11 +378,11 @@ def removals_flow(browser, vp_name, vp):
                       and all(a[1]["edge"] > b[1]["edge"] for a, b in zip(live, live[1:])) and pos1 == pos0, [pos0, pos1, mids])
                 p0 = page.evaluate(RM_MID, "reddit")["p"]
                 y0 = page.evaluate("scrollY")
-                cdp.send("Input.synthesizeScrollGesture", {"x": int(r["x"] + r["width"] * .5), "y": int(r["y"] + r["height"] * .5), "xDistance": 0, "yDistance": -220,
+                cdp.send("Input.synthesizeScrollGesture", {"x": int(r["x"] + r["width"] * .5), "y": int(r["y"] + r["height"] * .5), "xDistance": 0, "yDistance": 220,
                                                            "gestureSourceType": "touch", "speed": 800})
                 page.wait_for_timeout(600)
                 y1, p1 = page.evaluate("scrollY"), page.evaluate(RM_MID, "reddit")["p"]
-                check(f"{tag} touch: a vertical swipe on a stage scrolls the page, the edge stays", y1 - y0 >= 100 and p1 == p0, [y0, y1, p0, p1])
+                check(f"{tag} touch: a vertical swipe on a stage scrolls the page (up 220 px), the edge stays", y0 - y1 >= 100 and p1 == p0, [y0, y1, p0, p1])
                 cdp.detach()
             page.locator('#removals .rm-card[data-rm="x"] .rm-handle').focus()
             page.keyboard.press("End")
