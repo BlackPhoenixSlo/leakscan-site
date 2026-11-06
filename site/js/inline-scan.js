@@ -210,13 +210,13 @@
     g.when = function (src, fn) { if (g.ok[src]) fn(); else (g.wait[src] = g.wait[src] || []).push(fn); };
     var pass = function (src) { g.ok[src] = 1; (g.wait[src] || []).forEach(function (fn) { fn(); }); delete g.wait[src]; };
     m.images.slice().forEach(function (it) {
-      var probe = function (cors) {   // cors (API on another origin): readable pixels; refused → a plain load, kept
-        var im = new Image();
+      var probe = function (cors, f) {   // cors (API on another origin): readable pixels; refused → once more on a fresh
+        var im = new Image();             // URL (a stale cached copy without ACAO), then a plain load, kept
         im.referrerPolicy = 'no-referrer';
         if (cors) im.crossOrigin = 'anonymous';
         im.onload = function () { if (shows(im) && E.isPhoto(im)) pass(it.src); else g.kill(it.src); };
-        im.onerror = function () { if (cors) probe(false); else g.kill(it.src); };
-        im.src = E.thumb(it.src);
+        im.onerror = function () { if (cors && !f) probe(true, 1); else if (cors) probe(false); else g.kill(it.src); };
+        im.src = f ? E.fresh(E.thumb(it.src)) : E.thumb(it.src);
       };
       probe(E.XO);
     });
@@ -619,9 +619,13 @@
       .concat(m.videos.slice(0, BAND_VIDEOS).map(function (v) {
         var img = v.thumb && make('img', 'gi-img', [], Object.assign(E.XO ? { crossorigin: 'anonymous' } : {}, { src: E.thumb(v.thumb), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' }));
         if (img) {   // a still that fails / loads blank / is no person photo (a site logo): the grey 16:9 box with its play mark
-          // stays, never a black hole (the row is a result: counts unchanged). XO refused: loads once more plain, kept
+          // stays, never a black hole (the row is a result: counts unchanged). XO refused: once more on a fresh URL (a stale
+          // cached copy without ACAO), then plain, kept
           img.addEventListener('load', function () { if (!shows(img) || !E.isPhoto(img)) img.remove(); }, { once: true });
-          img.addEventListener('error', function () { if (img.hasAttribute('crossorigin')) img.removeAttribute('crossorigin'); else img.remove(); });
+          img.addEventListener('error', function () {
+            var s = img.getAttribute('src');
+            if (!img.hasAttribute('crossorigin')) img.remove(); else if (s !== E.fresh(s)) img.setAttribute('src', E.fresh(s)); else img.removeAttribute('crossorigin');
+          });
         }
         return mRow('m-video bad', v.link, v.domain, rowTitle(v.title, v.link), make('span', 'm-vthumb', [img, make('span', 'm-play', [], { 'aria-hidden': 'true' })]));
       })) : empty('video'));

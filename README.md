@@ -192,7 +192,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   to people photos (strip, Images tab, #free phone, scan page strip / Images grid): a thumb drawn at 48x48
   with little soft texture or almost no skin (a site logo, banner, icon, placeholder) is dropped like a failed one;
   a video still (scan page Videos tab, #free Videos rows) likewise falls back to its grey box, the row stays;
-  pixels read via a CORS load of `/api/thumb` (refused / unreadable = kept). Thresholds + measured confusion: comment there.
+  pixels read via a CORS load of `/api/thumb`; refused → once more on `E.fresh`'s URL (`?c=1&u=`: a copy cached before
+  the API sent ACAO / Vary would refuse forever), then plain (unreadable = kept). Thresholds + measured confusion: comment there.
 - `js/inline-scan.js`: with JS the form never leaves the page. The hero card turns into the live report (progress →
   first 5 links: domain + title, badge Live = `live: true`, Indexed = Google result, else Found; "N links found";
   Open full report `scan/?r=`; Send me the report; demo photo status; its image strip / Images tab / #free phone list the

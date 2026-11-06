@@ -34,6 +34,11 @@
   function thumb(u) {
     return typeof u === 'string' && /^https:\/\//.test(u) ? API + '/api/thumb?u=' + encodeURIComponent(u) : null;
   }
+  // fresh(t): the same /api/thumb URL under another cache key (api_thumb reads only u). A CORS load that fails may have
+  // hit a copy cached before the API sent ACAO / Vary (max-age a day): it retries once on this before the plain load.
+  // unfresh(t): back to the plain URL (the key a thumb is known by).
+  function fresh(t) { return t.replace('/api/thumb?u=', '/api/thumb?c=1&u='); }
+  function unfresh(t) { return (t || '').replace('/api/thumb?c=1&u=', '/api/thumb?u='); }
   function who(handle, platform) { return '@' + handle + ' (' + (PLATFORMS[platform] || platform) + ')'; }
 
   // ---------- message links ----------
@@ -241,7 +246,7 @@
   }
 
   window.LeakScanEngine = {
-    API: API, REPORT_BASE: REPORT_BASE, PLATFORMS: PLATFORMS, SLUG_RE: SLUG_RE, HANDLE_RE: HANDLE_RE, cleanHandle: cleanHandle, cleanSocial: cleanSocial, thumb: thumb,
+    API: API, REPORT_BASE: REPORT_BASE, PLATFORMS: PLATFORMS, SLUG_RE: SLUG_RE, HANDLE_RE: HANDLE_RE, cleanHandle: cleanHandle, cleanSocial: cleanSocial, thumb: thumb, fresh: fresh, unfresh: unfresh,
     who: who, setMessages: setMessages, sendReport: sendReport, remember: remember, runScan: runScan,
     fetchResult: fetchResult, progressInfo: progressInfo, favColor: favColor, fav: fav, imageItems: imageItems, isVideo: isVideo, photoStats: photoStats, isPhoto: isPhoto, XO: XO
   };

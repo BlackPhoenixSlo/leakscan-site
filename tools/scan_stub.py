@@ -30,7 +30,8 @@ Serves site/ and the API routes of the contract the scan page talks to:
   POST /__stub/media?slug=<slug>[&mode=normal|relative|scanhost|none|404] resets that slug's poll counter (and mode) for a test.
 - GET /api/thumb?u=<https url> → one of those photos (picked by a hash of u, webp), never fetches u. A u containing
   DEAD → 404 (a thumb Google no longer serves); BLANK → a 1×1 GIF (what a hotlink-blocked thumb comes back as); LOGO →
-  logo_png(): a flat site-logo PNG (no person photo: the image views must drop it).
+  logo_png(): a flat site-logo PNG (no person photo: the image views must drop it). STALE → no ACAO unless the URL has
+  ?c=1 (a copy cached before the API sent CORS: the views retry once on E.fresh's URL, then drop the logo).
 - demoBrokenT1: the fixture with three page-result thumbs swapped for DEAD / BLANK ones (images[] too), page result #7's
   for a LOGO one, a LOGO thumb no result has third in images[], a video result's still put first in images[] (the
   image views put it after the real images) and the 2nd video result's still a LOGO (Videos rows: grey box, row kept):
@@ -193,10 +194,10 @@ def broken_thumbs(fx):
         r["images"] = [u if i == x["thumb"] else i for i in r["images"]]
         x["thumb"] = u
     v = [x for x in r["results"] if x.get("thumb") and x.get("kind") == "video"][1]   # 2nd video's still: a LOGO
-    u = "https://encrypted-tbn0.gstatic.com/images?q=tbn:LOGO0906placeholder"
+    u = "https://encrypted-tbn0.gstatic.com/images?q=tbn:LOGO0906STALEplaceholder"
     r["images"] = [u if i == v["thumb"] else i for i in r["images"]]
     v["thumb"] = u
-    r["images"].insert(2, "https://encrypted-tbn0.gstatic.com/images?q=tbn:LOGO0905placeholder")
+    r["images"].insert(2, "https://encrypted-tbn0.gstatic.com/images?q=tbn:LOGO0905STALEplaceholder")
     r["images"].insert(0, next(x["thumb"] for x in r["results"] if x.get("kind") == "video" and x.get("thumb")))
     return r
 
@@ -324,7 +325,8 @@ class Handler(SimpleHTTPRequestHandler):
             blank, logo = "BLANK" in src, "LOGO" in src
             body = BLANK_GIF if blank else logo_png(src) if logo else stand_in(src, THUMB_FILES)
             self.send_response(200)
-            self.cors()
+            if "STALE" not in src or "c" in parse_qs(u.query):   # STALE: a copy cached before ACAO (no CORS) unless ?c=1
+                self.cors()
             self.send_header("Content-Type", "image/gif" if blank else "image/png" if logo else "image/webp")
             self.send_header("Cache-Control", "max-age=3600")
             self.send_header("Content-Length", str(len(body)))
