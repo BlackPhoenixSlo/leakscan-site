@@ -295,6 +295,8 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     pg.evaluate("scrollTo(0, 0)"); pg.wait_for_timeout(300)
     if phone:
         pg.evaluate("document.querySelector('.hero .report-card').scrollIntoView({block: 'center', behavior: 'instant'})")
+        pg.wait_for_timeout(600)   # the dock sits under the card now: on a short screen (iPhone 13, 664) bring it into view to grab it
+        pg.evaluate("(() => { const b = document.querySelector('.pip').getBoundingClientRect().bottom; if (b > innerHeight - 90) scrollBy(0, b - innerHeight + 90); })()")
     pg.wait_for_timeout(1200); s = st(pg)
     check(f"{tag} dock: scrolled back up → docked again on the card", s["mode"] == "dock" and abs(s["box"][2] - docked[2]) <= 1, [s["box"], docked])
     mx, my = s["vw"] * 0.4, s["vh"] * 0.45
