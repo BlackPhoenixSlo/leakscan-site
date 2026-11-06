@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   var E = window.LeakScanEngine;
-  var REPORT_BASE = E.REPORT_BASE, PLATFORMS = E.PLATFORMS, cleanHandle = E.cleanHandle, thumb = E.thumb, setMessages = E.setMessages;
+  var PLATFORMS = E.PLATFORMS, cleanHandle = E.clean.handleInput, thumb = E.thumb, setMessages = E.setMessages;
   var G_COLORS = ['#4285f4', '#ea4335', '#fbbc05', '#4285f4', '#34a853', '#ea4335'];
 
   var $ = function (id) { return document.getElementById(id); };
@@ -13,21 +13,15 @@
     });
   };
   var show = function (id, on) { $(id).hidden = !on; };
-  var plural = function (n, one, many) { return n === 1 ? one : many; };
+  var plural = E.plural, linked = E.linked;
   var num = function (n) { return Number(n || 0).toLocaleString('en-US'); };
 
-  // ---------- input ----------
-  function safeUrl(u) { return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null; }
-  function host(u) {
-    try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; }
-  }
-
   // ---------- state ----------
-  var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone', revealed: false,
-    more: null, fitted: null, expanded: null, dead: {}, log: [], retry: null };
+  var state = { handle: '', platform: 'onlyfans.com', social: null, data: null, tab: 'all', device: 'phone',
+    more: null, fitted: null, expanded: null, log: [], retry: null, pics: null, unsub: null };
   // phone preview: items per tab (fitPhone trims All's first look), tabs fitted / grown by More (per device + report).
-  // Images: 4 rows to start (phone 4 x 3, desktop 3 x 8; spares for a failed thumb's slot, see watchThumb), +24 per More.
-  // Videos: phone 5 (a card is ~300px: More shows up as the 5th ends), desktop 8, +12 per More. Then the page carries on
+  // Images: 4 rows to start (phone 4 x 3, desktop 3 x 8; a failed thumb's slot goes to the next image, E.gallery), +24
+  // per More. Videos: phone 5 (a card is ~300px: More shows up as the 5th ends), desktop 8, +12 per More. Then the page carries on
   var MORE0 = { all: 10, images: 12, videos: 5 }, DESK = { images: 24, videos: 8 }, DESK_STEP = { images: 24, videos: 12 };
   function more0(k) { return (state.device === 'phone' ? 0 : DESK[k]) || MORE0[k]; }
   function resetPreview() { state.more = {}; Object.keys(MORE0).forEach(function (k) { state.more[k] = more0(k); }); state.fitted = {}; state.expanded = {}; state.first = {}; }
@@ -59,7 +53,7 @@
     if (!cleanHandle(f.elements.h.value)) {
       e.preventDefault();
       showForm('That doesn’t look like a handle. Use letters, numbers, dots, dashes or underscores, like yourhandle.');
-    } else if (E.cleanSocial(f.elements.ig.value) === false) {
+    } else if (E.clean.social(f.elements.ig.value) === false) {
       e.preventDefault();
       showForm(SOCIAL_BAD);
       f.elements.ig.focus();
@@ -141,10 +135,7 @@
 
   // ---------- report ----------
   function normalize(r) {
-    var hits = Array.isArray(r.hits) ? r.hits.filter(function (h) { return h && safeUrl(h.url); }) : [];
-    var every = Array.isArray(r.results) ? r.results.filter(function (x) { return x && safeUrl(x.link); }) : [], results = every.slice(0, 80);
-    every.forEach(function (x) { x.domain = x.domain || host(x.link); });
-    hits.forEach(function (h) { h.domain = h.domain || host(h.url); });
+    var hits = linked(r.hits, 'url'), every = linked(r.results, 'link'), results = every.slice(0, 80);
     var d = {
       slug: String(r.slug || ''), handle: String(r.handle || state.handle || ''), platform: r.platform || state.platform,
       hit_count: +r.hit_count || hits.length, domain_count: +r.domain_count || 0, google_total: +r.google_total || 0,
@@ -152,14 +143,17 @@
     };
     d.status = r.status || (d.hit_count || results.length ? 'complete' : 'empty');
     var al = r.aliases && typeof r.aliases === 'object' && Array.isArray(r.aliases.discovered) ? r.aliases.discovered : [];
-    d.discovered = al.slice(0, 4).filter(function (a) { return typeof a === 'string' && E.HANDLE_RE.test(a) && a !== d.handle; });
+    d.discovered = al.slice(0, 4).filter(function (a) { return E.clean.handle(a) === a && a !== d.handle; });
     return d;
   }
   function report(raw, fresh) {
     mark('leakscan:report-start');
     var d = state.data = normalize(raw);
     resetPreview();
-    state.dead = {};   // per report: a device switch keeps the thumbs known to fail
+    if (state.pics) state.pics.close();
+    // the image pool behind the strip and the grid: every image Google shows (images[] + every result's thumb, video
+    // results' stills too, deduped; E.gallery: a dead thumb leaves, per page, so a device switch keeps it out)
+    state.pics = E.gallery(E.imageItems(d.images, d.imgResults, E.clean.thumbOk, Infinity, true), d.slug);
     state.handle = d.handle;
     state.platform = PLATFORMS[d.platform] ? d.platform : state.platform;
     if (d.slug && history.replaceState) history.replaceState(null, '', '?r=' + encodeURIComponent(d.slug));
@@ -220,9 +214,9 @@
     if (!slug || !window.LeakScanPersonalize) return;
     window.LeakScanPersonalize.pollMedia(slug, function (imgs, phase) {
       if (tok !== mediaToken) return;
-      var ready = phase === 'ready' || (phase !== 'pending' && imgs.length > 0);
+      var ready = phase === 'ready';
       el.textContent = ready ? 'Photos ready' : 'Gathering photos for your demo site…';
-      el.dataset.phase = ready ? 'ready' : phase;
+      el.dataset.phase = phase;
       el.hidden = !ready && phase !== 'pending';
     });
   }
@@ -241,7 +235,6 @@
       return '<span style="color:' + G_COLORS[i] + '">' + c + '</span>';
     }).join('') + '</span>';
   }
-  function imageItems(d) { return E.imageItems(d.images, d.imgResults, function (u) { var t = thumb(u); return t && !state.dead[t]; }, Infinity, true); }   // every image Google shows (images[] + result thumbs, deduped)
   function img(u, alt, video) {   // video: a video result's still, play badge (css: .g-vid)
     return '<span class="g-img' + (video ? ' g-vid' : '') + '"><img src="' + esc(thumb(u)) + '" alt="' + esc(video ? 'Video: ' + (alt || 'video result') : alt || '') +
       '"' + (E.XO ? ' crossorigin="anonymous"' : '') + ' loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';   // XO: readable pixels (watchThumb)
@@ -264,17 +257,28 @@
   }
   function firstLook(k) { return state.first[k] || more0(k); }
 
+  function packTile(it) {   // opens the page the image is on; an image no result has opens the Images tab
+    return it.link ? '<a class="g-pack-b" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer nofollow">' + img(it.src, it.title || it.domain, it.video) + '</a>'
+      : '<button type="button" class="g-pack-b" data-goto="images" aria-label="Show image results">' + img(it.src, '') + '</button>';
+  }
+  function gridTile(it) {
+    // an image no result has: same caption shape, credited to Google Images (nothing to open: this is the report)
+    var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>'
+      : '<span class="g-ct">Image result</span><span class="g-cs">' + fav('google.com', 'g-fav-s') + 'Google Images</span>';
+    var tile = img(it.src, it.title || 'Image result', it.video);
+    return '<figure class="g-tile">' + (it.link ? a(it.link, 'g-tile-a', tile + GO) : tile) + '<figcaption>' + cap + '</figcaption></figure>';
+  }
+  var NO_IMAGES = '<p class="g-empty">No image results indexed for this handle.</p>';
   function panelAll(d, phone) {
-    var pages = d.results.filter(function (r) { return r.kind !== 'video'; });
-    var imgs = imageItems(d);
+    var pages = d.results.filter(function (r) { return !E.isVideo(r); });
     var h = phone ? '' : '<p class="g-stats">About ' + num(d.google_total) + ' results</p>';
-    if (imgs.length) {   // one row that swipes sideways, every image, the next one peeking in from the right (desktop: arrows on hover)
+    if (state.pics.count().alive) {   // one row that swipes sideways, every image, the next one peeking in from the right (desktop: arrows on hover); tiles: renderGoogle()
       var nav = function (dir, label) {
         return '<button type="button" class="g-strip-nav g-strip-' + (dir < 0 ? 'prev' : 'next') + '" data-strip="' + dir + '" tabindex="-1" aria-label="' + label + '" title="' + label + '"' + (dir < 0 ? ' disabled' : '') + '>' +   // pointer aid; keys: ← → on the tiles
           '<svg class="icon" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>';
       };
       h += '<div class="g-pack"><p class="g-pack-h" id="g-pack-h">Images</p><div class="g-strip-w at-start">' + (phone ? '' : nav(-1, 'Previous images') + nav(1, 'More images')) +
-        '<div class="g-strip" role="group" aria-labelledby="g-pack-h">' + imgs.map(packB).join('') + '</div></div></div>';
+        '<div class="g-strip" role="group" aria-labelledby="g-pack-h" data-view="all"></div></div></div>';
     }
     if (!pages.length) return h + '<p class="g-empty">No web results indexed for this handle.</p>';
     var n = Math.min(state.more.all, pages.length);
@@ -285,27 +289,16 @@
     }).join('');
     return h + more('all', 'More results', pages.length - n);
   }
-  function packB(it) {   // opens the page the image is on; an image no result has opens the Images tab
-    return it.link ? '<a class="g-pack-b" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer nofollow">' + img(it.src, it.title || it.domain, it.video) + '</a>'
-      : '<button type="button" class="g-pack-b" data-goto="images" aria-label="Show image results">' + img(it.src, '') + '</button>';
-  }
-  function gTile(it) {
-    // an image no result has: same caption shape, credited to Google Images (nothing to open: this is the report)
-    var cap = it.domain ? '<span class="g-ct">' + esc(it.title || it.domain) + '</span><span class="g-cs">' + fav(it.domain, 'g-fav-s') + esc(it.domain) + '</span>'
-      : '<span class="g-ct">Image result</span><span class="g-cs">' + fav('google.com', 'g-fav-s') + 'Google Images</span>';
-    var tile = img(it.src, it.title || 'Image result', it.video);
-    return '<figure class="g-tile">' + (it.link ? a(it.link, 'g-tile-a', tile + GO) : tile) + '<figcaption>' + cap + '</figcaption></figure>';
-  }
   function panelImages(d, phone) {
-    var items = imageItems(d);
-    if (!items.length) return '<p class="g-empty">No image results indexed for this handle.</p>';
-    var n = Math.min(state.more.images, items.length);
+    var left = state.pics.count().alive;
+    if (!left) return NO_IMAGES;
+    var n = state.more.images;
     var h = '<div class="g-safe" aria-hidden="true"><span>Image results Google has indexed for your handle</span></div>';
-    h += '<div class="g-grid">' + items.slice(0, n).map(gTile).join('') + '</div>';
-    return h + more('images', 'Show more images', items.length - n);
+    h += '<div class="g-grid" data-view="' + n + '"></div>';
+    return h + more('images', 'Show more images', left - n);
   }
   function panelVideos(d, phone) {
-    var vids = d.results.filter(function (r) { return r.kind === 'video'; });
+    var vids = d.results.filter(E.isVideo);
     if (!vids.length) return '<p class="g-empty">No video results indexed for this handle</p>';
     var n = Math.min(state.more.videos, vids.length);   // a short first look (phone 5, desktop 8), +12 per More
     return vids.slice(0, n).map(function (r) {
@@ -321,15 +314,15 @@
     var deco = function (t) { return '<span class="g-tab-deco" aria-hidden="true">' + t + '</span>'; };
     return '<div class="g-tabs" role="tablist" aria-label="Google result type">' + deco('AI Mode') + TABS.map(function (t) {
       var on = state.tab === t[0];
-      return '<button type="button" role="tab" class="g-tab" id="g-tab-' + t[0] + '" data-tab="' + t[0] + '" aria-selected="' + on +
-        '" aria-controls="g-panel" tabindex="' + (on ? 0 : -1) + '">' + t[1] + '</button>';
+      return '<button type="button" role="tab" class="g-tab" id="tab-google-' + t[0] + '" data-tab="' + t[0] + '" aria-selected="' + on +
+        '" aria-controls="panel-google" tabindex="' + (on ? 0 : -1) + '">' + t[1] + '</button>';
     }).join('') + deco('Short videos') + deco('Forums') + deco('More ▾') + '</div>';
   }
   function renderGoogle(focusTab) {
     var d = state.data, phone = state.device === 'phone';
     var q = d.handle + ' leaks';
     var panel = state.tab === 'images' ? panelImages(d, phone) : state.tab === 'videos' ? panelVideos(d, phone) : panelAll(d, phone);
-    var body = '<div class="g-panel g-panel-' + state.tab + '" role="tabpanel" id="g-panel" aria-labelledby="g-tab-' + state.tab + '">' + panel + '</div>';
+    var body = '<div class="g-panel g-panel-' + state.tab + '" role="tabpanel" id="panel-google" aria-labelledby="tab-google-' + state.tab + '">' + panel + '</div>';
     var search = '<div class="g-search" aria-hidden="true"><svg class="icon"><use href="#i-search"/></svg><span>' + esc(q) + '</span></div>';
     var h;
     if (phone) {
@@ -347,23 +340,23 @@
         tabRow() + body + '</div></div></div>';
     }
     var stage = $('g-stage');
-    stage.className = 'g-stage' + (state.revealed ? ' revealed' : '');
     stage.innerHTML = h;
-    stage.querySelectorAll('img').forEach(watchThumb);
+    stage.querySelectorAll('[data-view]').forEach(function (box) {   // data-view: how many tiles ("all": every image)
+      var n = box.getAttribute('data-view');
+      state.pics.view(box, n === 'all' ? Infinity : +n, htmlTile(box.classList.contains('g-grid') ? gridTile : packTile), emptySlot);
+    });
+    stage.querySelectorAll('.g-v img').forEach(function (im) {   // a video still that dies or is no person photo leaves its grey box (the row stays)
+      E.watchThumb(im, function () { im.parentNode.classList.add('g-img-none'); im.remove(); }, null, true);
+    });
     var strip = stage.querySelector('.g-strip');
     if (strip) {   // desktop arrows: none at the start / end
-      var edges = function () {
-        var w = strip.parentNode, s0 = strip.scrollLeft < 4, s1 = strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 4;
-        w.classList.toggle('at-start', s0);
-        w.classList.toggle('at-end', s1);
-        w.querySelectorAll('[data-strip]').forEach(function (b) { b.disabled = b.dataset.strip < 0 ? s0 : s1; });
-      };
-      strip.addEventListener('scroll', edges, { passive: true });
-      strip.addEventListener('g-shrunk', edges);   // a tile moved away (watchThumb)
-      edges();
+      strip.addEventListener('scroll', function () { stripEdges(strip); }, { passive: true });
+      stripEdges(strip);
     }
+    if (state.unsub) state.unsub();
+    state.unsub = state.pics.onCount(fitImages);
     if (!phone) fitComputer(); else if ($('g-hint')) $('g-hint').removeAttribute('data-small');
-    if (focusTab) { var b = $('g-tab-' + state.tab); if (b) b.focus({ preventScroll: true }); }
+    if (focusTab) { var b = $('tab-google-' + state.tab); if (b) b.focus({ preventScroll: true }); }
     pinPhone(focusTab);
     if (phone) riseMore(stage);
   }
@@ -372,7 +365,7 @@
   var riseIo = null;
   function riseMore(stage) {
     if (riseIo) { riseIo.disconnect(); riseIo = null; }
-    var b = stage.querySelector('#g-panel [data-more=images], #g-panel [data-more=videos]');
+    var b = stage.querySelector('#panel-google [data-more=images], #panel-google [data-more=videos]');
     if (!b || !window.IntersectionObserver || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     b.style.transition = 'none';   // starts hidden, no fade-out first
     b.classList.add('g-rise');
@@ -385,57 +378,27 @@
     }, { threshold: 0.5 });
     riseIo.observe(b);
   }
-
-  // An image tile whose thumb fails or loads blank (hotlink-blocked) leaves the grid / pack (no empty square): the next
-  // image not shown yet takes its slot (same size: nothing below moves), else the tile goes. The dead thumb stays out of
-  // later renders; so does one that is no person photo. A Videos tab still that fails, loads blank or is no person photo
-  // falls back to its grey box (the row stays: it is a result, counts unchanged).
-  function onScreen(e) {   // any part visible: inside the viewport, its scroll row (strip) and the phone's screen
-    var r = e.getBoundingClientRect(), cs = [e.parentNode, e.closest('.ph-scroll')].filter(Boolean).map(function (c) { return c.getBoundingClientRect(); });
-    return cs.concat([{ left: 0, top: 0, right: innerWidth, bottom: innerHeight }]).every(function (c) {
-      return r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom;
-    });
+  var htmlTile = function (fn) { return function (it) { var w = document.createElement('div'); w.innerHTML = fn(it); return w.firstElementChild; }; };
+  function stripEdges(strip) {
+    var w = strip.parentNode, s0 = strip.scrollLeft < 4, s1 = strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 4;
+    w.classList.toggle('at-start', s0);
+    w.classList.toggle('at-end', s1);
+    w.querySelectorAll('[data-strip]').forEach(function (b) { b.disabled = b.dataset.strip < 0 ? s0 : s1; });
   }
-  function tail(e) { var r = []; for (; e; e = e.nextElementSibling) r.push(e); return r; }
-  function watchThumb(im) {
-    var drop = function () {
-      var t = im.closest('.g-tile, .g-pack-b');
-      if (!t) { im.parentNode.classList.add('g-img-none'); im.remove(); return; }
-      state.dead[E.unfresh(im.getAttribute('src'))] = 1;
-      if (!t.isConnected) return;   // an earlier render's tile
-      var box = t.parentNode, shown = {};
-      box.querySelectorAll('img').forEach(function (x) { shown[E.unfresh(x.getAttribute('src'))] = 1; });
-      var spare = imageItems(state.data).filter(function (it) { return !shown[thumb(it.src)]; });
-      var had = t.contains(document.activeElement), nu, last = box.lastElementChild;
-      while (last !== t && last.querySelector('.g-img-none')) last = last.previousElementSibling;   // the last tile still showing an image (after t)
-      if (spare.length) {
-        var tmp = document.createElement('div');
-        tmp.innerHTML = t.classList.contains('g-tile') ? gTile(spare[0]) : packB(spare[0]);
-        nu = tmp.firstElementChild;
-        t.replaceWith(nu);
-        watchThumb(nu.querySelector('img'));
-      } else if (last !== t && !tail(last).some(onScreen)) {   // all shown: the last one takes the slot if it and all after it are off screen
-        had = had || last.contains(document.activeElement);   // a focused donor keeps focus after the move
-        nu = last; t.replaceWith(last); box.dispatchEvent(new Event('g-shrunk'));
-      }
-      else {   // it is on screen (few images): keep an empty slot, nothing moves; the link keeps its name
-        var l = t.matches('a, button') ? t : t.querySelector('a, button');
-        if (l && !l.hasAttribute('aria-label')) l.setAttribute('aria-label', im.alt || 'Image result');
-        im.parentNode.classList.add('g-img-none'); im.remove(); return;
-      }
-      if (had) {   // focus stays on the slot; a tile with no link (an image no result has) passes it to the next tile, else the last one
-        var fs = [].slice.call(box.querySelectorAll('a, button')), f = nu.matches('a, button') ? nu : nu.querySelector('a, button');
-        f = f || fs.filter(function (x) { return nu.compareDocumentPosition(x) & 4; })[0] || fs[fs.length - 1];
-        if (f) f.focus({ preventScroll: true });
-      }
-    };
-    im.addEventListener('error', function () {   // a CORS refusal (XO): once more on a fresh URL (a stale cached copy
-      var s = im.getAttribute('src');               // without ACAO), then plain: pixels unread, kept
-      if (!im.hasAttribute('crossorigin')) drop(); else if (s !== E.fresh(s)) im.setAttribute('src', E.fresh(s)); else im.removeAttribute('crossorigin');
-    });
-    im.addEventListener('load', function () {   // an image tile / video still that is no person photo (a site logo, banner, icon) goes too
-      if (im.naturalWidth < 16 || im.naturalHeight < 16 || (im.closest('.g-tile, .g-pack-b, .g-vthumb') && !E.isPhoto(im))) drop();
-    }, { once: true });
+  // A thumb that fails or loads blank is dead for this page (E.gallery, `still` views): the next live image takes its
+  // slot (same size), else the last tile does when it and every tile after it are off screen, else the slot stays as an
+  // empty tile that keeps its link's name (emptySlot): nothing on screen moves. The next render leaves dead thumbs out
+  // (no strip, "No image results" when none is left). Here: nothing past the grid → no "Show more"; the strip's arrows.
+  function emptySlot(t) {
+    var im = t.querySelector('img'), l = t.matches('a, button') ? t : t.querySelector('a, button');
+    if (l && !l.hasAttribute('aria-label')) l.setAttribute('aria-label', (im && im.alt) || 'Image result');
+    if (im) { im.parentNode.classList.add('g-img-none'); im.remove(); }
+  }
+  function fitImages(c) {
+    var stage = $('g-stage'), grid = stage.querySelector('.g-grid'), strip = stage.querySelector('.g-strip');
+    var moreB = grid && stage.querySelector('[data-more="images"]');
+    if (moreB && c.alive <= +grid.getAttribute('data-view')) moreB.remove();
+    if (strip) stripEdges(strip);   // a tile moved away
   }
 
   // ---------- the phone frame stays put while its screen scrolls ----------
@@ -532,17 +495,18 @@
   }
   window.addEventListener('resize', function () { if (state.device === 'computer' && state.data) fitComputer(); });
 
+  // the All / Images / Videos tablist (E.tablist: click, ←/→, Home / End): one panel, re-rendered for the picked tab
+  E.tablist($('g-stage'), function (tab) { state.tab = tab.getAttribute('data-tab'); renderGoogle(true); });
   $('g-stage').addEventListener('click', function (e) {
-    var t = e.target.closest('[data-tab],[data-more],[data-less],[data-goto]');
+    var t = e.target.closest('[data-more],[data-less],[data-goto]');
     if (!t) return;
-    if (t.dataset.tab) { state.tab = t.dataset.tab; renderGoogle(true); }
-    else if (t.dataset.less) {   // back to its first look; the view lands on its More button (pinned: the screen's end)
+    if (t.dataset.less) {   // back to its first look; the view lands on its More button (pinned: the screen's end)
       var kl = t.dataset.less;
       state.more[kl] = firstLook(kl);
       state.expanded[kl] = false;
       if (!state.first[kl]) state.fitted[kl] = false;   // no first look on this screen yet (resized since): the phone refits it
       renderGoogle(false);
-      var mb = document.querySelector('#g-panel [data-more="' + kl + '"]') || $('g-tab-' + state.tab);
+      var mb = document.querySelector('#panel-google [data-more="' + kl + '"]') || $('tab-google-' + state.tab);
       if (mb) mb.classList.remove('g-rise');   // the view lands on it: shown at once, in place
       if (pin && pin.on) window.scrollTo({ top: window.pageYOffset + pin.track.getBoundingClientRect().top - pin.top + pin.max, behavior: 'instant' });
       else if (mb) mb.scrollIntoView({ block: 'nearest', behavior: 'instant' });
@@ -550,12 +514,13 @@
     }
     else if (t.dataset.goto) { state.tab = t.dataset.goto; renderGoogle(true); }
     else {
-      var k = t.dataset.more, sel = '#g-panel ' + ITEM[k], had = document.querySelectorAll(sel).length;
+      var k = t.dataset.more, sel = '#panel-google ' + ITEM[k], had = document.querySelectorAll(sel).length;
       state.more[k] += (state.device === 'phone' ? 0 : DESK_STEP[k]) || MORE_STEP[k];
       state.expanded[k] = true;
       renderGoogle(false);
       var nx = document.querySelectorAll(sel)[had];   // keyboard: carry on at the first new result
-      var nb = (nx && nx.querySelector('a')) || document.querySelector('#g-panel [data-more="' + k + '"]') || document.querySelector('#g-panel [data-less]') || $('g-tab-' + state.tab);
+      var nb = (nx && (nx.matches('a, button') ? nx : nx.querySelector('a'))) || document.querySelector('#panel-google [data-more="' + k + '"]') ||
+        document.querySelector('#panel-google [data-less]') || $('tab-google-' + state.tab);
       if (nb) nb.focus({ preventScroll: true });
     }
   });
@@ -573,15 +538,6 @@
     e.preventDefault();
     all[i].focus();
   });
-  $('g-stage').addEventListener('keydown', function (e) {
-    var t = e.target.closest('[role=tab]');
-    if (!t || ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return;
-    e.preventDefault();
-    var i = TABS.map(function (x) { return x[0]; }).indexOf(state.tab);
-    i = e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length;
-    state.tab = TABS[i][0];
-    renderGoogle(true);
-  });
   document.addEventListener('click', function (e) {   // "Switch to Phone" in the hint = the Phone toggle
     var b = e.target.closest && e.target.closest('[data-device-go]'), r = b && document.querySelector('#device input[value="' + b.getAttribute('data-device-go') + '"]');
     if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event('change')); r.focus(); }
@@ -590,50 +546,25 @@
     r.checked = r.value === state.device;
     r.addEventListener('change', function () { if (r.checked) { state.device = r.value; resetPreview(); renderGoogle(false); } });
   });
-  // Reveal / Blur: the button above the frame + the same switch on the pinned phone (the one above scrolls away)
-  function revealPill() {
-    return '<button type="button" class="ph-reveal" data-reveal aria-pressed="' + state.revealed + '"><svg class="icon" aria-hidden="true"><use href="#' +
-      (state.revealed ? 'i-eye-off' : 'i-eye') + '"/></svg><span>' + (state.revealed ? 'Blur images' : 'Reveal images') + '</span></button>';
+  function revealPill() {   // the same switch on the pinned phone (the one above scrolls away): same scope, same handler
+    var on = $('google').classList.contains('revealed');
+    return '<button type="button" class="ph-reveal" data-reveal aria-pressed="' + on + '"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>' +
+      '<span class="reveal-t">' + (on ? 'Blur images' : 'Reveal images') + '</span></button>';
   }
-  $('g-stage').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-reveal]');
-    if (!b) return;
-    $('reveal').click();
-    var nb = $('g-stage').querySelector('[data-reveal]');
-    if (nb) nb.focus({ preventScroll: true });
-  });
-  $('reveal').addEventListener('click', function () {
-    state.revealed = !state.revealed;
-    var b = $('reveal'), p = $('g-stage').querySelector('[data-reveal]');
-    b.setAttribute('aria-pressed', String(state.revealed));
-    b.querySelector('.rv-t').textContent = state.revealed ? 'Blur' : 'Reveal';
-    if (p) p.outerHTML = revealPill();
-    $('g-stage').classList.toggle('revealed', state.revealed);
-  });
+  // Reveal / Blur: #reveal is a [data-reveal] button in the #google [data-reveal-scope] (one handler, js/scan-engine.js)
 
   // ---------- "Where the copies are": every site and link, built only as far as it is looked at ----------
   // 1000 links on 100 sites must not mean 1000 rows on load: SITES_STEP sites first (then MORE_SITES per click), a
   // site's links only once it is opened (LINKS_STEP, then MORE_LINKS per click), one filter over domains + URLs.
   // Copy / .txt always carry everything. Built with elements + textContent only.
+  // Per site: its links (its most-seen hit first, then the order the scan found them in); sites in E.siteGroups order,
+  // the landing's Sites tab's too. E.rankHosts ranks by occurrences on purpose (see there).
   var SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50, AUTO_OPEN = 1;
   var lx = { groups: [], view: [], q: '', shown: 0, timer: 0 };
-  function groups(d) {
-    var by = {}, order = [];
-    var add = function (dom, url, occ) {
-      if (!dom) return;
-      if (!by[dom]) { by[dom] = { domain: dom, links: [], seen: {}, occ: 0, top: null, topOcc: -1 }; order.push(dom); }
-      var g = by[dom];
-      g.occ += occ || 0;
-      if ((occ || 0) > g.topOcc) { g.top = url; g.topOcc = occ || 0; }
-      if (!g.seen[url]) { g.seen[url] = 1; g.links.push(url); }
-    };
-    d.hits.forEach(function (h) { add(h.domain, h.url, +h.occurrences || 1); });
-    d.results.forEach(function (r) { add(r.domain, r.link, 0); });
-    return order.map(function (k) {   // the top link first, then the order the scan found them in
-      var g = by[k];
-      g.links = [g.top].concat(g.links.filter(function (u) { return u !== g.top; }));
-      return g;
-    }).sort(function (x, y) { return y.links.length - x.links.length || y.occ - x.occ; });
+  function groups(d) {   // E.siteGroups; a site's links: its most-seen first, then the order the scan found them in
+    return E.siteGroups(d.hits.map(function (h) { return { domain: h.domain, url: h.url, occ: +h.occurrences || 1 }; })
+      .concat(d.results.map(function (r) { return { domain: r.domain, url: r.link, occ: 0 }; })))
+      .map(function (g) { return { domain: g.domain, links: [g.top].concat(g.links.filter(function (u) { return u !== g.top; })) }; });
   }
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -762,7 +693,7 @@
   });
   $('lx-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
   function linksText() {
-    var d = state.data, out = ['Abolita free scan report: ' + who(), 'Report: ' + REPORT_BASE + d.slug,
+    var d = state.data, out = ['Abolita free scan report: ' + who(), 'Report: ' + E.reportUrl(d.slug),
       d.domain_count + ' sites, ' + d.hit_count + ' indexed pages, Google index ~' + num(d.google_total), ''];
     lx.groups.forEach(function (g) { out.push(g.domain + ' (' + g.links.length + ')'); out = out.concat(g.links); out.push(''); });
     return out.join('\n');
@@ -819,14 +750,14 @@
   var qs = new URLSearchParams(location.search);
   var slug = qs.get('r'), p = qs.get('p'), rawH = qs.get('h'), rawS = qs.get('ig') || qs.get('x') || '';
   state.platform = PLATFORMS[p] ? p : 'onlyfans.com';
-  if (slug && /^[A-Za-z0-9_-]{4,64}$/.test(slug)) { reopen(slug); return; }
+  if (E.clean.slug(slug)) { reopen(slug); return; }
   if (slug) { showError('not_found'); return; }
   if (rawH == null) { showForm(); return; }
   var h = cleanHandle(rawH);
   $('scan-form').elements.h.value = rawH;
   $('scan-form').elements.ig.value = rawS;
   if (!h) { showForm('That doesn’t look like a handle. Use letters, numbers, dots, dashes or underscores, like yourhandle.'); return; }
-  state.social = E.cleanSocial(rawS, qs.get('ig') ? 'instagram' : 'x');
+  state.social = E.clean.social(rawS, qs.get('ig') ? 'instagram' : 'x');
   if (state.social === false) { showForm(SOCIAL_BAD); return; }
   state.handle = h;
   startScan();

@@ -272,10 +272,8 @@
     scrollDown();
   }
 
-  function slug() {
-    try { var s = JSON.parse(localStorage.getItem('leakscan.last') || 'null'); return s && typeof s.slug === 'string' ? s.slug : null; }
-    catch (e) { return null; }
-  }
+  // the report this page is about (?r=, else the last scan in this browser): js/scan-engine.js, validated there
+  function slug() { var E = window.LeakScanEngine; return E ? E.currentSlug() : null; }
 
   function send(q) {
     msgs.push({ role: 'user', content: q });

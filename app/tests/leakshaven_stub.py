@@ -2,7 +2,7 @@
 tests/test_leakshaven.py and the local real-path run (LEAKSHAVEN_BASE=http://127.0.0.1:PORT).
 All data is synthetic (fake handle, fake pack ids).
 
-  python3 tests/leakshaven_stub.py PORT [ok|nomatch|404|403|slow]
+  python3 tests/leakshaven_stub.py PORT [ok|nomatch|other|404|403|slow]
 """
 import json
 import sys
@@ -13,11 +13,17 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HANDLE = "demo_creator_x"
 TITLE = "Demo Creator X"
+MODEL = "00000000-0000-4000-8000-000000000002"
+OTHER = "00000000-0000-4000-8000-000000000003"                 # another creator with the same display title
+WHO = {"title": TITLE, "modelId": MODEL}                         # what match() picks for HANDLE
 SUGGEST = [
     {"title": "Other Demo", "modelId": "00000000-0000-4000-8000-000000000001", "matchedSearch": "demo_creator_xy",
      "matchedSource": "instagram", "nationality": ["XX"], "ethnicity": "x", "birthDate": "2000-01-01",
      "media": {"url": "https://img.invalid/a.jpg", "aspectRatio": 1.0, "blurHash": None}},
-    {"title": TITLE, "modelId": "00000000-0000-4000-8000-000000000002", "matchedSearch": HANDLE,
+    {"title": TITLE, "modelId": OTHER, "matchedSearch": "someone_else_x",
+     "matchedSource": "instagram", "nationality": ["XX"], "ethnicity": "x", "birthDate": "2000-01-01",
+     "media": {"url": "https://img.invalid/c.jpg", "aspectRatio": 1.0, "blurHash": None}},
+    {"title": TITLE, "modelId": MODEL, "matchedSearch": HANDLE,
      "matchedSource": "instagram", "nationality": ["XX"], "ethnicity": "x", "birthDate": "2000-01-01",
      "media": {"url": "https://img.invalid/b.jpg", "aspectRatio": 1.0, "blurHash": None}},
 ]
@@ -26,18 +32,24 @@ SUGGEST = [
 def _pack(i, **kw):
     p = {"createdAt": f"2026-11-0{i}T10:00:00.000Z", "id": f"fakepack-{i:04d}", "shortCode": f"fk{i:04d}",
          "media": "https://img.invalid/p.jpg", "mediaAspectRatio": 1.0, "mediaType": "image", "tags": [],
-         "title": f"Demo pack {i}", "views": 10 * i, "isTrending": False, "blurHash": "x", "deleted": False,
+         "title": f"{TITLE} pack {i}", "views": 10 * i, "isTrending": False, "blurHash": "x", "deleted": False,
          "isPremium": False, "info": {"images": 100 + i, "size": 4_000_000_000 + i, "updatedAt":
                                       f"2026-11-0{i}T12:00:00.000Z", "videos": 300 + i}}
     p.update(kw)
     return p
 
 
+# `search=<title>` is free text: the same-titled other creator's packs come back too and must be dropped
 CONTENT = {"content": [_pack(1), _pack(2), _pack(1),                         # dup id -> dropped
                        _pack(3, deleted=True),                                # deleted -> dropped
                        _pack(4, shortCode="../evil"),                         # bad code -> dropped
+                       _pack(6, modelId=OTHER),                               # other creator -> dropped
+                       _pack(7, modelId=MODEL, info={"images": "12", "size": 5.0e9, "videos": 3.0}),
                        _pack(5, info={}, createdAt="nonsense")],              # meta missing -> nulls
-           "count": 6, "cursorId": "x", "richProfileId": "y", "richProfileName": TITLE}
+           "count": 8, "cursorId": "x", "richProfileId": MODEL, "richProfileName": TITLE}
+# the search resolved to the other creator: nothing is attributable to MODEL
+CONTENT_OTHER = {"content": [_pack(1), _pack(2)], "count": 2, "cursorId": "x", "richProfileId": OTHER,
+                 "richProfileName": TITLE}
 
 
 class Stub(ThreadingHTTPServer):
@@ -82,7 +94,7 @@ class _H(BaseHTTPRequestHandler):
         if u.path == "/content/suggest":
             return self._send([] if mode == "nomatch" else SUGGEST)
         if u.path == "/content" and q.get("search") == TITLE and q.get("sorting") == "NEWEST":
-            return self._send(CONTENT)
+            return self._send(CONTENT_OTHER if mode == "other" else CONTENT)
         self._send({"content": []})
 
 
