@@ -34,6 +34,7 @@ BREAKS = {
     "tgcta": ("personalize.js", "    if (bar) {\n", "    if (false) {\n"),   # no Telegram sticky bar after a scan
     "allowlist": ("chat.js", "return HOSTS.indexOf(h) >= 0;", "return true;"),
     "tuck": ("pip.js", "  function tuck(side) {\n", "  function tuck(side) {\n    return;\n"),
+    "pull": ("pip.js", "    if (drag.big) { pull(e, my); return; }\n", "    if (drag.big) return;\n"),   # expanded: no drag-down
     "dock": ("pip.js", "card = auto === 'dock' ? document.querySelector('.hero .report-card') : null;", "card = null;"),   # no dock anchor
     "incremental": ("scan.js", "SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50",
                     "SITES_STEP = 1e9, MORE_SITES = 1e9, LINKS_STEP = 1e9, MORE_LINKS = 1e9"),
