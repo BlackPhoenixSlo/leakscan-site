@@ -401,10 +401,10 @@
     var drop = function () {
       var t = im.closest('.g-tile, .g-pack-b');
       if (!t) { im.parentNode.classList.add('g-img-none'); im.remove(); return; }
-      state.dead[im.getAttribute('src')] = 1;
+      state.dead[E.unfresh(im.getAttribute('src'))] = 1;
       if (!t.isConnected) return;   // an earlier render's tile
       var box = t.parentNode, shown = {};
-      box.querySelectorAll('img').forEach(function (x) { shown[x.getAttribute('src')] = 1; });
+      box.querySelectorAll('img').forEach(function (x) { shown[E.unfresh(x.getAttribute('src'))] = 1; });
       var spare = imageItems(state.data).filter(function (it) { return !shown[thumb(it.src)]; });
       var had = t.contains(document.activeElement), nu, last = box.lastElementChild;
       while (last !== t && last.querySelector('.g-img-none')) last = last.previousElementSibling;   // the last tile still showing an image (after t)
@@ -429,8 +429,9 @@
         if (f) f.focus({ preventScroll: true });
       }
     };
-    im.addEventListener('error', function () {   // a CORS refusal (XO) loads it once more plain: pixels unread, kept
-      if (im.hasAttribute('crossorigin')) im.removeAttribute('crossorigin'); else drop();
+    im.addEventListener('error', function () {   // a CORS refusal (XO): once more on a fresh URL (a stale cached copy
+      var s = im.getAttribute('src');               // without ACAO), then plain: pixels unread, kept
+      if (!im.hasAttribute('crossorigin')) drop(); else if (s !== E.fresh(s)) im.setAttribute('src', E.fresh(s)); else im.removeAttribute('crossorigin');
     });
     im.addEventListener('load', function () {   // an image tile / video still that is no person photo (a site logo, banner, icon) goes too
       if (im.naturalWidth < 16 || im.naturalHeight < 16 || (im.closest('.g-tile, .g-pack-b, .g-vthumb') && !E.isPhoto(im))) drop();

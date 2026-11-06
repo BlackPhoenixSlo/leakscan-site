@@ -2361,6 +2361,7 @@ def tabs_flow(browser, vp_name, vp):
             pg.on("pageerror", lambda e: net["errors"].append(str(e)))
             pg.on("console", lambda msg: msg.type == "error" and urlsplit(msg.location.get("url") or "").hostname not in FONT_HOSTS
                   and not (msg.text.startswith("Failed to load resource") and "DEAD" in unquote(msg.location.get("url") or ""))
+                  and not ("STALE" in unquote(msg.text + (msg.location.get("url") or "")) and ("CORS" in msg.text or "ERR_FAILED" in msg.text))   # the stale copy's refusal (then E.fresh)
                   and net["console"].append(msg.text + " @ " + (msg.location.get("url") or "")))
         ctx.on("page", on_page)
         return ctx
@@ -2474,7 +2475,7 @@ def tabs_flow(browser, vp_name, vp):
               d0 >= 0 and len(s1[0]) == (len(s0) if len(AS) > len(s0) else len(AS)) and all(ok for _u, ok in s1[0]) and [u for u, _ok in s1[0][:d0]] == s0[:d0]
               and not dead_thumb(s1[0][d0][0]) and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(AS), len(s1[0]), d0, s1[1][:2]])
         page.locator("#device input[value=computer]").check(force=True)
-        page.wait_for_timeout(300)
+        page.wait_for_timeout(1000)   # a thumb the phone never showed: its probe (a STALE one: refusal, E.fresh retry) settles
         back = page.evaluate("() => [...document.querySelectorAll('#g-stage img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1] || ''))")
         check(f"{tag} thumbs: a device switch keeps failed thumbs out (Computer view lists none of them)", back and not any(dead_thumb(u) for u in back), [u[-24:] for u in back if dead_thumb(u)])
         ctx.close()
@@ -2810,7 +2811,7 @@ def tabs_flow(browser, vp_name, vp):
     ctx.close()
     hosts = {urlsplit(u).hostname for u in net["outside"]}
     check(f"{tag} no request left loopback but the demo's aborted Google Fonts", hosts <= FONT_HOSTS, sorted(hosts))
-    check(f"{tag} no JS errors, no console errors (the stub's 404 thumbs aside)", not net["errors"] and not net["console"], net["errors"] + net["console"])
+    check(f"{tag} no JS errors, no console errors (the stub's 404 thumbs and STALE CORS refusals aside)", not net["errors"] and not net["console"], net["errors"] + net["console"])
 
 # ---------- removals (js/removals.js, css/removals.css: the #removals "Where I remove from" panels) ----------
 RM_PANELS = ("mega", "x", "reddit", "site")
