@@ -225,25 +225,16 @@ def clean_socials(socials):
     return out
 
 
-def clean_hints(hints):
-    """{"names": [display-name candidates], "aliases": [other handles]} from leak pages, capped."""
-    h = hints if isinstance(hints, dict) else {}
-    names = [n for n in h.get("names") or [] if _text(n, CAPS["display_name"])][:4]
-    aliases = [a for a in h.get("aliases") or [] if valid_handle(a)][:4]
-    return {k: v for k, v in (("names", names), ("aliases", aliases)) if v}
-
-
-def collect_sources(platform, handle, cse_items, fetch=urlopen, socials=None, hints=None):
+def collect_sources(platform, handle, cse_items, fetch=urlopen, socials=None, hints=None):  # one-project: hints (other names / handles read off leak pages -> prompt evidence only)
     """Raw public evidence for one handle. Fetches run in parallel; each fails soft.
-    A declared Instagram handle replaces the scanned handle for the Instagram fetches.
-    `hints` (alias enrichment): other names/handles read off leak pages -> prompt evidence only."""
+    A declared Instagram handle replaces the scanned handle for the Instagram fetches."""
     declared = clean_socials(socials)
     src = {"handle": handle, "platform": _short_platform(platform),
            "instagram": None, "og": None, "google": []}
     if declared:
         src["declared"] = declared
-    if clean_hints(hints):
-        src["other_names"] = clean_hints(hints)
+    if clean_hints(hints):  # one-project: hints
+        src["other_names"] = clean_hints(hints)  # one-project: hints
     ig_h = declared.get("instagram") or handle
     if ig_h != handle:
         src["ig_handle"] = ig_h
@@ -319,9 +310,8 @@ def fetch_avatar(sources, fetch=urlopen, timeout=FETCH_TIMEOUT):
 # --------------------------------------------------------------- prompting
 SYSTEM_PROMPT = """You write a short public profile of an online creator for a demo website.
 You receive SOURCES: raw public data (Instagram page data, other profile page tags, Google results,
-and sometimes web_results: Google web snippets about the creator, declared_accounts: social
-accounts the creator confirmed as their own, and other_names: display names / other handles of the
-same creator read off pages that name her -- weaker evidence, use a name only when it fits the rest).
+and sometimes web_results: Google web snippets about the creator, and declared_accounts: social
+accounts the creator confirmed as their own).
 
 HARD RULES:
 - Use ONLY facts present in the SOURCES. If a field is not supported by the sources, use null.
@@ -351,8 +341,8 @@ def build_prompt(sources):
         payload["declared_accounts"] = sources["declared"]
     if sources.get("web"):
         payload["web_results"] = sources["web"]
-    if sources.get("other_names"):
-        payload["other_names"] = sources["other_names"]
+    if sources.get("other_names"):  # one-project: hints
+        payload["other_names"] = sources["other_names"]  # one-project: hints
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "SOURCES:\n" + json.dumps(payload, ensure_ascii=False)},
@@ -581,13 +571,13 @@ def extract_profile(sources, llm=deepseek_json, timeout=LLM_TIMEOUT, avatar=Fals
         return fallback_profile(sources, avatar=avatar)
 
 
-def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROFILE_BUDGET, socials=None,
-                  hints=None):
+def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROFILE_BUDGET, socials=None,  # one-project: hints
+                  hints=None):  # one-project: hints
     """collect -> avatar -> extract inside a total time budget.
     Returns (profile, avatar_bytes_and_ext_or_None, sources)."""
     fetch, llm = fetch or urlopen, llm or deepseek_json   # resolved per call (patchable)
     t0 = time.monotonic()
-    sources = collect_sources(platform, handle, cse_items, fetch=fetch, socials=socials, hints=hints)
+    sources = collect_sources(platform, handle, cse_items, fetch=fetch, socials=socials, hints=hints)  # one-project: hints
     remaining = lambda: budget - (time.monotonic() - t0)
     av = fetch_avatar(sources, fetch=fetch, timeout=min(FETCH_TIMEOUT, max(1, remaining() - 3))) \
         if remaining() > 4 else None
@@ -598,6 +588,25 @@ def build_profile(platform, handle, cse_items, fetch=None, llm=None, budget=PROF
 
 
 _KEEP_KEYS = tuple(CAPS) + ("followers", "site_domain")
+
+
+
+# >>> one-project patch (leakscan-site) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Alias enrichment: names / handles read off leak pages (hints) and leak-page socials. Every other line that differs
+# from upstream ends in "# one-project". Re-sync: README.
+SYSTEM_PROMPT = SYSTEM_PROMPT.replace(
+    "and declared_accounts: social\naccounts the creator confirmed as their own).",
+    "declared_accounts: social\naccounts the creator confirmed as their own, and other_names: display names / other "
+    "handles of the\nsame creator read off pages that name her -- weaker evidence, use a name only when it fits the "
+    "rest).", 1)
+
+
+def clean_hints(hints):
+    """{"names": [display-name candidates], "aliases": [other handles]} from leak pages, capped."""
+    h = hints if isinstance(hints, dict) else {}
+    names = [n for n in h.get("names") or [] if _text(n, CAPS["display_name"])][:4]
+    aliases = [a for a in h.get("aliases") or [] if valid_handle(a)][:4]
+    return {k: v for k, v in (("names", names), ("aliases", aliases)) if v}
 
 
 def merge_found_accounts(profile, found, declared=None, platform="", cap=12):
@@ -654,3 +663,4 @@ def refine_profile(old, sources, web, *, platform="", handle="", socials=None, l
         new["display_name"] = old["display_name"]
     new["refined"] = True
     return new
+# <<< one-project patch <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

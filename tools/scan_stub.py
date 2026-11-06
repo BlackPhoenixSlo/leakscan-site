@@ -11,15 +11,22 @@ Serves site/ and the API routes of the contract the scan page talks to:
   stub-fail → `failed` + `done`; stub-429 → 429 rate_limited; stub-busy → 429 busy; stub-empty → status empty;
   stub-mixed → 3 hits (live true / false / missing) + the results; stub-huge → huge_result(): 1000 hit links on 100
   domains (deterministic, long-tail counts), 80 Google results, 30 images (report-view scale test); stub-videos →
-  videos_result(): 45 results (34 video), 18 images[] (12 = video stills), 33 unique thumbs (video stills in the image views).
+  videos_result(): 45 results (34 video), 18 images[] (12 = video stills), 33 unique thumbs (video stills: badged in the scan page's Images tab, skipped by the landing's).
 - GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise. Preloaded: demoR3port01 (the
   fixture, with its synthetic `profile`), demoHuge0001 (huge_result()), demoVideos01 (videos_result()), demoNoProf01 (same, `profile` null: scan-only personalization, no leak-page
   Instagram), demoFoundIG1 (`profile` null, leak-page Instagram fills the IG rows) and evilR3port01
   (fixture overlaid with tools/fixtures/scan-evil.json: script tags, javascript: urls, oversized strings).
   `aliases` {declared, discovered, socials} (alias enrichment) comes from the fixture: discovered handles + the
   socials read off leak pages; stub-mixed / stub-empty carry none.
-  Every result carries a top-level `mega` list (mega.nz folders shared via an aggregator: url / host / via / title / size
-  bytes / images / videos / age ISO UTC / status; synthetic, [] when none); demoRemove1 = demoR3port01 + one x.com / reddit.com / mega.nz hit (the #removals panels); evilR3port01's
+  Every result carries a top-level `mega` list (the backend's shape exactly: url https://s.leakshaven.com/<code>, host =
+  via = leakshaven.com, title / size bytes / images / videos / age ISO UTC / status; synthetic code, [] when none);
+  demoRemove1 = demoR3port01 + x.com / reddit.com / mega.nz hits (the #removals panels; the first X poster and
+  subreddit carry leak words, the page must skip them) + stale leakshaven.com / s.leakshaven.com hit rows and a
+  result on an innocent domain whose url host is S.LeakShaven.com, served as an API from before the aggregator rule
+  (OLD_API: the engine's fallback guard must drop them all); every other result goes out as the API serves it
+  (app/public_app.py off_row, the API's own code: hits / results on a mega[] host and those results' thumbs
+  in images[] dropped, hit_count / domain_count / status / google_total recomputed); demoPackImg1 = demoR3port01 + a
+  Google result on a pack's host WITH a thumb, stored before the rule (that thumb leads images[]); evilR3port01's
   `mega` is hostile (markup, javascript: url, oversized size). demoNoProf01 / demoFoundIG1 have [] (demo fallback).
 - GET /api/profile/<slug> → {slug, profile}; GET /api/avatar/<slug> → a generated PNG when profile.avatar is true, else 404.
 - GET /api/media/<slug> (demo photos, arrive after the scan) → polls 1-2: {status:"pending", images:[2]}, then
@@ -34,8 +41,10 @@ Serves site/ and the API routes of the contract the scan page talks to:
   ?c=1 (a copy cached before the API sent CORS: the views retry once on E.fresh's URL, then drop the logo).
 - demoBrokenT1: the fixture with three page-result thumbs swapped for DEAD / BLANK ones (images[] too), page result #7's
   for a LOGO one, a LOGO thumb no result has third in images[], a video result's still put first in images[] (the
-  image views put it after the real images) and the 2nd video result's still a LOGO (Videos rows: grey box, row kept):
-  the broken-thumb / logo removal check.
+  landing puts it after the real images; the scan page's Images tab badges it) and the 2nd video result's still a LOGO
+  (Videos rows: grey box, row kept): the broken-thumb / logo removal check.
+- demoDeadTail1: 24 live thumbs, then 4 DEAD + 4 BLANK ones past the hero strip (results without thumbs): the image
+  counts must settle on 24 without scrolling and never say more.
 - POST /api/chat  {kb: "landing", messages: [{role, content}], slug?} → SSE: `token` events (data = JSON-encoded text
   chunk) streaming CHAT_ANSWER (markdown with an anchor, allowed + forbidden links, bold, bullets), then `done`. A last
   user message containing stub-fail → some tokens then `failed`; stub-429 → 429 rate_limited. Each request body is
@@ -52,6 +61,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "app"))
+from public_app import off_row   # the API's own aggregator rule for a stored row, not a copy
 SITE = ROOT / "site"
 FIXTURE = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())
 EVIL = json.loads((ROOT / "tools" / "fixtures" / "scan-evil.json").read_text())
@@ -71,20 +82,35 @@ CHAT_ANSWER = (
     "Questions about your case? See #contact.")
 
 
-# `mega` (top-level, added by the backend for mega.nz folders) + one hit each on x.com / reddit.com / mega.nz, so the
-# #removals panels have something to personalize from. Synthetic: fake folder ids / paths, the url is never rendered.
-# Contract (backend PR #36): always present, [] when none; host = the aggregator that shares the (captcha-gated) mega.nz
-# folder, url = its share page (here a fake .example path), size in bytes, age = ISO UTC timestamp, status "live".
-MEGA = [{"url": "https://leakshaven.example/share/DEMOfake0", "host": "leakshaven.com", "via": "leakvault.example",
+# `mega` (top-level, added by the backend: app/leakshaven.py packs()) + hits on x.com / reddit.com / mega.nz, so the
+# #removals panels have something to personalize from. Synthetic: fake pack code / paths, the url is never rendered.
+# Contract: always present, [] when none; url = the aggregator's share page SHARE/<code>, host = via = the aggregator
+# (leakshaven.com), size in bytes, age = ISO UTC timestamp, status "live". Never contacted: only strings here.
+MEGA = [{"url": "https://s.leakshaven.com/DEMOpack0", "host": "leakshaven.com", "via": "leakshaven.com",
          "title": "demo.creator MEGA pack 2026", "size": 6657199309, "images": 412, "videos": 88,
          "age": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3 * 86400 - 600)), "status": "live"}]
 SOCIAL_HITS = [
+    {"domain": "x.com", "url": "https://x.com/demo_leaks/status/1000000000000000002", "occurrences": 3, "method": "google",
+     "alias": None, "live": True, "title": "Mira Example / X"},
+    {"domain": "reddit.com", "url": "https://www.reddit.com/r/demo_leaksub/comments/abc124/mira_example/", "occurrences": 2,
+     "method": "google", "alias": None, "live": True, "title": "Mira Example : r/demo_leaksub"},
     {"domain": "x.com", "url": "https://x.com/demo_reposter/status/1000000000000000001", "occurrences": 2, "method": "google",
      "alias": None, "live": True, "title": "Mira Example leaked full set / X"},
     {"domain": "reddit.com", "url": "https://www.reddit.com/r/demo_leaksub/comments/abc123/mira_example/", "occurrences": 1,
      "method": "google", "alias": None, "live": True, "title": "Mira Example new pack in comments : r/demo_leaksub"},
     {"domain": "mega.nz", "url": "https://mega.nz/folder/DEMOfake0#synthetic", "occurrences": 1, "method": "google",
-     "alias": None, "live": True, "title": "demo.creator pack - MEGA"}]
+     "alias": None, "live": True, "title": "demo.creator pack - MEGA"},
+    {"domain": "reddit.com", "url": "https://www.reddit.com/r/demo_pics/comments/abc125/mira_example/", "occurrences": 1,
+     "method": "google", "alias": None, "live": True, "title": "Mira Example : r/demo_pics"}]
+# an API from before the aggregator rule (public_app scan_row / scan_end): pack rows on the aggregator host and a
+# subdomain of it (+ a Google result with a thumb)
+STALE_PACK_HITS = [{"domain": "leakshaven.com", "url": MEGA[0]["url"], "occurrences": 99, "method": "leakshaven",
+                    "alias": None, "live": True, "title": "demo.creator MEGA pack 2026"},
+                   {"domain": "s.leakshaven.com", "url": "https://s.leakshaven.com/DEMOpack1", "occurrences": 50,
+                    "method": "google", "alias": None, "live": True, "title": "demo.creator pack 2"}]
+STALE_PACK_RESULT = {"title": "demo.creator pack 3", "link": "https://S.LeakShaven.com/DEMOpack2", "snippet": "pack",
+                     "thumb": "https://encrypted-tbn0.gstatic.com/images?q=tbn:DEMOpackThumb2", "domain": "packmirror.example",
+                     "kind": "page"}
 
 
 EVIL_MEGA = [{"url": "javascript:alert(1)", "host": "mega.nz", "title": "<img src=x onerror=alert(1)>", "size": "x" * 500,
@@ -121,6 +147,9 @@ def huge_result(handle, n_links=1000, n_domains=100):
     images = [f"https://encrypted-tbn0.gstatic.com/images?q=tbn:DEMO{200 + j:04d}huge" for j in range(30)]
     return {"hits": hits, "results": results, "images": images, "hit_count": len(hits), "domain_count": n_domains,
             "google_total": 48200, "status": "complete"}
+
+
+OLD_API = {"demoRemove1"}   # served as an API from before the aggregator rule: the page's fallback guard must cope
 
 
 def make_result(handle, platform, empty=False):
@@ -431,9 +460,20 @@ class Handler(SimpleHTTPRequestHandler):
         if socials:
             r["socials"] = socials
             r["aliases"]["declared"] += list(socials.values())
-        STORE[r["slug"]] = r
+        STORE[r["slug"]] = r = off_row(r)
         ev("result", json.dumps(r))
         ev("done", "end")
+
+
+def dead_tail(fx):
+    """demoDeadTail1: images[] = 24 live thumbs, then a tail of DEAD / BLANK ones no view shows at first (past the hero
+    strip's 24 tiles); results carry no thumbs, so images[] is the whole image list."""
+    r = json.loads(json.dumps(fx))
+    u = "https://encrypted-tbn0.gstatic.com/images?q=tbn:{}placeholder".format
+    r["images"] = [u(f"TAIL{i:04d}") for i in range(24)] + [u(f"{t}{i:04d}") for i, t in enumerate(["DEAD", "BLANK"] * 4)]
+    for x in r["results"]:
+        x["thumb"] = None
+    return r
 
 
 def main():
@@ -448,7 +488,11 @@ def main():
     for slug, overlay in (("demoR3port01", {"mega": MEGA}), ("demoNoProf01", {"profile": None, "aliases": no_ig, "mega": []}),
                           ("demoFoundIG1", {"profile": None, "mega": []}), (EVIL["slug"], {**EVIL, "mega": EVIL_MEGA}),
                           ("demoBrokenT1", {**broken_thumbs(FIXTURE), "mega": []}),
-                          ("demoRemove1", {"mega": MEGA, "hits": FIXTURE["hits"] + SOCIAL_HITS}),
+                          ("demoDeadTail1", {**dead_tail(FIXTURE), "mega": []}),
+                          ("demoRemove1", {"mega": MEGA, "hits": STALE_PACK_HITS + FIXTURE["hits"] + SOCIAL_HITS,
+                                           "results": [STALE_PACK_RESULT] + FIXTURE["results"]}),
+                          ("demoPackImg1", {"mega": MEGA, "results": [STALE_PACK_RESULT] + FIXTURE["results"],
+                                            "images": [STALE_PACK_RESULT["thumb"]] + FIXTURE["images"]}),
                           ("demoHuge0001", {**huge_result(FIXTURE["handle"]), "mega": []}),
                           ("demoVideos01", {**videos_result(FIXTURE["handle"]), "mega": []})):
         seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
@@ -456,7 +500,7 @@ def main():
             seed.pop("results", None)
         if OPTS.omit_profile:
             seed["profile"] = None
-        STORE[slug] = seed
+        STORE[slug] = seed if slug in OLD_API else off_row(seed)   # as /api/scan-result serves it
     srv = ThreadingHTTPServer(("127.0.0.1", OPTS.port), Handler)
     print(f"scan stub on http://127.0.0.1:{srv.server_address[1]}/", flush=True)
     srv.serve_forever()

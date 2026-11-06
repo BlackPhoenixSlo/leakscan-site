@@ -15,10 +15,7 @@ Sources (official only, nothing from the scan's leak results), in this order:
            then ONE extra DeepSeek call refines the scan's profile (profile_extract.refine_profile);
         3. Instagram grid fallback (only when (a) added < BB_FALLBACK_BELOW images).
       EU consent: SOCS/CONSENT cookies pre-set, "Accept all" clicked as fallback. Google's
-      /sorry captcha is left to Browserbase's solveCaptchas (~8 s measured). Order: google.com is
-      opened once first (warmup: consent + captcha settle, <= CAPTCHA_WAIT s) so the web-text query
-      does not run into an unsolved captcha (prod: solved=False -> raw=0 -> no refine); a web-text
-      query that still came back raw=0 is retried ONCE after the Images step.
+      /sorry captcha is left to Browserbase's solveCaptchas (~8 s measured).
   MEDIA_GOOGLE=cse: the old CSE image search (GOOGLE_CSE_ID_WEB, a whole-web engine) instead
   of 1-2; MEDIA_GOOGLE=off: no Google at all (session only for 3).
 SFW limitation: there is NO NSFW classifier. Safety relies on Instagram/TikTok/YouTube/X
@@ -73,7 +70,7 @@ PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "https://scan.srv1395798.hstgr.c
 BB_API = "https://api.browserbase.com/v1"
 MAX_GATHERS = 2               # concurrent full gathers (Browserbase); when busy -> Google step only
 CACHE_TTL = 7 * 86400
-NONE_TTL = int(os.environ.get("MEDIA_NONE_TTL", "3600"))   # an empty result is retried after an hour, not a week
+NONE_TTL = int(os.environ.get("MEDIA_NONE_TTL", "3600"))  # one-project: NONE_TTL (an empty result is retried after an hour, not a week)
 GOOGLE_QUERIES = 2
 MIN_SIDE, MAX_SIDE, MAX_BYTES = 200, 1200, 300 * 1024
 FETCH_CAP = 8 * 1024 * 1024
@@ -360,8 +357,8 @@ def _cache_load(key):
     try:
         with open(_cache_path(key), encoding="utf-8") as fh:
             c = json.load(fh)
-        ttl = CACHE_TTL if c.get("images") else NONE_TTL
-        if time.time() - float(c["ts"]) > ttl or not SLUG_RE.match(c["slug"]):
+        ttl = CACHE_TTL if c.get("images") else NONE_TTL  # one-project: NONE_TTL
+        if time.time() - float(c["ts"]) > ttl or not SLUG_RE.match(c["slug"]):  # one-project: NONE_TTL
             return None
         return c
     except (OSError, ValueError, KeyError, TypeError):
@@ -837,22 +834,6 @@ def google_page(page, url, box_deadline, ready):
     return h if ready(h) else ""
 
 
-GOOGLE_HOME = "https://www.google.com/?safe=active&hl=en&gl=us"
-
-
-def google_warmup(page, box_deadline):
-    """Open google.com once and let the consent click / Browserbase captcha solve finish before the
-    first query (same helpers as every query). -> settled?"""
-    t0 = time.monotonic()
-    try:
-        ok = bool(google_page(page, GOOGLE_HOME, box_deadline, lambda h: bool(h)))
-    except Exception as e:
-        ok = False
-        log(f"media google warmup failed: {type(e).__name__}")
-    log(f"media google warmup ok={ok} secs={time.monotonic() - t0:.1f}")
-    return ok
-
-
 def _google_url(q, images):
     return ("https://www.google.com/search?" + ("tbm=isch&" if images else "")
             + "safe=active&hl=en&gl=us&q=" + quote_plus(q))
@@ -934,7 +915,6 @@ def clean_snippets(results, leak):
 
 
 def google_web_step(page, handle, profile, ig, leak, box_deadline):
-    """-> (kept snippets, raw result count)."""
     t0, raw, nq = time.monotonic(), [], 0
     for q in web_queries(handle, profile, ig):
         if box_deadline - time.monotonic() < 4:
@@ -946,7 +926,7 @@ def google_web_step(page, handle, profile, ig, leak, box_deadline):
     log(f"media google web queries={nq} raw={len(raw)} kept={len(out)} "
         f"chars={sum(len(r['title']) + len(r['snippet']) + len(r['url']) for r in out)} "
         f"secs={time.monotonic() - t0:.1f}")
-    return out, len(raw)
+    return out, len(raw)  # one-project: web retry (-> kept snippets, raw result count)
 
 
 def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_grid):
@@ -973,11 +953,11 @@ def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_g
         with _cdp_page(sess["connectUrl"], deadline) as page:
             if want_google:
                 _set_consent(page)
-                google_warmup(page, min(deadline, time.monotonic() + CAPTCHA_WAIT + 3))
-                raw = 0
+                google_warmup(page, min(deadline, time.monotonic() + CAPTCHA_WAIT + 3))  # one-project: warmup
+                raw = 0  # one-project: web retry
                 try:   # web text first: ~3 s, and it is what feeds the profile refine
-                    st["snippets"], raw = google_web_step(page, handle, profile, ig, leak,
-                                                          min(deadline, time.monotonic() + GOOGLE_WEB_BOX))
+                    st["snippets"], raw = google_web_step(page, handle, profile, ig, leak,  # one-project: web retry
+                                                          min(deadline, time.monotonic() + GOOGLE_WEB_BOX))  # one-project: web retry
                 except Exception as e:
                     st["ok"] = False
                     log(f"media google web failed: {type(e).__name__}")
@@ -987,14 +967,7 @@ def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_g
                 except Exception as e:
                     st["ok"] = False
                     log(f"media google images failed: {type(e).__name__}")
-                if not raw and deadline - time.monotonic() > 6:
-                    try:   # once: the Images step usually leaves the captcha solved
-                        log("media google web retry")
-                        st["snippets"], raw = google_web_step(page, handle, profile, ig, leak,
-                                                              min(deadline, time.monotonic() + GOOGLE_WEB_BOX))
-                    except Exception as e:
-                        st["ok"] = False
-                        log(f"media google web retry failed: {type(e).__name__}")
+                google_web_retry(st, raw, page, handle, profile, ig, leak, deadline)  # one-project: web retry
             if want_grid and not g.full and deadline - time.monotonic() > 8:
                 t1 = time.monotonic()
                 try:
@@ -1188,3 +1161,38 @@ def prune(days=30):
         except OSError:
             pass
     return n
+
+
+# >>> one-project patch (leakscan-site) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Google order in browser_steps: google.com is opened once first (warmup: consent + captcha settle, <= CAPTCHA_WAIT s)
+# so the web-text query does not run into an unsolved captcha (prod: solved=False -> raw=0 -> no refine); a web-text
+# query that still came back raw=0 is retried ONCE after the Images step. Every other line that differs from upstream
+# ends in "# one-project". Re-sync: README.
+GOOGLE_HOME = "https://www.google.com/?safe=active&hl=en&gl=us"
+
+
+def google_warmup(page, box_deadline):
+    """Open google.com once and let the consent click / Browserbase captcha solve finish before the
+    first query (same helpers as every query). -> settled?"""
+    t0 = time.monotonic()
+    try:
+        ok = bool(google_page(page, GOOGLE_HOME, box_deadline, lambda h: bool(h)))
+    except Exception as e:
+        ok = False
+        log(f"media google warmup failed: {type(e).__name__}")
+    log(f"media google warmup ok={ok} secs={time.monotonic() - t0:.1f}")
+    return ok
+
+
+def google_web_retry(st, raw, page, handle, profile, ig, leak, deadline):
+    """The web-text step once more when it came back raw=0 (the Images step usually leaves the captcha solved)."""
+    if raw or deadline - time.monotonic() <= 6:
+        return
+    try:
+        log("media google web retry")
+        st["snippets"], _ = google_web_step(page, handle, profile, ig, leak,
+                                            min(deadline, time.monotonic() + GOOGLE_WEB_BOX))
+    except Exception as e:
+        st["ok"] = False
+        log(f"media google web retry failed: {type(e).__name__}")
+# <<< one-project patch <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

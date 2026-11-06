@@ -20,29 +20,10 @@
     });
   }
 
-  // Phone mockups: All / Images / Videos are real tabs (click, ←/→, Home / End). The screen has a fixed height, so a
-  // switch never moves the page.
-  document.querySelectorAll('.m-tabs[role=tablist]').forEach(function (bar) {
-    var tabs = Array.prototype.slice.call(bar.querySelectorAll('[role=tab]'));
-    var pick = function (t, focus) {
-      tabs.forEach(function (b) {
-        var on = b === t, panel = document.getElementById(b.getAttribute('aria-controls'));
-        b.setAttribute('aria-selected', String(on));
-        b.tabIndex = on ? 0 : -1;
-        if (panel) panel.hidden = !on;
-      });
-      if (focus) t.focus();
-    };
-    tabs.forEach(function (b, i) {
-      b.addEventListener('click', function () { pick(b); });
-      b.addEventListener('keydown', function (e) {
-        var k = ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key);
-        if (k < 0) return;
-        e.preventDefault();
-        pick(tabs[k === 2 ? 0 : k === 3 ? tabs.length - 1 : (i + (k ? 1 : tabs.length - 1)) % tabs.length], true);
-      });
-    });
-  });
+  // Phone mockups: All / Images / Videos are real tabs (E.tablist: click, ←/→, Home / End). The screen has a fixed
+  // height, so a switch never moves the page.
+  var E = window.LeakScanEngine;
+  if (E) document.querySelectorAll('.phone').forEach(function (phone) { E.tablist(phone); });
 
   // Demo site: "Full screen" pops the frame out to a layer over the page (same iframe, no reload: it keeps its scroll).
   // Its slot keeps its height and the scrollbar gutter stays, so nothing behind it moves. Esc / the button / the
@@ -90,7 +71,7 @@
       frame.tabIndex = on ? 0 : -1;   // full screen: the keyboard can go in and scroll it
       popBtn.setAttribute('aria-label', on ? 'Close full screen' : 'Open the demo full screen');
       popBtn.setAttribute('aria-expanded', String(on));
-      popBtn.lastChild.textContent = on ? 'Close' : 'Full screen';
+      popBtn.querySelector('.demo-pop-t').textContent = on ? 'Close' : 'Full screen';
       try { frame.contentWindow[on ? 'addEventListener' : 'removeEventListener']('keydown', onKey); } catch (e) { /* not loaded yet */ }
       popBtn.focus({ preventScroll: true });
     };

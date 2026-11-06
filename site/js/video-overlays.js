@@ -421,7 +421,7 @@
   var owns = root.querySelectorAll('.vo-own');
   Array.prototype.forEach.call(owns, function (im) { im.__def = im.getAttribute('src'); });
   function photos(slug, g, n) {
-    if (!window.fetch || !E.SLUG_RE.test(slug || '')) return;
+    if (!window.fetch || !E.clean.slug(slug)) return;
     var base = E.API + '/api/media/' + encodeURIComponent(slug);
     fetch(base, { credentials: 'omit' }).then(function (res) { return res.ok ? res.json() : null; }).then(function (j) {
       if (g !== gen || !j) return;
@@ -465,7 +465,7 @@
   // done() once the images are in
   function useResult(raw, done) {
     var m = R && E && R.model(raw);
-    if (!m || !E.SLUG_RE.test(raw.slug || '')) return false;
+    if (!m || !E.clean.slug(raw.slug)) return false;
     var o = mine(raw); m.site = o.site; m.ig = o.ig; m.tt = o.tt;
     var r = report(raw);
     m.gcount = r.gtotal;
@@ -538,10 +538,9 @@
     fill(values({ name: name }));
     personal(name);
   }
-  else {   // the shared scan result, same slug rule as js/removals.js (?r= → last scan → none = generic)
-    var slug = q.get('r'), g0 = gen;
-    if (slug === null) { try { slug = (JSON.parse(localStorage.getItem('leakscan.last') || 'null') || {}).slug; } catch (e) { slug = null; } }
-    if (E && E.fetchResult && R && typeof slug === 'string' && E.SLUG_RE.test(slug)) {
+  else {   // the shared scan result, same slug rule as js/removals.js (E.currentSlug: ?r= → last scan → none = generic)
+    var slug = E && E.currentSlug ? E.currentSlug() : null, g0 = gen;
+    if (slug && E.fetchResult && R) {
       E.fetchResult(slug).then(function (raw) { if (g0 === gen && who === null) useResult(raw); }, function () { /* generic */ });
     }
   }
@@ -709,7 +708,7 @@
   }
   function scanFor(n, g) {
     var h = n.toLowerCase().replace(/[^a-z0-9._]/g, '');
-    if (!E || !E.runScan || !R || !E.HANDLE_RE.test(h)) return;
+    if (!E || !E.runScan || !R || !E.clean.handle(h)) return;
     scanning = g;
     waiting(true, 'Scanning @' + h + '…');
     waitT = setTimeout(function () { if (scanning === g) waiting(false); }, WAIT_MAX * 1000);

@@ -29,13 +29,19 @@ class TestKind(unittest.TestCase):
                    item("https://a.com/videos/x"),
                    item("https://a.com/watch?v=1"),
                    item("https://cdn.a.com/f.mp4"),
+                   item("https://cdn.a.com/f.m3u8?t=1"),
+                   item("https://a.com/embed/9"),
+                   item("https://a.com/clip-7"),
+                   item("https://a.com/vod/x"),
                    item("https://a.com/p", title="Leaked Video of x"),
                    item("https://a.com/p", title="new clips")):
             self.assertEqual(public_app.result_kind(it), "video", it)
 
     def test_page(self):
         for it in (item("https://a.com/models/x", title="x onlyfans leaks"),
-                   item("https://a.com/videography", title="Videographer")):
+                   item("https://a.com/videography", title="Videographer"),
+                   item("https://a.com/watchlist/x", title="list"),
+                   item("https://a.com/embedded-gallery", title="x")):
             self.assertEqual(public_app.result_kind(it), "page", it)
 
     def test_parse_items_keeps_video_flag(self):

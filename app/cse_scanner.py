@@ -11,7 +11,7 @@ site-scraping. Reads GOOGLE_API_KEY + GOOGLE_CSE_ID from env. Stdlib only.
 import json
 import os
 import re
-import time
+import time  # one-project: deadline
 import urllib.parse
 import urllib.request
 from urllib.parse import urlparse
@@ -171,14 +171,13 @@ def cse_search_deep(query, max_calls=15, api_key=None, cx=None, timeout=20,
 
 
 def cse_search_wide(queries, max_calls=15, api_key=None, cx=None, timeout=20,
-                    q_budget=1900, on_progress=None, tags=None, deadline=None):
+                    q_budget=1900, on_progress=None, tags=None, deadline=None):  # one-project: deadline (monotonic) stops before a call that could not finish in time
     """Multi-seed exclude-reset widening. Same idea as cse_search_deep but CYCLES
     through several seed queries (e.g. the base query + `<h> nude` + `<h> porn`) so
     different phrasings surface different leak sites — while sharing ONE exclusion
     set across all seeds, so every later call `-site:`-excludes every domain any
     seed has seen. Stops after a full cycle of seeds adds nothing new. `tags` (parallel to
-    queries) stamps each new item's `alias` with its seed's tag. `deadline` (monotonic) stops
-    before a call that could not finish in time. Returns
+    queries) stamps each new item's `alias` with its seed's tag. Returns
     (items, google_total_from_first_call)."""
     key = api_key or os.environ.get("GOOGLE_API_KEY", "")
     cid = cx or os.environ.get("GOOGLE_CSE_ID", "")
@@ -190,9 +189,9 @@ def cse_search_wide(queries, max_calls=15, api_key=None, cx=None, timeout=20,
     seen_links, items, excl = set(), [], []
     total, dry = None, 0
     for call in range(max_calls):
-        left = None if deadline is None else deadline - time.monotonic()
-        if left is not None and left < 1:
-            break
+        left = None if deadline is None else deadline - time.monotonic()  # one-project: deadline
+        if left is not None and left < 1:  # one-project: deadline
+            break  # one-project: deadline
         base = queries[call % len(queries)]
         negs = " ".join(f"-site:{d}" for d in excl)
         while negs and len(base) + 1 + len(negs) > q_budget:   # keep query under limit
@@ -200,7 +199,7 @@ def cse_search_wide(queries, max_calls=15, api_key=None, cx=None, timeout=20,
             negs = " ".join(f"-site:{d}" for d in excl)
         q = f"{base} {negs}".strip()
         try:
-            d = _call(q, key, cid, start=1, timeout=timeout if left is None else min(timeout, left))
+            d = _call(q, key, cid, start=1, timeout=timeout if left is None else min(timeout, left))  # one-project: deadline
         except Exception as e:
             if on_progress:
                 on_progress(f"call {call+1}: API error ({e}); stopping")

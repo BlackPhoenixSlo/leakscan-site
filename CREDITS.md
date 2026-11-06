@@ -4,7 +4,7 @@
   Cole Bemis 2013-2023 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2025.
   Used as an inline SVG sprite in `site/*.html`; the logo/favicon shield is Lucide `shield-check`.
 - **Fonts**: none shipped. System font stacks only (serif: Iowan Old Style / Palatino / Georgia; sans: system-ui) on the landing pages.
-  The showcase demo loads Fraunces and Karla (SIL Open Font License) from Google Fonts.
+  The showcase demo uses system font stacks too (display: Georgia; body: system-ui), no web fonts.
 - **Photos**: the showcase demo (`site/showcase/imgs/`) uses Pexels photos (Pexels License), credited per file in
   `tools/showcase/CREDITS.md`. The landing page reuses small crops of those same photos (the fictional demo creator's
   "own" pictures) in two places: `site/assets/phone/` (After phone, Images / Videos tabs) and `site/img/removals/`

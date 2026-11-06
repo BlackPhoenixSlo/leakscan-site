@@ -88,6 +88,34 @@ def new_verify_code():
     return "bruqi-" + secrets.token_hex(3)
 
 
+# >>> one-project patch (leakscan-site) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# What this repo adds to upstream db.py (bruquiextension) lives in this block; every other line that differs from
+# upstream ends in "# one-project" (app/tests/test_one_project.py lists the sites). Re-sync: README.
+def domain_count(hits):
+    """Distinct hit domains: the one definition of a scan's `domain_count`."""
+    return len({h.get("domain") for h in hits or [] if h.get("domain")})
+
+
+def recent_extra(handle, key, value, max_age_s, path=None):
+    """extra_json of the newest scan of `handle` (case-insensitive) younger than max_age_s whose extra[key] ==
+    value (a truthy value), else None. Per-handle cache over the scans table (idx_scans_handle)."""
+    if not value:
+        return None
+    since = (datetime.now(timezone.utc) - timedelta(seconds=max_age_s)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with _db(path) as c:
+        rows = c.execute("SELECT extra_json FROM scans WHERE handle = ? COLLATE NOCASE AND created_at >= ? "
+                         "ORDER BY created_at DESC LIMIT 10", (handle, since)).fetchall()
+    for r in rows:
+        try:
+            ex = json.loads(r[0] or "{}") or {}
+        except ValueError:
+            continue
+        if ex.get(key) == value:
+            return ex
+    return None
+# <<< one-project patch <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
 def insert_scan(hits, *, handle, level="low", platform="", status=None,
                 ownership_verified=False, verify_code=None, verify_platform=None,
                 client_ip_hash=None, extra=None, path=None):
@@ -97,7 +125,7 @@ def insert_scan(hits, *, handle, level="low", platform="", status=None,
     on the astronomically unlikely slug collision."""
     hits = hits or []
     hit_count = len(hits)
-    domain_count = len({h.get("domain") for h in hits if h.get("domain")})
+    n_domains = domain_count(hits)  # one-project: domain_count
     if status is None:
         status = "empty" if hit_count == 0 else "complete"
     payload = json.dumps(hits, ensure_ascii=False, separators=(",", ":"))
@@ -112,7 +140,7 @@ def insert_scan(hits, *, handle, level="low", platform="", status=None,
                     "verify_code, verify_platform, client_ip_hash, extra_json) "
                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (slug, level, platform, handle, _now(), status, payload,
-                     hit_count, domain_count, 1 if ownership_verified else 0,
+                     hit_count, n_domains, 1 if ownership_verified else 0,  # one-project: domain_count
                      verify_code, verify_platform, client_ip_hash, extra_json),
                 )
                 return slug
@@ -152,7 +180,7 @@ def finish_scan(slug, hits, *, status=None, extra=None, path=None):
         return False
     hits = hits or []
     hit_count = len(hits)
-    domain_count = len({h.get("domain") for h in hits if h.get("domain")})
+    n_domains = domain_count(hits)  # one-project: domain_count
     if status is None:
         status = "empty" if hit_count == 0 else "complete"
     payload = json.dumps(hits, ensure_ascii=False, separators=(",", ":"))
@@ -161,7 +189,7 @@ def finish_scan(slug, hits, *, status=None, extra=None, path=None):
         cur = c.execute(
             "UPDATE scans SET status=?, result_json=?, hit_count=?, domain_count=?, "
             "extra_json=? WHERE slug=?",
-            (status, payload, hit_count, domain_count, extra_json, slug),
+            (status, payload, hit_count, n_domains, extra_json, slug),  # one-project: domain_count
         )
     return cur.rowcount > 0
 
@@ -229,27 +257,10 @@ def get_scan(slug, path=None):
     # whatever the worker stored so a share/reload renders the full report.
     for key in ("img_meta", "gallery", "cse_sites", "top_leaks", "n_leaks",
                 "n_media", "n_hosting", "n_sites", "quote", "links_by_domain",
-                "excluded", "mega"):
+                "excluded", "mega", "results"):  # one-project: get_scan
         if key in extra:
             d[key] = extra[key]
     return d
-
-
-def recent_extra(handle, key, max_age_s, path=None):
-    """extra_json of the newest scan of `handle` (case-insensitive) younger than max_age_s that has `key`
-    set truthy, else None. Per-handle cache over the scans table (idx_scans_handle)."""
-    since = (datetime.now(timezone.utc) - timedelta(seconds=max_age_s)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    with _db(path) as c:
-        rows = c.execute("SELECT extra_json FROM scans WHERE handle = ? COLLATE NOCASE AND created_at >= ? "
-                         "ORDER BY created_at DESC LIMIT 10", (handle, since)).fetchall()
-    for r in rows:
-        try:
-            ex = json.loads(r[0] or "{}") or {}
-        except ValueError:
-            continue
-        if ex.get(key):
-            return ex
-    return None
 
 
 def mark_verified(slug, path=None):

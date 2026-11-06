@@ -1,23 +1,28 @@
 // #removals "Where I remove from": four mock panels (Mega, X, Reddit, a leak site), each a live leak vs. its removed
-// state. Remove / Show again animates the compare edge; the handle (drag anywhere on the stage, arrow keys on the
-// handle) moves it: left of it = the live leak, right = removed. Own file so it merges next to other work.
+// state. Remove / Show again animates the compare edge; the handle moves it (arrow keys on it; drag it, or drag sideways
+// anywhere on the stage: a tap or a vertical swipe never moves it): left of it = the live leak, right = removed. Idle
+// (all live) the handle is parked in the stage's bottom corner with no edge line, so nothing of the live leak is covered.
+// Personalized per panel from the page's scan result (E.currentSlug() → E.fetchResult, the one request shared with the
+// hero card; again on `leakscan:result` after an in-page scan): a panel is all hers or all the demo, never a mix. Shown
+// of hers: name / handle, a poster / subreddit / host read off her hits, mega[] counts and age, her Google thumbs.
+// Never a third-party title, never a leak URL (read for its host / path only), never an aggregator host. textContent
+// only. Own file so it merges next to other work.
 // Ambient sweep: on screen each edge glides by itself to a random spot and holds there, per card, never in step;
-// the first input on a card stops its sweep for good. None under prefers-reduced-motion.
-// Personalized from the scan result the page already fetches (?r=<slug> or the last scan: js/scan-engine.js
-// fetchResult, one request shared with the hero card), and again after an in-page scan (wraps LeakScanPersonalize.apply).
-// textContent only; leak URLs are read for their host / subreddit / poster, never rendered or linked.
-// model() is defined before the #removals check and exposed as LeakScanRemovals.model (the video page has no #removals).
+// the first input on a card (a Remove press, a stage tap, a handle key) stops its sweep for good. None under
+// prefers-reduced-motion.
+// LeakScanRemovals.model(raw) (defined before the #removals check: site/js/video-overlays.js, whose page has none).
 (function () {
   'use strict';
-  // ---------- personalization ----------
-  var HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/, SLUG_RE = /^[A-Za-z0-9_-]{4,64}$/, GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
-  var NOT_LEAK = /(^|\.)(x|twitter|reddit|redd|mega|instagram|tiktok|onlyfans|fansly|patreon|youtube|threads|twitch|google|facebook)\.(com|net|tv|it|nz|io)$/;
-  function str(v, max) {
-    if (typeof v !== 'string') return null;
-    var s = v.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, ' ').replace(/\s+/g, ' ').trim();
-    return s && s.length <= max && !/[<>{}]|javascript:|data:|https?:\/\/|www\./i.test(s) ? s : null;
-  }
-  var cut = function (s, n) { return s && s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '\u2026' : s; };
+  var E = window.LeakScanEngine;
+  if (!E) return;
+  var C = E.clean, each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
+
+  // ---------- personalization: per panel, all hers or all the demo ----------
+  // A third-party string that does show (an X poster, a subreddit, a leak host) must not carry adult / leak words (Ads
+  // policy): an unsafe one is skipped for the next candidate; none left = that panel stays the demo.
+  var UNSAFE = /onlyfan|fansly|leak|nud[ei]|naked|nsfw|porn|xxx|sex|hentai|erotic|fap|slut|escort|tits|boob|puss|cock|dick|cum|18\+|adult|explicit/i;
+  var safe = function (s) { return s && !UNSAFE.test(s) ? s : null; };
+  var PLATFORM_HOST = /(^|\.)(instagram|tiktok|onlyfans|fansly|patreon|youtube|threads|twitch|google|facebook)\.(com|net|tv)$/;
   // mega[].size is bytes → "6.2 GB" / "740 MB"; mega[].age an ISO UTC timestamp → "7 minutes ago"
   function bytes(v) {
     if (typeof v !== 'number' || !isFinite(v) || v <= 0 || v > 1e15) return null;
@@ -35,75 +40,109 @@
     return 'just now';
   }
   function num(v) { return typeof v === 'number' && isFinite(v) && v >= 0 && v < 1e7 ? Math.round(v) : null; }
-  function dom(v) {
-    var d = typeof v === 'string' ? v.trim().toLowerCase().replace(/^www\./, '') : '';
-    return d.length <= 80 && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) ? d : null;
-  }
-  function path(u) {
-    try { var x = new URL(u); return /^https?:$/.test(x.protocol) ? x.pathname : ''; } catch (e) { return ''; }
-  }
-  function model(raw) {
-    if (!raw || typeof raw !== 'object') return null;
-    var h = typeof raw.handle === 'string' ? raw.handle.trim().replace(/^@/, '') : '';
-    if (!HANDLE_RE.test(h)) return null;
-    var pr = raw.profile && typeof raw.profile === 'object' ? raw.profile : {};
-    var name = str(pr.display_name, 60) || str(pr.first_name, 30) || h;
-    var plat = (dom(raw.platform) || 'onlyfans.com').split('.')[0];
-    var hits = (Array.isArray(raw.hits) ? raw.hits : []).slice(0, 1000).filter(function (x) { return x && dom(x.domain); });
-    var on = function (re) { return hits.filter(function (x) { return re.test(dom(x.domain)); }); };
-    var m = { name: name, handle: h, plat: plat };
-    // X: the post's text + poster (first path segment) from an x.com / twitter.com hit
-    var xh = on(/(^|\.)(x|twitter)\.com$/)[0];
-    var xp = xh && /^\/([A-Za-z0-9_]{1,15})(\/|$)/.exec(path(xh.url));
-    if (xp && !/^(i|search|hashtag|home|explore)$/i.test(xp[1])) m.xat = '@' + xp[1];
-    if (xh) m.xtext = cut(str(xh.title, 300) && str(xh.title, 300).replace(/\s*\/\s*(X|Twitter)$/, ''), 90);
-    // Reddit: subreddit from the URL, title from the hit
-    var rh = on(/(^|\.)reddit\.com$/)[0];
-    var rs = rh && /^\/r\/([A-Za-z0-9_]{2,21})\//.exec(path(rh.url));
-    if (rs) m.sub = 'r/' + rs[1];
-    if (rh) m.rtitle = cut(str(rh.title, 300) && str(rh.title, 300).replace(/\s*(:\s*r\/\w+|[-|]\s*Reddit)$/i, ''), 110);
-    // Mega: the backend's top-level mega[] (always there, [] = none: title, size in bytes, images, videos, age ISO UTC; its url /
-    // host are an aggregator share page, never shown); else a mega.nz hit's title
-    var mg = (Array.isArray(raw.mega) ? raw.mega : []).filter(function (x) { return x && typeof x === 'object'; })[0];
-    if (mg) {
-      m.mtitle = cut(str(mg.title, 200), 70);
-      m.mimg = num(mg.images); m.mvid = num(mg.videos);
-      m.mmeta = [bytes(mg.size), m.mimg !== null ? m.mimg + ' images' : null, m.mvid !== null ? m.mvid + ' videos' : null, ago(mg.age)]
-        .filter(Boolean).join(' · ') || null;
-    } else {
-      var mh = on(/(^|\.)mega\.(nz|io)$/)[0];
-      if (mh) m.mtitle = cut(str(mh.title, 200) && str(mh.title, 200).replace(/\s*[-|]\s*MEGA$/i, ''), 70);
-    }
-    // custom leak site: the most-seen other host
-    var occ = {};
-    hits.forEach(function (x) {
-      var d = dom(x.domain);
-      if (!NOT_LEAK.test(d)) occ[d] = (occ[d] || 0) + (typeof x.occurrences === 'number' && x.occurrences > 0 ? Math.min(x.occurrences, 1e6) : 1);
+  // ---------- readers of the scan result, shared by the panels and model() ----------
+  // the first hit on a host matching hostRe whose path gives re's capture (not `skip`; ok(capture) when given) →
+  // {cap, hit}, else null
+  function fromHits(raw, hostRe, re, skip, ok) {
+    var out = null;
+    (Array.isArray(raw.hits) ? raw.hits : []).slice(0, 1000).some(function (x) {
+      var d = x && C.domain(x.domain), u = d && hostRe.test(d) && C.link(x.url), m = u && re.exec(u.pathname);
+      if (m && !(skip && skip.test(m[1])) && (!ok || ok(m[1]))) out = { cap: m[1], hit: x };
+      return !!out;
     });
-    m.host = Object.keys(occ).sort(function (a, b) { return occ[b] - occ[a]; })[0] || null;
-    var E = window.LeakScanEngine;
-    m.thumbs = E && E.thumb ? (Array.isArray(raw.images) ? raw.images : []).filter(function (u) {
-      return typeof u === 'string' && u.length <= 600 && GSTATIC_RE.test(u);
-    }).slice(0, 10).map(E.thumb).filter(Boolean) : [];
-    return m;
+    return out;
+  }
+  var X_AT = /^\/([A-Za-z0-9_]{1,15})(?:\/|$)/, X_NOT = /^(i|search|hashtag|home|explore)$/i, R_SUB = /^\/r\/([A-Za-z0-9_]{2,21})(?:\/|$)/;
+  // the first mega[] item → {mg, img, vid, meta: "6.2 GB · 412 images · 88 videos · 3 days ago"}, else null. Its url /
+  // host are an aggregator share page: never read here
+  function megaMeta(raw) {
+    var mg = (Array.isArray(raw.mega) ? raw.mega : []).filter(function (x) { return x && typeof x === 'object'; })[0];
+    if (!mg) return null;
+    var img = num(mg.images), vid = num(mg.videos);
+    return { mg: mg, img: img, vid: vid,
+      meta: [bytes(mg.size), img !== null ? img + ' images' : null, vid !== null ? vid + ' videos' : null, ago(mg.age)].filter(Boolean).join(' · ') || null };
+  }
+  // her Google thumbs (/api/thumb urls), at most 10
+  function thumbsOf(raw) { return (Array.isArray(raw.images) ? raw.images : []).filter(C.thumbOk).slice(0, 10).map(E.thumb).filter(Boolean); }
+
+  // One row per panel: the hosts it stands for (they never count as "a leak site") and fill(raw, who) → its values by
+  // data-rm-k key, or null = the demo. In her panel a key without a value (null) hides its slot: no demo meta next to her.
+  // Every third-party string shown passes safe(); mega[]'s title is never shown here.
+  var PANELS = {
+    mega: { hosts: /(^|\.)mega\.(nz|io)$/, fill: function (raw, who) {
+      var mm = megaMeta(raw);
+      return mm && { name: who.name, 'mega-title': who.handle + ' – pack', 'mega-pill': null, 'mega-meta': mm.meta,
+        'mega-img': mm.img !== null ? mm.img + ' files' : null, 'mega-vid': mm.vid !== null ? mm.vid + ' files' : null, 'mega-note': null };   // the demo's own file row
+    } },
+    x: { hosts: /(^|\.)(x|twitter)\.com$/, fill: function (raw, who) {
+      var x = fromHits(raw, PANELS.x.hosts, X_AT, X_NOT, safe), at = x && x.cap;
+      return at && { 'x-at': '@' + at, 'x-name': at, 'x-av': at.charAt(0).toUpperCase(), 'x-age': null, 'x-l1': who.name, 'x-l2': null, 'x-acts': null };
+    } },
+    reddit: { hosts: /(^|\.)(reddit\.com|redd\.it)$/, fill: function (raw, who) {
+      var r = fromHits(raw, PANELS.reddit.hosts, R_SUB, null, safe);
+      return r && { sub: 'r/' + r.cap, 'rd-age': null, 'rd-title': who.name, 'rd-acts': null };
+    } },
+    site: { fill: function (raw, who) {   // a custom leak site: her most-seen host (E.rankHosts) that no other row claims
+      var top = E.rankHosts(raw).filter(function (x) { return !notLeak(x.domain) && safe(x.domain); })[0];
+      return top && { host: brand(top.domain), name: who.name, aka: aka(who) };
+    } }
+  };
+  // leak-site wordmark: the host without its TLD ("leakvault.example" → "leakvault"), like fapello's bare logo; aliases
+  // line: "<handle>, <name squashed>" (the way those sites list a model), just the handle without one
+  function brand(d) { var p = d.split('.'); p.pop(); if (p.length > 1 && /^(co|com|net|org)$/.test(p[p.length - 1])) p.pop(); return p[p.length - 1]; }
+  function aka(w) { var v = w.name.toLowerCase().replace(/[^a-z0-9]+/g, ''); return v && v !== w.handle ? w.handle + ', ' + v : w.handle; }
+  function notLeak(d) {
+    return PLATFORM_HOST.test(d) || Object.keys(PANELS).some(function (k) { return PANELS[k].hosts && PANELS[k].hosts.test(d); });
   }
 
-  window.LeakScanRemovals = { model: model };   // site/js/video-overlays.js reuses the same validation
+  // ---------- LeakScanRemovals.model(raw): the video page's prefab values (site/js/video-overlays.js) ----------
+  // The panels' readers, the same picks (first mega[] item, X poster / subreddit off the first hit that has one, the
+  // most-seen other host, the thumbs). Deliberately unlike the panels, the video shows the leak posts as they read:
+  // that hit's title, mega[]'s title (else a mega.nz hit's), leak words kept (no safe()): that page is noindex and in
+  // no ad. A title is one line with no URL in it. null = no valid handle.
+  function line(v, max, n, tail) {
+    var s = C.str(v, max);
+    s = s && !/https?:\/\/|www\./i.test(s) ? s.replace(tail || /$^/, '') : null;
+    return s && n && s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : s;
+  }
+  function model(raw) {
+    var h = raw && typeof raw === 'object' && C.handle(raw.handle);
+    if (!h) return null;
+    var pr = raw.profile && typeof raw.profile === 'object' ? raw.profile : {};
+    var m = { name: line(pr.display_name, 60) || line(pr.first_name, 30) || h, handle: h, plat: (C.domain(raw.platform) || 'onlyfans.com').split('.')[0] };
+    var x = fromHits(raw, PANELS.x.hosts, X_AT, X_NOT), r = fromHits(raw, PANELS.reddit.hosts, R_SUB), mm = megaMeta(raw);
+    if (x) { m.xat = '@' + x.cap; m.xtext = line(x.hit.title, 300, 90, /\s*\/\s*(X|Twitter)$/); }
+    if (r) { m.sub = 'r/' + r.cap; m.rtitle = line(r.hit.title, 300, 110, /\s*(:\s*r\/\w+|[-|]\s*Reddit)$/i); }
+    if (mm) { m.mtitle = line(mm.mg.title, 200, 70); m.mimg = mm.img; m.mvid = mm.vid; m.mmeta = mm.meta; }
+    else { var mh = fromHits(raw, PANELS.mega.hosts, /^(\/)/); if (mh) m.mtitle = line(mh.hit.title, 200, 70, /\s*[-|]\s*MEGA$/i); }
+    var top = E.rankHosts(raw).filter(function (o) { return !notLeak(o.domain); })[0];   // the most-seen other host
+    m.host = top ? top.domain : null;
+    m.thumbs = thumbsOf(raw);
+    return m;
+  }
+  window.LeakScanRemovals = { model: model };
 
   var root = document.getElementById('removals');
   if (!root) return;
-  var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
 
-  // ---------- compare: --p = edge position in % (100 = all live, 0 = all removed) ----------
+  // the removed layer repeats the live post's chrome (header, text, actions): written once in the live layer, copied
+  // where the markup says <span data-rm-copy="<selector in the live layer>">
+  each(root.querySelectorAll('[data-rm-copy]'), function (slot) {
+    var src = slot.closest('.rm-stage').querySelector('.rm-live ' + slot.getAttribute('data-rm-copy'));
+    if (src) slot.parentNode.replaceChild(src.cloneNode(true), slot);
+  });
+
+  // ---------- compare: --p = edge position in % (LIVE = all live, GONE = all removed) ----------
+  var LIVE = 100, GONE = 0, HALF = 50, END = 5, STEP = 10, PAGE = 25, INTENT_PX = 8;
   function set(card, p, anim) {
-    p = Math.max(0, Math.min(100, Math.round(p)));
-    var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), b = card.querySelector('.rm-btn'), gone = p <= 50;
+    p = Math.max(GONE, Math.min(LIVE, Math.round(p)));
+    var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), b = card.querySelector('.rm-btn'), gone = p <= HALF;
     stage.classList.toggle('rm-anim', !!anim);
     stage.style.setProperty('--p', p);
-    stage.setAttribute('data-end', p >= 95 ? 'r' : p <= 5 ? 'l' : '');
+    stage.setAttribute('data-end', p === LIVE ? 'idle' : p >= LIVE - END ? 'r' : p <= GONE + END ? 'l' : '');   // CSS keeps the knob in
     card.classList.toggle('is-removed', gone);
     h.setAttribute('aria-valuenow', p);
-    h.setAttribute('aria-valuetext', p === 100 ? 'Leak live' : p === 0 ? 'Removed' : p + '% leak, ' + (100 - p) + '% removed');
+    h.setAttribute('aria-valuetext', p === LIVE ? 'Leak live' : p === GONE ? 'Removed' : p + '% leak, ' + (LIVE - p) + '% removed');
     b.setAttribute('aria-pressed', String(gone));
     b.textContent = gone ? 'Show again' : 'Remove';
   }
@@ -114,7 +153,7 @@
   // reduced motion: no sweep at all; switched on mid-visit: the next step is skipped (edges stay put)
   var mq = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
   var still = !window.IntersectionObserver || !mq || mq.matches;
-  var cards = [], io = null;
+  var sweeps = [], io = null;
   var rnd = function (a, b) { return a + Math.random() * (b - a); };
   function step(c) {
     c.t = 0;
@@ -136,97 +175,95 @@
   if (!still) {
     io = new IntersectionObserver(function (en) {
       en.forEach(function (e) {
-        var c = cards.filter(function (x) { return x.card === e.target; })[0];
+        var c = sweeps.filter(function (x) { return x.card === e.target; })[0];
         c.seen = e.isIntersecting;
         if (c.seen) wake(c, rnd(300, 1500)); else { clearTimeout(c.t); c.t = 0; }
       });
     });
     document.addEventListener('visibilitychange', function () {
-      cards.forEach(function (c) { if (document.hidden) { clearTimeout(c.t); c.t = 0; } else wake(c, rnd(300, 1500)); });
+      sweeps.forEach(function (c) { if (document.hidden) { clearTimeout(c.t); c.t = 0; } else wake(c, rnd(300, 1500)); });
     });
   }
 
   each(root.querySelectorAll('.rm-card'), function (card, i) {
     var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), drag = null;
-    var c = cards[i] = { card: card, stage: stage, t: 0, seen: false, dead: still };
+    var c = sweeps[i] = { card: card, stage: stage, t: 0, seen: false, dead: still };
     // a press (pointer or key) stops the sweep before its click: no glide may flip Remove / Show again under the finger
     each(['pointerdown', 'keydown'], function (t) { card.querySelector('.rm-btn').addEventListener(t, function () { stop(c); }); });
-    card.querySelector('.rm-btn').addEventListener('click', function () { stop(c); set(card, now(card) <= 50 ? 100 : 0, true); });
+    card.querySelector('.rm-btn').addEventListener('click', function () { stop(c); set(card, now(card) <= HALF ? LIVE : GONE, true); });
     var at = function (e) { var r = stage.getBoundingClientRect(); return (e.clientX - r.left) / r.width * 100; };
-    stage.addEventListener('pointerdown', function (e) {
-      if (e.button !== 0) return;
-      stop(c);
-      drag = e.pointerId;
+    var start = function (e) {
+      drag.on = true;
       try { stage.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ }
       set(card, at(e), false);
       if (e.pointerType !== 'touch') h.focus({ preventScroll: true });
+    };
+    // a press on the knob drags at once; anywhere else only once the pointer moves sideways (INTENT_PX, more x than y)
+    stage.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      stop(c);   // a tap too: the sweep never moves an edge she touched
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, on: false };
+      if (e.target.closest && e.target.closest('.rm-knob')) start(e);
     });
-    stage.addEventListener('pointermove', function (e) { if (drag === e.pointerId) set(card, at(e), false); });
-    var end = function (e) { if (drag === e.pointerId) drag = null; };
+    stage.addEventListener('pointermove', function (e) {
+      if (!drag || drag.id !== e.pointerId) return;
+      if (!drag.on) {
+        var dx = Math.abs(e.clientX - drag.x), dy = Math.abs(e.clientY - drag.y);
+        if (dx > INTENT_PX && dx > dy) start(e);
+        else if (dy > INTENT_PX) drag = null;   // a vertical swipe: the page scrolls (touch-action: pan-y)
+        return;
+      }
+      set(card, at(e), false);
+    });
+    var end = function (e) { if (drag && drag.id === e.pointerId) drag = null; };
     stage.addEventListener('pointerup', end);
-    stage.addEventListener('pointercancel', end);   // a vertical swipe (touch-action: pan-y) scrolls the page instead
+    stage.addEventListener('pointercancel', end);
     h.addEventListener('keydown', function (e) {
-      var p = now(card), k = e.key, n = k === 'ArrowLeft' || k === 'ArrowDown' ? p - 10 : k === 'ArrowRight' || k === 'ArrowUp' ? p + 10
-        : k === 'PageDown' ? p - 25 : k === 'PageUp' ? p + 25 : k === 'Home' ? 0 : k === 'End' ? 100 : null;
+      var p = now(card), k = e.key, n = k === 'ArrowLeft' || k === 'ArrowDown' ? p - STEP : k === 'ArrowRight' || k === 'ArrowUp' ? p + STEP
+        : k === 'PageDown' ? p - PAGE : k === 'PageUp' ? p + PAGE : k === 'Home' ? GONE : k === 'End' ? LIVE : null;
       if (n === null) return;
       e.preventDefault();
       stop(c);
       set(card, n, false);
     });
-    set(card, 100, false);
+    set(card, LIVE, false);
     if (io) io.observe(card);
   });
-  var rev = root.querySelector('.rm-reveal');
-  if (rev) rev.addEventListener('click', function () {
-    var on = rev.getAttribute('aria-pressed') !== 'true';
-    rev.setAttribute('aria-pressed', String(on));
-    root.classList.toggle('revealed', on);
-    rev.lastChild.textContent = on ? 'Blur images' : 'Reveal images';
+  // Reveal / Blur: the [data-reveal] button in this [data-reveal-scope] section (one handler, js/scan-engine.js)
+
+  // the demo (as in the markup), kept so a second result / no data puts it back
+  var cards = Array.prototype.map.call(root.querySelectorAll('.rm-card'), function (card) {
+    return { el: card, panel: PANELS[card.getAttribute('data-rm')],
+      texts: Array.prototype.map.call(card.querySelectorAll('[data-rm-k]'), function (el) { return [el, el.textContent]; }),
+      imgs: Array.prototype.map.call(card.querySelectorAll('.rm-img'), function (im) { return [im, im.getAttribute('src')]; }) };
   });
-
-  // defaults (the demo creator) kept so a second result / no data puts them back
-  var DEF = {}, IMGS = root.querySelectorAll('.rm-img'), DEF_IMG = [];
-  each(root.querySelectorAll('[data-rm-k]'), function (el) { DEF[el.getAttribute('data-rm-k')] = el.textContent; });
-  each(IMGS, function (im) { DEF_IMG.push(im.getAttribute('src')); });
-  // leak-site profile's aliases line: "<handle>, <name squashed>" (the way those sites list a model), just the handle without one
-  // leak-site wordmark: the host without its TLD ("leakvault.example" → "leakvault"), like fapello's bare logo
-  function brand(d) { var p = d.split('.'); p.pop(); if (p.length > 1 && /^(co|com|net|org)$/.test(p[p.length - 1])) p.pop(); return p[p.length - 1]; }
-  function aka(m) { var v = m.name.toLowerCase().replace(/[^a-z0-9]+/g, ''); return v && v !== m.handle ? m.handle + ', ' + v : m.handle; }
-  function render(m) {
-    var v = {
-      name: m.name,
-      'mega-title': m.mtitle || m.handle + ' \u2013 pack', 'mega-meta': m.mmeta || DEF['mega-meta'],
-      'mega-img': (m.mimg != null ? m.mimg : 369) + ' files', 'mega-vid': (m.mvid != null ? m.mvid : 1069) + ' files',
-      'x-at': m.xat || DEF['x-at'], 'x-name': m.xat ? m.xat.slice(1) : DEF['x-name'], 'x-av': m.xat ? m.xat.charAt(1).toUpperCase() : DEF['x-av'],
-      'x-l1': m.xtext || m.name + ' leaked', 'x-l2': m.xtext ? '' : m.name + ' ' + m.plat,
-      sub: m.sub || 'r/' + (m.handle.replace(/[^A-Za-z0-9_]/g, '').slice(0, 14) || 'creator') + '_leaks',
-      'rd-title': m.rtitle || m.name + ' full pack, link in comments',
-      host: m.host ? brand(m.host) : DEF.host, aka: aka(m)
-    };
-    each(root.querySelectorAll('[data-rm-k]'), function (el) {
-      var k = el.getAttribute('data-rm-k');
-      if (v.hasOwnProperty(k) && el.textContent !== v[k]) el.textContent = v[k];
-    });
-    each(IMGS, function (im, i) {
-      var src = m.thumbs.length ? m.thumbs[i % m.thumbs.length] : DEF_IMG[i];
-      if (im.getAttribute('src') === src) return;
-      if (m.thumbs.length) {
+  function render(raw) {
+    var h = raw && C.handle(raw.handle), pr = h && raw.profile && typeof raw.profile === 'object' ? raw.profile : {};
+    var who = h && { handle: h, name: safe(C.str(pr.display_name, 60)) || safe(C.str(pr.first_name, 30)) || h };
+    // her Google thumbs go round her panels' image slots in page order; one that dies leaves its tile empty
+    var pics = h ? thumbsOf(raw) : [], n = 0;
+    cards.forEach(function (c) {
+      var v = who && c.panel ? c.panel.fill(raw, who) : null;
+      c.texts.forEach(function (t) {
+        var el = t[0], s = v ? v[el.getAttribute('data-rm-k')] : t[1];
+        el.hidden = !s;
+        if (s && el.textContent !== s) el.textContent = s;
+      });
+      c.imgs.forEach(function (t) {   // the tile goes with its photo: no empty grey box, never a demo face beside her
+        var im = t[0], tile = im.parentNode, src = v ? pics.length ? pics[n++ % pics.length] : null : t[1];
+        tile.hidden = !src;
+        if (!src || im.getAttribute('src') === src) return;
         im.referrerPolicy = 'no-referrer';
-        im.addEventListener('error', function () { if (im.getAttribute('src') === src) im.setAttribute('src', DEF_IMG[i]); }, { once: true });
-      }
-      im.setAttribute('src', src);
+        im.setAttribute('src', src);
+        if (v) E.watchThumb(im, function () { if (im.getAttribute('src') === src) tile.hidden = true; });
+      });
+      c.el.setAttribute('data-rm-for', v ? 'scan' : 'demo');
     });
-    root.setAttribute('data-rm-for', m.handle);
+    root.setAttribute('data-rm-for', who ? h : '');
   }
-  function apply(raw) { var m = model(raw); if (m) render(m); }
 
-  var E = window.LeakScanEngine, P = window.LeakScanPersonalize;
-  if (P && typeof P.apply === 'function') {   // an in-page scan re-personalizes the page through this
-    var orig = P.apply;
-    P.apply = function (r) { var ok = orig.apply(this, arguments); if (ok) apply(r); return ok; };
-  }
-  var slug = null, mr = /[?&]r=([^&#]*)/.exec(location.search);
-  if (mr) { try { slug = decodeURIComponent(mr[1]); } catch (e) { slug = null; } }
-  else { try { slug = (JSON.parse(localStorage.getItem('leakscan.last') || 'null') || {}).slug; } catch (e) { slug = null; } }
-  if (E && E.fetchResult && typeof slug === 'string' && SLUG_RE.test(slug)) E.fetchResult(slug).then(apply, function () { /* defaults */ });
+  var scanned = false;
+  document.addEventListener('leakscan:result', function (e) { scanned = true; render(e.detail); });   // an in-page scan
+  var slug = E.currentSlug();
+  if (slug && window.fetch) E.fetchResult(slug).then(function (r) { if (!scanned) render(r); }, function () { /* the demo */ });
 })();

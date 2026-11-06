@@ -45,11 +45,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import web_common as wc
 import db
 import ratelimit
-import alias_enrich
 import chat_proxy
 import cse_scanner
 import leak_evidence
-import leakshaven
 import media_gather
 import profile_extract
 import report_live
@@ -228,7 +226,7 @@ def _profile_cse_items(handle, items):
         return []
 
 
-def _quick_profile(handle, platform, items, socials=None, hints=None):
+def _quick_profile(handle, platform, items, socials=None, hints=None):  # one-project: hints
     """-> (profile|None, avatar(bytes, ext)|None, sources|None). Never raises, never exceeds
     ~budget+2s. sources go on to media_gather (profile refine with web snippets)."""
     box = {}
@@ -239,7 +237,7 @@ def _quick_profile(handle, platform, items, socials=None, hints=None):
             more = _profile_cse_items(handle, items)
             budget = profile_extract.PROFILE_BUDGET - (time.monotonic() - t0)
             prof, av, src = profile_extract.build_profile(platform, handle, more + list(items or []),
-                                                          budget=budget, socials=socials, hints=hints)
+                                                          budget=budget, socials=socials, hints=hints)  # one-project: hints
             box["r"] = (prof, av, src)
         except Exception as e:
             _event(f"profile failed: {type(e).__name__}")
@@ -283,85 +281,6 @@ def quick_aliases(handle_aliases, socials):
             seen.add(a.lower())
             out.append(a)
     return out[:MAX_QUICK_ALIASES]
-
-
-# Alias enrichment: read a few found leak pages for the creator's other handles, re-scan <= 2 of them.
-ALIAS_ENRICH = os.environ.get("ALIAS_ENRICH", "1").lower() in ("1", "true", "yes")
-ALIAS_NEW_MAX = 2             # new aliases CSE-scanned per scan (each <= CSE_QUICK_CALLS calls)
-ALIAS_TOTAL_MAX = 4           # declared + discovered aliases per scan
-ALIAS_BUDGET = float(os.environ.get("ALIAS_BUDGET", "12"))          # s: page reads + extra CSE, hard cap
-ALIAS_SKIP_AFTER = float(os.environ.get("ALIAS_SKIP_AFTER", "45"))  # s into the scan: past this, skip the step
-
-
-def _alias_cse(alias, deadline):
-    """One discovered alias -> CSE items tagged alias=<alias> (<= CSE_QUICK_CALLS calls). Never raises."""
-    seeds = [alias] + [f"{p} {alias}" for p in CSE_PREFIXES]
-    try:
-        items, _ = cse_scanner.cse_search_wide(seeds, max_calls=CSE_QUICK_CALLS, tags=[alias] * len(seeds),
-                                               deadline=deadline)
-        return items
-    except Exception:
-        return []
-
-
-def enrich_aliases(declared, rows, results, prog, started):
-    """First-pass rows/results -> (extra CSE items, discovered aliases scanned, leak-page socials, names).
-    Bounded: skipped with 0 hits or when the scan already ran ALIAS_SKIP_AFTER s; <= ALIAS_BUDGET s."""
-    none = ([], [], [], [])
-    if not ALIAS_ENRICH or not rows:
-        return none
-    if time.monotonic() - started > ALIAS_SKIP_AFTER:
-        _event("alias_enrich skipped: budget")
-        return none
-    t0 = time.monotonic()
-    deadline = t0 + ALIAS_BUDGET
-    prog("Checking other names…")
-    d = alias_enrich.discover(rows, results, declared, budget=min(alias_enrich.FETCH_TOTAL, ALIAS_BUDGET))
-    low = {a.lower() for a in declared}
-    room = max(0, min(ALIAS_NEW_MAX, ALIAS_TOTAL_MAX - len(declared)))
-    new = [a for a in d["aliases"] if a.lower() not in low][:room]
-    extra = []
-    if new and deadline - time.monotonic() > 2:
-        prog("Also searching Google for " + ", ".join("@" + a for a in new) + "…")
-        with _cf.ThreadPoolExecutor(max_workers=len(new)) as ex:
-            for items in ex.map(lambda a: _alias_cse(a, deadline), new):
-                extra += items
-    else:
-        new = []
-    _event(f"alias_enrich pages={d['pages']} cand={d['cand']} kept={d['kept']} new={len(new)} "
-           f"items={len(extra)} secs={time.monotonic() - t0:.1f} reasons={alias_enrich.reasons_str(d['reasons'])}")
-    return extra, new, d["socials"], d["names"]
-
-
-def leakshaven_step(handle, socials, aliases, names, prog):
-    """leakshaven.com packs for this creator -> (mega items, fresh_ok). Reuses a scan of the same
-    handle from the last 6 h; else one suggest + one pack-list request. Never raises; one log line."""
-    if not leakshaven.ENABLED:
-        return [], False
-    try:
-        ex = db.recent_extra(handle, "mega_ok", leakshaven.CACHE_TTL)
-    except Exception:
-        ex = None
-    if ex is not None:
-        mega = ex.get("mega") if isinstance(ex.get("mega"), list) else []
-        _event(f"leakshaven cache=hit packs={len(mega)}")
-        return mega, False            # only a fresh fetch is a cache source: TTL can't roll forward
-    prog("Checking leak aggregators…")
-    t0 = time.monotonic()
-    mega, reason = leakshaven.lookup(socials.get("instagram") or handle, aliases, names)
-    _event(f"leakshaven {reason} packs={len(mega)} secs={time.monotonic() - t0:.1f}")
-    return mega, reason in ("ok", "nomatch")
-
-
-def merge_items(results, extra):
-    """CSE items unioned by link; first sighting (and its alias tag) wins."""
-    seen = {it.get("link") for it in results}
-    out = list(results)
-    for it in extra:
-        if it.get("link") and it["link"] not in seen:
-            seen.add(it["link"])
-            out.append(it)
-    return out
 
 
 # Quick-scan `results` (Google-style links/images/videos tabs).
@@ -1446,9 +1365,12 @@ def _run_bio_verify(handle, code, platforms):
 
 
 # >>> one-project patch (leakscan-site) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# Same origin serves the landing site (SITE_DIR, default <repo>/site) and this API. Legacy scan UI
-# moves from / to /app/. Paths below that the API owns are untouched. Re-sync public_app.py from
-# bruquiextension, then re-apply this block + the lines marked "one-project" in Handler (2 hooks, api_thumb Vary).
+# What this repo adds to upstream public_app.py (bruquiextension) lives in this block; every other line that
+# differs from upstream ends in "# one-project" (app/tests/test_one_project.py lists the sites). Re-sync: README.
+# 1) Same origin serves the landing site (SITE_DIR, default <repo>/site) and this API. Legacy scan UI
+# moves from / to /app/. Paths below that the API owns are untouched.
+import alias_enrich
+import leakshaven
 import site_static
 
 _API_PREFIXES = ("/api/", "/static/", "/s/")
@@ -1489,6 +1411,191 @@ class _NullWriter:
 
     def flush(self):
         pass
+
+
+def _one_project_head(h):
+    """HEAD = GET minus body, non-API paths only."""
+    path = urllib.parse.urlparse(h.path).path
+    if path.startswith(_API_PREFIXES) or path in _API_PATHS:
+        return h.send_error(501, "Unsupported method ('HEAD')")
+    real, cls_end = h.wfile, type(h).end_headers
+
+    def end_headers():
+        cls_end(h)
+        h.wfile = _NullWriter()  # headers flushed; drop any body
+    h.end_headers = end_headers
+    try:
+        h.do_GET()
+    finally:
+        h.wfile = real
+        del h.end_headers
+
+
+# 2) Quick scan. Alias enrichment: read a few found leak pages for the creator's other handles, re-scan <= 2 of them.
+ALIAS_ENRICH = os.environ.get("ALIAS_ENRICH", "1").lower() in ("1", "true", "yes")
+ALIAS_NEW_MAX = 2             # new aliases CSE-scanned per scan (each <= CSE_QUICK_CALLS calls)
+ALIAS_TOTAL_MAX = 4           # declared + discovered aliases per scan
+ALIAS_BUDGET = float(os.environ.get("ALIAS_BUDGET", "12"))          # s: page reads + extra CSE, hard cap
+ALIAS_SKIP_AFTER = float(os.environ.get("ALIAS_SKIP_AFTER", "45"))  # s into the scan: past this, skip the step
+
+
+def _alias_cse(alias, deadline):
+    """One discovered alias -> CSE items tagged alias=<alias> (<= CSE_QUICK_CALLS calls). Never raises."""
+    seeds = [alias] + [f"{p} {alias}" for p in CSE_PREFIXES]
+    try:
+        items, _ = cse_scanner.cse_search_wide(seeds, max_calls=CSE_QUICK_CALLS, tags=[alias] * len(seeds),
+                                               deadline=deadline)
+        return items
+    except Exception:
+        return []
+
+
+def enrich_aliases(declared, rows, results, prog, started):
+    """First-pass rows/results -> (extra CSE items, discovered aliases scanned, leak-page socials, names).
+    Bounded: skipped with 0 hits or when the scan already ran ALIAS_SKIP_AFTER s; <= ALIAS_BUDGET s."""
+    none = ([], [], [], [])
+    if not ALIAS_ENRICH or not rows:
+        return none
+    if time.monotonic() - started > ALIAS_SKIP_AFTER:
+        _event("alias_enrich skipped: budget")
+        return none
+    t0 = time.monotonic()
+    deadline = t0 + ALIAS_BUDGET
+    prog("Checking other names…")
+    d = alias_enrich.discover(rows, results, declared, budget=min(alias_enrich.FETCH_TOTAL, ALIAS_BUDGET))
+    low = {a.lower() for a in declared}
+    room = max(0, min(ALIAS_NEW_MAX, ALIAS_TOTAL_MAX - len(declared)))
+    new = [a for a in d["aliases"] if a.lower() not in low][:room]
+    extra = []
+    if new and deadline - time.monotonic() > 2:
+        prog("Also searching Google for " + ", ".join("@" + a for a in new) + "…")
+        with _cf.ThreadPoolExecutor(max_workers=len(new)) as ex:
+            for items in ex.map(lambda a: _alias_cse(a, deadline), new):
+                extra += items
+    else:
+        new = []
+    _event(f"alias_enrich pages={d['pages']} cand={d['cand']} kept={d['kept']} new={len(new)} "
+           f"items={len(extra)} secs={time.monotonic() - t0:.1f} reasons={alias_enrich.reasons_str(d['reasons'])}")
+    return extra, new, d["socials"], d["names"]
+
+
+def leakshaven_start(handle, platform, socials, aliases, names, prog):
+    """Starts the leakshaven.com step (it runs next to the profile step) -> join() returning (mega items, cache
+    key to store or None). Cache: a scan of this handle from the last 6 h whose lookup had the same inputs
+    (leakshaven.cache_key: platform, search term, aliases, names); else one suggest + one pack-list request in a
+    worker thread (<= leakshaven.TIMEOUT s). Never raises; one log line."""
+    if not leakshaven.ENABLED:
+        return lambda: ([], None)
+    term = socials.get("instagram") or handle
+    key = leakshaven.cache_key(platform, term, aliases, names)
+    try:
+        ex = db.recent_extra(handle, leakshaven.CACHE_FIELD, key, leakshaven.CACHE_TTL)
+    except Exception:
+        ex = None
+    if ex is not None:
+        mega = ex.get("mega") if isinstance(ex.get("mega"), list) else []
+        _event(f"leakshaven cache=hit packs={len(mega)}")
+        return lambda: (mega, None)   # only a fresh fetch is a cache source: TTL can't roll forward
+    prog("Checking leak aggregators…")
+    t0 = time.monotonic()
+    fut, done = leakshaven.start(term, aliases, names), {}
+    fut.add_done_callback(lambda _: done.setdefault("at", time.monotonic()))   # secs = the lookup's own time
+
+    def join():
+        mega, reason = leakshaven.result(fut, t0 + leakshaven.TIMEOUT - time.monotonic())
+        _event(f"leakshaven {reason} packs={len(mega)} secs={done.get('at', time.monotonic()) - t0:.1f}")
+        return mega, key if reason in ("ok", "nomatch") else None
+    return join
+
+
+def merge_items(results, extra):
+    """CSE items unioned by link; first sighting (and its alias tag) wins."""
+    seen = {it.get("link") for it in results}
+    out = list(results)
+    for it in extra:
+        if it.get("link") and it["link"] not in seen:
+            seen.add(it["link"])
+            out.append(it)
+    return out
+
+
+def scan_begin(handle, platform, aliases, socials, rows, results, prog, started):
+    """_scan_cse after its first CSE pass: alias enrichment (its items merged into results / rows), then the
+    leakshaven step starts (it runs next to the profile step) -> (op, rows, results); op feeds the other hooks."""
+    extra, found, found_socials, names = enrich_aliases(aliases, rows, results, prog, started)
+    if extra:
+        results = merge_items(results, extra)
+        rows = cse_scanner.summarize_cse(results)
+    mine = {v.lower() for v in socials.values()}
+    info = {"declared": list(aliases), "discovered": found,
+            "socials": [s for s in found_socials if s["handle"].lower() not in mine]}
+    join = leakshaven_start(handle, platform, socials, list(aliases) + found + [s["handle"] for s in info["socials"]],
+                            names, prog)
+    return {"aliases": info, "hints": {"names": names, "aliases": found}, "join": join}, rows, results
+
+
+def _estimate(n_results, n_rows):
+    """The grounded Google-index estimate (upstream's formula, one place): _scan_cse's google_total, and what each
+    result / hit row added to it when the aggregator rule takes one out again (off_aggregators)."""
+    return int(round(n_results * ESTIMATE_URL_MULT + n_rows * ESTIMATE_SITES_MULT))
+
+
+def scan_end(op, handle, rows, results, google_total):
+    """_scan_cse after the profile step: joins the leakshaven step. Packs go to mega[] only (never hit rows); a hit
+    row / CSE result on a pack's host neither shows nor counts, nor does anything taken from it: the preview images are
+    re-picked from the results left, and media_gather's cse_items are only those (off_aggregators). The profile step
+    ran next to the lookup (it can't wait for it) on every result, a pack page's title / snippet as text evidence like
+    any leak page's, and media_gather's refine reuses those sources (text only); it shows no host, url or thumb of
+    one. -> (rows, results, status, pub, mega_key): pub = what the stored row's extra_json and the live result both
+    take (it replaces upstream's images / results / google_total, adds aliases / mega); mega_key goes to the stored row
+    only (never served)."""
+    mega, key = op["join"]()
+    rows, results, google_total = off_aggregators(mega, rows, results, google_total)
+    pub = {"images": cse_scanner.good_images(results, handle, CSE_IMAGES), "results": shape_results(results),
+           "google_total": google_total, "aliases": op["aliases"], "mega": mega}
+    return rows, results, "empty" if not rows else "complete", pub, key
+
+
+def off_aggregators(mega, hits, results, google_total):
+    """The aggregator rule, one place: hit rows / CSE results on a mega[] item's host (leakshaven.off_aggregators)
+    neither show nor count -> (hits, results, google_total). google_total loses what _estimate gave each dropped row
+    and result, never below 0; it stands when it is Google's raw number (USE_TOTAL_RESULTS_QUERY) or sits at the
+    GOOGLE_INDEX_MAX cap (the uncapped figure is gone)."""
+    kept_h, kept_r = leakshaven.off_aggregators(hits, mega), leakshaven.off_aggregators(results, mega, "link")
+    gone = _estimate(len(results or []) - len(kept_r), len(hits or []) - len(kept_h))
+    gt = google_total
+    if (gone and not USE_TOTAL_RESULTS_QUERY and isinstance(gt, (int, float)) and not isinstance(gt, bool)
+            and not 0 < GOOGLE_INDEX_MAX <= gt):
+        google_total = max(0, int(round(gt - gone)))
+    return kept_h, kept_r, google_total
+
+
+def off_row(row):
+    """A stored scan row (db.get_scan's dict) under the aggregator rule, for scans stored before it (their hit rows can
+    hold packs, their results Google hits on a pack's host, their images those results' thumbs): what is left is
+    recounted (hit_count, domain_count, status, google_total). Such a row kept only its shaped results
+    (<= RESULTS_CAP), so their part of the images / google_total repair is a lower bound. Mutates and returns row."""
+    if row and row.get("mega"):
+        n, res = len(row["hits"]), row.get("results") or []
+        row["hits"], row["results"], row["google_total"] = off_aggregators(
+            row["mega"], row["hits"], row.get("results"), row.get("google_total"))
+        gone = {r.get("thumb") for r in res if r not in row["results"]} - {None}
+        if gone and isinstance(row.get("images"), list):
+            row["images"] = [u for u in row["images"] if u not in gone]
+        if len(row["hits"]) < n:
+            row["hit_count"], row["domain_count"] = len(row["hits"]), db.domain_count(row["hits"])
+            if row["status"] == "complete" and not row["hits"]:
+                row["status"] = "empty"
+    return row
+
+
+def scan_row(slug):
+    """db.get_scan + the aggregator rule (off_row)."""
+    return off_row(db.get_scan(slug))
+
+
+# 3) the one video rule (replaces upstream's): the landing / scan page read `kind` only (no client-side URL sniffing)
+_VIDEO_LINK_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|embed|clips?|vod)(?:[/?#.-]|$)", re.I)
 # <<< one-project patch <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
@@ -1598,8 +1705,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "public, max-age=86400")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        if not self._cors_origin():  # one-project: a plain and a CORS (pixel-reading) load never share a cache entry
-            self.send_header("Vary", "Origin")
+        if not self._cors_origin():  # one-project: api_thumb Vary (a plain and a CORS pixel-reading load never share a cache entry)
+            self.send_header("Vary", "Origin")  # one-project: api_thumb Vary
         self.end_headers()
         try:
             self.wfile.write(data)
@@ -1622,8 +1729,8 @@ class Handler(BaseHTTPRequestHandler):
     # ----------------------------------------------------------------- routing
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
-        if _one_project_get(self, path):  # one-project hook
-            return
+        if _one_project_get(self, path):  # one-project: landing site
+            return  # one-project: landing site
         if path in ("/", "/index.html"):
             return self._render_page("index.html")
         if path == "/healthz":
@@ -1659,21 +1766,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_scan_links(path[len("/api/scan-links/"):])
         return wc.send_simple(self, 404, "Not found")
 
-    def do_HEAD(self):  # one-project hook: HEAD = GET minus body, non-API paths only
-        path = urllib.parse.urlparse(self.path).path
-        if path.startswith(_API_PREFIXES) or path in _API_PATHS:
-            return self.send_error(501, "Unsupported method ('HEAD')")
-        real, cls_end = self.wfile, type(self).end_headers
-
-        def end_headers():
-            cls_end(self)
-            self.wfile = _NullWriter()  # headers flushed; drop any body
-        self.end_headers = end_headers
-        try:
-            self.do_GET()
-        finally:
-            self.wfile = real
-            del self.end_headers
+    def do_HEAD(self):  # one-project: HEAD
+        return _one_project_head(self)  # one-project: HEAD
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
@@ -1754,7 +1848,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             wc.sse_start(self)
             slug = body.get("slug")
-            scan = db.get_scan(slug) if slug else None
+            scan = scan_row(slug) if slug else None  # one-project: aggregator rule
             landing = body.get("kb") == "landing"   # unknown kb values -> default scan-app mode
             kb_text = chat_proxy.load_kb(KB_LANDING_FILE if landing else KB_FILE)
             if landing and not kb_text:
@@ -1818,7 +1912,7 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     pass          # never let the live layer break the poll
             return self._json(payload, 200, extra=noindex)
-        row = db.get_scan(slug)
+        row = scan_row(slug)  # one-project: aggregator rule
         if not row:
             return self._json({"error": "not_found"}, 404, extra=noindex)
         # A 'running' row with no in-memory job = orphaned by a restart -> failed.
@@ -1836,13 +1930,13 @@ class Handler(BaseHTTPRequestHandler):
                     "n_accepted", "n_removed"):   # counts only — the URL lists come from /api/scan-links
             if key in row:
                 pub[key] = row[key]
-        pub["mega"] = row.get("mega") or []
+        pub["mega"] = row.get("mega") or []  # one-project: mega[]
         if row["level"] == "low":
             ex = _scan_extra_all(slug) or {}
-            pub["results"] = ex.get("results") or []
+            pub["results"] = row.get("results") or []  # one-project: aggregator rule (scan_row filtered them)
             pub["profile"] = ex.get("profile")
             pub["socials"] = ex.get("socials") or {}
-            pub["aliases"] = ex.get("aliases") or {"declared": [], "discovered": [], "socials": []}
+            pub["aliases"] = ex.get("aliases") or {"declared": [], "discovered": [], "socials": []}  # one-project: aliases
             pub["media"] = {"status": media_gather.public_view(slug)["status"]}
         return self._json(pub, 200, extra=noindex)
 
@@ -2017,7 +2111,7 @@ class Handler(BaseHTTPRequestHandler):
         quick scan surfaces many more distinct leak hosts than the old 2-pass, with
         a shallow depth fallback when too few sites turn up."""
         aliases, socials = aliases or [handle], socials or {}
-        started = time.monotonic()
+        started = time.monotonic()  # one-project: scan_begin
         _event(f"scan start level=low platform={platform} aliases={len(aliases)}")
         if not cse_scanner.cse_available():
             return wc.sse_fail(self, "Quick search isn't configured right now. Try the deep scan.")
@@ -2038,16 +2132,8 @@ class Handler(BaseHTTPRequestHandler):
                     pass
         except Exception:
             return wc.sse_fail(self, "Quick search is temporarily unavailable. Please try again.")
-        extra, found, found_socials, names = enrich_aliases(aliases, rows, results, prog, started)
-        if extra:
-            results = merge_items(results, extra)
-            rows = cse_scanner.summarize_cse(results)
-        alias_info = {"declared": list(aliases), "discovered": found,
-                      "socials": [s for s in found_socials if s["handle"].lower() not in
-                                  {v.lower() for v in socials.values()}]}
-        mega, mega_ok = leakshaven_step(handle, socials, list(aliases) + found +
-                                        [s["handle"] for s in alias_info["socials"]], names, prog)
-        rows = rows + leakshaven.hit_rows(mega, handle)
+        op, rows, results = scan_begin(handle, platform, aliases, socials, rows, results, prog, started)  # one-project: scan_begin
+        # images / status / shaped below: upstream's, dead here (scan_end's pub replaces them, pack hosts dropped)  # one-project: scan_end
         images = cse_scanner.good_images(results, handle, CSE_IMAGES)
         # Replace Google's inflated raw totalResults with a grounded estimate.
         if USE_TOTAL_RESULTS_QUERY:
@@ -2056,7 +2142,7 @@ class Handler(BaseHTTPRequestHandler):
             except (TypeError, ValueError):
                 google_total = 0
         else:
-            google_total = int(round(len(results) * ESTIMATE_URL_MULT + len(rows) * ESTIMATE_SITES_MULT))
+            google_total = _estimate(len(results), len(rows))  # one-project: estimate
             if GOOGLE_INDEX_MAX > 0:
                 google_total = min(google_total, GOOGLE_INDEX_MAX)
         status = "empty" if not rows else "complete"
@@ -2064,28 +2150,26 @@ class Handler(BaseHTTPRequestHandler):
         profile, avatar, sources = None, None, None
         if PROFILE_ENABLED:
             prog("Reading your public profile…")
-            profile, avatar, sources = _quick_profile(handle, platform, results, socials,
-                                                      hints={"names": names, "aliases": found})
-            profile = profile_extract.merge_found_accounts(profile, alias_info["socials"], socials, platform)
+            profile, avatar, sources = _quick_profile(handle, platform, results, socials, hints=op["hints"])  # one-project: hints
+            profile = profile_extract.merge_found_accounts(profile, op["aliases"]["socials"], socials, platform)  # one-project: hints
+        rows, results, status, pub, mega_key = scan_end(op, handle, rows, results, google_total)  # one-project: scan_end
         slug = db.insert_scan(rows, handle=handle, level="low", platform=platform,
                               status=status, client_ip_hash=_ip_hash(ip),
                               extra={"images": images, "google_total": google_total,
-                                     "results": shaped, "profile": profile, "socials": socials,
-                                     "aliases": alias_info, "mega": mega, "mega_ok": mega_ok})
+                                     "results": shaped, "profile": profile, "socials": socials, **pub, leakshaven.CACHE_FIELD: mega_key})  # one-project: scan_end
         if avatar and not _save_avatar(slug, avatar) and profile:
             profile["avatar"] = False
         media = {"status": media_gather.start(slug, platform, handle, profile, results,
                                               sources=sources, socials=socials)}
-        _event(f"scan done level=low hits={len(rows)} images={len(images)} calls={CSE_QUICK_CALLS} "
-               f"aliases={len(aliases)}+{len(found)} socials={len(socials)}+{len(alias_info['socials'])} "
+        _event(f"scan done level=low hits={len(rows)} images={len(pub['images'])} calls={CSE_QUICK_CALLS} "  # one-project: scan_end
+               f"aliases={len(aliases)}+{len(pub['aliases']['discovered'])} socials={len(socials)}+{len(pub['aliases']['socials'])} "  # one-project: aliases
                f"profile={(profile or {}).get('generated_by')} avatar={bool(avatar)} media={media['status']}")
         wc.sse(self, "result", json.dumps({
             "slug": slug, "handle": handle, "platform": platform, "level": "low",
-            "status": status, "hit_count": len(rows),
-            "domain_count": len({r.get("domain") for r in rows if r.get("domain")}),
+            "status": status, "hit_count": len(rows), "domain_count": db.domain_count(rows),  # one-project: domain_count
             "google_total": google_total, "images": images, "hits": rows,
             "results": shaped, "profile": profile, "media": media, "socials": socials,
-            "aliases": alias_info, "mega": mega,
+            **pub,  # one-project: scan_end
         }, ensure_ascii=False))
         wc.sse(self, "done", "end")
 

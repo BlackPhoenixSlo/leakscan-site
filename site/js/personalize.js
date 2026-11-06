@@ -1,51 +1,31 @@
 // After a free scan, fills the landing mockups ("Your website", showcase frame) and the demo site (showcase/) with the
-// scanned creator's data. Plain ES5-ish, no deps, no third parties (only the scan API host).
-// Slug: ?r=<slug> -> localStorage['leakscan.last'].slug (written by js/scan.js) -> nothing: page keeps its defaults.
-// One fetch of GET <API>/api/scan-result/<slug> per page (sessionStorage cache, 8s timeout, shared with js/scan-engine.js
-// where that is loaded); any failure = defaults.
-// Every API value is validated in clean(); rendering uses textContent / createElement only, never innerHTML.
+// scanned creator's data. Plain ES5-ish, no deps, no third parties (only the scan API host). Needs js/scan-engine.js,
+// loaded before it on every page: API host, validators (E.clean), the current slug, thumb liveness, the result fetch.
+// Slug: E.currentSlug() = ?r=<slug>, else localStorage['leakscan.last'].slug (written by scan-engine.js remember()), else
+// nothing: the page keeps its defaults. One GET <API>/api/scan-result/<slug> per page (E.fetchResult, shared with the
+// hero card; sessionStorage cache, 8s timeout); any failure = defaults. A scan run on this page re-applies (the
+// `leakscan:result` event). Rendering uses textContent / createElement only, never innerHTML.
 (function () {
   'use strict';
-  var SCAN_API = 'https://scan.srv1395798.hstgr.cloud'; // the scan server's public origin (also serves this site on the VPS)
-  var API = ((document.body && document.body.getAttribute('data-api')) || (location.hostname.slice(-9) === 'github.io' ? SCAN_API : '')).replace(/\/+$/, ''); // '' = same origin (VPS)
-  var LAST = 'leakscan.last', CACHE = 'leakscan.r.', MEDIA = 'leakscan.media.';
-  var SLUG_RE = /^[A-Za-z0-9_-]{4,64}$/, HANDLE_RE = /^[A-Za-z0-9._-]{1,60}$/, DOMAIN_RE = /^[a-z0-9.-]+$/;
-  var GSTATIC_RE = /^https:\/\/[a-z0-9-]+\.gstatic\.com\/[^\s"'<>\\]*$/;
+  var E = window.LeakScanEngine;
+  if (!E) return;
+  var API = E.API, SCAN_API = E.SCAN_API, C = E.clean, make = E.make, NEW_TAB = E.NEW_TAB;
+  // CACHE: per-slug models in sessionStorage; r2 = models built since aggregator rows are dropped (older ones may hold them)
+  var CACHE = 'leakscan.r2.', MEDIA = 'leakscan.media.';
   var PLAT = {
     instagram: ['Instagram', 'instagram.com'], tiktok: ['TikTok', 'tiktok.com'], youtube: ['YouTube', 'youtube.com'],
     patreon: ['Patreon', 'patreon.com'], onlyfans: ['OnlyFans', 'onlyfans.com'], fansly: ['Fansly', 'fansly.com'],
     x: ['X', 'x.com', 'twitter.com'], threads: ['Threads', 'threads.net'], twitch: ['Twitch', 'twitch.tv']
   };
   // Before-phone rows: same phrasing as the static mockup, name swapped in. Never the leak pages' own titles.
-  var LEAK_TITLES = ['{n} leaked: full gallery', '{n}: all photos and videos', '{n} videos (new)', '{n} leak thread'];
+  var LEAK_TITLES = ['{n}: full gallery', '{n}: all photos and videos', '{n} videos (new)', '{n} forum thread'];
 
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
   var $$ = function (sel, root) { return (root || document).querySelectorAll(sel); };
   function hide(el) { if (el) { el.style.display = 'none'; el.setAttribute('data-p-off', ''); } }
   function text(el, s) { if (el) el.textContent = s; }
-  function make(tag, attrs, kids) {
-    var el = document.createElement(tag);
-    for (var k in attrs) if (attrs.hasOwnProperty(k)) el.setAttribute(k, attrs[k]);
-    (kids || []).forEach(function (c) { el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
-    return el;
-  }
 
-  // ---------- validation ----------
-  function str(v, max) {
-    if (typeof v !== 'string') return null;
-    var s = v.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, ' ').replace(/\s+/g, ' ').trim();
-    return s && s.length <= max && !/[<>{}]|javascript:|data:/i.test(s) ? s : null;
-  }
-  function handle(v) {
-    if (typeof v !== 'string') return null;
-    var h = v.trim().replace(/^@/, '');
-    return HANDLE_RE.test(h) ? h : null;
-  }
-  function domain(v) {
-    if (typeof v !== 'string') return null;
-    var d = v.trim().toLowerCase().replace(/^www\./, '');
-    return d.length <= 80 && DOMAIN_RE.test(d) && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) ? d : null;
-  }
+  // ---------- validation (E.clean: str / handle / domain / thumbOk; here only what the profile adds) ----------
   function platKey(v) {
     if (typeof v !== 'string') return null;
     var k = v.trim().toLowerCase().replace(/^www\./, '').replace(/\.(com|net|tv)$/, '');
@@ -58,15 +38,7 @@
     try { x = new URL(u); } catch (e) { return null; }
     if (x.protocol !== 'https:' || x.username || x.password || x.port) return null;
     var h = x.hostname.toLowerCase();
-    return PLAT[key].slice(1).some(function (d) { return h === d || h.slice(-d.length - 1) === '.' + d; }) ? x.href : null;
-  }
-  // a leak page's own URL: http(s), no credentials, on that site (or a subdomain of it)
-  function hitUrl(u, d) {
-    if (typeof u !== 'string' || u.length > 600 || !/^https?:\/\/[^\s"'<>\\]+$/i.test(u)) return null;
-    var x;
-    try { x = new URL(u); } catch (e) { return null; }
-    var h = x.hostname.toLowerCase().replace(/^www\./, '');
-    return !x.username && !x.password && (h === d || h.slice(-d.length - 1) === '.' + d) ? x.href : null;
+    return PLAT[key].slice(1).some(function (d) { return E.under(h, d); }) ? x.href : null;
   }
   // follower count for prose: 2 significant figures ("12,000", "1.2 million"); < 100 or not a number = unknown
   function people(n) {
@@ -78,14 +50,14 @@
   function cleanProfile(p) {
     if (!p || typeof p !== 'object') return null;
     var o = {
-      display_name: str(p.display_name, 60), first_name: str(p.first_name, 30), username: handle(p.username),
-      tagline: str(p.tagline, 120), profession: str(p.profession, 60), location: str(p.location, 60),
-      bio: str(p.bio, 700), about_short: str(p.about_short, 320), site_domain: domain(p.site_domain),
+      display_name: C.str(p.display_name, 60), first_name: C.str(p.first_name, 30), username: C.handle(p.username),
+      tagline: C.str(p.tagline, 120), profession: C.str(p.profession, 60), location: C.str(p.location, 60),
+      bio: C.str(p.bio, 700), about_short: C.str(p.about_short, 320), site_domain: C.domain(p.site_domain),
       avatar: p.avatar === true, followers: people(p.followers), accounts: []
     };
     var seen = {};
     (Array.isArray(p.accounts) ? p.accounts : []).slice(0, 12).forEach(function (a) {
-      var k = a && platKey(a.platform), h = a && handle(a.handle);
+      var k = a && platKey(a.platform), h = a && C.handle(a.handle);
       if (!k || !h || seen[k]) return;
       seen[k] = 1;
       o.accounts.push({ key: k, handle: h, url: accountUrl(a.url, k) });
@@ -95,56 +67,32 @@
     o.first = o.first_name || o.name.split(' ')[0];
     return o;
   }
+  // r: an API result → {slug, handle, platform, leaks: top 4 leak hosts (E.rankHosts), urls: {host:
+  // its most-seen page}, images: 3 Google thumbs, profile, socials, found} or null
   function clean(r, slug) {
     if (!r || typeof r !== 'object') return null;
-    var h = handle(r.handle);
+    var h = C.handle(r.handle);
     if (!h) return null;
-    var occ = {}, order = [], urls = {}, best = {};
-    (Array.isArray(r.hits) ? r.hits : []).slice(0, 1000).forEach(function (x) {
-      var d = x && domain(x.domain);
-      if (!d) return;
-      var n = typeof x.occurrences === 'number' && x.occurrences > 0 ? Math.min(x.occurrences, 1e6) : 1;
-      if (!occ.hasOwnProperty(d)) { occ[d] = 0; order.push(d); }
-      occ[d] += n;
-      var u = hitUrl(x.url, d); // the phone's row for this site opens its most-seen page
-      if (u && !(best[d] >= n)) { best[d] = n; urls[d] = u; }
-    });
-    order.sort(function (a, b) { return occ[b] - occ[a]; });
-    var images = (Array.isArray(r.images) ? r.images : []).filter(function (u) {
-      return typeof u === 'string' && u.length <= 600 && GSTATIC_RE.test(u);
-    });
+    var ranked = E.rankHosts(r).slice(0, 4), top = {};
+    ranked.forEach(function (x) { if (x.url) top[x.domain] = x.url; }); // the phone's row for this site opens its most-seen page
+    var images = (Array.isArray(r.images) ? r.images : []).filter(C.thumbOk);
     // socials: the Instagram / X names she typed next to the scan (echoed by the API); they win over profile guesses
     var so = r.socials && typeof r.socials === 'object' ? r.socials : {}, socials = {};
-    if (handle(so.instagram)) socials.instagram = handle(so.instagram);
-    if (handle(so.x)) socials.x = handle(so.x);
+    if (C.handle(so.instagram)) socials.instagram = C.handle(so.instagram);
+    if (C.handle(so.x)) socials.x = C.handle(so.x);
     // found: her other accounts read off leak pages (alias enrichment); only fill platforms nothing else knows
     var al = r.aliases && typeof r.aliases === 'object' ? r.aliases : {}, found = [], fseen = {};
     (Array.isArray(al.socials) ? al.socials : []).slice(0, 12).forEach(function (a) {
-      var k = a && platKey(a.platform), fh = a && handle(a.handle);
+      var k = a && platKey(a.platform), fh = a && C.handle(a.handle);
       if (!k || !fh || fseen[k]) return;
       fseen[k] = 1;
       found.push({ key: k, handle: fh, url: accountUrl(a.url, k) });
     });
-    var leaks = order.slice(0, 4), top = {};
-    leaks.forEach(function (d) { if (urls[d]) top[d] = urls[d]; });
-    return { slug: slug, handle: h, platform: platKey(r.platform), leaks: leaks, urls: top, images: images.slice(0, 3),
-      profile: cleanProfile(r.profile), socials: socials, found: found };
+    return { slug: slug, handle: h, platform: platKey(r.platform), leaks: ranked.map(function (x) { return x.domain; }), urls: top,
+      images: images.slice(0, 3), profile: cleanProfile(r.profile), socials: socials, found: found };
   }
 
-  // ---------- slug + data ----------
-  function getSlug() {
-    var m = /[?&]r=([^&#]*)/.exec(location.search);
-    if (m) {
-      var s;
-      try { s = decodeURIComponent(m[1]); } catch (e) { return null; }
-      return SLUG_RE.test(s) ? s : null;
-    }
-    try {
-      var last = JSON.parse(localStorage.getItem(LAST) || 'null');
-      if (last && typeof last.slug === 'string' && SLUG_RE.test(last.slug)) return last.slug;
-    } catch (e) { /* storage blocked or junk: defaults */ }
-    return null;
-  }
+  // ---------- data ----------
   function load(slug, cb) {
     try {
       var c = JSON.parse(sessionStorage.getItem(CACHE + slug) || 'null');
@@ -152,25 +100,20 @@
       if (c && c.m && (c.m.profile || Date.now() - c.ts < 60000)) return cb(c.m);
     } catch (e) { /* ignore */ }
     if (!window.fetch) return;
-    // On the landing, js/scan-engine.js already fetches this result for the hero card: share its one request.
-    var E = window.LeakScanEngine, shared = E && E.fetchResult && E.API === API;
-    var ctrl = !shared && window.AbortController ? new AbortController() : null, late = false;
-    var timer = setTimeout(function () { late = true; if (ctrl) ctrl.abort(); }, 8000);
-    (shared ? E.fetchResult(slug) : fetch(API + '/api/scan-result/' + encodeURIComponent(slug), { credentials: 'omit', signal: ctrl ? ctrl.signal : undefined })
-      .then(function (res) { if (!res.ok) throw new Error('http ' + res.status); return res.json(); }))
-      .then(function (j) {
-        clearTimeout(timer);
-        var m = late ? null : clean(j, slug);
-        if (!m) return;
-        try { sessionStorage.setItem(CACHE + slug, JSON.stringify({ ts: Date.now(), m: m })); } catch (e) { /* ignore */ }
-        cb(m);
-      })
-      .catch(function () { clearTimeout(timer); });
+    var late = false, timer = setTimeout(function () { late = true; }, 8000);
+    E.fetchResult(slug).then(function (j) {   // the hero card's request on the landing: one per page
+      clearTimeout(timer);
+      var m = late ? null : clean(j, slug);
+      if (!m) return;
+      try { sessionStorage.setItem(CACHE + slug, JSON.stringify({ ts: Date.now(), m: m })); } catch (e) { /* ignore */ }
+      cb(m);
+    }, function () { clearTimeout(timer); });
   }
 
   // ---------- demo photos: they arrive after the scan, so poll ----------
   // GET <API>/api/media/<slug> every 3s for up to 90s; stop on "ready" / "none" / a second 404 (or network error).
-  // cb(images, phase) on every answer; phase = 'pending' | 'ready' | 'none' | 'stopped'. Only API-hosted media srcs pass:
+  // cb(images, phase) on every answer; phase = 'pending' (still polling) | 'ready' (photos to show: the API says ready, or
+  // it ended with some) | 'none' | 'stopped' (no photos coming). Only API-hosted media srcs pass:
   // "/api/media/<slug>/<file>", relative or absolute on the API origin, this page's origin or SCAN_API (the backend
   // emits its public origin, which differs from the page host on the VPS). The emitted origin is dropped: photos always
   // load from API + path.
@@ -182,8 +125,9 @@
       return it && typeof it.src === 'string' && it.src.length <= 300 && MEDIA_RE.test(it.src);
     }).map(function (it) { return { src: API + MEDIA_RE.exec(it.src)[1] }; });
   }
-  function pollMedia(slug, cb) {
-    if (!SLUG_RE.test(slug || '') || !window.fetch) return;
+  function pollMedia(slug, done) {
+    if (!C.slug(slug) || !window.fetch) return;
+    var cb = function (imgs, phase) { done(imgs, phase !== 'pending' && imgs.length ? 'ready' : phase); };
     try {
       var c = JSON.parse(sessionStorage.getItem(MEDIA + slug) || 'null');
       if (c && c.phase) return cb(c.images, c.phase);
@@ -292,11 +236,11 @@
         if (site == null) return hide(r);
         if (site) text(r.querySelector('.m-site'), site);
         if (title) text(r.querySelector('.m-title'), title);
-        var f = site && /^(leak-\d|gone)$/.test(k) && r.querySelector('.fav'), E = window.LeakScanEngine;
+        var f = site && /^(leak-\d|gone)$/.test(k) && r.querySelector('.fav');
         if (f) { // a letter avatar per leak site, like the hero card's rows
           f.textContent = site.charAt(0).toUpperCase();
           f.classList.add('fav-l');
-          if (E && E.favColor) f.style.background = E.favColor(site);
+          f.style.background = E.favColor(site);
         }
       });
     };
@@ -309,9 +253,9 @@
     each($$('[data-p="thumbs"] .thumb'), function (span, i) {
       var u = m.images[i];
       if (!u) return;
-      var img = make('img', { src: API + '/api/thumb?u=' + encodeURIComponent(u), alt: '', width: '60', height: '60',
-        loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', 'class': 'p-img' });
-      img.addEventListener('error', function () { img.remove(); }, { once: true });
+      var img = make('img', 'p-img', [], { src: E.thumb(u), alt: '', width: '60', height: '60',
+        loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+      E.watchThumb(img, function () { img.remove(); });   // dead / blank: the illustration's gradient stays
       span.appendChild(img);
     });
     row('ig', d.ig ? '' : null, d.ig ? name + ' (@' + d.ig + ')' : '');
@@ -330,29 +274,30 @@
     each($$('[data-p="demo"]'), function (el) {
       var k = el.tagName === 'IFRAME' ? 'src' : 'href';
       if (el.getAttribute(k) !== demo) el.setAttribute(k, demo);
+      if (k === 'src') keepSlug(el);
     });
 
     // phone sticky bar: "Free scan" → "DM me on Telegram", prefilled like #contact's Telegram channel with her report link
-    // (scan-engine.js's REPORT_BASE, absolute) + handle. Set again on every apply(); Reset reloads = the original bar.
-    var bar = document.querySelector('.mobile-cta'), E = window.LeakScanEngine;
+    // (E.reportUrl, absolute) + handle. Set again on every apply(); Reset reloads = the original bar.
+    var bar = document.querySelector('.mobile-cta');
     if (bar) {
-      var link = (E && E.REPORT_BASE ? E.REPORT_BASE : new URL('scan/?r=', location.href).href) + encodeURIComponent(m.slug);
-      bar.setAttribute('href', 'https://t.me/jakabasej?text=' + encodeURIComponent('Hi Jaka, I ran the free scan. My report link and handle: ' + link + ' @' + m.handle));
+      bar.setAttribute('href', 'https://t.me/jakabasej?text=' + encodeURIComponent('Hi Jaka, I ran the free scan. My report link and handle: ' + E.reportUrl(m.slug) + ' @' + m.handle));
       bar.querySelector('use').setAttribute('href', '#i-send');
       bar.lastChild.textContent = 'DM me on Telegram';
     }
 
     var line = q('scanned');
     if (line) {
-      var reset = make('button', { type: 'button', 'class': 'linkish' }, ['Reset page']);
+      var reset = make('button', 'linkish', ['Reset page'], { type: 'button' });
       reset.addEventListener('click', function () {
-        try { localStorage.removeItem(LAST); sessionStorage.removeItem(CACHE + m.slug); } catch (e) { /* ignore */ }
+        E.forget();
+        try { sessionStorage.removeItem(CACHE + m.slug); } catch (e) { /* ignore */ }
         location.href = location.pathname;
       });
       line.textContent = '';
       // one line in the note's slot (CSS): the handle shortens before anything wraps
-      [ make('span', {}, ['Scanned ', make('strong', {}, ['@' + m.handle])]), ' \u00b7 ',
-        make('a', { href: 'scan/?r=' + encodeURIComponent(m.slug) }, ['Your report']), ' \u00b7 ', reset
+      [ make('span', null, ['Scanned ', make('strong', null, ['@' + m.handle])]), ' \u00b7 ',
+        make('a', null, ['Your report'], { href: E.reportUrl(m.slug) }), ' \u00b7 ', reset
       ].forEach(function (c) { line.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
       line.hidden = false;
     }
@@ -381,10 +326,9 @@
       if (!href || !r.classList.contains('m-result') || r.hasAttribute('data-p-off')) return;
       var out = href.charAt(0) !== '#', site = r.querySelector('.m-site'), title = r.querySelector('.m-title');
       var label = [site && site.textContent, title && title.textContent].filter(Boolean).join(': ') + (out ? ' (opens in a new tab)' : '');
-      var a = make('a', out ? { 'class': 'm-link', href: href, target: '_blank', rel: 'noopener noreferrer nofollow', 'aria-label': label }
-        : { 'class': 'm-link', href: href, 'aria-label': label });
+      var a = make('a', 'm-link', [], Object.assign({ href: href, 'aria-label': label }, out ? NEW_TAB : {}));
       while (r.firstChild) a.appendChild(r.firstChild);
-      a.appendChild(make('span', { 'class': 'm-go', 'aria-hidden': 'true' }, ['\u2197']));
+      a.appendChild(make('span', 'm-go', ['\u2197'], { 'aria-hidden': 'true' }));
       r.appendChild(a);
       r.classList.add('is-link');
       n++;
@@ -394,7 +338,7 @@
       p[0].setAttribute('aria-label', p[1].replace(/^Illustration: /, '').replace(/^./, function (c) { return c.toUpperCase(); }));
     });
     ba.classList.add('is-live');
-    if (!document.querySelector('.ba-hint')) ba.parentNode.insertBefore(make('p', { 'class': 'ba-hint' }, ['Tap a result to open it']), ba.nextSibling);
+    if (!document.querySelector('.ba-hint')) ba.parentNode.insertBefore(make('p', 'ba-hint', ['Tap a result to open it']), ba.nextSibling);
   }
 
   // ---------- demo site ----------
@@ -409,7 +353,7 @@
     for (var n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 3 && n.nodeValue.trim()) return true;
     return false;
   }
-  function strong(s) { return make('strong', {}, [s]); }
+  function strong(s) { return make('strong', null, [s]); }
   var builders = {
     eyebrow: function (el, d) {
       var t = [d.profession && d.profession.charAt(0).toUpperCase() + d.profession.slice(1), d.location].filter(Boolean).join(' \u00b7 ');
@@ -438,9 +382,8 @@
         var a = d.acc[k];
         if (!a.url) return;
         var icon = document.querySelector('.link-btn[id^="' + k + '-"] svg');
-        var btn = make('a', { 'class': 'link-btn' + (n ? '' : ' link-btn--featured'), id: 'p-' + k, href: a.url,
-          target: '_blank', rel: 'noopener noreferrer nofollow' },
-          [make('span', { 'class': 'link-btn__label' }, [PLAT[k][0] + ' \u2014 @' + a.handle])]);
+        var btn = make('a', 'link-btn' + (n ? '' : ' link-btn--featured'),
+          [make('span', 'link-btn__label', [PLAT[k][0] + ' \u2014 @' + a.handle])], Object.assign({ id: 'p-' + k, href: a.url }, NEW_TAB));
         if (icon) btn.insertBefore(icon.cloneNode(true), btn.firstChild);
         el.appendChild(btn);
         n++;
@@ -515,7 +458,7 @@
   }
 
   function demo(m) {
-    if (!m.profile) return; // scan only: the demo stays the fictional creator
+    if (!m.profile) return slugLinks(m.slug); // scan only: the demo stays the fictional creator, its links keep the slug
     var d = dict(m);
     each($$('[data-p]'), function (el) {
       var b = builders[el.getAttribute('data-p')];
@@ -540,22 +483,42 @@
     media(m, d);
     var t = fill(document.body.getAttribute('data-p-title') || '', d);
     if (t) document.title = t;
-    // keep the slug on every internal link so navigating inside the demo (and the landing iframe) stays personalized
+    slugLinks(m.slug);
+    document.documentElement.classList.add('p-on');
+  }
+  // keep the slug on every internal link so navigating inside the demo (and the landing iframe) stays on her scan
+  function slugLinks(slug) {
     each($$('a[href]'), function (a) {
       var raw = a.getAttribute('href');
       if (!raw || raw.charAt(0) === '#' || /^[a-z][a-z0-9+.-]*:/i.test(raw)) return;
       var u;
       try { u = new URL(raw, location.href); } catch (e) { return; }
       if (u.origin !== location.origin) return;
-      u.searchParams.set('r', m.slug);
+      u.searchParams.set('r', slug);
       a.setAttribute('href', u.href);
     });
-    document.documentElement.classList.add('p-on');
   }
 
-  // ---------- public API ----------
-  // apply(result): personalize from an in-memory scan result (e.g. right after an inline scan), no reload.
-  // applySlug(slug): fetch + personalize. pollMedia(slug, cb): the demo-photo poller. Safe to call repeatedly.
+  // A lazy iframe's deferred first load (showcase/) can commit after the src change above and win: Chrome left the demo
+  // un-personalized in ~1 of 16 desktop loads (measured). So until the iframe has loaded a page with ?r=, a load without
+  // it is sent on to its src; from the first ?r= load on, the listener is gone: whatever the visitor does inside the
+  // demo is never undone (once its scan result is in, scan-only too, its links carry ?r=: slugLinks()).
+  function keepSlug(f) {
+    if (f.keepSlug) return;
+    f.keepSlug = true;
+    var onLoad = function () {
+      try {
+        if (/[?&]r=/.test(f.contentWindow.location.search)) f.removeEventListener('load', onLoad);
+        else f.contentWindow.location.replace(new URL(f.getAttribute('src'), location.href).href);
+      } catch (e) { f.removeEventListener('load', onLoad); /* not same-origin: leave it */ }
+    };
+    f.addEventListener('load', onLoad);
+  }
+
+  // ---------- wiring ----------
+  // apply(result): personalize from an in-memory scan result, no reload; a scan run on this page reaches it through the
+  // leakscan:result event (scan-engine.js). applySlug(slug): fetch + personalize (?r= / last scan). Both are internal;
+  // the only export is pollMedia(slug, cb), the demo-photo poller. Safe to run repeatedly.
   var isDemo = document.body.hasAttribute('data-p-demo'), shown = null;
   function render(m) {
     if (!isDemo) return landing(m);
@@ -564,7 +527,7 @@
     if (shown !== m.slug) location.replace(location.pathname + '?r=' + encodeURIComponent(m.slug));
   }
   function apply(result) {
-    var slug = result && typeof result.slug === 'string' && SLUG_RE.test(result.slug) ? result.slug : null;
+    var slug = result ? C.slug(result.slug) : null;
     var m = slug && clean(result, slug);
     if (!m) return false;
     try { sessionStorage.setItem(CACHE + slug, JSON.stringify({ ts: Date.now(), m: m })); } catch (e) { /* ignore */ }
@@ -572,13 +535,14 @@
     return true;
   }
   function applySlug(slug) {
-    if (typeof slug !== 'string' || !SLUG_RE.test(slug)) return false;
+    if (!C.slug(slug)) return false;
     load(slug, render);
     return true;
   }
-  window.LeakScanPersonalize = { apply: apply, applySlug: applySlug, pollMedia: pollMedia };
+  window.LeakScanPersonalize = { pollMedia: pollMedia };   // the scan page's / hero card's photo status
 
   if (!document.querySelector('[data-p]') && !isDemo) return; // e.g. scan/: poller only
-  var slug = getSlug();
+  document.addEventListener('leakscan:result', function (e) { apply(e.detail); });   // a scan run on this page (scan-engine.js)
+  var slug = E.currentSlug();
   if (slug) applySlug(slug);
 })();

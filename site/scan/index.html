@@ -25,8 +25,8 @@
 <link rel="stylesheet" href="../css/scan.css">
 <link rel="stylesheet" href="../css/pip.css">
 <script>document.documentElement.classList.add('js')</script>
-<script src="../js/personalize.js" defer></script>
 <script src="../js/scan-engine.js" defer></script>
+<script src="../js/personalize.js" defer></script>
 <script src="../js/scan.js" defer></script>
 <script src="../js/pip.js" data-pip-auto="r" defer></script>
 </head>
@@ -114,7 +114,7 @@
       <a class="rnav-a rnav-cta" href="#send" data-sec="send">Send report</a>
     </div>
   </nav>
-  <section class="scan-section" id="google" aria-labelledby="google-title">
+  <section class="scan-section" id="google" aria-labelledby="google-title" data-reveal-scope>
     <div class="container">
       <div class="section-head">
         <h2 id="google-title">What Google shows</h2>
@@ -126,7 +126,7 @@
           <label><input type="radio" name="device" value="phone"><span><svg class="icon" aria-hidden="true"><use href="#i-smartphone"/></svg>Phone</span></label>
           <label><input type="radio" name="device" value="computer"><span><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg>Computer</span></label>
         </fieldset>
-        <button class="btn btn-ghost btn-sm" type="button" id="reveal" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="rv-t">Reveal</span><span class="rv-w"> images</span></button>
+        <button class="btn btn-ghost btn-sm" type="button" id="reveal" aria-pressed="false" data-reveal><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="reveal-t">Reveal</span><span class="rv-w"> images</span></button>
       </div>
       <p class="g-hint" id="g-hint"><svg class="icon" aria-hidden="true"><use href="#i-external-link"/></svg><span class="g-hint-tap">Tap All · Images · Videos to switch, tap any result to open it.</span><span class="g-hint-click">Click All · Images · Videos to switch, click any result to open it.</span><span class="g-hint-small">Shrunk to fit this screen. <button class="linkish" type="button" data-device-go="phone">Switch to Phone</button> to tap results.</span></p>
       <div id="g-stage" class="g-stage"></div>
