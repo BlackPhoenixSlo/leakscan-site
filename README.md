@@ -23,9 +23,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   an aggregator page and is never shown), else a mega.nz hit's title; X poster + text, Reddit subreddit + title, the
   most-seen other host, `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
 - Video page `site/video/` (noindex, not in the sitemap; `css/video.css` + `js/video-overlays.js`, own files): Jack's
-  face video (full frame, Jack on the left half; `jack.webm` = the one take, a 40 s placeholder until Jack's recording; drop-in: CUES.md "After recording") with 5
+  face video (full frame, Jack on the left half; `jack.webm` = his real one take, 56.9 s, + `jack.mp4` for old iPhones; cues + `transcript.json` from his words by `tools/video/cues_from_take.py`, CUES.md) with his words as word-by-word captions on his left half (`.vo-capt`, CC toggle) and 5
   overlay prefabs drawn on the video's right half, no panel of their own (640x720 box scaled to 960x1080, vertically centred; Google phone, Google
-  Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → Jack's snap = shake + flash + "GONE." → the
+  Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → his "they get removed" = shake + flash + "GONE." → the
   #removals compare wipe with rolling counters → "Removed" slam + CSS confetti → slide out; reduced motion = fades;
   WebAudio-synthesized pop / whoosh + thud after the play gesture, `?sfx=0` off; Google / Images after = the landing
   after-phone: her `<name>.com` + Instagram + TikTok, her own unblurred photos), driven by `video.currentTime`
@@ -34,8 +34,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   from `js/removals.js`: texts; site / Instagram / TikTok from its profile, as personalize.js; with a scan result the
   cards show her production images: real Google domains / titles / counts, `/api/thumb` thumbs blurred in every card,
   `/api/media/<slug>` own photos in the after states, text only on failure): one take `jack.webm` for both modes
-  (the name bar runs the landing's `/api/public-scan`, holding the take before the first card while it runs), speaks the name at `data-cue-say-start` + `data-cue-say` (`speechSynthesis`, video ducked) + "for
-  <name>" pill; generic = "Your name", no speech, end card `cta-steps` at `data-cue-cta` (default `-say`):
+  (the name bar runs the landing's `/api/public-scan`, holding the take before the first card while it runs), never speaks (no AI overvoice: Jack's voice only), "for
+  <name>" pill at the start + from `data-cue-say`; generic = "SophieStar", no pill, end card `cta-steps` at `data-cue-cta` (default `-say`):
   a phone replica of the landing, one 10 s take (hero, camera zooms onto the onlyfans.com/ field and types the name
   as a handle → scan card → report card → "Rewatch this video with YOUR content" + name flip; keeps looping after the
   take ends) over a name form. Name bar under the stage (theater / full screen: a pill opens it; pulsing "type your
@@ -45,7 +45,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   theater (Esc / X / back closes); touch: own play bar, tap-to-play + "Rotate for full size" hint. Script (one take):
   `site/video/SCRIPT.md`; cue sheet + SFX + where the webm goes: `site/video/CUES.md`. Gate: `tools/video/check_video.py`
   (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry at both widths, full frame: video box = stage box + transparent overlay (`--break-full`), after state,
-  counters, end card + form + cta-steps, name bar + in-place swap (`--break-swap`), snap, reduced motion, sfx, speech, production images (`prod`, `--break-img`), player: tap / theater / full
+  counters, end card + form + cta-steps, name bar + in-place swap (`--break-swap`), snap, reduced motion, sfx, no overvoice (`--break-voice`), production images (`prod`, `--break-img`), player: tap / theater / full
   screen, scan-stub texts + thumbs); cues from a take (`.webm` / `.mp4`)
   (whisper / faster-whisper word timestamps → `data-cue-*` diff, untested on a real take):
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local

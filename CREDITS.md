@@ -11,5 +11,5 @@
   (blurred thumbnails in the `#removals` mock-ups). The `/video/` demo reuses those same crops in its cards.
   Everything else on the landing pages is CSS/SVG drawn for this site (device mockups, gradient thumbnails, initials
   avatar). Google's name and colours appear only inside illustrative mockups.
-- **Video**: `site/video/` ships one file, `jack.webm`, a 40 s placeholder rendered for this site (a drawn silhouette
-  and a timecode, no stock footage), to be replaced by Jack's own recording (see `site/video/CUES.md`).
+- **Video**: `site/video/` ships Jack's own recording (one 56.9 s take, his face and voice, no stock footage):
+  `jack.webm` (VP9) + `jack.mp4` (H.264), and `transcript.json` (his words, transcribed locally; see `site/video/CUES.md`).

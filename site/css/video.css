@@ -44,9 +44,34 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 [data-vo-touch] .vo-fs { padding: 6px; min-height: 0; }   /* icon only: the "Rotate for full size" hint says it */
 [data-vo-full] .vo-fs-x { display: block; }
 [data-vo-full] .vo-fs { padding: 8px; }
-.vo-hint { position: absolute; left: 25%; bottom: 40px; display: none; padding: 7px 14px; border: 3px solid #000; border-radius: 999px; background: #ffd400;
+.vo-hint { position: absolute; left: 75%; bottom: 40px; display: none; padding: 7px 14px; border: 3px solid #000; border-radius: 999px; background: #ffd400;
   color: #000; font: 900 .85rem/1 var(--sans); white-space: nowrap; transform: translateX(-50%); cursor: pointer; }
 [data-vo-hint]:not([data-vo-full]) .vo-hint { display: block; }
+/* CC toggle (captions on by default, localStorage leakscan.cc): under the full screen button (touch: the play bar's right end) */
+.vo-ccb { position: absolute; top: 48px; right: 8px; min-height: 28px; padding: 5px 9px; border: 0; border-radius: 6px; background: rgb(0 0 0 / .55);
+  color: #fff; font: 900 .78rem/1 var(--sans); letter-spacing: .04em; cursor: pointer; }
+[data-vo-touch] .vo-ccb { top: auto; bottom: 2px; right: 6px; min-height: 26px; padding: 4px 7px; }   /* touch: the play bar's right end */
+[data-vo-touch] .vo-ui > .vo-ctl { padding-right: 52px; }
+.vo-ccb[aria-pressed="false"] { opacity: .6; text-decoration: line-through; }
+/* captions (.vo-capt, js/video-overlays.js captions(t)): his words as spoken, 1-3 at a time, bold white with a black
+   stroke, the current word yellow; Jack's left half, lower third ("lo": bottom 16 %, above the touch play bar), or its
+   top band ("hi": top 4 %) while his face is down there (transcript.json chunks, tools/video/cues_from_take.py BANDS);
+   --sw = the stage width in px (fit()); the 14 px floor shrinks on small stages (the landing's mini player) so a chunk stays
+   in the left half; under 260 px (data-vo-tiny) no captions (unreadable); reduced motion: plain lines, no pop, no highlight */
+.vo-capt { position: absolute; left: 2%; bottom: 16%; z-index: 3; width: 46%; margin: 0; color: #fff; text-align: center; text-transform: uppercase;
+  white-space: nowrap; pointer-events: none; font: 900 max(min(14px, calc(var(--sw, 1920) * .036px)), calc(var(--sw, 1920) * .034px))/1.12 var(--sans); letter-spacing: .01em;
+  text-shadow: 0 .07em 0 #000, .07em 0 0 #000, 0 -.07em 0 #000, -.07em 0 0 #000, .05em .05em 0 #000, -.05em .05em 0 #000, .05em -.05em 0 #000,
+    -.05em -.05em 0 #000, 0 .14em .25em rgb(0 0 0 / .55);
+  transform: scale(var(--ccs, 1)); transform-origin: 50% 100%; }
+.vo-capt[data-band="hi"] { top: 4%; bottom: auto; transform-origin: 50% 0; }
+.vo-capt span { display: inline-block; margin: 0 max(3px, .14em); transform: scale(var(--ws, 1)); }
+.vo-capt .on { color: #ffd400; }
+.vo-capt[data-plain] { white-space: normal; text-transform: none; font-size: max(min(13px, calc(var(--sw, 1920) * .034px)), calc(var(--sw, 1920) * .026px)); font-weight: 800; transform: none; }
+.vo-capt[data-plain] span { transform: none; }
+.vo-capt[data-off], [data-vo-cc="off"] .vo-capt, .vo-stage[data-vo-tiny] .vo-capt { display: none; }
+.vo-stage:fullscreen .vo-capt { left: calc((100vw - min(100vw, 177.78vh)) / 2 + min(100vw, 177.78vh) * .02); width: calc(min(100vw, 177.78vh) * .46);
+  bottom: calc((100vh - min(100vh, 56.25vw)) / 2 + min(100vh, 56.25vw) * .16); }
+.vo-stage:fullscreen .vo-capt[data-band="hi"] { top: calc((100vh - min(100vh, 56.25vw)) / 2 + min(100vh, 56.25vw) * .04); bottom: auto; }
 .vo-big { position: absolute; left: 25%; top: 50%; display: none; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: rgb(0 0 0 / .55);
   color: #fff; transform: translate(-50%, -50%); }
 [data-vo-touch]:not([data-vo-playing]) .vo-big { display: grid; }
