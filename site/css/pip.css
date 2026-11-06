@@ -1,4 +1,4 @@
-/* js/pip.js: mini player of site/video/. Picture (16:9, the iframe, no control drawn over it; landing: a still .pip-poster until the first touch) + a thin control bar under it.
+/* js/pip.js: mini player of site/video/. Picture (16:9, the iframe, no control drawn over it; landing: a .pip-poster over the whole player until the first play) + a thin control bar under it.
    Docked (.docked, landing): absolute, over the hero docket's .pip-slot (no slot: off the card's corner), scrolls with the page.
    Floating: fixed, min(320px, 45vw), dropped anywhere; fling / drag past a side or the bottom → tucked off-screen,
    .pip-tab (chevron) brings it back. Expanded (.big): fixed under the header, full width (phone) / min(960px, 70vw); the page
@@ -20,20 +20,23 @@
 .pip-pic { position: relative; aspect-ratio: 16 / 9; background: #000; }
 .pip iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
 .pip-hit { position: absolute; inset: 0; }
-.pip-poster { position: absolute; inset: 0; display: flex; align-items: stretch; background: #2b0f20; color: #e6d6df; pointer-events: none; }
-.pip-poster img { flex: none; height: 100%; width: auto; aspect-ratio: 1; object-fit: cover; }
-.pip-poster p { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; margin: 0; padding: 0 16px; font: 500 .875rem/1.3 var(--sans, system-ui, sans-serif); }
-.pip-poster strong { color: #fff; font-size: 1.0625rem; font-weight: 600; }
-.pip-poster-go { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-bottom: 8px; border-radius: 50%; background: #f2b8d2; color: #2b0f20; }
+.pip { container-type: inline-size; }
+.pip-poster { position: absolute; inset: 0; z-index: 1; display: flex; background: #2b0f20; color: #e6d6df; cursor: pointer; }
+.pip.posted .pip-bar, .pip.posted .pip-rs { visibility: hidden; }   /* until the first play: the poster only (the 40 px stay) */
+.pip-poster img { flex: none; width: 58%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+.pip-poster p { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 10px; min-width: 0; margin: 0; padding: 0 16px;
+  font: 500 .875rem/1.35 var(--sans, system-ui, sans-serif); }
+.pip-poster strong { color: #fff; font-weight: 600; white-space: nowrap; }
+.pip-poster-go { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: #f2b8d2; color: #2b0f20; }
 .pip-poster-go svg { width: 18px; height: 18px; margin-left: 2px; stroke: none; }
-/* a small player (floating, 45vw on a phone): the portrait fills the picture, only the play mark, in its corner */
-.pip-pic { container-type: inline-size; }
+/* a small player (floating, 45vw on a phone): the portrait over the picture, the play mark + caption in the bar's strip */
 @container (max-width: 259px) {
-  .pip-poster img { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; object-position: 50% 35%; }
-  .pip-poster p { position: relative; flex: 1; justify-content: flex-end; align-items: flex-start; padding: 8px; }
-  .pip-poster p > :not(.pip-poster-go) { display: none; }
-  .pip-poster-go { width: 32px; height: 32px; margin: 0; box-shadow: 0 2px 8px rgb(0 0 0 / .35); }
-  .pip-poster-go svg { width: 15px; height: 15px; }
+  .pip-poster { flex-direction: column; }
+  .pip-poster img { width: 100%; height: auto; flex: 1; min-height: 0; }
+  .pip-poster p { flex: none; flex-direction: row; align-items: center; gap: 8px; height: var(--bar); padding: 0 8px; font-size: .75rem; }
+  .pip-poster-go { width: 28px; height: 28px; flex: none; }
+  .pip-poster-go svg { width: 13px; height: 13px; }
+  .pip-poster-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 .pip-bar { display: flex; align-items: center; height: var(--bar); padding: 0 4px; background: #2b0f20; }
 .pip-bar i { flex: 1; }

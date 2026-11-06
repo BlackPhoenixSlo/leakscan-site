@@ -195,8 +195,17 @@
     pip.style.setProperty('--s', '1');
     move(x, y);
   }
+  function unposter() {   // the first play: the poster goes, the bar shows, the take starts over (its intro included)
+    if (!poster) return;
+    var f = poster.contains(document.activeElement);
+    poster.remove(); poster = null;
+    pip.classList.remove('posted');
+    if (video) try { video.currentTime = 0; } catch (e) { /* not seekable yet */ }
+    if (f) exp.focus();
+  }
   function expand() {
     if (big || S.t) return;
+    unposter();
     big = true;
     flip(place);
     if (video) { video.muted = false; play(); }
@@ -266,7 +275,7 @@
       return;
     }
     if (drag) return;
-    drag = { id: e.pointerId, big: big, pic: !!e.target.closest('.pip-pic'), sx: e.clientX, sy: e.clientY, moved: false, pts: [[e.timeStamp, e.clientX, e.clientY]] };
+    drag = { id: e.pointerId, big: big, pic: !!e.target.closest('.pip-pic, .pip-poster'), sx: e.clientX, sy: e.clientY, moved: false, pts: [[e.timeStamp, e.clientX, e.clientY]] };
     try { pip.setPointerCapture(e.pointerId); } catch (x) { /* synthetic pointer */ }
   }
   function over(e) {
@@ -359,22 +368,23 @@
       '</div></div><div class="pip-bar"><button class="pip-pp" type="button">' + I.pp +
       '</button><button class="pip-snd" type="button"></button><i></i><button class="pip-exp" type="button"></button><button class="pip-x" type="button" aria-label="Close video">' + I.x + '</button></div>';
     pic = pip.querySelector('.pip-pic');
-    // landing: a still poster (his portrait, "Jaka, 57 s", play mark) over the muted autoplay until the first touch / key on
-    // the player: then it goes and the take restarts from 0 (the personalised intro included). Not a control: no hit target.
+    // landing: until the first play, only a still poster over the whole player (his portrait, one play mark, one caption);
+    // the bar and the resize corner are hidden (visibility: the 40 px stay, the box = the slot) while the muted take autoplays
+    // underneath. A tap on it (a picture tap: expanded, sound on) or Enter / Space = play: it goes, the take restarts from 0.
     if (auto === 'dock') {
       poster = document.createElement('div');
       poster.className = 'pip-poster';
-      poster.setAttribute('aria-hidden', 'true');
+      poster.setAttribute('role', 'button');
+      poster.setAttribute('tabindex', '0');
+      poster.setAttribute('aria-label', "Play Jaka's video (57 s)");
       poster.innerHTML = '<img src="' + new URL('../assets/jaka.webp', me.src).href + '" alt="" width="192" height="192" decoding="async"><p><span class="pip-poster-go">' +
-        SVG('<path d="M8 5v14l11-7z" fill="currentColor"/>') + '</span><strong>Jaka, 57 s</strong><span>Tap to watch</span></p>';
-      pic.insertBefore(poster, pip.querySelector('.pip-rs'));
-      var unposter = function () {
-        if (!poster) return;
-        poster.remove(); poster = null;
-        if (video) try { video.currentTime = 0; } catch (e) { /* not seekable yet */ }
-      };
-      pip.addEventListener('pointerdown', unposter, true);
-      pip.addEventListener('keydown', unposter, true);
+        SVG('<path d="M8 5v14l11-7z" fill="currentColor"/>') + '</span><span class="pip-poster-t"><strong>Jaka, 57 s</strong> · Tap to watch</span></p>';
+      pip.appendChild(poster);
+      pip.classList.add('posted');
+      poster.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault(); e.stopPropagation(); expand();
+      });
     }
     frame = document.createElement('iframe');
     frame.title = "Jack's video";

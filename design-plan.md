@@ -123,3 +123,14 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
   the player removes it and restarts the take at 0 (intro kept). Start offset (a) rejected: the intro covers 0.3-9.8 s,
   every frame in it has overlays. Not a control: pip.py overPic stays 0.
 - Secondary h2s (removals, FAQ, contact, before/after h3) clamp 28-40 px; why/how/pricing keep 52.
+
+## Round 6 notes
+- design-runs/tools/build.py retired: site/index.html is the source (static, no build). Edit it directly.
+- Pip poster: until the first play only the poster (one play mark, "Jaka, 57 s · Tap to watch"); bar + grip
+  visibility:hidden (40 px kept: CLS 0, slot rule holds). Tap / Enter / Space on it = expand with sound. Under 260 px
+  wide (phone floating) the mark + caption sit in the bar's strip. pip.py had no bar-before-play assertion: unchanged.
+- Said once: authorization line in the hero lead + pricing note only; "570 of 633" in the docket only.
+- Removals: idle knob parked 8 px inside the corner; dark 8 px frame drawn as box-shadow (same inner box as light,
+  so the knob clears the 390 px X thumbs). Stage height stays 372 (removals.py fp crop asserts it). Facts list
+  (notice / recipients / report) from 1200 px only, where the left column has room.
+- Demo: GALWAY vs headband not fixable without touching showcase/ (demo hero min-height 600 in a 560 frame): left.

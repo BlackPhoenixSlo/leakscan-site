@@ -171,6 +171,8 @@ strong { font-weight: 600; }
 .hero { padding: 20px 0 28px; position: relative; overflow: hidden; overflow: clip; }   /* clip: focus can't pan the hero sideways */
 @media (min-width: 720px) { .hero { padding: 56px 0 72px; } }
 .hero h1 { margin: 0 0 12px; }
+@media (max-width: 559px) { .hero h1 { font-size: 2.625rem; line-height: 44px; } .hero .lead { font-size: 1.125rem; line-height: 27px; } .lead-x { display: none; }
+  .hero { padding-top: 10px; } .hero h1 { margin-bottom: 10px; } .hero .docket { margin-top: 12px; padding: 12px; } .hero .docket .scan-form { gap: 6px; } }   /* phone: the button above ~500 px */
 @media (min-width: 1100px) { .hero h1 > span { display: block; } .hero h1 { margin-bottom: 20px; } }   /* one sentence per line */
 .lead { font-size: 1.1875rem; line-height: 1.526; color: var(--muted); max-width: 40ch; margin: 0; }
 @media (min-width: 1100px) { .lead { font-size: 1.3125rem; line-height: 1.524; max-width: 46ch; } }
@@ -180,6 +182,8 @@ strong { font-weight: 600; }
 .scan-form { display: grid; gap: 10px; margin: 24px 0 10px; max-width: 620px; }
 @media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1fr) auto; } .scan-form > :first-child { grid-column: 1 / -1; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
 .scan-prefix { position: relative; display: flex; align-items: center; gap: 0; padding: 15px 0 0 1.1em; cursor: text; }
+.scan-prefix { container-type: inline-size; }
+@container (max-width: 269px) { .scan-lab-x { display: none; } }   /* the alias hint only where it fits */
 .scan-lab { position: absolute; left: 1.155rem; top: 7px; color: var(--muted); font: 600 .72rem/1 var(--sans); letter-spacing: .01em; pointer-events: none; }
 .scan-prefix:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .scan-pre { color: var(--muted); font-size: .95rem; white-space: nowrap; user-select: none; }
@@ -319,8 +323,9 @@ html:not(.js) .pip-cap, .pip-x .pip-cap { margin: 0; }
 
 /* Leak thumbnails: the demo creator's photos (assets/phone, the same set the "after" phone and the demo site use),
    blurred like every leak-side photo; [data-reveal] scopes lift the blur */
-.thumb { display: block; position: relative; overflow: hidden; background: #b49a8e; }
-.thumb::after { content: ""; position: absolute; inset: -12%; background: center / cover no-repeat; filter: blur(calc(var(--leak-blur) * 2 / 3)) saturate(.85); }
+/* the default blurred photo sits under any child (a real thumb <img>: the video page, live rows): z -1 in its own stack */
+.thumb { display: block; position: relative; overflow: hidden; background: #b49a8e; isolation: isolate; }
+.thumb::after { content: ""; position: absolute; inset: -12%; z-index: -1; background: center / cover no-repeat; filter: blur(calc(var(--leak-blur) * 2 / 3)) saturate(.85); }
 .thumb .p-img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; filter: blur(calc(var(--leak-blur) * 2 / 3)); transform: scale(1.2); }
 .t1::after { background-image: url(../assets/phone/photo-1.jpg); }
 .t2::after { background-image: url(../assets/phone/photo-3.jpg); }
@@ -463,7 +468,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 #main .phone .m-grid .gi-box { aspect-ratio: auto; height: 84px; }
 @media (max-width: 559px) { #main .phone .m-grid .gi-box { height: 96px; } }
 @media (prefers-color-scheme: dark) {
-  .browser-demo { padding: 8px; background: #26222c; border-color: #26222c; }
+  .browser-demo { background: #26222c; border-color: #26222c; }
   /* the Google screens get Google's own dark surfaces (no glare); the light values above stay as they are */
   #main .phone { --mock: #26222b; background: var(--mock); }
   #main .phone-screen { color: #e8e6ec; }
@@ -480,8 +485,8 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   #main .phone .reveal-btn { border-color: #4a4452; color: #e8e6ec; }
   #main .phone .reveal-btn[aria-pressed="true"], #main .phone .m-link:focus-visible .m-go { border-color: #9db7ff; color: #9db7ff; }
   #main .phone .m-vthumb { background: #3a3442; }
-  .browser-demo iframe { border-radius: 0 0 8px 8px; filter: brightness(.9); }
-  .browser-demo .browser-bar { border-radius: 8px 8px 0 0; }
+  .browser-demo iframe { filter: brightness(.9); }
+  .browser-demo .browser-bar { border-color: transparent; }
 }
 /* the Google screens draw no coloured letter tiles: neutral favicon dots (the letters stay in the DOM for personalize.js) */
 .m-illus .fav-l, .m-illus .gi-fav, .ba [data-p^="leak-"] .fav { background: #dadce0 !important; color: transparent; }
@@ -494,8 +499,9 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* #free: the offer, once; the screen beside it shows her results after a scan (js/inline-scan.js) */
 .free-band { display: grid; gap: 28px; align-items: center; }
 @media (min-width: 860px) { .free-band { grid-template-columns: minmax(0, 1fr) 320px; gap: 64px; } }
-@media (min-width: 1100px) { .free-band { grid-template-columns: minmax(0, 640px) 1fr; } .free-phone { justify-items: end; } }
+@media (min-width: 1100px) { .free-band { grid-template-columns: minmax(0, 640px) 1fr; } #free .free-phone { justify-items: end; } }   /* the mock on the grid's right edge */
 .free-copy h2 { max-width: 15ch; }
+@media (min-width: 1100px) { .free-copy h2 { max-width: none; } }
 .free-copy > p:not(.free-actions) { color: var(--ink); max-width: 36em; }
 .free-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 20px 0 0; }
 .free-phone { margin: 0; display: grid; justify-items: center; min-width: 0; }
@@ -532,10 +538,13 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .proof-t { color: var(--muted); font-size: .906rem; line-height: 21px; }
 @media (min-width: 720px) { .proof { grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 20px; } .proof-t { font-size: 1.0625rem; line-height: 1.6; } }
 
-/* #how, on the fold: steps 1-3 are hers, 4-5 mine; two groups, the same heading each */
+/* #how, on the fold: "You" (1-2 = the free removal, 3 = optional ongoing help) and "Me" (4-5) */
 .how h2 { max-width: 20ch; margin-bottom: 20px; }
 .parts { display: grid; gap: 20px; }
 .part-h { margin: 0 0 6px; font: 600 1.1875rem/1.37 var(--sans); color: var(--ink); }
+.phases { display: grid; gap: 4px; }
+.phase-h { margin: 12px 0 4px; font: 600 .8125rem/20px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.phase-opt .phase-h { color: var(--muted); }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; }
 .step { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-content: start; padding: 10px 0; border-top: 1px solid var(--line); }
 .step-n { display: block; height: 32px; font: 400 2rem/36px var(--serif); font-synthesis: none; font-variant-numeric: lining-nums tabular-nums; color: var(--accent); }
@@ -543,13 +552,19 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .step p { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.5; }
 @media (min-width: 1000px) {
   .parts { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 48px; }
-  .part .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
-  .part-me .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .phases { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
+  .phase .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .phase-opt .steps { grid-template-columns: minmax(0, 1fr); }
+  .phase-h { margin: 14px 0 0; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+  .phase:not(.phase-opt) .phase-h { border-bottom-style: solid; border-bottom-color: var(--accent); }
+  .phase-h { white-space: nowrap; }
+  .part-me .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding-top: 43px; }   /* = a phase label: the numbers line up */
   .part-h { padding-bottom: 12px; margin-bottom: 0; border-bottom: 2px solid var(--ink); }
   .step { grid-template-columns: 1fr; gap: 10px; padding: 18px 0 0; border-top: 0; }
   .step-n { height: 44px; font-size: 2.75rem; line-height: 44px; }
   .step h3 { font-size: 1.1875rem; line-height: 1.37; }
 }
+@media (min-width: 1000px) and (max-width: 1199px) { .phase-h { letter-spacing: .02em; font-size: .75rem; } }   /* "Optional ongoing help" on one line in the 1fr column */
 
 /* #pricing: Monthly on the docket, One-time on paper with a 1 px ink rule; the inclusions said once above */
 .plans { display: grid; gap: 16px; }
@@ -596,7 +611,9 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .showcase-head.section-head { margin-bottom: 0; }
 @media (max-width: 559px) { .showcase-head { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
 .browser { margin-top: 20px; }
-.browser-demo { position: relative; }
+.browser-demo { position: relative; padding: 8px; }   /* the same 8 px inset in light and dark */
+.browser-demo iframe { border-radius: 0 0 8px 8px; }
+.browser-demo .browser-bar { border-radius: 8px 8px 0 0; border: 1px solid var(--line); }
 /* 560 px: the demo's whole hero (name, tagline, both buttons) sits inside the frame at 390 and 1440; no fade */
 .browser-demo iframe { display: block; width: 100%; height: 560px; border: 0; background: var(--surface-2); }
 .ba-wrap { display: grid; gap: 16px; margin-top: 32px; }
@@ -617,7 +634,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* phone (< 820 px): one screen at a time behind the Before | After switch (js/main.js); no JS = both, stacked */
 .ba-switch, .ba-label { display: none; }
 @media (max-width: 819px) {
-  .js .ba-switch { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; width: min(100%, 260px); margin-top: 14px; border: 1px solid var(--ink); border-radius: 6px; overflow: hidden; }
+  .js .ba-switch { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; width: 100%; margin-top: 14px; border: 1px solid var(--ink); border-radius: 6px; overflow: hidden; }
   .ba-switch button { min-height: 44px; border: 0; border-radius: 0; background: none; color: var(--ink); font: 600 .95rem/1 var(--sans); cursor: pointer; }
   .ba-switch button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
   .ba-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -652,7 +669,6 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .contact-copy > p:not(.hint) { color: var(--muted); max-width: 32em; margin-bottom: 0; }
 .hint { color: var(--muted); font-size: .95rem; margin: 12px 0 0; }
 .hint q { color: var(--ink); font-style: normal; }
-@media (max-width: 719px) { .contact .hint { display: none; } }
 .channels { display: grid; gap: 8px; }
 .channel { display: flex; align-items: center; gap: 16px; min-height: 56px; padding: 8px 18px; border-radius: 6px; background: transparent; border: 1px solid var(--line); color: var(--ink); text-decoration: none; transition: border-color .15s; }
 @media (hover: hover) { .channel:hover { border-color: var(--accent); color: var(--ink); } }
