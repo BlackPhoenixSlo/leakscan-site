@@ -4,7 +4,8 @@
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet]... [--changed [REF]] [--no-reuse]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
-        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-sheet500] [--break-sheetdead] [--break-askstall]
+        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine]
+        [--break-sheet500] [--break-sheetdead] [--break-askstall]
 
 Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
 `reused green from <run folder>` and skips the browser; --no-reuse forces a run; --changed runs only what the diff reaches; break runs never touch it.
@@ -149,6 +150,11 @@ card whatever the screen: off-screen on a phone): only `vis:` / `follow:` / phon
 serves it with #79's floating spot (re-computed off the form at the current scroll, every scroll): only `follow:` checks may go red.
 --break-pipload serves it with the iframe started at once (before the load event): only the `vis:` load-event checks may go red.
 --break-still serves pip.css with the first-paint still hidden: only `still:` checks may go red.
+mini: a phone's mini plays jack-360.* (no 720p request before expand), a computer's and /video/ directly 720p only, 360p 404 = 720p by itself. hd: (phone) expand = the
+720p layer at the master's second, same box, muted, under the overlays; the master's clock never stops; follows pause / seek / end / ?name= rebuild, hidden at once when
+behind, dropped when minimized, the 720p never answering = the mini plays on; the browser pausing the master = the mini alone, no 720p this page view. --break-pipmini
+serves pip.js without ?mini=1: only phone `mini:` / `hd:` checks may go red; --break-hdsync serves it revealing the layer without waiting for sync, --break-hdmin only
+pausing the layer on minimize, --break-hdguard without the guard, --break-hdmine with the guard taking our own pauses for the browser's: only `hd:` checks may go red.
 Declared bypass: the tabs and huge flows put the player away as soon as it mounts, by a script click on its X
 (common.PIP_AWAY, focus kept where it was): floating it
 stays top-right while scrolling (by design) and covers what sits there, e.g. the demo's full-screen button.

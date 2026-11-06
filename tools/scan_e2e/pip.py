@@ -1,5 +1,6 @@
 """Scenario `pip` (see tools/scan_e2e.py for what it proves)."""
 import base64
+import json
 import os
 from urllib.parse import parse_qs, urlsplit
 
@@ -53,6 +54,15 @@ PIP_TAKE = """async (t) => { const v = document.querySelector('video'); v.pause(
     lum: m(L), lumsd: sd(L), colorful: Math.hypot(sd(rg), sd(yb)) + .3 * Math.hypot(m(rg), m(yb)), sw: stg.clientWidth,
     card: !g.hasAttribute('data-off'), cardIn: gr.left >= sr.left + sr.width * .45 && gr.right <= sr.right + 1 && gr.top >= sr.top - 1 && gr.bottom <= sr.bottom + 1,
     capOn: !cap.hasAttribute('data-off'), capShown: getComputedStyle(cap).display !== 'none', capText: cap.textContent.trim().toLowerCase()}; }"""
+
+# the 360p mini + the 720p layer, read inside the iframe (or /video/ itself); every 20 ms from HD_WATCH: [now, master t, paused, layer t, shown]
+F360, F720 = ("jack-360.webm", "jack-360.mp4"), ("jack.webm", "jack.mp4")
+HD_IOS = """() => { const P = HTMLMediaElement.prototype, play = P.play, pause = P.pause; window.__ios = 0;
+  P.play = function () { const r = play.call(this); if (this.classList.contains('pip-hd')) { window.__ios++; pause.call(document.querySelector('.vo-video')); } return r; }; }"""
+HD_J = """() => { const v = document.querySelector('.vo-video'), h = document.querySelector('.pip-hd'), b = e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); }, z = q => +getComputedStyle(document.querySelector(q)).zIndex, pg = getComputedStyle(document.querySelector('.vo-pg .vo-hd'));
+  return {n: document.querySelectorAll('video').length, src: v.currentSrc.split('/').pop(), t: v.currentTime, p: v.paused, e: v.ended, mu: v.muted, w: v.videoWidth, rect: b(v), stage: b(document.querySelector('.vo-stage')), capt: z('.vo-capt'), over: z('.vo-over'), pghd: [+pg.opacity, pg.height],
+    hd: h && {src: h.currentSrc.split('/').pop(), t: h.currentTime, p: h.paused, mu: h.muted, w: h.videoWidth, on: h.classList.contains('on'), rect: b(h), op: +getComputedStyle(h).opacity, z: +getComputedStyle(h).zIndex}}; }"""
+HD_WATCH = """() => { const v = document.querySelector('.vo-video'), X = window.__hdw = []; setInterval(() => { const h = document.querySelector('.pip-hd'); X.push([performance.now(), v.currentTime, v.paused, h ? h.currentTime : null, !!(h && h.classList.contains('on'))]); }, 20); }"""
 
 # the first-paint still: when it entered the page (a mutation with neither it nor the box = a gap), LCP elements
 STILL_INIT = """window.__st = {gap: false, lcp: []}; new MutationObserver(() => { const s = document.querySelector('.pip-still');
@@ -729,8 +739,8 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         pg.query_selector(".pip iframe").content_frame().wait_for_function("() => document.querySelector('video').readyState >= 2", timeout=15000)
         a = take(pg, 3.0)
         if where.startswith("floating"):
-            check(f"{tag} take: playing source = the real take, the first <source> this engine plays (jack.webm / jack.mp4)",
-                  a["src"] in ("jack.webm", "jack.mp4") and a["src"] == a["first"], [a["src"], a["first"]])
+            check(f"{tag} take: playing source = the real take, the first <source> this engine plays (jack.webm / jack.mp4, a phone's mini jack-360.*: mini:)",
+                  a["src"] in F720 + F360 and a["src"] == a["first"], [a["src"], a["first"]])
             check(f"{tag} take: duration about 56.9 s", abs(a["dur"] - 56.9) < 0.2, a["dur"])
         # placeholder (b794368~1) measured lum 51, SD 16, colourfulness 12; the real take 150+ / 55+ / 23+
         check(f"{tag} take: {where}: frame at 3 s is the real take, not the placeholder", a["lum"] > 100 and a["lumsd"] > 35 and a["colorful"] > 18,
@@ -747,6 +757,231 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
               + ("hidden (under 260 px)" if tiny else "drawn"),
               e["capOn"] and "real" in e["capText"] and not f["capOn"] and e["capShown"] == (not tiny), [e["capOn"], e["capText"], e["capShown"], e["sw"], f["capOn"]])
         ctx.close()
+
+    # mini: a phone's mini plays the 360p files, chosen while the page parses (no 720p request before expand); a computer's and
+    # /video/ opened directly 720p only. Requests as the route saw them (bypass, declared: page.route = no HTTP cache here)
+    def fr(pg):
+        return pg.query_selector(".pip iframe").content_frame()
+
+    def video_up(f):
+        f.wait_for_function("() => document.querySelector('video').readyState >= 2", timeout=20000)
+
+    def vfiles(n0):
+        return sorted({urlsplit(u).path.rsplit("/", 1)[-1] for u in net["video"][n0:] if urlsplit(u).path.endswith((".webm", ".mp4"))})
+
+    def hd_on(f, ms=20000):   # no raise: --break-pipmini has no layer at all
+        try:
+            f.wait_for_function("() => document.querySelector('.pip-hd.on')", timeout=ms)
+            return True
+        except Exception:
+            return False
+
+    def hd_watch(f):   # HD_WATCH's samples: the first with the layer shown, the lag there and all along, the master's clock vs the wall clock
+        s = json.loads(f.evaluate("JSON.stringify(window.__hdw)"))
+        on = next((y for y in s if y[4]), None)
+        run = [(p, q) for p, q in zip(s, s[1:]) if not p[2] and not q[2]]
+        return {"on": on and round(on[0] - s[0][0]), "lag0": on and round(abs(on[1] - on[3]), 3), "lagmax": max((round(abs(y[1] - y[3]), 3) for y in s if y[4]), default=None),
+                "wall": round(sum(q[0] - p[0] for p, q in run) / 1000, 2), "adv": round(sum(q[1] - p[1] for p, q in run), 2)}
+
+    def hd_ok(a):   # the 720p layer showing, in sync, the master under it still playing
+        H = a["hd"] or {}
+        return bool(H.get("on")) and abs(a["t"] - H.get("t", 1e9)) <= 0.25 and not H.get("p") and not a["p"]
+
+    for what, url in (("report", "scan/?r=demoR3port01"), ("landing", ""), ("named", "?name=Orla%20Brennick")):
+        ctx, pg, cdp = new_ctx()
+        n0 = len(net["video"])
+        s = ready(pg, url)
+        f = fr(pg)
+        video_up(f)
+        pg.wait_for_timeout(800)
+        a, got, q = f.evaluate(HD_J), vfiles(n0), parse_qs(urlsplit(s["src"]).query)
+        if phone:
+            check(f"{tag} mini: {what}: 360p file playing (640 px), ?mini=1, no 720p request and no HD layer before expand", a["src"] in F360 and a["w"] == 640 and q.get("mini") == ["1"] and got and all(x in F360 for x in got) and not a["hd"], [a["src"], a["w"], q, got, a["hd"]])
+            if what != "report":   # the main flow below has the details
+                pg.tap(".pip-exp")
+                ok = hd_on(f)
+                check(f"{tag} hd: {what}: expand reveals the 720p layer", ok and hd_ok(f.evaluate(HD_J)), f.evaluate(HD_J))
+        else:
+            check(f"{tag} mini: {what}: computer: 720p file (1280 px), no ?mini, no jack-360 request", a["src"] in F720 and a["w"] == 1280 and "mini" not in q and got and all(x in F720 for x in got), [a["src"], a["w"], q, got])
+            pg.click(".pip-exp")
+            pg.wait_for_timeout(1200)
+            a = f.evaluate(HD_J)
+            check(f"{tag} mini: {what}: computer: expand adds no second video", a["n"] == 1 and not a["hd"] and a["src"] in F720, [a["n"], a["hd"], a["src"]])
+        ctx.close()
+    ctx, pg, cdp = new_ctx()
+    n0 = len(net["video"])
+    pg.goto(cfg.base + "video/", wait_until="load")
+    pg.wait_for_function("() => document.querySelector('video').readyState >= 2", timeout=20000)
+    pg.wait_for_timeout(500)
+    a, got = pg.evaluate(HD_J), vfiles(n0)
+    check(f"{tag} mini: /video/ opened directly: 720p, no jack-360 request, no second video", a["src"] in F720 and a["w"] == 1280 and got and all(x in F720 for x in got) and a["n"] == 1, [a["src"], a["w"], got, a["n"]])
+    ctx.close()
+
+    # hd: expand = 720p at the same second over the still-playing mini; it follows the master and drops out to it, never a freeze
+    if phone:
+        ctx, pg, cdp = new_ctx()
+        ready(pg, "scan/?r=demoR3port01")
+        f = fr(pg)
+        video_up(f)
+        pg.wait_for_timeout(1500)
+        n0 = len(net["video"])
+        f.evaluate(HD_WATCH)
+        shot(pg, "hd-1-mini")
+        pg.tap(".pip-exp")
+        pg.wait_for_timeout(350)
+        shot(pg, "hd-2-expanded-360")
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: expanded at once on the 360p master: sound on, playing, nothing shown over it yet", a["w"] == 640 and not a["mu"] and not a["p"] and not (a["hd"] or {}).get("on"), [a["w"], a["mu"], a["p"], a["hd"]])
+        ok = hd_on(f)
+        pg.wait_for_timeout(1000)
+        a, w = f.evaluate(HD_J), hd_watch(f)
+        H = a["hd"] or {}
+        shot(pg, "hd-3-revealed-720")
+        check(f"{tag} hd: revealed in sync: 720p (1280 px) at the master's second (first shown within 0.2 s, never more than 0.3 s off), same box as master and stage",
+              ok and w["lag0"] is not None and w["lag0"] <= 0.2 and w["lagmax"] <= 0.3 and H.get("w") == 1280 and H.get("rect") == a["rect"] == a["stage"] and H.get("op") == 1, [w, H, a["rect"], a["stage"]])
+        check(f"{tag} hd: the master never froze across the switch (its clock kept the wall clock's pace), sound on the master, the layer muted", w["wall"] > 1 and w["adv"] >= 0.8 * w["wall"] and not a["mu"] and H.get("mu") is True, [w, a["mu"], H.get("mu")])
+        check(f"{tag} hd: layers: under the captions and cards, one extra <video>, same container as the master, the fake phone's own header untouched",
+              H.get("z", 9) < min(a["capt"], a["over"]) and a["n"] == 2 and H.get("src") == a["src"].replace("-360.", ".") and a["pghd"] == [1, "64px"], [H.get("z"), a["capt"], a["over"], a["n"], H.get("src"), a["pghd"]])
+        check(f"{tag} hd: the 720p file requested only after the tap", (H.get("src") or "?") in vfiles(n0), vfiles(n0))
+        pg.tap(".pip-pp")
+        pg.wait_for_timeout(600)
+        a = f.evaluate(HD_J)
+        H = a["hd"] or {}
+        check(f"{tag} hd: pause button: both stay paused (the guard quiet), within 0.06 s of each other", a["p"] and H.get("p") is True and abs(a["t"] - H.get("t", 1e9)) <= 0.06, [a["p"], a["t"], H])
+        pg.tap(".pip-pp")
+        ok = hd_on(f, 15000)
+        pg.wait_for_timeout(1000)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: play again: both playing, shown, in sync", ok and hd_ok(a), a)
+        tap(pg, *pic_c(st(pg)))
+        pg.wait_for_timeout(600)
+        a = f.evaluate(HD_J)
+        H = a["hd"] or {}
+        check(f"{tag} hd: a tap on the picture pauses too: both stay paused (the guard quiet), the layer kept", a["p"] and H.get("p") is True and a["n"] == 2, [a["p"], a["n"], H])
+        tap(pg, *pic_c(st(pg)))
+        ok = hd_on(f, 15000)
+        pg.wait_for_timeout(500)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: a tap again: both playing, shown, in sync", ok and hd_ok(a), a)
+        pg.tap(".pip-snd")
+        pg.wait_for_timeout(200)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: the sound button mutes the master, the layer stays muted, picture unchanged", a["mu"] and (a["hd"] or {}).get("mu") is True and hd_ok(a), a)
+        pg.tap(".pip-snd")
+        f.evaluate("() => { const h = document.querySelector('.pip-hd'); if (h) h.currentTime = Math.max(0, h.currentTime - 3); }")   # bypass, declared: the fault forced from the page
+        pg.wait_for_timeout(120)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: fell 3 s behind (forced): hidden within 120 ms, the master plays on with sound", not (a["hd"] or {}).get("on") and not a["p"] and not a["mu"], a)
+        ok = hd_on(f, 15000)
+        pg.wait_for_timeout(600)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: then back, in sync", ok and hd_ok(a), a)
+        pg.tap(".pip-exp")
+        pg.wait_for_timeout(250)
+        a = f.evaluate(HD_J)
+        shot(pg, "hd-4-minimized")
+        check(f"{tag} hd: minimize: the layer dropped at once (no 720p element left to download), the master still playing with sound", not a["hd"] and a["n"] == 1 and not a["p"] and not a["mu"], a)
+        pg.tap(".pip-exp")
+        ok = hd_on(f, 15000)
+        pg.wait_for_timeout(500)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: re-expand: a new layer in sync at the master's second, no second one", ok and hd_ok(a) and a["n"] == 2 and (a["hd"] or {}).get("w") == 1280, a)
+        f.evaluate("() => { const n = document.querySelector('.vo-nb form'), i = n.querySelector('input'); i.value = 'Orla Brennick'; n.requestSubmit(); }")   # bypass, declared: the name bar is hidden in the embed; its submit from the page
+        pg.wait_for_timeout(150)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: ?name= rebuilt in place (master back to the start): the old second is hidden at once", a["t"] < 2 and not (a["hd"] or {}).get("on"), a)
+        ok = hd_on(f, 15000)
+        pg.wait_for_timeout(500)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: ?name= rebuilt: the layer back in sync, still 2 videos", ok and hd_ok(a) and a["n"] == 2, a)
+        f.evaluate("() => { const v = document.querySelector('.vo-video'); v.currentTime = v.duration - 0.8; }")
+        pg.wait_for_timeout(1800)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: the take ended: both stopped", a["e"] and (a["hd"] or {}).get("p") is True, a)
+        pg.tap(".pip-pp")
+        pg.wait_for_timeout(250)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: replay: master from the start, the last frame not left over it", not a["p"] and a["t"] < 2 and not (a["hd"] or {}).get("on"), a)
+        ok = hd_on(f, 15000)
+        pg.wait_for_timeout(500)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: replay: the layer back in sync", ok and hd_ok(a), a)
+        pg.tap(".pip-x")
+        pg.wait_for_timeout(400)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: X: the master paused, the layer dropped", a["p"] and not a["hd"] and a["n"] == 1, a)
+        pg.tap(".pip-tab")
+        pg.wait_for_timeout(500)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: the tab: back on the mini, playing, no layer", not a["p"] and not a["hd"] and a["n"] == 1, a)
+        shot(pg, "hd-5-settled")
+        pg.tap(".pip-exp")
+        ok = hd_on(f, 15000)
+        pg.wait_for_timeout(500)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: X and the take's end were no browser pause: expand still reaches the 720p", ok and hd_ok(a), a)
+        ctx.close()
+
+        # guard: the browser pauses the master as the second video starts (iOS? unproven on a real iPhone). Bypass, declared: the fault forced by a test hook in the
+        # page, through the prototype's pause right after the layer's play(), so past pip.js's own pause: a browser's pause wouldn't pass there either
+        ctx, pg, cdp = new_ctx()
+        ready(pg, "scan/?r=demoR3port01")
+        f = fr(pg)
+        video_up(f)
+        pg.wait_for_timeout(800)
+        f.evaluate(HD_IOS)
+        pg.tap(".pip-exp")
+        try:
+            f.wait_for_function("() => window.__ios > 0", timeout=20000)
+        except Exception:
+            pass
+        pg.wait_for_timeout(500)
+        a = f.evaluate(HD_J)
+        pg.wait_for_timeout(1000)
+        b, fired = f.evaluate(HD_J), f.evaluate("window.__ios")
+        shot(pg, "hd-7-guard")
+        check(f"{tag} hd: guard: the browser pauses the master right after the layer's play(): layer dropped, the master back, sound on, its clock running", fired == 1 and not b["hd"] and b["n"] == 1 and not b["p"] and not b["mu"] and b["t"] - a["t"] >= 0.7, [fired, a["t"], b])
+        n1 = len(net["video"])
+        pg.tap(".pip-exp")
+        pg.wait_for_timeout(300)
+        pg.tap(".pip-exp")
+        pg.wait_for_timeout(2500)
+        a = f.evaluate(HD_J)
+        check(f"{tag} hd: guard: minimize + expand: no 720p again this page view (no layer, no request), the master playing", not a["hd"] and a["n"] == 1 and not a["p"] and not [u for u in net["video"][n1:] if "-360." not in u] and f.evaluate("window.__ios") == 1, [a, net["video"][n1:]])
+        ctx.close()
+
+        # the wire's two faults: the 720p never answers (a slow link: the mini plays on), the 360p files are gone (720p by itself, no layer)
+        ctx, pg, cdp = new_ctx()
+        for x in F720:
+            ctx.route(f"**/video/{x}", lambda r: None)
+        ready(pg, "scan/?r=demoR3port01")
+        f = fr(pg)
+        video_up(f)
+        pg.wait_for_timeout(800)
+        f.evaluate(HD_WATCH)
+        pg.tap(".pip-exp")
+        pg.wait_for_timeout(4000)
+        a, w = f.evaluate(HD_J), hd_watch(f)
+        check(f"{tag} hd: the 720p never answers: never shown, no freeze, the mini plays on with sound", w["on"] is None and not a["p"] and not a["mu"] and w["wall"] > 2 and w["adv"] >= 0.8 * w["wall"], [w, a["p"], a["mu"]])
+        shot(pg, "hd-6-720p-never-answers")
+        pg.tap(".pip-exp")
+        pg.wait_for_timeout(300)
+        s = st(pg)
+        check(f"{tag} hd: the 720p never answers: minimize still works", not s["big"] and not f.evaluate(HD_J)["p"], s["box"])
+        ctx.close()
+        e0 = len(net["errors"])
+        ctx, pg, cdp = new_ctx()
+        ctx.route("**/video/jack-360.*", lambda r: r.fulfill(status=404, body=""))
+        ready(pg, "scan/?r=demoR3port01")
+        f = fr(pg)
+        video_up(f)
+        a = f.evaluate(HD_J)
+        pg.tap(".pip-exp")
+        pg.wait_for_timeout(1200)
+        b = f.evaluate(HD_J)
+        check(f"{tag} mini: the 360p files 404: the 720p plays by itself, expand adds no layer", a["src"] in F720 and b["n"] == 1 and not b["hd"] and not b["p"], [a["src"], b["n"], b["hd"], b["p"]])
+        ctx.close()
+        del net["errors"][e0:]   # the injected 404s
 
     ctx, pg, cdp = new_ctx(motion="reduce")
     ready(pg, "scan/?r=demoR3port01")
