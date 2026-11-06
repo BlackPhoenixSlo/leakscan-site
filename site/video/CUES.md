@@ -17,6 +17,19 @@ iPhones before iOS 17.4), set from his words by `tools/video/cues_from_take.py`.
 speech; the tool still looks for them: a snap >= 9 dB over the speech near the removal word wins), so each removed cue
 sits on his word "removed".
 
+## Fills: the intro + the sites gap card (own `data-cue-in` / `data-cue-out`, not cued prefabs)
+
+| fill | in | out | while he says | what |
+|---|---|---|---|---|
+| `intro` (`.vo-intro`) | 0.3 | 9.8 | "Hey, it's me Jack, a real face, not a bot. I remove leaks, check, fuck leaks." | "Type a name → get YOUR video" + a compact cta-steps take: js clones the end card's `.vo-steps` phone (one markup, the same `steps()` engine, time-warped, no loop): 0.3-4.4 s the hero, the camera zooms onto `onlyfans.com/`, types `jakabasej` (both modes; generic: the viewer's typed name, as the end card), "Scan now" pressed; 4.4-7 s the scan card "@jakabasej", "Searching <place>, step N of 9…"; from 6.8 s "Building YOUR video…" pops in over the phone, its bar fills; slides out 9.4-9.8 s (google comes in at 10) |
+| `sites` (`.vo-sites`) | 28.2 | 34.6 | "If you see stuff of any of these websites and a lot more, like 10,000 of them, they get removed." | "N sites": the counter rolls 0 → 10,000 (28.6-33.2 s, then "10,000+"); a wall of 12 names from his whiteboard (Telegram, Fapello, Nudogram, Erome, Leakheaven, Pornhub, YouPorn, JustTheGays) + Forums, Tube sites, Cloud links, Leak blogs, text only (no logos, no URLs), each struck + "Removed" in turn (0.33 s apart from 28.9 s); out before the end card (34.77) |
+
+The "for <name>" pill (named, 0-2 s) sits at the top of the right half, above the intro's phone, and slides out upward.
+While the name bar's scan runs, the take holds on the intro's "Building YOUR video…" beat (intro out − 0.5 = 9.3 s).
+Key text >= 11 px on a 390 px phone in portrait (typed handle, title, "Building YOUR video…", site names, counter).
+Reduced motion: plain fades (no pop / slide). `tools/video/check_video.py` checks their cues sit between the cards
+(intro out <= google live, sites between mega out and `data-cue-cta`), `cue_shots.py` fill() the rest.
+
 ## Captions (`transcript.json`, `.vo-capt`)
 
 His words as spoken (never personalized), as HTML over the video, drawn by `draw(t)` like the cards (exact on seek /

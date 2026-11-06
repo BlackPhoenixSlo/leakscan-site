@@ -97,7 +97,20 @@ Plus:
 --break-voice serves video-overlays.js with the old overvoice (speechSynthesis.speak(name) 0.5 s in): only the "no overvoice"
   / swap speak checks go red. --only voice = the speech + desktop swap part.
 --break-logos serves video-overlays.js with its E.isPhoto test off (logos kept): only the "prod logos:" check goes red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--skip-prod] [--only prod|captions|voice]
+- fills (fill(), 1920x1080 + phone 390x844 portrait + iPhone theater, generic + named): the intro (.vo-intro, data-cue-in ..
+  -out, 0.3-9.8 s) and the gap card (.vo-sites, 28.2-34.6 s). Real seeks + shots at 0.5 / 3 / 3.5 / 6 / 9.5 / 10.2 / 29 /
+  32 / 34.5 / 35 s (fill-<view>-<mode>-t<t>.png): 0.5 the hero, 3 typing, 3.5 "jakabasej" typed in full (both modes,
+  >= 11 px on screen), 6 the scan card ("@jakabasej", "Searching <place>, step N of 9…"), 9.5 "Building YOUR video…"
+  (>= 11 px) while it slides out, 10.2 google alone (intro gone), 29 / 32 the sites wall, counter rolling, 34.5 "10,000+",
+  every name struck, 35 the end card alone. Timeline (pure draw(t), declared: every 0.1 s 0-36 s): intro visible exactly
+  0.3-9.8, sites exactly 28.2-34.6, counter "10,000+" by 34 s, never two right-half cards at once (the "for NAME" pill is
+  not a card), the pill (named 0-2 s) never overlaps the intro, captions stay on the left half (right edge <= 50 %), never
+  over a fill. Scan hold (1920, POST /api/public-scan held unanswered, declared): the name bar submit → the take holds on
+  the intro's "Building YOUR video…" beat (intro out - 0.5) with the wait pill (fill-1920-hold.png). Reduced motion: the
+  fills fade, no pop (transform none). Checks are prefixed "intro:" / "sites:" / "fills:".
+--break-intro serves index.html with the intro's data-cue-in / -out removed (the intro never shows): only the "intro:"
+  checks go red. --only fill = this part.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--break-intro] [--skip-prod] [--only prod|captions|voice|fill]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, json, pathlib, re, socket, subprocess, sys, time, urllib.parse, urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -463,8 +476,8 @@ def prod(b, base, out, cues, cta):
             t0 = time.monotonic()
             while not held and time.monotonic() - t0 < 5:
                 pg.wait_for_timeout(100)
-            hold = cues["google"][0] - 0.4
-            if label == "1920":   # the take plays its intro, then holds before the first card while the scan runs
+            hold = cues["intro"][1] - 0.5   # = js holdAt(): the intro's "Building YOUR video…" beat
+            if label == "1920":   # the take plays its intro, then holds on its Building beat while the scan runs
                 try:
                     pg.wait_for_function("() => document.querySelector('video').paused", timeout=(hold + 6) * 1000)
                 except Exception:
@@ -476,7 +489,7 @@ def prod(b, base, out, cues, cta):
             if label == "1920":
                 ok = ok and w[3] and abs(w[4] - hold) < 0.6
             check(f"prod ({label}): submit '{PROD_HANDLE}' → one POST /api/public-scan, the wait pill"
-                  + (f", the take held at ~{hold:g} s (before the first card)" if label == "1920" else "") + f" -> prod-{label}-loading.png", ok, (len(held), w))
+                  + (f", the take held at ~{hold:g} s (the intro's Building beat)" if label == "1920" else "") + f" -> prod-{label}-loading.png", ok, (len(held), w))
             for r in held:
                 r.fulfill(status=200, content_type="text/event-stream", body=sse)
         try:
@@ -1287,6 +1300,133 @@ def captions(b, base, out, name_q):
         ctx.close()
 
 
+# the fills' state: visible cards (.vo-pf[data-prefab], not the pill), rects (stage fractions) of the intro / pill / captions /
+# sites, the intro's typed handle + its on-screen px, scan line, the build beat, the sites counter / strikes / names + px
+FILL = """() => { const s = document.querySelector('.vo-stage').getBoundingClientRect(), k = +document.querySelector('.vo-box').style.getPropertyValue('--k'),
+  th = document.documentElement.dataset.voFull === 'theater',
+  R = e => { const r = e.getBoundingClientRect(); return th ? [(r.top - s.top) / s.height, 1 - (r.right - s.left) / s.width, (r.bottom - s.top) / s.height, 1 - (r.left - s.left) / s.width]
+    : [(r.left - s.left) / s.width, (r.top - s.top) / s.height, (r.right - s.left) / s.width, (r.bottom - s.top) / s.height]; },
+  on = e => !!e && !e.hasAttribute('data-off') && +getComputedStyle(e).opacity > 0, fs = e => parseFloat(getComputedStyle(e).fontSize),
+  i = document.querySelector('.vo-intro'), si = document.querySelector('.vo-sites'), f = document.querySelector('.vo-for'), c = document.querySelector('.vo-capt'), q = x => i.querySelector(x);
+  return {cards: [...document.querySelectorAll('.vo-pf[data-prefab]')].filter(on).map(e => e.dataset.prefab), io: +getComputedStyle(i).opacity,
+    intro: on(i) ? R(i) : null, pill: on(f) ? R(f.querySelector('.vo-cap')) : null, capt: c && getComputedStyle(c).display !== 'none' && c.textContent.trim() ? R(c) : null,
+    typed: q('.vo-mi-t').textContent, typedpx: +(fs(q('.vo-mi-t')) * k * +q('.vo-sc-hero .vo-pg').style.getPropertyValue('--cz')).toFixed(1),
+    at: q('.vo-sc-scan .vo-at').textContent, ms: q('.vo-ms').textContent, so: [...i.querySelectorAll('.vo-step')].map(e => +(+getComputedStyle(e).opacity).toFixed(2)),
+    build: +getComputedStyle(q('.vo-build')).opacity, buildtxt: q('.vo-build-h').textContent, buildpx: +(fs(q('.vo-build-h')) * k).toFixed(1), titlepx: +(fs(q('.vo-intro-t')) * k).toFixed(1),
+    sites: on(si) ? R(si) : null, n: si.querySelector('.vo-sites-n').textContent, struck: [...si.querySelectorAll('li')].map(l => +l.style.getPropertyValue('--k')),
+    names: [...si.querySelectorAll('li b')].map(b => b.textContent), namepx: +(fs(si.querySelector('li b')) * k).toFixed(1), npx: +(fs(si.querySelector('.vo-sites-n')) * k).toFixed(1),
+    tf: [getComputedStyle(i).transform, getComputedStyle(q('.vo-build')).transform, getComputedStyle(si).transform]}; }"""
+FILL_SHOTS = (0.5, 3, 3.5, 6, 9.5, 10.2, 29, 32, 34.5, 35)
+FILL_AT = "t => { const v = document.querySelector('video'); v.pause(); window.VideoOverlays.draw(t); return (" + FILL + ")(); }"
+inter = lambda a, b: bool(a and b) and a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def fill(b, base, out, name_q, nm, intro, sites, cta):
+    """the intro (intro = (in, out)) + the sites gap card (sites = (in, out)): real seeks + shots, the 0.1 s timeline, the scan hold"""
+    want = handle(DEMO)
+    for view, opts in (("1920", dict(viewport={"width": 1920, "height": 1080})), ("phone", VIEWPORTS["phone"]), ("theater", VIEWPORTS["phone"])):
+        ctx = ctx_new(b, **opts)
+        if view == "theater":
+            ctx.add_init_script(IPHONE_FS)
+        ext = guard(ctx, (base,))
+        pg = ctx.new_page()
+        errs = []
+        console(pg, errs)
+        lim = 11   # px on screen: portrait (k = .305) and theater (bigger) alike
+        for mode, query in (("generic", ""), ("named", name_q)):
+            goto(pg, base, query, 0.5)
+            if view == "theater":
+                pg.locator(".vo-fs").tap()
+                pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+                pg.wait_for_timeout(300)
+            at = {}
+            for t in FILL_SHOTS:   # real seeks
+                pg.evaluate("t => { const v = document.querySelector('video'); v.pause(); v.currentTime = t; }", t)
+                pg.wait_for_function(SEEKED, arg=t, timeout=15000)
+                pg.wait_for_timeout(250)
+                f = out / f"fill-{view}-{mode}-t{t:05.2f}.png"
+                (pg if view == "theater" else pg.locator(".vo-stage")).screenshot(path=str(f))
+                at[t] = pg.evaluate(FILL)
+                print(f"fill {view} {mode} t={t:g}: cards={at[t]['cards']} typed={at[t]['typed']!r} ms={at[t]['ms']!r} build={at[t]['build']:.2f} n={at[t]['n']!r} | said: {said(t)!r} -> {f.name}")
+            v = f"{view} {mode}"
+            a = at[0.5]
+            check(f"intro: {v} 0.5 s: the intro alone (hero scene, field empty) -> fill-{view}-{mode}-t00.50.png", a["cards"] == ["intro"] and a["so"][0] == 1 and a["typed"] == "", (a["cards"], a["so"], a["typed"]))
+            a = at[3]
+            check(f"intro: {v} 3 s: typing a prefix of {want!r}", a["cards"] == ["intro"] and 0 < len(a["typed"]) < len(want) and want.startswith(a["typed"]), (a["cards"], a["typed"]))
+            a = at[3.5]
+            check(f"intro: {v} 3.5 s: onlyfans.com/{want} typed in full, >= {lim} px on screen ({a['typedpx']}), title >= {lim} px ({a['titlepx']})",
+                  a["cards"] == ["intro"] and a["typed"] == want and a["typedpx"] >= lim and a["titlepx"] >= lim, (a["typed"], a["typedpx"], a["titlepx"]))
+            a = at[6]
+            check(f"intro: {v} 6 s: the scan card '@{want}', {a['ms']!r}", a["cards"] == ["intro"] and a["so"][1] == 1 and a["at"] == "@" + want and bool(PROGRESS.fullmatch(a["ms"])), (a["so"], a["at"], a["ms"]))
+            a = at[9.5]
+            check(f"intro: {v} 9.5 s: 'Building YOUR video…' up ({a['buildpx']} px >= {lim}), the card sliding out (opacity {a['io']:.2f})",
+                  a["cards"] == ["intro"] and a["build"] == 1 and a["buildtxt"] == "Building YOUR video…" and a["buildpx"] >= lim and 0 < a["io"] < 1, (a["cards"], a["build"], a["io"]))
+            a = at[10.2]
+            check(f"fills: {v} 10.2 s: google alone (the intro handed off)", a["cards"] == ["google"] and a["intro"] is None, a["cards"])
+            for t in (29, 32):
+                a = at[t]
+                check(f"sites: {v} {t} s: the sites card alone, counter rolling ({a['n']!r}), names >= {lim} px ({a['namepx']}), counter ({a['npx']})",
+                      a["cards"] == ["sites"] and a["n"] not in ("0", "10,000+") and a["namepx"] >= lim and a["npx"] >= lim, (a["cards"], a["n"], a["namepx"]))
+            a = at[34.5]
+            check(f"sites: {v} 34.5 s: '10,000+', every site struck + Removed", a["cards"] == ["sites"] and a["n"] == "10,000+" and all(x == 1 for x in a["struck"]), (a["cards"], a["n"], a["struck"]))
+            a = at[35]
+            check(f"fills: {v} 35 s: the end card alone (sites out)", a["cards"] == ["cta-steps"] and a["sites"] is None, a["cards"])
+            # the timeline, every 0.1 s (pure draw(t))
+            iv, sv, two, ov, cap, n34 = [], [], [], [], [], None
+            for i in range(0, 361):
+                t = round(i * 0.1, 2)
+                a = pg.evaluate(FILL_AT, t)
+                if "intro" in a["cards"]:
+                    iv.append(t)
+                if "sites" in a["cards"]:
+                    sv.append(t)
+                if len(a["cards"]) > 1:
+                    two.append((t, a["cards"]))
+                if inter(a["pill"], a["intro"]):
+                    ov.append(t)
+                if a["capt"] and (a["capt"][2] > .5 + 1e-3 or inter(a["capt"], a["intro"]) or inter(a["capt"], a["sites"])):
+                    cap.append((t, [round(x, 3) for x in a["capt"]]))
+                if t == 34.0:
+                    n34 = a["n"]
+            check(f"intro: {v} timeline: visible exactly {intro[0]:g}-{intro[1]:g} s (every 0.1 s)", bool(iv) and abs(iv[0] - (intro[0] + .1)) < .06 and abs(iv[-1] - (intro[1] - .1)) < .06, iv[:1] + iv[-1:])
+            check(f"sites: {v} timeline: visible exactly {sites[0]:g}-{sites[1]:g} s, counter '10,000+' by 34 s", bool(sv) and abs(sv[0] - (sites[0] + .1)) < .06 and abs(sv[-1] - (sites[1] - .1)) < .06 and n34 == "10,000+", (sv[:1] + sv[-1:], n34))
+            check(f"fills: {v} timeline 0-36 s: never two right-half cards at once", not two, two[:3])
+            check(f"fills: {v} timeline: the 'for NAME' pill never overlaps the intro" + (" (generic: no pill)" if mode == "generic" else ""), not ov, ov[:3])
+            check(f"fills: {v} timeline: captions on the left half, never over a fill", not cap, cap[:3])
+        check(f"fills: {view}: no console errors, no requests outside the local server", not errs and not ext, (errs[:2], sorted(set(ext))[:2]))
+        ctx.close()
+    # the scan hold: the name bar's scan still running → the take holds on the intro's "Building YOUR video…" beat
+    ctx = ctx_new(b, viewport={"width": 1920, "height": 1080})
+    held = []
+    ctx.route("**/api/public-scan", lambda r: held.append(r))   # declared: held unanswered (the scan keeps running)
+    pg = ctx.new_page()
+    goto(pg, base, "", 0.5)
+    pg.fill("#vo-nb-in", nm)
+    pg.press("#vo-nb-in", "Enter")
+    hold = intro[1] - 0.5
+    try:
+        pg.wait_for_function("() => { const v = document.querySelector('video'); return v.paused && v.currentTime > 1; }", timeout=(hold + 8) * 1000)
+    except Exception:
+        pass
+    pg.wait_for_timeout(300)
+    a, w = pg.evaluate(FILL), pg.evaluate("() => [document.querySelector('video').paused, +document.querySelector('video').currentTime.toFixed(2), getComputedStyle(document.querySelector('.vo-wait')).display]")
+    pg.locator(".vo-stage").screenshot(path=str(out / "fill-1920-hold.png"))
+    check(f"intro: scan hold: the take held at ~{hold:g} s on 'Building YOUR video…' with the wait pill -> fill-1920-hold.png",
+          bool(held) and w[0] and abs(w[1] - hold) < 0.3 and a["cards"] == ["intro"] and a["build"] == 1 and w[2] == "block", (len(held), w, a["cards"], a["build"]))
+    for r in held:
+        r.fulfill(status=200, content_type="text/event-stream", body=SCAN_FAILED)
+    pg.wait_for_timeout(300)
+    ctx.close()
+    # reduced motion: plain fades, no pop
+    ctx = ctx_new(b, viewport={"width": 1920, "height": 1080}, reduced_motion="reduce")
+    pg = ctx.new_page()
+    goto(pg, base, "", 0.5)
+    tf = [pg.evaluate(FILL_AT, t)["tf"] for t in (0.45, 6.9, 28.4)]
+    plain = lambda x: x == "none" or re.fullmatch(r"matrix\(1, 0, 0, 1, [-\d.]+, [-\d.]+\)", x)
+    check("fills: reduced motion: the intro / build beat / sites card fade, no pop or slide (plain translate)", plain(tf[0][0]) and tf[1][1] == "none" and plain(tf[2][2]), tf)
+    ctx.close()
+
+
 def sources(p, b, base, out):
     """the take: jack.webm plays in Chromium, 56.9 s (= transcript.json's duration); WebKit with jack.webm unreachable
     (declared: routed to 404, as an iPhone that cannot play WebM skips it) plays jack.mp4, same length"""
@@ -1331,7 +1471,8 @@ def main():
     ap.add_argument("--skip-prod", action="store_true")
     ap.add_argument("--break-captions", action="store_true")
     ap.add_argument("--break-voice", action="store_true")
-    ap.add_argument("--only", choices=["prod", "captions", "voice"], help="run only this part (iteration)")
+    ap.add_argument("--break-intro", action="store_true")
+    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill"], help="run only this part (iteration)")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -1382,11 +1523,17 @@ def main():
                             "speechSynthesis.speak(new SpeechSynthesisUtterance(who)); } sounds(t);", js)
         assert k == 1, "break: the play loop's draw(t); sounds(t); not found"
         BREAK["voice"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_intro:   # wire boundary: index.html with the intro's own cues removed (the intro never shows)
+        broken, k = re.subn(r'(data-prefab="intro") data-cue-in="[\d.]+" data-cue-out="[\d.]+"', r"\1", BREAK["steps"][1] if "steps" in BREAK else html)
+        assert k == 1, "break: the intro's data-cue-in / -out not found"
+        BREAK["intro"] = (lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), broken, "text/html")
+    fl = {k: tuple(map(float, re.search(r'data-prefab="%s" data-cue-in="([\d.]+)" data-cue-out="([\d.]+)"' % k, html).groups())) for k in ("intro", "sites")}
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     tap = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', html)
     cues = {p[0]: p[1:] for p in pf}
     cues["say"] = stage_attr(html, "data-cue-say")
+    cues["intro"] = fl["intro"]
     cta = stage_attr(html, "data-cue-cta") or cues["say"]
     name_q = "name=" + urllib.parse.quote(a.name)
     with serve() as base, sync_playwright() as p:
@@ -1400,6 +1547,11 @@ def main():
         if a.only == "voice":
             speech(b, base, out, a.name, cues)
             swap(b, base, out, cues, cta, "desktop", SWAP_VIEWPORTS["desktop"])
+            for f in fails:
+                print("FAIL", f)
+            return 1 if fails else 0
+        if a.only == "fill":
+            fill(b, base, out, name_q, a.name, fl["intro"], fl["sites"], cta)
             for f in fails:
                 print("FAIL", f)
             return 1 if fails else 0
@@ -1548,6 +1700,7 @@ def main():
         personalized(b, out, a.break_thumbs)
         captions(b, base, out, name_q)
         sources(p, b, base, out)
+        fill(b, base, out, name_q, a.name, fl["intro"], fl["sites"], cta)
         if not a.skip_prod:
             prod(b, base, out, cues, cta)
     for f in fails:

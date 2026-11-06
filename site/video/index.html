@@ -42,6 +42,14 @@
     <p class="vo-capt" aria-hidden="true" data-off></p>
     <div class="vo-over"><div class="vo-box">
 
+      <!-- intro, both modes, data-cue-in .. -out (0.3-9.8 s: "Hey, it's me Jack…", before the google card): js clones the end
+           card's .vo-steps phone in here (one markup, one engine: steps(), time-warped, no loop): the hero types
+           onlyfans.com/jakabasej, "Scan now", the scan card, then "Building YOUR video…"; slides out at 9.4 s -->
+      <div class="vo-pf vo-intro" data-prefab="intro" data-cue-in="0.3" data-cue-out="9.8" data-off aria-hidden="true">
+        <p class="vo-intro-t">Type a name<br>→ get <em>YOUR</em> video</p>
+        <p class="vo-build"><span class="vo-build-h">Building <em>YOUR</em> video…</span><span class="vo-build-b"><i></i></span></p>
+      </div>
+
       <div class="vo-pf" data-prefab="google" data-cue-live="10" data-cue-removed="12.86" data-cue-out="14.81" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><b>Google</b><span class="vo-st"><span class="vo-st-live">Leaks for <span data-vo="name">Orla Brennick</span></span><span class="vo-st-gone">A few days later: no leaks</span></span></p>
         <div class="phone vo-phone"><div class="phone-screen">
@@ -162,6 +170,14 @@
         </div></div>
         <span class="vo-stamp"><svg class="icon"><use href="#i-check"/></svg>Removed</span>
         <span class="vo-kw"><span class="vo-kw-live">MEGA <span data-vo="mega-gb">52 GB</span></span><span class="vo-kw-gone">GONE.</span></span>
+      </div>
+
+      <!-- gap card, data-cue-in .. -out (28.2-34.6 s: "any of these websites and a lot more, like 10,000 of them"): site names
+           from his whiteboard + a few generic ones, text only (no logos, no URLs), struck "Removed" in turn; the counter
+           rolls to 10,000+ (js sites()) -->
+      <div class="vo-pf vo-sites" data-prefab="sites" data-cue-in="28.2" data-cue-out="34.6" data-off aria-hidden="true">
+        <p class="vo-sites-h"><b class="vo-sites-n">0</b><span>sites</span></p>
+        <ul class="vo-sites-l"><li><b>Telegram</b><span>Removed</span></li><li><b>Fapello</b><span>Removed</span></li><li><b>Nudogram</b><span>Removed</span></li><li><b>Erome</b><span>Removed</span></li><li><b>Leakheaven</b><span>Removed</span></li><li><b>Pornhub</b><span>Removed</span></li><li><b>YouPorn</b><span>Removed</span></li><li><b>JustTheGays</b><span>Removed</span></li><li><b>Forums</b><span>Removed</span></li><li><b>Tube sites</b><span>Removed</span></li><li><b>Cloud links</b><span>Removed</span></li><li><b>Leak blogs</b><span>Removed</span></li></ul>
       </div>
 
       <!-- 0-2 s and data-cue-say (stays to the end + after it): "for <name>". Personalized names only; never spoken. -->
