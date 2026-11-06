@@ -167,6 +167,9 @@ strong { font-weight: 600; }
 .nav { display: flex; align-items: center; gap: 14px; }
 .nav-toggle { display: none; }
 .header-scan { display: none; }
+.js .header-scan { transition: opacity .2s ease, visibility .2s; }
+.js .header-scan:not(.is-on) { visibility: hidden; opacity: 0; }   /* the hero form is on screen: no second "scan" button; slot kept, nothing moves */
+@media (prefers-reduced-motion: reduce) { .js .header-scan { transition: none; } }
 @media (max-width: 879px) { .header-scan { display: inline-flex; margin-left: auto; min-height: 40px; padding-inline: .9em; white-space: nowrap; } .header-row { gap: 10px; } }   /* phone + tablet: scan one tap away, beside the menu */
 @media (max-width: 374px) { .header-scan { padding-inline: .75em; text-transform: capitalize; } .hs-free { display: none; } .brand { font-size: 1.4rem; gap: 8px; } }   /* 320: icon + "Scan" */
 @media (max-width: 879px) {
@@ -215,7 +218,7 @@ strong { font-weight: 600; }
   .hero .lead { font-size: 1rem; line-height: 1.5; margin-bottom: 0; }
   .hero .scan-form { margin-top: 18px; gap: 8px; }
   .hero .scan-slot { margin-bottom: 6px; }
-  .assurances { gap: 8px; font-size: .92rem; }
+  .scan-help { column-gap: 16px; font-size: .92rem; }
   .hero-grid { gap: 22px; }
 }
 /* right column: the example card, "Meet Jaka" (js/pip.js docks the player exactly over .meet-pic: 55% of the card,
@@ -254,17 +257,21 @@ strong { font-weight: 600; }
 .more p { margin: 6px 0 0; font-size: .92rem; line-height: 1.5; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); }
 /* Free-scan form: OnlyFans + optional Instagram / X. With JS it scans in place (js/inline-scan.js); without, a plain GET
    to scan/. Stacked on phones; from 560px the OnlyFans field + button share one row, Instagram / X gets the next.
-   With JS (html.js) and :has(), an empty Instagram / X field folds behind "+ Add Instagram or X" (.scan-more, js/main.js
-   adds .ig-open); a typed or restored value keeps it open; no JS or no :has() = always shown. */
+   With JS (html.js) and :has(), an empty Instagram / X field folds behind "+ Instagram or X" (.scan-more in the help
+   line, js/main.js adds .ig-open); a typed or restored value keeps it open; no JS or no :has() = always shown.
+   Under the form two lines: the note (.scan-slot) and the help line (IG toggle · Fansly / Patreon · What's stored). */
 .scan-form { display: grid; gap: 10px; margin: 30px 0 10px; max-width: 640px; }
 .scan-form .scan-ig { grid-column: 1 / -1; }
 @media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1fr) auto; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
 @media (min-width: 960px) and (max-width: 1099px) { .scan-form .btn-lg { min-width: 0; padding-inline: 1em; } .scan-form .btn-lg .icon { display: none; } }   /* narrow 2-column hero: the handle keeps room for 20 characters */
 .js .scan-form:not(.ig-open):has(.scan-social:placeholder-shown) .scan-ig { display: none; }
-.scan-more { margin: 0 0 10px; color: var(--muted); font-size: .92rem; line-height: 24px; }
-.scan-more button { display: none; margin-right: .5em; font-weight: 600; text-decoration: none; }
+.scan-help { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 20px; max-width: 640px; color: var(--muted); font-size: .95rem; line-height: 24px; }
+.scan-help > p { margin: 0; }
+.scan-more { display: contents; }
+.scan-more button { display: none; font-weight: 600; text-decoration: none; }
 @media (hover: hover) { .scan-more button:hover { text-decoration: underline; } }
-.js .scan-form:not(.ig-open):has(.scan-social:placeholder-shown) ~ .scan-more button { display: inline-block; }
+.js .scan-form:not(.ig-open):has(.scan-social:placeholder-shown) ~ .scan-help .scan-more button { display: inline-block; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .scan-prefix { display: flex; flex-wrap: wrap; align-items: center; gap: 0; padding: 0 0 0 1.1em; cursor: text; }
 /* the field's own name, always shown (the placeholder is only an example) */
 .scan-lbl { flex: 0 0 100%; padding-top: 9px; font: 600 .76rem/1.2 var(--sans); letter-spacing: .02em; color: var(--muted); user-select: none; }
@@ -302,11 +309,11 @@ strong { font-weight: 600; }
 .scanned .linkish { font: inherit; line-height: inherit; padding: 0; }
 .scanned:not([hidden]) + .scan-note { visibility: hidden; }
 .linkish { padding: 0; border: 0; background: none; font: inherit; color: var(--accent, inherit); text-decoration: underline; cursor: pointer; min-height: 24px; }
-.assurances { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); font-size: .95rem; line-height: 1.5; max-width: 36em; }
-.assurances li { display: flex; align-items: flex-start; gap: 10px; }
-.assurances .icon { flex: none; width: 18px; height: 18px; margin-top: .15em; color: var(--accent); }
+/* What's stored: opens as a card over what follows (nothing under it moves) */
+.assurances summary { min-height: 24px; }
+.assurances > p { position: absolute; z-index: 6; left: 0; right: 0; top: calc(100% + 6px); max-width: 36em; margin: 0; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
 .assurances a { color: var(--accent); text-underline-offset: 3px; }
-.scan-alt { margin: 0; color: var(--muted); font-size: .95rem; }
 .scan-alt a { color: var(--ink); font-weight: 600; text-decoration-color: var(--accent); text-underline-offset: 4px; }
 @media (hover: hover) { .scan-alt a:hover { color: var(--accent); } }
 /* the track record: real numbers, labelled as such, right under the form (the card beside / below is the example) */
@@ -403,13 +410,8 @@ strong { font-weight: 600; }
 .icon-badge { flex: none; display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); color: var(--accent); margin-bottom: 16px; }
 .icon-badge .icon { width: 22px; height: 22px; }
 
-/* Free: one band. Left the two free offers, right a phone with Google for her handle (js/free-phone.js fills it). */
-.free-sec { padding: clamp(32px, 4vw, 56px) 0; }
-.free-band { display: grid; gap: clamp(24px, 4vw, 64px); align-items: center; }
-@media (min-width: 900px) { .free-sec { padding: 72px 0; } .free-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }   /* the heading level with the phone's top */
-.free-copy h2 { font-size: clamp(1.9rem, 3.6vw, 2.8rem); margin-bottom: .55em; }
-.free-line { margin: 0; color: var(--muted); font-size: 1.06rem; line-height: 1.55; max-width: 32em; }
-.free-send { color: var(--accent); font-weight: 600; text-underline-offset: 3px; white-space: nowrap; }
+/* #free = the Before phone (js/free-phone.js): its caption link sends her report (Telegram) once a scan ran */
+.free-send { margin-left: auto; color: var(--accent); font-weight: 600; text-underline-offset: 3px; white-space: nowrap; }
 
 /* Browser frame */
 .browser { margin: clamp(32px, 5vw, 56px) 0 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-lg); }
@@ -438,7 +440,7 @@ strong { font-weight: 600; }
 .ba-tabs button { min-height: 44px; min-width: 7.5em; padding: 0 20px; border: 0; border-radius: 999px; background: none; color: var(--ink); font: 600 1rem/1 var(--sans); cursor: pointer; }
 .ba-tabs [aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
 @media (hover: hover) { .ba-tabs [aria-selected="false"]:hover { color: var(--accent); } }
-.js .ba { display: grid; grid-template-columns: none; margin-top: 18px; }
+.js .ba { display: grid; grid-template-columns: none; margin-top: 18px; scroll-margin-top: 70px; }   /* #free lands with its Before / After tabs in view */
 .js .ba .ba-arrow, .js .ba[data-show="before"] #ba-after, .js .ba[data-show="after"] #ba-before { display: none; }
 /* the swipe row's controls (#removals): phone only (where the row scrolls); static markup, so nothing shifts when JS wires it */
 .swipe-nav { display: none; }
@@ -519,7 +521,12 @@ strong { font-weight: 600; }
 .m-video .m-title { font-size: .8rem; margin-bottom: 0; }
 /* #free: one phone, Google for her handle; js/inline-scan.js fills it with her results (links, Reveal) */
 .free-phone { margin: 0; display: grid; justify-items: center; min-width: 0; position: relative; }
-.phone-free { width: 288px; aspect-ratio: 9 / 14.4; }   /* tall enough for the Images grid, no empty white foot */
+.ba .phone { width: 288px; aspect-ratio: 9 / 15.2; }   /* Before and After the same size: the tab switch moves nothing */
+#ba-after .m-lines { display: none; }   /* After's five rows fit that screen */
+#ba-after .m-result:not(.is-link), #ba-after .m-link { padding-block: 7px; }
+.ba .ba-item { width: 288px; max-width: 100%; }
+.ba .ba-item figcaption { justify-self: stretch; white-space: nowrap; }
+.js .ba-item figcaption .chip { display: none; }   /* the tabs name them; no JS = both phones side by side, chips label them */
 .m-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; margin: 2px 0 6px; font-size: .74rem; color: #5f6368; }
 .phone .reveal-btn { min-height: 30px; padding: 0 10px; border-color: #dadce0; background: #fff; color: #202124; font-size: .72rem; }
 .phone .reveal-btn[aria-pressed="true"] { border-color: #1a73e8; color: #1a73e8; }
@@ -551,13 +558,13 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .ticks-3 .icon { flex: none; color: var(--accent); width: 26px; height: 26px; margin-top: 0; }
 /* #website (the add-on under pricing): the argument + the three things on top, then #showcase: the demo, before / after */
 @media (min-width: 960px) {
-  .web-top { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 80px; align-items: center; }
+  .web-top { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 80px; align-items: start; }
   .web-top .section-head { margin-bottom: 0; }
   .web-top .ticks-3 { border-top: 1px solid var(--ink); }
   .web-top .ticks-3 li { padding: 22px 0; font-size: 1.08rem; }
 }
 .showcase { margin-top: clamp(40px, 6vw, 80px); }
-.showcase-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 32px; }
+.showcase-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 16px 32px; }
 .showcase-head h3 { margin: 0; font: 500 clamp(2rem, 3vw, 2.4rem)/1.1 var(--display); font-optical-sizing: none; font-variation-settings: "opsz" 24; }
 .showcase-head p { margin: 0; max-width: 34em; color: var(--muted); }
 .showcase .browser { margin-top: clamp(18px, 3vw, 28px); }
@@ -588,28 +595,6 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .why-points .icon-badge { margin: 0; }
 .why-points h3 { font-size: 1.2rem; margin-bottom: .3em; }
 .why-points p { margin: 0; color: var(--muted); }
-@media (max-width: 559px) {   /* phone: the reasons as a tight ruled list; the website list, the steps compact */
-  .ticks-3 li { padding: 14px 0; font-size: .97rem; line-height: 1.5; }
-  .ticks-3 .icon { width: 22px; height: 22px; }
-  .showcase-head h3 { font-size: 2rem; }
-  .showcase-head p { font-size: .97rem; }
-  .price { margin: 10px 0 18px; padding-bottom: 18px; }
-  #how .steps { gap: 16px; }
-  .step { grid-template-columns: 52px minmax(0, 1fr); }
-  .step-n { font-size: 2.2rem; }
-  #how .record { margin-top: 28px; padding: 22px 20px; border-radius: 20px; }
-  #how .record p { font-size: 1.55rem; margin-bottom: .45em; }
-  .record footer { font-size: .95rem; }
-  .why-intro .person { display: none; }   /* Jaka is introduced in the hero and the contact card */
-  .why-grid { gap: 12px; }
-  .why-intro p:last-of-type { margin-bottom: 0; }
-  .why-points .card { gap: 14px; padding: 18px 0; }
-  .why-points .icon-badge { width: 36px; height: 36px; }
-  .why-points h3 { font-size: 1.08rem; }
-  .why-points p { font-size: .95rem; line-height: 1.55; }
-  .plan .ticks { gap: 8px; font-size: 1rem; }
-  .faq summary { padding: 18px 4px; font-size: 1.04rem; }
-}
 .record { grid-column: 1 / -1; position: relative; margin: clamp(32px, 5vw, 56px) 0 0; padding: clamp(32px, 5vw, 60px) clamp(28px, 5vw, 64px); border-radius: 28px; background: var(--bg); overflow: hidden; }
 .record p { font: 500 clamp(2rem, 4vw, 2.9rem)/1.12 var(--display); font-optical-sizing: none; font-variation-settings: "opsz" 24; margin-bottom: .6em; max-width: 22em; text-wrap: balance; }
 .record footer { font-size: 1.02rem; color: var(--muted); max-width: 52em; }
@@ -632,7 +617,21 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 
 /* Showcase */
 .browser-demo iframe { width: 100%; height: clamp(480px, 70vh, 720px); border: 0; background: var(--surface-2); }
-@media (max-width: 559px) { .browser-demo iframe { height: 324px; } .ba .phone { width: 270px; } .browser-demo + .center { margin-top: 18px; } }   /* phone: a window onto the demo, cut above its buttons ("Open the demo site" for the rest); one phone, a bit smaller */
+/* phone: no nested scroll. A still of the demo's top (with its buttons) opens the full-screen frame (js/main.js; no JS =
+   the demo page). The frame keeps its box, hidden, so it still lazy-loads for the pop-out. */
+.demo-shot { display: none; }
+@media (max-width: 559px) {
+  .browser-demo { position: relative; }
+  .browser-demo:not(.is-pop) iframe { position: absolute; left: 0; bottom: 0; height: 324px; visibility: hidden; }
+  .browser-demo:not(.is-pop) .demo-shot { position: relative; display: block; color: #fff; }
+  .demo-shot img { display: block; width: 100%; height: auto; }
+  .demo-shot-t { position: absolute; right: 10px; top: 10px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 999px; background: rgb(20 8 24 / .78); font-size: .85rem; font-weight: 600; }
+  .demo-shot-t .icon { width: 15px; height: 15px; }
+  .demo-shot:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+  .js .browser-demo + .center { display: none; }   /* the still is the way in (full screen); no JS keeps the button */
+
+  .browser-demo + .center { margin-top: 18px; }
+}
 .browser-demo + .center { margin-top: 28px; }
 
 /* Pricing: the monthly plan in velvet, the one-time on paper */
@@ -649,17 +648,47 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .plan .ticks { margin-bottom: 24px; align-content: start; font-size: 1rem; line-height: 1.5; }
 .plan-note { margin: -8px 0 24px; color: var(--muted); font-size: .95rem; line-height: 1.5; }
 .plan > .btn-block { margin-top: auto; }   /* both buttons on one line, whatever is above them */
-.plan-alt { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: .92rem; }
+.plan-alt { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: .95rem; }
 .plan-alt a { display: inline-block; min-height: 24px; color: var(--ink); font-weight: 600; text-decoration-color: var(--accent); text-underline-offset: 4px; }
 @media (hover: hover) { .plan-alt a:hover { color: var(--accent); } }
 /* under each price: what the plan covers, how long, re-uploads, the website (same four rows in both, so they compare) */
 .spec { margin: -8px 0 22px; display: grid; gap: 0; }
 .spec div { display: grid; grid-template-columns: 7.2em minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
-.spec dt { color: var(--muted); font-size: .9rem; font-weight: 600; letter-spacing: .02em; padding-top: .1em; }
+.spec dt { color: var(--muted); font-size: .95rem; font-weight: 600; letter-spacing: .02em; padding-top: .1em; }
 .spec dd { margin: 0; color: var(--ink); font-size: 1rem; line-height: 1.45; font-weight: 550; }
 @media (max-width: 559px) { .spec div { grid-template-columns: 5.4em minmax(0, 1fr); gap: 10px; padding: 7px 0; } .spec dt { font-size: .86rem; } .spec dd { font-size: .95rem; line-height: 1.4; } }
 .fineprint { display: flex; gap: 12px; align-items: flex-start; max-width: 760px; margin: 32px 0 0; color: var(--muted); font-size: .97rem; }
 .fineprint .icon { color: var(--accent); margin-top: .2em; }
+@media (max-width: 559px) {   /* phone: the reasons as a tight ruled list; the website list, the steps compact (after the base rules it overrides) */
+  .ticks-3 li { padding: 14px 0; font-size: .97rem; line-height: 1.5; }
+  .ticks-3 .icon { width: 22px; height: 22px; }
+  .showcase-head h3 { font-size: 2rem; }
+  .showcase-head p { font-size: .97rem; }
+  .price { margin: 10px 0 18px; padding-bottom: 18px; }
+  #how .steps { gap: 16px; }
+  .step { grid-template-columns: 52px minmax(0, 1fr); }
+  .step-n { font-size: 2.2rem; }
+  #how .record { margin-top: 28px; padding: 22px 20px; border-radius: 20px; }
+  #how .record p { font-size: 1.55rem; margin-bottom: .45em; }
+  .record footer { font-size: .95rem; }
+  .why-intro .person { display: none; }   /* Jaka is introduced in the hero and the contact card */
+  .why-grid { gap: 12px; }
+  .why-intro p:last-of-type { margin-bottom: 0; }
+  .why-points .card { gap: 14px; padding: 18px 0; }
+  .why-points .icon-badge { width: 36px; height: 36px; }
+  .why-points h3 { font-size: 1.08rem; }
+  .why-points p { font-size: .95rem; line-height: 1.55; }
+  .plan .ticks { gap: 8px; font-size: 1rem; }
+  .faq details summary { padding: 13px 4px; font-size: 1.04rem; }   /* beats the base rule below */
+  .plan-kind { margin-bottom: .25em; }
+  .price { margin: 6px 0 14px; padding-bottom: 14px; }
+  .amount { font-size: 2.6rem; }
+  .plans { gap: 16px; }
+  .fineprint { margin-top: 22px; }
+  .js .ba-tabs { margin-top: 22px; }
+  .js .ba { margin-top: 12px; }
+  .ba-item { gap: 10px; }
+}
 
 /* FAQ: ruled list, a + that turns into − */
 .faq { display: grid; gap: 0; border-top: 1px solid var(--ink); }
@@ -691,10 +720,12 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .channel .icon { width: 26px; height: 26px; color: var(--accent); }
 @media (max-width: 559px) {   /* phone: the letter, compact */
   .contact-card { padding: 32px 18px 26px; border-radius: 24px; }
-  .contact-avatar { width: 64px; height: 64px; margin-bottom: 16px; font-size: 2rem; }
+  .contact-avatar, .contact-card .hint { display: none; }   /* the channels' messages come prefilled */
   .contact-card > p { font-size: 1rem; }
   .channels { gap: 8px; margin: 22px 0 16px; }
-  .channel { min-height: 58px; padding: 10px 16px; }
+  .channel { min-height: 52px; padding: 8px 16px; }
+  .channel > span { flex: 1; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 12px; }   /* name + handle on one line */
+  .channel > span > strong { display: inline; }
 }
 .channel strong { display: block; }
 .channel span span { color: var(--muted); font-size: .92rem; }
@@ -730,7 +761,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .footer-base { margin-top: 36px; font-size: .88rem; }
 .footer-base p { margin: 0; padding-top: 20px; border-top: 1px solid var(--line); }
 .nowrap { white-space: nowrap; }
-@media (max-width: 719px) { .site-footer { padding-bottom: 48px; } }
+@media (max-width: 719px) { .site-footer { padding-block: 40px 48px; } .footer-base { margin-top: 24px; } }
 
 /* Legal pages */
 .legal { padding: clamp(40px, 7vw, 80px) 0 clamp(64px, 9vw, 112px); }
@@ -901,12 +932,6 @@ a.gi-card:focus-visible .gi-go { opacity: 1; transform: none; }
 .live-panel .live-grid .gi-box { aspect-ratio: 16 / 15; }
 @media (max-width: 559px) { :root { --live-grid-cols: 3; } .live-panel .live-grid { gap: 8px; } }   /* 3×4 (GRID in inline-scan.js) */
 
-@media (max-width: 559px) {
-  .free-copy h2 { font-size: 1.45rem; margin-bottom: .45em; }
-  .free-line { font-size: .97rem; line-height: 1.5; }
-  .free-sec { padding: 40px 0; }
-  .free-band { gap: 16px; }
-}
 .live-empty, .live-error p { margin: 14px 0; }
 .live-empty strong { display: block; }
 .live-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px; margin-top: 12px; background: var(--surface-2); border-radius: 14px; }

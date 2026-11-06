@@ -10,7 +10,8 @@
 - **Photos**: the showcase demo (`site/showcase/imgs/`) uses Pexels photos (Pexels License), credited per file in
   `tools/showcase/CREDITS.md`. The landing page reuses small crops of those same photos (the fictional demo creator's
   "own" pictures) in two places: `site/assets/phone/` (After phone, Images / Videos tabs) and `site/img/removals/`
-  (blurred thumbnails in the `#removals` mock-ups). The `/video/` demo reuses those same crops in its cards.
+  (blurred thumbnails in the `#removals` mock-ups). `site/assets/demo/` holds `top.webp`, a screenshot of the demo site's top
+  (its own hero photo), shown on phones in place of the live demo frame. The `/video/` demo reuses those same crops in its cards.
   Everything else on the landing pages is CSS/SVG drawn for this site (device mockups, gradient thumbnails). Google's name and colours appear only inside illustrative mockups.
 - **Video**: `site/video/` ships Jack's own recording (one 56.9 s take, his face and voice, no stock footage):
   `jack.webm` (VP9) + `jack.mp4` (H.264), and `transcript.json` (his words, transcribed locally; see `site/video/CUES.md`).

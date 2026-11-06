@@ -280,7 +280,7 @@
     }
     capEl.style.setProperty('--ccs', (0.85 + 0.15 * back(clamp((t - c[0]) / CC_POP))).toFixed(3));
   }
-  function fit() { root.querySelector('.vo-box').style.setProperty('--k', (over.clientWidth / 640).toFixed(4)); stage.style.setProperty('--sw', String(stage.clientWidth)); stage.toggleAttribute('data-vo-tiny', stage.clientWidth < 260); }
+  function fit() { root.querySelector('.vo-box').style.setProperty('--k', (over.clientWidth / 640).toFixed(4)); stage.style.setProperty('--sw', String(stage.clientWidth)); stage.toggleAttribute('data-vo-tiny', stage.clientWidth < 260); stage.toggleAttribute('data-vo-small', stage.clientWidth < 520); }
   fit();
   if (window.ResizeObserver) new ResizeObserver(fit).observe(over); else window.addEventListener('resize', fit);
 

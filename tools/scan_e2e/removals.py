@@ -258,14 +258,14 @@ def removals_flow(browser, vp_name, vp):
         page = open_(ctx)
         order = page.evaluate("() => { const r = document.getElementById('removals'); return [r && r.previousElementSibling && r.previousElementSibling.id, r && r.nextElementSibling && r.nextElementSibling.id, r && r.closest('main') && r.closest('main').id]; }")
         if scheme == "light":
-            check(f"{tag} section sits after #free, directly before #website, inside <main>", order == ["free", "website", "main"], order)
+            check(f"{tag} section sits after #pricing, directly before #website, inside <main>", order == ["pricing", "website", "main"], order)
             t = page.evaluate(RM_TEXT)
             check(f"{tag} defaults: demo creator (Orla Brennick / brennickclay) in every panel",
                   t.get("name") == "Orla Brennick" and t.get("mega-title") == "brennickclay – pack" and t.get("x-l1") == "Orla Brennick full set"
                   and "READ THIS.txt" in t.get("mega-note", "")
                   and t.get("aka") == "brennickclay, orlabrennick" and t.get("host") == "leak-mirror", t)
             copy = page.evaluate("() => [...document.querySelectorAll('#removals .rm-stage, .phone .phone-screen')].map(s => s.textContent).join(' | ')")
-            check(f"{tag} L11: mock panels and the #free / Before / After phones carry no 'onlyfans' / 'leaked' / 'leaks' (removed layers, hidden tabs included)", not NEUTRAL_RE.search(copy),
+            check(f"{tag} L11: mock panels and the Before (#free) / After phones carry no 'onlyfans' / 'leaked' / 'leaks' (removed layers, hidden tabs included)", not NEUTRAL_RE.search(copy),
                   NEUTRAL_RE.findall(copy))
             gone = page.evaluate("() => [...document.querySelectorAll('#removals .rm-card')].map(c => [c.dataset.rm, [...c.querySelectorAll('.rm-gone .xp-head, .rm-gone .xp-text, .rm-gone .xp-acts, .rm-gone .rd-head, .rm-gone .rd-title, .rm-gone .rd-acts, .rm-gone .fp-bar, .rm-gone .fp-search')].length, c.querySelectorAll('[data-rm-copy]').length])")
             check(f"{tag} removed layers carry the live post's chrome (copied once from the live layer)",

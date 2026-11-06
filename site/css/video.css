@@ -15,6 +15,8 @@
    page and the 1920x1080 renders match. Not clipped: the card slides in from the frame edge (the stage clips). */
 .vo-over { position: absolute; top: 0; right: 0; z-index: 3; width: 50%; height: 100%; pointer-events: none; }
 .vo-box { position: absolute; top: 0; left: 0; width: 640px; height: 720px; transform: scale(var(--k, 1)); transform-origin: 0 0; }
+/* small stages (the landing's mini player, a phone): the cards shrink into the right edge, clear of his captions on the left */
+.vo-stage[data-vo-small] .vo-over { top: 6%; right: 1%; width: 44%; height: 88%; }
 /* every width, phones included: the cards stay in the stage's right half (Jack records 16:9, he is on the left). Bigger on a
    phone = rotate it (the stage fills the landscape screen) or the full screen button (js): the stage in the Fullscreen API
    (desktop, Android), else (iPhone: no element full screen) "theater": the stage fixed, rotated 90deg over the portrait screen */

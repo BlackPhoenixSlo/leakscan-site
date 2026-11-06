@@ -48,7 +48,7 @@ def tabs_flow(browser, vp_name, vp):
 
     shot = lambda page, name, el=None: (page.locator(el) if el else page).screenshot(path=str(cfg.out / f"{vp_name}-t{name}.png"))
     overflow = lambda page: page.evaluate("""() => ({doc: document.documentElement.scrollWidth, vw: innerWidth,
-        wide: [...document.querySelectorAll('.phone, .browser-demo, .report-card, .free-band, .ba')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.left < -0.5 || r.right > innerWidth + 0.5); }).map(e => e.className)})""")
+        wide: [...document.querySelectorAll('.phone, .browser-demo, .report-card, .ba')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.left < -0.5 || r.right > innerWidth + 0.5); }).map(e => e.className)})""")
 
     t = types.SimpleNamespace(browser=browser, vp_name=vp_name, vp=vp, tag=tag, net=net, broken=broken, m=m, ctx_=ctx_, shot=shot, overflow=overflow)
     report_card(t)
@@ -500,28 +500,36 @@ def order_popout(t):
     order = page.evaluate("""() => { const y = e => e.getBoundingClientRect().top + scrollY, b = e => e.getBoundingClientRect().bottom + scrollY;
         const w = document.getElementById('website'), sc = document.getElementById('showcase'), fr = sc.querySelector('.browser-demo'), ba = document.querySelector('.ba');
         return {website: Math.round(y(w)), showcase: Math.round(y(sc)), frameBottom: Math.round(b(fr)), ba: Math.round(y(ba)), inShowcase: sc.contains(ba),
+          free: ba.id, beforeIsFree: !!document.querySelector('#ba-before .phone-free'), phones: document.querySelectorAll('.phone').length,
           link: (a => a && a.getAttribute('href'))(sc.querySelector('a.btn[data-p=demo]'))}; }""")
-    check(f"{tag} order: #website copy → demo iframe (#showcase) → Before / After phones below it; 'Open the demo site' link kept",
-          order["website"] < order["showcase"] < order["frameBottom"] <= order["ba"] and order["inShowcase"] and order["link"] == "showcase/", order)
-    bring(page, "#showcase .ba", "center")
+    # one Google phone block (#free): Before = the scan's phone (.phone-free), After = her own pages; below the demo on phones, beside it on desktop
+    check(f"{tag} order: #website copy → demo (#showcase) → the one Before / After block (#free, Before = the scan phone), "
+          "below the demo (phone) / beside it (desktop); 'Open the demo site' link kept; 2 phones on the page",
+          order["website"] < order["showcase"] < order["frameBottom"] and order["inShowcase"] and order["free"] == "free" and order["beforeIsFree"]
+          and order["phones"] == 2 and (order["frameBottom"] <= order["ba"] if vp_name == "phone" else order["showcase"] < order["ba"] < order["frameBottom"])
+          and order["link"] == "showcase/", order)
+    bring(page, "#free", "center")
     page.wait_for_timeout(900)
     ok, shifts = [], []
-    for side in ("before", "after"):
+    for side, pre in (("before", "free"), ("after", "after")):
+        page.locator(f"#ba-tab-{side}").click()
+        page.wait_for_timeout(200)
         for k in ("images", "videos", "all"):
             t0 = page.evaluate("performance.now()")
-            page.locator(f"#tab-{side}-{k}").click()
+            page.locator(f"#tab-{pre}-{k}").click()
             page.wait_for_timeout(300)
             shifts += page.evaluate("t0 => window.__ls.filter(x => x[0] >= t0 && x[1] > 0 && !x[3].every(n => n.startsWith('BUTTON.askai-launcher'))).map(x => [x[1], x[3]])", t0)
-            r = page.evaluate("(id) => document.getElementById(id).closest('.phone').getBoundingClientRect().height", f"panel-{side}-{k}")
-            vis = page.evaluate(f"[...document.querySelectorAll('[id^=panel-{side}-]')].filter(p => !p.hidden).map(p => p.id)")
-            imgs = page.evaluate(f"[...document.querySelectorAll('#panel-{side}-{k} img')].map(i => i.complete && i.naturalWidth > 0)")
-            ok.append([side, k, vis == [f"panel-{side}-{k}"], all(imgs), round(r)])
+            r = page.evaluate("(id) => document.getElementById(id).closest('.phone').getBoundingClientRect().height", f"panel-{pre}-{k}")
+            vis = page.evaluate(f"[...document.querySelectorAll('[id^=panel-{pre}-]')].filter(p => !p.hidden).map(p => p.id)")
+            imgs = page.evaluate(f"[...document.querySelectorAll('#panel-{pre}-{k} img')].map(i => i.complete && i.naturalWidth > 0)")
+            ok.append([side, k, vis == [f"panel-{pre}-{k}"], all(imgs), round(r)])
             if k != "all":
-                shot(page, f"2-ba-{side}-{k}", "#showcase .ba")
+                shot(page, f"2-ba-{side}-{k}", "#free")
     hs = {x[4] for x in ok}
-    check(f"{tag} before/after: All / Images / Videos switch in both phones, their photos load, phone height fixed (no CLS)",
+    check(f"{tag} before/after: Before / After tabs, then All / Images / Videos in each phone; photos load, one phone size (no CLS)",
           all(x[2] and x[3] for x in ok) and len(hs) == 1 and not shifts, (ok, shifts))
-    shot(page, "2-before-after", "#showcase .ba")
+    page.locator("#ba-tab-before").click()
+    shot(page, "2-before-after", "#free")
     m["overflow_before_after"] = overflow(page)
     # pop-out
     bring(page, "#showcase .browser-demo", "center")
@@ -572,6 +580,21 @@ def order_popout(t):
     check(f"{tag} popout: Esc inside the demo, the Close button and the backdrop close it too", in_frame is False and by_btn is False and by_bd["pop"] is False and by_bd["y"] == l0["y"],
           (in_frame, by_btn, by_bd["pop"]))
     shot(page, "2-popout-closed")
+    st = page.evaluate("""() => { const f = document.querySelector('#showcase .browser-demo'), i = f.querySelector('iframe'), s = f.querySelector('.demo-shot');
+        return {iframe: getComputedStyle(i).visibility, shot: getComputedStyle(s).display, href: s.getAttribute('href'), img: s.querySelector('img').naturalWidth}; }""")
+    if vp_name == "phone":   # no nested scroll: a still of the demo's top; a tap opens the same full-screen layer
+        page.locator("#showcase .demo-shot").click()
+        page.wait_for_timeout(400)
+        sp = page.evaluate(LAY)
+        shot(page, "2-popout-from-still")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        se = page.evaluate(LAY)
+        check(f"{tag} popout: phone shows a still (frame hidden, image loaded, no-JS link to showcase/); tapping it opens the full-screen demo, Esc closes, nothing moved",
+              st["iframe"] == "hidden" and st["shot"] == "block" and st["href"] == "showcase/" and st["img"] > 0 and sp["pop"] and sp["role"] == "dialog"
+              and not se["pop"] and se["y"] == l0["y"], (st, sp["pop"], se["pop"]))
+    else:
+        check(f"{tag} popout: desktop shows the live frame, no still", st["iframe"] == "visible" and st["shot"] == "none", st)
     m["popout"] = {"before": l0, "open": l1, "after_close": l2}
     ov = [m.get("overflow_no_scan"), m.get("overflow_report"), m["overflow_before_after"]]
     check(f"{tag} layout: no horizontal overflow at {vp['width']} px (document, phones, demo frame, card)",

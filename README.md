@@ -12,24 +12,28 @@ Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py
 the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB copy and any full-size photo > 200 KB).
 
 - Landing page (`site/index.html`), top to bottom, primary path first (scan, evidence, process, price, demos, FAQ, contact):
-  header: phones / tablets get a compact "Free scan" button beside the menu ("Scan" under 375px) ·
-  `#top` hero (left: scan form: OnlyFans field + "Find my leaks" on one row from 560px; the optional Instagram / X field
-  folds behind "+ Add Instagram or X" (`.scan-more`; CSS `html.js` + `:has()`, open while it has a value; no JS = shown),
-  "what happens next" line, the Fansly / Patreon line (message me: the scan takes an OnlyFans username only), one
-  privacy line with "What's stored" in a `<details class="more">` (`privacy.html`'s facts; check.py's FAQ match skips
-  `.more`), then the track-record numbers; right: example report card (masked leak hosts, blurred CSS site marks, no
-  links), "Meet Jaka" poster `.meet` under it where the player docks) · `#why` · `#how` (4 numeral-led steps, one row
+  header: phones / tablets get a compact "Free scan" button beside the menu ("Scan" under 375px), its slot always
+  kept, shown (opacity / visibility, no shift) only while the hero form is off screen (IntersectionObserver on `#scan`) ·
+  `#top` hero (left: offer-led h1, Jaka's line that he files every takedown himself; scan form: OnlyFans field + "Find my leaks" on one row from 560px; the optional Instagram / X field
+  folds behind "+ Instagram or X" (`.scan-more`; CSS `html.js` + `:has()`, open while it has a value; no JS = shown),
+  two helper lines: "Free, no email. Your report opens here…" (`.scan-note`), then one row: "+ Instagram or X", the
+  Fansly / Patreon line (message me: the scan takes an OnlyFans username only) and "What's stored" in a
+  `<details class="more">` that opens as a popover (`privacy.html`'s facts; check.py's FAQ match skips `.more`), then
+  the track-record numbers; right: example report card (masked leak hosts, blurred CSS site marks, no
+  links; statuses Live / Still in Google / Removed), "Meet Jaka" poster `.meet` under it where the player docks) · `#why` · `#how` (4 numeral-led steps, one row
   from 900px, numeral beside the text on phones, then the "nobody can promise every page" note) · `#pricing` (the one
   place the free start is spelled out: heading + one line; per plan: price, then Covers / Runs / Re-uploads, the
-  one-time plan says weekly re-scans / report / tracking are monthly-only; buttons aligned at the foot = plan-specific
-  Telegram messages, the same text on WhatsApp under each; one "Both plans" line under them) · `#free` one Google phone
-  (All / Images / Videos tabs; after a scan her real results, `js/inline-scan.js`) and a "message to me" link ·
-  `#removals` · `#website`, the add-on in both plans ("An official home for your name": the three things you get, the
+  one-time plan files new copies found within its 40 days, monthly adds the weekly re-scan, report and tracking; buttons aligned at the foot = plan-specific
+  Telegram messages, the same text on WhatsApp under each; one "Both plans" line under them) · `#removals` · `#website`, the add-on in both plans ("An official home for your name": the three things you get, the
   only place website + blog posts are spelled out), then `#showcase` inside it (demo iframe with a "Full screen"
-  in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button; one Before / After
-  Google phone at a time, picked by real ARIA tabs `.ba-tabs`, `js/main.js`; without JS both show; desktop: demo left,
-  phone right) · `#faq` (desktop: sticky head; all closed; footer "Not covered? Message me." + Telegram / WhatsApp)
-  · `#contact`. `tools/check.py` fails if a section id is missing here. One container width for every section on desktop.
+  in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button; phones show a still of the demo's top
+  (`assets/demo/top.webp`, a link to `showcase/` that opens the same pop-out) instead of the live frame; then the page's
+  one Google phone block `#free` (`.ba`): one Before / After phone at a time, picked by real ARIA tabs `.ba-tabs`,
+  `js/main.js`; Before = the scan's phone `.phone-free` (All / Images / Videos tabs; after a scan her real results,
+  `js/inline-scan.js` + `js/free-phone.js`, "Send it to me" link), After = her own pages first; without JS both show;
+  desktop: demo left, phone right) · `#faq` (desktop: sticky head; all closed; footer "Not covered? Message me." + Telegram / WhatsApp)
+  · `#contact` (what to send to start: the report link or the username; the signed Copyright Enforcement Authorization
+  before any filing). `tools/check.py` fails if a section id is missing here. One container width for every section on desktop.
   Phones: `#removals` is the page's only swipe row (one per view, the next peeks 14px, arrows + dots, `js/swipe.js`,
   static `.swipe-nav` markup: no shift). The "Free scan" bar shows once the scan form and the report card are both
   off screen, hides over the demo, `#contact`, the footer and any focused control under it; safe-area aware.
@@ -37,11 +41,12 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   one soft shadow; dark: velvet. Section heads vary: eyebrow only on hero, pricing, website. Phones: "Meet Jaka" video
   full width, caption under it; its poster is CSS (name, "60-second intro · 0:57", play mark; a plain box, the player docks over it).
   Jaka's portrait everywhere = the CSS `.mono` "J" disc (no photo). Eyebrow rule line only in the hero. FAQ leads with
-  privacy, what you need, timing; Ask-AI lives only in its launcher. Phone demo frame 324px (cut above its buttons).
+  privacy, what you need, timing; Ask-AI lives only in its launcher. "Meet Jaka" player under 520px: overlay cards
+  shrink to the right edge (`data-vo-small`), off the captions.
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
-  removed layer's chrome is cloned from the live one, `data-rm-copy`). Velvet section between `#free` and `#website`, head left like every section; 2x2 on desktop, a swipe row (scroll-snap, arrows + dots) on phones. On screen each edge glides by itself (1-2 s CSS
+  removed layer's chrome is cloned from the live one, `data-rm-copy`). Velvet section between `#pricing` and `#website`, head left like every section; 2x2 on desktop, a swipe row (scroll-snap, arrows + dots) on phones. On screen each edge glides by itself (1-2 s CSS
   transition) to a random 55-85 % (the leak side: the button keeps reading Preview removal) and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
   reduced motion; a card's first input (Preview removal press, stage tap, handle key) stops its sweep for good. Preview removal / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
@@ -121,8 +126,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   card's request from `js/scan-engine.js` is shared, and a `?r=` link opened with the card below the fold scrolls it up); every value is
   validated and rendered with textContent / built elements, never leak titles or snippets. Landing: hero line +
   Reset, the phone sticky bar ("Free scan: type your handle" → "DM me on Telegram", `t.me/jakabasej` prefilled like
-  #contact's with her report link + @handle), both "Your website" phones (name, top-4 leak domains by occurrences, blurred `/api/thumb` thumbs, IG / TikTok /
-  site rows hidden when unknown), hero card handles, showcase url bar + iframe `showcase/?r=` (until the iframe has
+  #contact's with her report link + @handle), the After phone (name, her own pages, the most-seen leak domain as the one "Removed" row, IG / TikTok /
+  site rows hidden when unknown; the Before phone is the scan's own, `js/free-phone.js`), hero card handles, showcase url bar + iframe `showcase/?r=` (until the iframe has
   loaded a page with `?r=`, a load without it, the lazy iframe's own first load of `showcase/` landing after the src
   change: Chrome's race, is sent on to its `?r=` src; after that first `?r=` load nothing in it is redirected). Slots are `data-p="…"`.
   Demo: once its scan result is in, its internal links keep `?r=` (scan-only too, so clicking around stays on her scan); the content changes

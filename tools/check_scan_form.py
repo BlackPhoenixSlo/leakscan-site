@@ -7,7 +7,7 @@
 Phone (390x844) + desktop (1440x900), each with JS on and off: type `@Some.Name` + `@some.ig`, submit.
 JS off: the navigation goes to the on-site scan page BASE_URL/scan/? with h=@Some.Name, ig=@some.ig (no go=, no p=).
 JS on: no navigation (the scan runs in place, js/inline-scan.js; tools/scan_e2e.py --only inline covers the rest).
-With JS the empty Instagram/X field is folded behind "+ Add Instagram or X" (one click opens + focuses it); without JS
+With JS the empty Instagram/X field is folded behind "+ Instagram or X" (one click opens + focuses it); without JS
 it shows and the toggle doesn't. Controls (OnlyFans field, Instagram/X field, button) are >= 44px tall, stacked on phone;
 on desktop the OnlyFans field + button share a row, Instagram/X gets the next. At 390, 600, 960, 1024, 1440 px both placeholders and a
 20-character handle fit their input unclipped (canvas text width vs the input's content box). Every non-local request is aborted
@@ -52,8 +52,8 @@ with sync_playwright() as pw:
             inp, soc, btn = page.locator("#scan input[name=h]"), page.locator("#scan input[name=ig]"), page.locator("#scan button")
             more = page.locator(".scan-more button")
             if js:
-                check(f"{tag} Instagram/X folded behind '+ Add Instagram or X'", not soc.is_visible() and more.is_visible()
-                      and more.inner_text() == "+ Add Instagram or X", f"field {soc.is_visible()}, toggle {more.is_visible()}")
+                check(f"{tag} Instagram/X folded behind '+ Instagram or X'", not soc.is_visible() and more.is_visible()
+                      and more.inner_text() == "+ Instagram or X", f"field {soc.is_visible()}, toggle {more.is_visible()}")
                 page.screenshot(path=str(out / f"form-{vp_name}-folded.png"))
                 more.click()
                 check(f"{tag} toggle opens + focuses it, toggle goes", soc.is_visible() and not more.is_visible()

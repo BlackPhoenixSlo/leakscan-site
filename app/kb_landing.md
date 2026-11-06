@@ -7,8 +7,8 @@
 # Abolita landing page: facts
 
 ## Who
-- Abolita is leak removal for OnlyFans, Fansly and Patreon creators: "Leaked content, taken down by a real person. Me."
-- Run by Jaka (Jaka Basej), from Ljubljana. "Find suspected leaks of you on Google. I'm Jaka, and I'm the one who files every takedown."
+- Abolita is leak removal for OnlyFans, Fansly and Patreon creators, done by a real person, not a bot.
+- Run by Jaka (Jaka Basej), from Ljubljana. Hero: "Find your leaks. I'll remove one page free." "I'm Jaka. The scan searches Google's results, images and videos for your username; I check every link and file every takedown myself."
 - #why: "Every link checked by hand before I file." A scanner can't tell a leaked set from your own promo page or from someone who looks like you; Jaka can. Nothing goes out until he has compared it with your content.
 - "Your own pages stay safe": Your profiles, pages you licensed and lookalikes are never filed against, so your accounts aren't put at risk.
 - "Correct notices get acted on": One accurate notice to the site, then its host, registrar and Google, beats ten careless ones.
@@ -17,10 +17,10 @@
 - Business: Ognjeni Feniks, Jaka Basej, s.p., Ljubljana, Slovenia (address on the privacy page: Kvedrova cesta 5A, 1000 Ljubljana, Slovenia).
 
 ## Free, before you pay anything
-- Free scan: runs right here on the site. Type your OnlyFans username into the box at the top of the page (plus Instagram or X behind "+ Add Instagram or X", optional: the scan searches that name too). It searches Google's results, images and videos for your username on hundreds of known leak sites and gives you a report link with every link it found. "Your report opens right here, with a link to keep. Free, no email or phone needed. Send it to me and I'll remove one page free." The scan also has its own page (scan/).
+- Free scan: runs right here on the site. Type your OnlyFans username into the box at the top of the page (plus Instagram or X behind "+ Instagram or X", optional: the scan searches that name too). It searches Google's results, images and videos for your username on hundreds of known leak sites and gives you a report link with every link it found. "Free, no email. Your report opens here. Send it to me and I remove one page free." The scan also has its own page (scan/).
 - On Fansly or Patreon? The scan box takes an OnlyFans username; message Jaka on Telegram, WhatsApp or email instead.
-- Privacy line under the box: "Your username goes only to my own scan server." Behind "What's stored": the server keeps the result so your report link works; report pages are unlisted and marked noindex; anyone with the link can open it; no cookies, no tracking.
-- #free ("What Google shows for your name"): leak sites in the results, the images and the videos; after a scan its phone shows your own results, ready to message to Jaka.
+- "What's stored" under the box: your username goes only to Jaka's own scan server, which keeps the result so your report link works; report pages are unlisted and marked noindex; anyone with the link can open it; no cookies, no tracking.
+- #free (in #website, "Before / After"): the Before phone shows what Google shows for your username (leak sites in the results, the images and the videos; after a scan your own results, with "Send it to me"); the After phone shows the goal: your own pages first.
 - One page removed free: run the free scan, send Jaka the report, and he takes one page down free, usually the simplest site. You see the result before you pay anything.
 - Then €250/month or €500 one-time, only if you continue.
 
@@ -31,15 +31,14 @@ Plan buttons on the page: "Ask for monthly on Telegram" and "Ask for one-time on
 
 Monthly removal: €250 / month (ongoing protection). Covers: everything the weekly re-scans find. Runs: month to month, cancel anytime. Re-uploads: filed every week, as Jaka finds them.
 - Removal tracking on every link
-- Weekly report: live / cached / dead
+- Weekly report: live / still in Google / removed
 
 One-time clean: €500 one-time (one big clean-up). Covers: everything found, all filed in week 1. Runs: 40 days, no auto-renewal. Re-uploads: new copies Jaka finds in those 40 days are filed too; on day 40 you decide.
-- No weekly report or per-link tracking: those come with the monthly plan (so does re-scanning every week).
+- "Monthly adds the scheduled weekly re-scan, a weekly report and status tracking on every link. On day 40 you decide."
 
 ## Your website (official website + blog)
 - "An official home for your name"
 - Even after a page dies, Google can keep showing it for a while, and new copies pop up. So both plans include an official website for you (your name, your links and your style), plus blog posts Jaka publishes after removals, so Google keeps finding fresh, real pages about you. Google gets real pages about the real you to rank, so a search for your name has something better to show than a leak site. The goal: your pages on top.
-- "Removal plus your own pages. Fewer leak results, more real ones about you."
 - Showcase: a live demo site built for a fictional creator ("This is the kind of site you get"). Yours is built around your name, your links and your look. Demo: showcase/
 
 ## How it works: "After the free removal: what I do"
@@ -47,7 +46,7 @@ One-time clean: €500 one-time (one big clean-up). Covers: everything found, al
 1. You choose a plan and sign one page: monthly or one-time. The one page is a free Copyright Enforcement Authorization: it lets Jaka file in your name.
 2. Notices, then de-indexing: DMCA notices to the site, then its host and registrar. Then he asks Google to drop the pages from its results.
 3. Your own pages go up: your own site (see "Your website") gives Google real pages to rank above the leaks.
-4. Monthly plan: a weekly report. Jaka re-scans every week: what's live, cached and dead, and anything new he has filed.
+4. Monthly plan: a weekly report. Jaka re-scans every week: what's live, still in Google or removed, and anything new he has filed.
 
 ## FAQ (verbatim from the page)
 Q: Is my information safe?
@@ -87,23 +86,23 @@ A: No. There's no account, no app and no card. The free scan runs right here fro
 - Telegram: https://t.me/jakabasej (@jakabasej)
 - WhatsApp: https://wa.me/38640703992 (+386 40 703 992)
 - Email: me@jackbase.dev (mailto:me@jackbase.dev)
-- "Message me. I answer myself." Send your report link, or just your username, on whichever app you already use. You'll be talking to him, not a bot and not a team.
+- "Ran the scan? Send me the report link." No report? Your username is enough. Before Jaka files anything you sign a one-page Copyright Enforcement Authorization so he can act in your name; he never needs your passwords. You'll be talking to him, not a bot and not a team.
 - Suggested first message: "Hi Jaka, I ran the free scan. My report link and handle: …"
 
 ## Section anchor list (link with markdown, e.g. [Pricing](#pricing))
-- #top: hero: "Leaked content, taken down by a real person. Me." Intro by Jaka, the scan box, privacy line, track record, example report, "Meet Jaka" video.
+- #top: hero: "Find your leaks. I'll remove one page free." Intro by Jaka, the scan box, "What's stored", track record, example report, "Meet Jaka" video.
 - #scan: the free scan box at the top (OnlyFans username, optional Instagram or X, "Find my leaks").
 - #why: "Every link checked by hand before I file": your own pages stay safe.
 - #how: "After the free removal: what I do": four steps once you start; nobody can honestly promise every page comes down.
 - #pricing: "One removal free, then choose your plan": both plans and prices, Telegram or WhatsApp per plan.
 - #plan-monthly: Monthly removal plan (€250 / month).
 - #plan-once: One-time clean plan (€500 one-time).
-- #free: "What Google shows for your name": a Google phone for your handle (results, images, videos).
 - #removals: "Where I remove from": re-enacted removals on Mega, X, Reddit and a leak site ("Preview removal", "Show demo images").
-- #website: "Included in both plans: your website": website and blog posts so Google ranks real pages, the demo and before / after.
+- #website: "Included in both plans: your website": website and blog posts so Google ranks real pages, the demo and the Before / After Google phones.
 - #showcase: preview of the demo creator website (inside #website).
+- #free: the Before / After Google phones under the demo (inside #website): Before = a Google phone for your handle (results, images, videos).
 - #faq: "Straight answers", then "Not covered? Message me. I reply myself." with Telegram / WhatsApp buttons.
-- #contact: "Message me. I answer myself." Telegram, WhatsApp, email.
+- #contact: "Ran the scan? Send me the report link." What to send, the signed authorization; Telegram, WhatsApp, email.
 - showcase/: the full live demo site (separate page).
 - scan/: the free scan page (separate page).
 - privacy.html: privacy policy (separate page).

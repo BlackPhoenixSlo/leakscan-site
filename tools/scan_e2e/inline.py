@@ -81,7 +81,7 @@ def submit(run, page, h, social=""):
     run.net["bodies"].clear()
     page.locator("#scan input[name=h]").fill(h)
     ig = page.locator("#scan input[name=ig]")
-    if social and not ig.is_visible():   # folded behind "+ Add Instagram or X" while empty
+    if social and not ig.is_visible():   # folded behind "+ Instagram or X" while empty
         page.locator(".scan-more button").click()
     if ig.is_visible():
         ig.fill(social)
@@ -142,7 +142,7 @@ def before_submit(run):
     shot(run, page, "1-band-before", "#free")
     band_h0 = ill(page)["h"]
     fh = page.evaluate("Math.round(document.getElementById('free').getBoundingClientRect().height)")
-    check(f"{tag} band: #free compact (<= 640 px desktop: the phone beside the copy / 1240 px phone: stacked)", fh <= (1240 if vp_name == "phone" else 640), fh)
+    check(f"{tag} band: #free = the Before / After phone block, compact (<= 720 px: one phone + its caption)", fh <= 720, fh)
     page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
     page.wait_for_timeout(300)
     net["nav"].clear()
@@ -423,13 +423,13 @@ def hero_look(run):
             const over = r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom;
             return [over, getComputedStyle(L).visibility]; }}""")
     if vp_name == "phone":   # the sticky "Free scan" bar steps aside while the showcase preview is behind it, and is back after
-        bring(page, "#showcase .browser-demo", "center")
+        page.evaluate("() => { const r = document.querySelector('#showcase .browser-demo').getBoundingClientRect(); scrollTo({top: scrollY + r.top - innerHeight + 160, behavior: 'instant'}); }")   # its top in the bar's band
         page.wait_for_timeout(500)
         on_demo = page.evaluate("document.querySelector('.mobile-cta').classList.contains('show')")
-        bring(page, "#pricing")
+        bring(page, "#faq")
         page.wait_for_timeout(500)
         on_pricing = page.evaluate("document.querySelector('.mobile-cta').classList.contains('show')")
-        check(f"{tag} sticky scan bar: hidden over the showcase preview, shown again past it", not on_demo and on_pricing, [on_demo, on_pricing])
+        check(f"{tag} sticky scan bar: hidden over the showcase preview, shown again past it (#faq)", not on_demo and on_pricing, [on_demo, on_pricing])
     pa, pb, ps = pill_clear(".report-card .live-actions"), pill_clear(".ba"), pill_clear("#showcase .browser-demo")
     check(f"{tag} askai: launcher hidden while it would cover the card's actions / the phones / the showcase preview", all(not o or v == "hidden" for o, v in (pa, pb, ps))
           and (pa[0] or pb[0]) and (ps[0] or vp_name != "phone"), (pa, pb, ps))
@@ -448,12 +448,12 @@ def hero_personalize(run):
         page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=5000)
     except Exception:
         pass
-    texts = lambda sel: page.eval_on_selector_all(sel, "els => els.filter(e => e.offsetParent !== null).map(e => e.textContent.trim())")
+    texts = lambda sel: page.eval_on_selector_all(sel, "els => els.filter(e => !e.closest('[data-p-off]')).map(e => e.textContent.trim())")   # either Before / After tab
     name = PROFILE["display_name"]
-    check(f"{tag} hero: personalize line + phones' leak domains", "Scanned @demo.creator" in page.locator("[data-p=scanned]").inner_text()
-          and top_ok([page.locator(f'[data-p="leak-{k}"] .m-site').inner_text() for k in range(1, 5)], occurrences(d["hits"]), 4))
-    check(f"{tag} profile: phones search for the name, IG row = the typed Instagram", texts("[data-p=search]") == [name, name]
-          and texts('[data-p="ig"] .m-title') == [f"{name} (@demo.ig)"] * 2, texts('[data-p="ig"] .m-title'))
+    check(f"{tag} hero: personalize line + After phone's Removed row = top leak domain", "Scanned @demo.creator" in page.locator("[data-p=scanned]").inner_text()
+          and top_ok([page.locator('[data-p="gone"] .m-site').inner_text()], occurrences(d["hits"]), 1))
+    check(f"{tag} profile: After phone searches for the name, IG row = the typed Instagram", texts("[data-p=search]") == [name]
+          and texts('[data-p="ig"] .m-title') == [f"{name} (@demo.ig)"], texts('[data-p="ig"] .m-title'))
     check(f"{tag} hero: showcase iframe + button carry the slug", page.locator("iframe[data-p=demo]").get_attribute("src") == "showcase/?r=" + slug
           and page.locator("a[data-p=demo]").get_attribute("href") == "showcase/?r=" + slug)
     try:
@@ -468,9 +468,10 @@ def hero_personalize(run):
     bring(page, "#free", "center")
     page.wait_for_timeout(700)
     shot(run, page, "4-band", "#free")
-    bring(page, "#showcase .ba", "center")
-    page.wait_for_timeout(700)
-    shot(run, page, "5-phones", "#showcase .ba")
+    page.click("#ba-tab-after")
+    page.wait_for_timeout(400)
+    shot(run, page, "5-phones-after", "#free")
+    page.click("#ba-tab-before")
 
 
 def reload_rescan(run):

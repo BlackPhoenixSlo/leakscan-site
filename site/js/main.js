@@ -22,7 +22,7 @@
 
   // Phone mockups: All / Images / Videos are real tabs (E.tablist: click, ←/→, Home / End). The screen has a fixed
   // height, so a switch never moves the page.
-  // Hero form: "+ Add Instagram or X" opens the folded optional field (CSS folds it only while empty: styles.css).
+  // Hero form: "+ Instagram or X" opens the folded optional field (CSS folds it only while empty: styles.css).
   var scanForm = document.getElementById('scan'), igMore = document.querySelector('.scan-more button');
   if (scanForm && igMore && scanForm.elements.ig) {
     var igOpen = function () { scanForm.classList.add('ig-open'); igMore.setAttribute('aria-expanded', 'true'); };
@@ -104,6 +104,8 @@
     popBtn.hidden = false;
     popBtn.setAttribute('aria-expanded', 'false');
     popBtn.addEventListener('click', function () { setPop(!popOpen()); });
+    var shot = demoFig.querySelector('.demo-shot');   // phone: the still of the demo's top opens the same full screen
+    if (shot) shot.addEventListener('click', function (e) { e.preventDefault(); setPop(true); });
     document.addEventListener('keydown', onKey);
     frame.addEventListener('load', function () {   // a popped frame that navigates keeps Esc
       if (popOpen()) try { frame.contentWindow.addEventListener('keydown', onKey); } catch (e) { /* ignore */ }
@@ -113,6 +115,8 @@
   var items = document.querySelectorAll('.reveal');
   if (!('IntersectionObserver' in window)) {
     items.forEach(function (el) { el.classList.add('is-in'); });
+    var hs0 = document.querySelector('.header-scan');
+    if (hs0) hs0.classList.add('is-on');
   } else {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
@@ -125,6 +129,11 @@
       var el = e.target.closest && e.target.closest('.reveal:not(.is-in)');
       if (el) { el.classList.add('is-in'); io.unobserve(el); }
     });
+
+    // Header "Free scan" (phone / tablet): shown only once the hero form is off screen; its slot is always kept (CSS)
+    var hs = document.querySelector('.header-scan'), scanEl = document.getElementById('scan');
+    if (hs && scanEl) new IntersectionObserver(function (en) { hs.classList.toggle('is-on', !en[0].isIntersecting); }).observe(scanEl);
+    else if (hs) hs.classList.add('is-on');
 
     // Phone "Free scan" bar: only once the scan form and the example card are both off screen, never over the
     // contact card, the footer or the demo preview, and never over whatever has focus (safe area: CSS).
