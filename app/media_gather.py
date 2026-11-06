@@ -1139,14 +1139,14 @@ def start(slug, platform, handle, profile, cse_items, sources=None, socials=None
         return "none"
 
 
-def prune(days=30):
+def prune(days=30, pins=()):  # one-project: retention
     """Drop media dirs older than `days` and stale cache entries. -> count removed."""
     n, now = 0, time.time()
     root = os.path.join(data_dir(), "media")
     for name in os.listdir(root) if os.path.isdir(root) else []:
         p = os.path.join(root, name)
         try:
-            if SLUG_RE.match(name) and now - os.path.getmtime(p) > days * 86400:
+            if SLUG_RE.match(name) and name not in pins and now - os.path.getmtime(p) > days * 86400:  # one-project: retention
                 shutil.rmtree(p)
                 n += 1
         except OSError:
@@ -1168,12 +1168,23 @@ def prune(days=30):
 # so the web-text query does not run into an unsolved captcha (prod: solved=False -> raw=0 -> no refine); a web-text
 # query that still came back raw=0 is retried ONCE after the Images step. Every other line that differs from upstream
 # ends in "# one-project". Re-sync: README.
-def drop_media(slug):
-    """Retention: a scan's media dir (the /api/media answer falls back to "none") -> dirs removed. media-cache is not
-    per-scan: it keeps CACHE_TTL (prune)."""
+def cache_pins():
+    """Slugs a live media-cache entry reads its photos from (from_cache): deleting them would end the entry before CACHE_TTL."""
+    root = os.path.join(data_dir(), "media-cache")
+    entries = (_cache_load(name[:-5]) for name in (os.listdir(root) if os.path.isdir(root) else []) if name.endswith(".json"))
+    return {c["slug"] for c in entries if c and c.get("images")}
+
+
+def drop_media(slug, pins=()):
+    """Retention: a scan's media dir (the /api/media answer falls back to "none") -> dirs removed. A pinned slug loses only
+    its index, so the report answers the same; prune takes the photos once the entry expires."""
     p = os.path.join(data_dir(), "media", slug)
     if not SLUG_RE.match(slug or "") or not os.path.isdir(p):
         return 0
+    if slug in pins:
+        if os.path.exists(os.path.join(p, "index.json")):
+            os.remove(os.path.join(p, "index.json"))
+        return 1
     shutil.rmtree(p)
     return 1
 

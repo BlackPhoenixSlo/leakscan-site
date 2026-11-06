@@ -34,7 +34,12 @@
     $('scan-lead').textContent = lead;
   }
   function hideAll() {
-    ['scan-form', 'form-error', 'progress', 'error', 'summary', 'empty', 'report', 'scan-aliases', 'scan-aged', 'expired'].forEach(function (id) { show(id, false); });
+    ['scan-form', 'form-error', 'progress', 'error', 'summary', 'empty', 'report', 'scan-aliases', 'scan-aged'].forEach(function (id) { show(id, false); });
+    dropExpired();
+  }
+  function dropExpired() {   // built only for an expired report: the page's DOM budget (tools/scan_e2e/huge.py)
+    var note = $('expired');
+    if (note) note.remove();
   }
 
   // ---------- message links ----------
@@ -182,9 +187,12 @@
     $('summary').querySelector('[data-stat=google]').textContent = '~' + num(d.google_total);
     show('summary', true);
     show('empty', empty);
-    $('expired').textContent = '';
-    if (noList) $('expired').appendChild(E.expiredNote('scan-card empty-card', raw));
-    show('expired', !!noList);
+    dropExpired();
+    if (noList) {
+      var note = E.expiredNote('scan-card empty-card', raw);
+      note.id = 'expired';
+      $('empty').after(note);
+    }
     show('rnav', !empty && !noList);
     show('google', !empty && !d.expired);
     show('sites', !empty && !noList);

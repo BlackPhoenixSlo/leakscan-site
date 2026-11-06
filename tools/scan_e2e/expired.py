@@ -80,6 +80,9 @@ def scan_page(ctx, vp_name):
     check("expired: scan summary: no empty lists", page.locator("#google").is_hidden() and page.locator("#sites").is_hidden() and page.locator("#empty").is_hidden())
     no_false_claim("scan summary", page.locator("body").inner_text())
     page.screenshot(path=str(cfg.out / f"{vp_name}-expired-scan-summary.png"))
+    page.locator("#scan-aged .aged-again").click()
+    page.wait_for_function("old => !location.search.includes(old) && !document.getElementById('report').hidden", arg=SUMMARY, timeout=20000)
+    check("expired: scan summary: Scan again = the note gone, a full report", page.locator("#expired").count() == 0 and page.locator("#google").is_visible() and page.locator("#sites").is_visible())
     page.close()
 
 

@@ -265,6 +265,30 @@ class TestServing(Base):
         self.assertEqual(sorted(os.listdir(croot)), ["keep"])
         self.assertEqual(sorted(os.listdir(mroot)), ["young0000"])
 
+    def test_live_media_cache_entry_keeps_its_photos_until_its_ttl(self):
+        """The 7 d cache saves Browserbase calls: it reads the photos from the source scan's dir, so big must not end it early."""
+        s = self.seed(5, extra={**BIG, "profile": PROFILE})
+        self.files(s)
+        croot, d = os.path.join(mg.data_dir(), "media-cache"), os.path.join(mg.data_dir(), "media", s)
+        os.makedirs(croot)
+        entry = os.path.join(croot, "onlyfans-mira.json")
+        with open(entry, "w") as fh:
+            json.dump({"ts": time.time() - 5 * 86400, "slug": s, "images": [{"n": 0}]}, fh)
+        public_app.run_retention()
+        self.assertEqual(self.get(f"/api/media/{s}")[1]["status"], "none")      # the report: as for any expired row
+        self.assertEqual(self.get(f"/api/avatar/{s}")[0], 404)
+        g = mg._Gallery("repeat000")
+        self.assertTrue(g.from_cache("onlyfans-mira"))                          # the repeat scan: a hit, no gather
+        self.assertEqual((g.images, os.path.isfile(os.path.join(g.dir, "0.jpg"))), ([{"n": 0}], True))
+        with open(entry, "w") as fh:
+            json.dump({"ts": time.time() - mg.CACHE_TTL - 60, "slug": s, "images": [{"n": 0}]}, fh)
+        os.utime(entry, (time.time() - mg.CACHE_TTL - 60,) * 2)
+        os.utime(d, (time.time() - 5 * 86400,) * 2)
+        public_app.run_retention()
+        self.assertFalse(os.path.exists(d))                                     # expired: the next run takes them
+        self.assertFalse(os.path.exists(entry))
+        self.assertTrue(os.path.isfile(os.path.join(g.dir, "0.jpg")))           # the repeat's own copy stays
+
     def test_pre_rule_row_keeps_what_was_served(self):
         """A row stored before the aggregator rule: off_row recounts from mega + results, which go. What was served stays."""
         pack = [{"domain": "leakshaven.com", "url": "https://leakshaven.com/p", "occurrences": 2}]

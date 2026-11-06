@@ -360,7 +360,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   `demoSummary1` with it.
 - `off_row` recounts from `mega` + `results`, which go: leaving `full`, what it serves is baked into the row (`hits`, `hit_count`, `domain_count`, `status`,
   `google_total`), so a served count never moves. Only rows stored before the aggregator rule differ from their stored values.
-- Files: media dirs and avatars by mtime follow at big + 1 day (orphans, a crash mid-run); `media-cache` keeps its own 7 d TTL.
+- Files: media dirs and avatars by mtime follow at big + 1 day (orphans, a crash mid-run). `media-cache` keeps its own 7 d TTL, and its entries read photos from the
+  source slug's dir: a slug a live entry points at (`media_gather.cache_pins`) loses only `index.json` at big; the mtime sweep takes the photos once the entry is gone. `thumb-sheets/` has its own bounds (7 d, 500 MB, swept on a sheet write) and serves only a row's live `images`.
 - Serving: `/api/scan-result` stays 200 with `retention`, `top_domains`; `/api/media` answers `none`, `/api/avatar` 404. The site says `Scanned 5 days ago,
   images expired · Scan again` / `..., details expired · Scan again`, never "no images" (`expiredOf`, `expiredNote` in `site/js/scan-engine.js`).
 - A rollback to a build before this one restores upstream's `prune_scans(30)`: it deletes rows past 30 days at startup. Corrupt `extra_json` keeps its bytes.

@@ -1617,9 +1617,9 @@ def _db_bytes():
     return sum(os.path.getsize(p) for p in (db.DB_PATH, db.DB_PATH + "-wal") if os.path.exists(p))
 
 
-def _drop_files(slug):
+def _drop_files(slug, pins=()):
     """A scan's avatar and media dir -> files or dirs removed."""
-    n = media_gather.drop_media(slug)
+    n = media_gather.drop_media(slug, pins)
     p = _avatar_path(slug)
     if p:
         os.remove(p)
@@ -1635,12 +1635,13 @@ def run_retention():
     n, files = None, 0
     try:
         n = db.retain_scans(RETAIN_BIG_DAYS, RETAIN_SMALL_DAYS, repair=off_row)
+        pins = media_gather.cache_pins()
         for slug in n["slugs"]:
             try:
-                files += _drop_files(slug)
+                files += _drop_files(slug, pins)
             except OSError:
                 pass
-        files += _prune_avatars(RETAIN_BIG_DAYS + 1) + media_gather.prune(RETAIN_BIG_DAYS + 1)
+        files += _prune_avatars(RETAIN_BIG_DAYS + 1) + media_gather.prune(RETAIN_BIG_DAYS + 1, pins)
         if n["trimmed"] or n["summary"]:
             db.vacuum()
         _event(f"retention trimmed={n['trimmed']} summary={n['summary']} corrupt={n['corrupt']} errors={n['errors']} "

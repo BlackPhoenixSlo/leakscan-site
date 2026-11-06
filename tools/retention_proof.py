@@ -243,9 +243,11 @@ def main():
             os.utime(p, (mt, mt))
     croot = os.path.join(tmp, "media-cache")
     os.makedirs(croot, exist_ok=True)
+    pinned = next(shape(i, now)["slug"] for i in with_files if shape(i, now)["_age"] != "young" and shape(i, now)["_kind"] != "running")
     for name, age in (("alive", 6 * DAY), ("stale", mg.CACHE_TTL + 60)):
-        open(os.path.join(croot, name), "w").close()
-        os.utime(os.path.join(croot, name), (time.time() - age,) * 2)
+        with open(os.path.join(croot, name + ".json"), "w") as fh:
+            json.dump({"ts": time.time() - age, "slug": pinned, "images": [{"n": 0}]}, fh)
+        os.utime(os.path.join(croot, name + ".json"), (time.time() - age,) * 2)
 
     srv = ThreadingHTTPServer(("127.0.0.1", 0), public_app.Handler)
     srv.daemon_threads = True
@@ -402,12 +404,17 @@ def main():
     for i in with_files:
         s = shape(i, now)
         there = os.path.exists(os.path.join(mdir, s["slug"])), os.path.exists(os.path.join(adir, f"{s['slug']}.jpg"))
+        if s["slug"] == pinned:
+            continue
         should = s["_kind"] == "running" or s["_age"] == "young"
         if there != (should, should) and not (s["_kind"] == "running" and s["_days"] > 4):   # a running row's old files: the mtime sweep, as on main at 30 d
             (kept if should else gone).append((s["slug"], s["_kind"], s["_age"], there))
     check("files: rows past big lost media + avatar", not gone, (len(gone), gone[:3]))
     check("files: rows under big kept them", not kept, (len(kept), kept[:3]))
-    check("files: media-cache keeps its own TTL", sorted(os.listdir(croot)) == ["alive"], os.listdir(croot))
+    check("files: media-cache keeps its own TTL", sorted(os.listdir(croot)) == ["alive.json"], os.listdir(croot))
+    g = mg._Gallery("cachehit0")
+    check("files: a live entry still hits past big, its row's report says none",
+          g.from_cache("alive") and g.images == [{"n": 0}] and os.path.isfile(os.path.join(g.dir, "0.jpg")) and mg.public_view(pinned)["status"] == "none", pinned)
     fives = [r for r in reqs if r["s"] >= 500 or r["s"] == 0]
     check("load: no 5xx, no connection error", reqs and not fives, (len(fives), fives[:3]))
     during = [r for r in reqs if run_t0 <= r["t0"] <= run_t1]
