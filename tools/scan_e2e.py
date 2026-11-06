@@ -4,6 +4,7 @@
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
+        [--break-dock]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs the scenarios below. Expected values come from what the stub serves
@@ -94,16 +95,22 @@ personalize also proves the phone sticky bar (`tgcta:`): no slug = "Free scan: t
 "DM me on Telegram" → t.me/jakabasej with the #contact prefill + her absolute report link + @handle; Reset = the original
 bar. --break-tgcta serves personalize.js without the bar swap: only `tgcta:` checks may go red.
 
-pip (js/pip.js, the floating mini player of site/video/): landing without ?pip=1 and scan/ without ?r= show none and load
-no /video/; scan/?r=<slug> mounts it by itself after the page's load (lazy): 16:9, 45% of the phone width / 320 px,
-same-origin iframe of /video/?r=<slug> in embed form (no name bar / player UI, stage = frame), starts muted + playing, a
-tap unmutes; drags snap to the nearest corner (under the sticky header / report nav); a fling past the left / right
-edge tucks it off-screen with a '>' / '<' tab at that edge (paused), a tap or an inward drag on the tab brings it back;
-Esc tucks, Enter on the tab returns; corner / tucked / closed kept in sessionStorage; expand = /video/?r=&t=; x closes
-for the session; header, report nav, Scan now, phone CTA bar and Ask-AI launcher stay clickable (elementFromPoint);
-CLS 0 after it mounts; reduced motion = no transitions; no request off loopback, no console errors. Phone (Chromium,
-real touch via CDP), desktop, and WebKit iPhone 13 (taps are touch, drags use the mouse: pointerType mouse). Screenshots:
-<vp>-pip-*.png. --break-tuck serves pip.js with tuck() emptied: only `tuck:` checks may go red.
+pip (js/pip.js, the mini player of site/video/): ?pip=0 and scan/ without ?r= show none and load no /video/. Landing
+(default on): docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report, or the
+scan report card after an in-page / ?r= scan) at 55% of the card width, coverage <= 25%, no live element under it
+(elementFromPoint grid), start spot off the screen corner, else just below the card; hero out = floating bottom-right
+at normal size clear of Scan now / CTA bar / Ask-AI; scroll back re-docks unless dragged / resized / tucked. scan/?r=:
+floating bottom-right. Lazy (after load), 16:9, same-origin embed (no name bar / player UI), muted + playing, tap
+unmutes; icon-only 30 px bar under the picture. Free drop (stays mid-screen, kept on-screen under the header); fling or
+drag past the left / right edge tucks with a '>' / '<' tab (tap / inward drag = back where it was); corner grip / pinch
+resizes (16:9, min 160 px, max 60% / 90% phone width); Esc tucks, Enter on the tab returns; spot / size / tucked /
+closed kept in sessionStorage; expand = /video/?r=&t=; x closes; CLS 0; reduced motion = no transitions; no request
+off loopback, no console errors. Phone (Chromium, real touch via CDP), desktop 1440, WebKit iPhone 13 (taps are touch,
+drags use the mouse). take: inside the iframe (seeks via Range, as Pages): currentSrc = the first <source> the engine
+plays (jack.webm / jack.mp4), duration ~56.9 s, the 3 s frame is the real take (luminance / colourfulness, vs the
+placeholder's), google card off at 9 s / on at 11.5 s in the picture's right half, caption 'real' at 2.95 s (hidden under
+260 px, #72), floating and docked. Screenshots: <vp>-pip-*.png. --break-tuck serves pip.js with tuck() emptied: only `tuck:` checks
+may go red; --break-dock serves it with no dock anchor (card = null): only `dock:` checks may go red.
 
 A scenario part that raises (a Playwright timeout, a missing element) prints one FAIL line for it and the run goes on.
 """

@@ -57,8 +57,11 @@ so the page → API calls are cross-origin and exercise CORS like production. --
 result (break-it run); --omit-profile sets `profile` to null everywhere (break-it run for the personalization checks).
 """
 import argparse, hashlib, json, pathlib, random, re, string, struct, sys, time, zlib
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "video"))
+from serve import RangeHandler   # static files answer Range (as GitHub Pages does) so <video> can seek
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "app"))
@@ -280,7 +283,7 @@ def media_answer(slug, origin):
     return {"slug": slug, "status": status, "images": imgs}
 
 
-class Handler(SimpleHTTPRequestHandler):
+class Handler(RangeHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(SITE), **kw)
 

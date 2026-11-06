@@ -56,15 +56,18 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   (whisper / faster-whisper word timestamps → `data-cue-*` diff, untested on a real take):
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).
-- Mini player (`js/pip.js` + `css/pip.css`): a floating 16:9 player of `video/` (min(320 px, 45vw), fixed, CLS 0). On by default on
-  the scan report (`scan/?r=<slug>`: the video personalizes itself with that scan); on the landing only with `?pip=1`; `?pip=0`
-  off. Created after the page's load + first scroll / pointer / key or idle; same-origin iframe of `video/?r=&name=` made
-  embed-only from the host (injected style: no name bar / player UI; `<video>` driven directly: starts muted, tap = unmute,
-  then play / pause). Drag (pointer events, touch) snaps to the nearest corner under the sticky header / report nav, off the
-  Scan now button, phone CTA bar, Ask-AI launcher and report Reveal pill; a fling / drag past the left or right edge tucks it
-  (paused) leaving a `>` / `<` tab at that edge (tap / drag inward = back; Esc inside tucks, Enter on the tab returns); expand
-  = `video/?r=&t=`; x closes for the session; corner / tucked / closed in sessionStorage `leakscan.pip`. E2E:
-  `scan_e2e.py OUT --only pip` (phone, desktop, WebKit iPhone 13; `--break-tuck`).
+- Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
+  `?pip=0` off. Landing: docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report,
+  or the scan report card after a scan) at 55% of its width, never > 25% of the card, never over a link / button / pill
+  (else just below the card); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
+  user dragged, resized, tucked or closed it. Created after load + first scroll / pointer / key or idle; same-origin
+  iframe of `video/?r=&name=` made embed-only from the host (injected style; `<video>` driven directly: muted start, tap =
+  unmute, then play / pause); icon-only 30 px bar under the picture. Drag drops it where released (kept on-screen, under
+  the sticky header / report nav); a fling / drag past the left or right edge tucks it (paused) with a `>` / `<` tab
+  (tap / drag inward = back; Esc tucks, Enter on the tab returns); corner grip / pinch resizes (min 160 px, max 60% of
+  the width, 90% on phones); expand = `video/?r=&t=`; x closes for the session; spot / size / tucked / closed in
+  sessionStorage `leakscan.pip`. E2E: `scan_e2e.py OUT --only pip` (phone, desktop, WebKit iPhone 13; `--break-tuck`,
+  `--break-dock`).
 - Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
   `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
