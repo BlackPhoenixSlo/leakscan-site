@@ -3,22 +3,24 @@
 Google Ads landing site for Abolita: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
 cookies, no third-party requests on the landing pages. `site/` is what ships. `site/showcase/` is the demo of
 the official site each client gets (fictional creator, built from the tessa template); the landing page links and
-iframes it as `showcase/`. The demo uses system fonts too (no Google Fonts); `tools/check.py` fails if it loads any
+iframes it as `showcase/`. Landing fonts are self-hosted in `site/fonts/` (Bodoni Moda display + Jost body, OFL, Latin subset, 2 preloaded,
+metric-matched fallbacks so the swap doesn't shift); the demo uses system fonts (no Google Fonts); `tools/check.py` fails if it loads any
 third-party host that `privacy.html` does not disclose. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py --variants` rebuilds them from
 the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB copy and any full-size photo > 200 KB).
 
 - Landing page (`site/index.html`), top to bottom, primary path first (scan, evidence, process, price, FAQ, contact):
+  header: phones / tablets get a compact "Free scan" button beside the menu ("Scan" under 375px) ·
   `#top` hero (left: scan form with visible field labels, the Fansly / Patreon line (message me: the scan takes an
   OnlyFans username only), one privacy line with "What's stored" in a `<details class="more">` (`privacy.html`'s facts;
   check.py's FAQ match skips `.more`), then the track-record numbers; right: live report card, "Meet Jaka" poster
   `.meet` under it where the player docks) · `#free` one Google phone (All / Images / Videos tabs; after a scan her
-  real results, `js/inline-scan.js`) and a "Send me the report link" link, no repeat of the offer · `#why` ·
-  `#removals` · `#how` (4 steps in 2 stages once she starts, stacked on phones, then the "nobody can promise every
+  real results, `js/inline-scan.js`) and a "message to me" link, no repeat of the offer · `#why` ·
+  `#removals` · `#how` (4 steps in 2 stages once she starts, 2x2 from 1100px, stacked on phones, then the "nobody can promise every
   page" note) · `#pricing` (the one place the free start is spelled out: heading + one line; per plan: price, then
   Covers / Runs / Re-uploads, the one-time plan says weekly re-scans / report / tracking are monthly-only; buttons
-  aligned at the foot = plan-specific Telegram messages) · `#website`, the add-on in both plans: the three things
+  aligned at the foot = plan-specific Telegram messages; one "Both plans" line under them) · `#website`, the add-on in both plans: the three things
   you get, then `#showcase` inside it (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop
   close, page behind inert, focus back to the button; one Before / After Google phone at a time, picked by real ARIA
   tabs `.ba-tabs`, `js/main.js`; without JS both show; desktop: demo left, phone right) · `#faq` (desktop: sticky
@@ -27,7 +29,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   Phones: `#removals` is the page's only swipe row (one per view, the next peeks 14px, arrows + dots, `js/swipe.js`,
   static `.swipe-nav` markup: no shift). The "Free scan" bar shows once the scan form and the report card are both
   off screen, hides over the demo, `#contact`, the footer and any focused control under it; safe-area aware.
-  Light theme: header + hero on blush paper, cards / fields = 1px line + one soft shadow; dark: velvet.
+  Light theme: header + hero on blush paper, flat surfaces (no gradients, no button glows), cards / fields = 1px line +
+  one soft shadow; dark: velvet. Section heads vary: eyebrow only on hero, pricing, website. Phones: "Meet Jaka" video
+  full width, caption under it. Jaka's portrait everywhere = `img/meet/jaka-face.webp` (a crop of his own take).
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
@@ -286,10 +290,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 
 ## Replace before launch
 
-- **Jaka's photo**: `site/assets/avatar-jaka.svg` is an initials placeholder (used 3x in `site/index.html`). Add a square
-  photo, e.g. `site/assets/jaka.webp` (at least 176x176), then
-  `sed -i '' 's#assets/avatar-jaka.svg#assets/jaka.webp#g' site/index.html && rm site/assets/avatar-jaka.svg`
-  and run the gate.
+- **Jaka's photo** (optional): `site/img/meet/jaka-face.webp` is a 176x176 crop of his video take; swap in a real
+  portrait under the same name if wanted, then run the gate.
 - **Imprint**: add registration number (matična številka) and tax number (davčna številka) to `site/imprint.html`
   if you want them shown.
 

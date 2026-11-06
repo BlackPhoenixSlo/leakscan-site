@@ -54,7 +54,7 @@
   function dockAt() {   // → viewport rect {x, y, w} or null (no safe spot)
     var r = card && card.getBoundingClientRect();
     if (!r || !r.width) return null;
-    var w = Math.round(r.width * DOCK), h = Math.round(w * 9 / 16) + 30, W = vw();
+    var w = Math.round(r.width * (innerWidth < 720 ? 1 : DOCK)), h = Math.round(w * 9 / 16) + 30, W = vw();
     var fit = function (x) { return Math.max(12, Math.min(x, W - w - 12)); };
     var spots = [{ x: fit(r.right - w), y: r.bottom + 14 }, { x: fit(r.right - w * 0.7), y: r.bottom - h * 0.7 }];   // under the card first: the card's own note stays readable
     var live = [].filter.call(document.querySelectorAll(LIVE), function (el) {
@@ -69,7 +69,7 @@
     }
     return null;
   }
-  var DOCK = 0.55, BAR = 30;   // docked width = 55% of the card (1.25x the first 44%: coverage / no-control checks still hold)
+  var DOCK = 0.55, BAR = 30;   // docked width = 55% of the card (1.25x the first 44%: coverage / no-control checks still hold); phones: the card's full width (.meet-pic, CSS)
   function lim(w) {   // 16:9 + bar, 160 px .. 60% (phone 90%) of the width, and it fits the screen's height
     var W = vw(), max = Math.min(W * (innerWidth < 720 ? 0.9 : 0.6), (innerHeight - topInset() - 8 - BAR) * 16 / 9);
     return Math.round(Math.max(160, Math.min(w, max)));

@@ -1,7 +1,14 @@
 /* Abolita: one stylesheet, mobile-first. Light default, dark via prefers-color-scheme.
    Direction "velvet & signature": a private-client service. Aubergine velvet frames the page (header, hero, the
-   promise blocks, footer); white paper carries the evidence (report card, phones, plans). Didot for the voice, Avenir
-   Next for the reading, a hand-signed "Me." as the one flourish. Orchid on paper, blush on velvet, mint = removed. */
+   promise blocks, footer); white paper carries the evidence (report card, phones, plans). Bodoni Moda for the voice
+   (its italic is the one flourish: "Me.", the numerals), Jost for the reading. Both self-hosted (fonts/, OFL, Latin
+   subset, see CREDITS.md), so every OS renders the same page. Orchid on paper, blush on velvet, mint = removed. */
+@font-face { font-family: "Bodoni Moda"; src: url("../fonts/bodoni-moda.woff2") format("woff2"); font-weight: 400 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Bodoni Moda"; src: url("../fonts/bodoni-moda-italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Jost"; src: url("../fonts/jost.woff2") format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
+/* metric-matched fallbacks (size-adjust from the fonts' own advance widths vs Georgia / Arial): no shift on swap */
+@font-face { font-family: "Bodoni Fallback"; src: local("Georgia"); size-adjust: 103.8%; ascent-override: 108.4%; descent-override: 38.5%; line-gap-override: 0%; }
+@font-face { font-family: "Jost Fallback"; src: local("Arial"), local("Helvetica"), local("Roboto"); size-adjust: 95.8%; ascent-override: 111.7%; descent-override: 39.1%; line-gap-override: 0%; }
 :root {
   --leak-blur: 9px;   /* leak-side photos, blurred by CSS before any JS; a [data-reveal] button lifts it per scope */
   --live-grid-cols: 4;   /* hero card Images grid; read by js/inline-scan.js */
@@ -40,10 +47,9 @@
   --shadow-lg: 0 6px 20px rgb(35 20 40 / .08);
   --radius: 20px;
   --radius-sm: 12px;
-  --display: Didot, "Bodoni 72", "Bodoni MT", "Didot LT STD", "Libre Bodoni", Georgia, serif;
+  --display: "Bodoni Moda", "Bodoni Fallback", Georgia, serif;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;   /* scan/ + video/ only */
-  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
-  --script: "Snell Roundhand", "Apple Chancery", "Segoe Script", "Brush Script MT", cursive;
+  --sans: "Jost", "Jost Fallback", Arial, sans-serif;
   --header-h: 64px;
   color-scheme: light dark;
 }
@@ -109,8 +115,9 @@ img { height: auto; }
 a { color: var(--accent); text-underline-offset: .2em; text-decoration-thickness: 1px; }
 @media (hover: hover) { a:hover { color: var(--accent-hover); } }
 h1, h2, h3 { margin: 0 0 .5em; text-wrap: balance; }
-h1, h2 { font-family: var(--display); font-weight: 400; line-height: 1.04; letter-spacing: -.012em; }
-h1 { font-size: clamp(2.6rem, 8.2vw, 5.1rem); }
+h1, h2 { font-family: var(--display); font-weight: 400; line-height: 1.04; letter-spacing: -.022em; }
+h1 em, h2 em { font-style: italic; color: var(--accent); letter-spacing: -.01em; }   /* Bodoni italic: the one flourish */
+h1 { font-size: clamp(2.5rem, 7.4vw, 4.5rem); }
 h2 { font-size: clamp(2.05rem, 5vw, 3.35rem); }
 h3 { font: 600 1.18rem/1.3 var(--sans); letter-spacing: -.005em; }
 p { margin: 0 0 1em; text-wrap: pretty; }
@@ -133,7 +140,7 @@ strong { font-weight: 600; }
   border: 1.5px solid transparent; transition: background-color .15s, color .15s, border-color .15s, transform .15s;
 }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 1px 0 rgb(255 255 255 / .18) inset, 0 8px 20px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+.btn-primary { background: var(--accent); color: var(--on-accent); }   /* flat: no glow */
 @media (hover: hover) { .btn-primary:hover { background: var(--accent-hover); color: var(--on-accent); } }
 .btn-outline { border-color: var(--accent); color: var(--accent); background: transparent; }
 @media (hover: hover) { .btn-outline:hover { background: var(--accent-soft); color: var(--accent); } }
@@ -159,6 +166,9 @@ strong { font-weight: 600; }
 @media (hover: hover) { .nav a:not(.btn):hover { color: var(--ink); background: var(--surface); } }
 .nav { display: flex; align-items: center; gap: 14px; }
 .nav-toggle { display: none; }
+.header-scan { display: none; }
+@media (max-width: 879px) { .header-scan { display: inline-flex; margin-left: auto; min-height: 40px; padding-inline: .9em; white-space: nowrap; } .header-row { gap: 10px; } }   /* phone + tablet: scan one tap away, beside the menu */
+@media (max-width: 374px) { .header-scan { padding-inline: .75em; text-transform: capitalize; } .hs-free { display: none; } .brand { font-size: 1.4rem; gap: 8px; } }   /* 320: icon + "Scan" */
 @media (max-width: 879px) {
   .js .nav-toggle {
     display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;
@@ -179,16 +189,11 @@ strong { font-weight: 600; }
   .js .nav.open a:not(.btn) { padding: 13px 12px; font-size: 1.08rem; color: var(--ink); border-bottom: 1px solid var(--line); border-radius: 0; }
 }
 
-/* Hero: velvet, a soft sheen behind the card, the signed "Me." */
-.hero { padding: clamp(36px, 6.5vw, 92px) 0 0; position: relative; overflow: hidden; overflow: clip; isolation: isolate;
-  background:
-    radial-gradient(60% 70% at 88% 18%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
-    radial-gradient(50% 60% at 0% 100%, rgb(0 0 0 / .22), transparent 70%),
-    var(--bg); }   /* clip: not scrollable, so focus/scrollIntoView can't pan the hero sideways */
+/* Hero: flat velvet (dark) / blush paper (light), no sheen; the italic "Me." is the one flourish */
+.hero { padding: clamp(24px, 3vw, 40px) 0 0; position: relative; overflow: hidden; overflow: clip; isolation: isolate; background: var(--bg); }   /* clip: not scrollable, so focus/scrollIntoView can't pan the hero sideways */
 @media (prefers-color-scheme: light) {   /* light: blush paper, the card and fields lifted by line + soft shadow */
-  .hero { background: radial-gradient(60% 70% at 88% 12%, #f2d4e4, transparent 70%), radial-gradient(55% 60% at 0% 100%, #ece2f0, transparent 70%), #f9f2f6; border-bottom: 1px solid var(--line); }
+  .hero { background: #f8f0f4; border-bottom: 1px solid var(--line); }
   .hero .scan-field { border: 1px solid #d9c9df; box-shadow: var(--shadow); }
-  .hero .scan-form .btn-primary { box-shadow: var(--shadow); }
   .hero .report-card { border: 1px solid #e0d2e5; box-shadow: var(--shadow); }   /* one line, no halo */
   .meet-pic { box-shadow: var(--shadow); }
 }
@@ -200,7 +205,7 @@ strong { font-weight: 600; }
 .eyebrow::before { content: ""; flex: none; width: 28px; height: 1.5px; background: currentColor; opacity: .7; }
 @media (max-width: 559px) { .eyebrow::before { display: none; } .hero .eyebrow { font-size: .9rem; } }
 .hero h1 { margin-bottom: .38em; color: var(--ink); }
-.hero h1 .accent { display: inline-block; margin-left: .08em; font: 400 1.04em/0.8 var(--script); color: var(--accent); transform: rotate(-5deg) translateY(.04em); letter-spacing: 0; }
+.hero h1 .accent { font-style: italic; color: var(--accent); letter-spacing: -.01em; }
 .lead { font-size: clamp(1.08rem, 2.2vw, 1.24rem); line-height: 1.6; color: var(--muted); max-width: 33em; }
 .hero .lead { color: color-mix(in srgb, var(--ink) 82%, var(--bg)); }
 @media (max-width: 559px) {   /* phone: heading, form, reassurance and the example's heading inside the first 844 px */
@@ -223,15 +228,23 @@ strong { font-weight: 600; }
 .meet-cap { margin: 0; display: grid; gap: 4px; font-size: .9rem; line-height: 1.4; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); }
 .meet-cap strong { font: 650 1.12rem/1.3 var(--sans); color: var(--ink); }
 .meet-cap a { color: var(--accent); font-weight: 600; text-underline-offset: 3px; justify-self: start; }
-.meet-pic { flex: 0 0 55%; padding-bottom: 30px; border-radius: 12px; overflow: hidden; background: #16181c; box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
+.meet-pic { flex: 0 0 55%; padding-bottom: 30px; border-radius: 12px; overflow: hidden; background: #16181c; box-shadow: 0 4px 14px rgb(0 0 0 / .14); }
 .meet-pic img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+@media (max-width: 719px) {   /* phone: the video full width under the card (pip.js docks the player over it), the caption below */
+  .meet { flex-direction: column-reverse; align-items: stretch; gap: 12px; }
+  .meet-pic { flex: none; width: 100%; }
+  .meet-cap { display: block; }
+  .meet-cap strong { margin-right: .35em; }
+  .meet-cap a { display: table; margin-top: 4px; }
+  .hero { padding-bottom: 32px; }
+}
 /* under the form: one privacy line; what the server keeps sits behind "What's stored" (privacy.html's facts) */
-.more { margin-top: 2px; }
-.more summary { display: inline-flex; align-items: center; min-height: 32px; cursor: pointer; list-style: none; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.more summary { cursor: pointer; list-style: none; }
 .more summary::-webkit-details-marker { display: none; }
-.more summary::after { content: "+"; margin-left: .35em; font-weight: 700; text-decoration: none; display: inline-block; }
-.more[open] summary::after { content: "\2212"; }
-.more p { margin: 2px 0 6px; font-size: .92rem; line-height: 1.5; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); }
+.more-t { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.more-t::after { content: " +"; }
+.more[open] .more-t::after { content: " \2212"; }
+.more p { margin: 6px 0 0; font-size: .92rem; line-height: 1.5; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); }
 /* Free-scan form: OnlyFans + optional Instagram / X. With JS it scans in place (js/inline-scan.js); without, a plain GET
    to scan/. Stacked on phones; from 560px the OnlyFans field gets its own row, Instagram / X + button share the next
    (one row of three clipped both placeholders and a typed handle at every width up to the 680px cap). */
@@ -258,33 +271,34 @@ strong { font-weight: 600; }
 .scan-field::placeholder { color: var(--muted); opacity: .8; }
 @media (hover: hover) { .scan-field:hover { border-color: var(--muted); } }
 .scan-field:focus { border-color: var(--accent); }
-@media (prefers-color-scheme: dark) { .hero .scan-form .btn-primary { box-shadow: 0 14px 34px -14px rgb(0 0 0 / .6); } }   /* on velvet */
 .scan-platform {
   -webkit-appearance: none; appearance: none; cursor: pointer; padding-right: 2.6em;
   background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23948779' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 1em center / 18px;
 }
-.scan-note { margin: 0 0 14px; color: var(--muted); font-size: .95rem; line-height: 24px; }
+.scan-note { margin: 0 0 12px; color: var(--muted); font-size: .97rem; line-height: 24px; }
+.scan-note strong { color: var(--ink); }
 /* after a scan this line takes the note's place: same slot, same height, nothing under the form moves */
-.scanned { display: flex; gap: .35em; margin: 0 0 14px; color: var(--muted); font-size: .95rem; line-height: 24px; white-space: nowrap; }
+.scanned { display: flex; gap: .35em; margin: 0 0 12px; color: var(--muted); font-size: .95rem; line-height: 24px; white-space: nowrap; }
 .scanned[hidden] { display: none; }
 .scanned > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .scanned strong { color: var(--ink); }
 .scanned .linkish { font: inherit; line-height: inherit; padding: 0; }
 .scanned:not([hidden]) + .scan-note { display: none; }
 .linkish { padding: 0; border: 0; background: none; font: inherit; color: var(--accent, inherit); text-decoration: underline; cursor: pointer; min-height: 24px; }
-.assurances { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 10px; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); font-size: .95rem; line-height: 1.5; max-width: 36em; }
-.assurances li { display: flex; align-items: flex-start; gap: 12px; }
+.assurances { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); font-size: .95rem; line-height: 1.5; max-width: 36em; }
+.assurances li { display: flex; align-items: flex-start; gap: 10px; }
 .assurances .icon { flex: none; width: 18px; height: 18px; margin-top: .15em; color: var(--accent); }
 .assurances a { color: var(--accent); text-underline-offset: 3px; }
 .scan-alt { margin: 0; color: var(--muted); font-size: .95rem; }
 .scan-alt a { color: var(--ink); font-weight: 600; text-decoration-color: var(--accent); text-underline-offset: 4px; }
 @media (hover: hover) { .scan-alt a:hover { color: var(--accent); } }
 /* the track record: real numbers, labelled as such, right under the form (the card beside / below is the example) */
-.proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px clamp(20px, 3vw, 40px); max-width: 36em; margin: 4px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
-.proof-k { grid-column: 1 / -1; margin: 0; font: 600 .78rem/1.4 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
-.proof-k span { margin-left: .8em; font: 500 .9rem/1.4 var(--sans); letter-spacing: 0; text-transform: none; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); }
+.proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px clamp(20px, 3vw, 40px); max-width: 36em; margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.proof-k { grid-column: 1 / -1; margin: 0; font: 600 .97rem/1.4 var(--sans); color: var(--ink); }
+.proof-k span { margin-left: .5em; font: 400 .92rem/1.4 var(--sans); color: color-mix(in srgb, var(--ink) 80%, var(--bg)); }
 .proof-stat { margin: 0; display: grid; gap: 6px; align-content: start; }
-.proof-stat strong { font: 400 clamp(2.2rem, 3.4vw, 2.8rem)/.95 var(--display); color: var(--accent); letter-spacing: -.01em; }
+.proof-stat strong .plus { font: 400 .62em/1 var(--sans); color: inherit; vertical-align: .5em; margin-left: .04em; }   /* Bodoni's + is a hairline */
+.proof-stat strong { font: 500 clamp(2.3rem, 3.4vw, 2.9rem)/.95 var(--display); color: var(--accent); letter-spacing: -.01em; font-variant-numeric: lining-nums; }
 .proof-stat small { font-size: .42em; letter-spacing: 0; color: var(--ink); margin-left: .2em; }
 .proof-stat span { font-size: .95rem; line-height: 1.45; color: color-mix(in srgb, var(--ink) 84%, var(--bg)); }
 @media (max-width: 559px) { .proof-k span { display: block; margin: 4px 0 0; } .proof-stat strong { font-size: 2.2rem; } .proof-stat span { font-size: .9rem; } }
@@ -357,7 +371,7 @@ strong { font-weight: 600; }
   .rm-stage { filter: brightness(.86) saturate(.95); }
 }
 /* Where I remove from: the other velvet room, centred, the four mock-ups on paper */
-.rm.section-alt { background: radial-gradient(70% 50% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%), var(--bg); box-shadow: none; color: var(--ink); }
+.rm.section-alt { background: var(--bg); box-shadow: none; color: var(--ink); }
 @media (min-width: 720px) {
   .rm .section-head { margin-inline: auto; text-align: center; }
   .rm .section-head .eyebrow { justify-content: center; }
@@ -491,8 +505,6 @@ strong { font-weight: 600; }
 .m-video .m-title { font-size: .8rem; margin-bottom: 0; }
 /* #free: one phone, Google for her handle; js/inline-scan.js fills it with her results (links, Reveal) */
 .free-phone { margin: 0; display: grid; justify-items: center; min-width: 0; position: relative; }
-.free-phone::before { content: ""; position: absolute; z-index: -1; left: 50%; top: 50%; width: min(420px, 100%); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 14%, transparent), transparent); }
 .phone-free { width: 288px; aspect-ratio: 9 / 16; }
 .m-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; margin: 2px 0 6px; font-size: .74rem; color: #5f6368; }
 .phone .reveal-btn { min-height: 30px; padding: 0 10px; border-color: #dadce0; background: #fff; color: #202124; font-size: .72rem; }
@@ -550,11 +562,10 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .why-grid { display: grid; gap: 36px; }
 @media (min-width: 960px) { .why-grid { grid-template-columns: 1fr 1fr; gap: 48px 72px; } }
 .why-intro p:not(.eyebrow) { color: var(--muted); font-size: 1.1rem; }
-.why-intro em { font-style: normal; }
 .person { display: flex; align-items: center; gap: 16px; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
 .person img { border-radius: 50%; box-shadow: var(--shadow); }
 .person p { margin: 0 !important; font-size: .97rem !important; line-height: 1.45; }
-.person strong { color: var(--ink); font: 400 1.7rem/1.1 var(--script); margin-bottom: 2px; }
+.person strong { display: block; color: var(--ink); font: 600 1.05rem/1.3 var(--sans); margin-bottom: 2px; }
 .why-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; align-content: start; border-top: 1px solid var(--line); }
 .why-points .card { display: flex; gap: 20px; align-items: flex-start; padding: 26px 0; background: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; }
 .why-points .icon-badge { margin: 0; }
@@ -580,8 +591,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   .plan .ticks { gap: 8px; font-size: 1rem; }
   .faq summary { padding: 18px 4px; font-size: 1.04rem; }
 }
-.record { grid-column: 1 / -1; position: relative; margin: clamp(32px, 5vw, 56px) 0 0; padding: clamp(32px, 5vw, 60px) clamp(28px, 5vw, 64px); border-radius: 28px; background: var(--bg);
-  background-image: radial-gradient(70% 120% at 100% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%); overflow: hidden; }
+.record { grid-column: 1 / -1; position: relative; margin: clamp(32px, 5vw, 56px) 0 0; padding: clamp(32px, 5vw, 60px) clamp(28px, 5vw, 64px); border-radius: 28px; background: var(--bg); overflow: hidden; }
 .record p { font: 400 clamp(2rem, 4vw, 2.9rem)/1.12 var(--display); margin-bottom: .6em; max-width: 22em; text-wrap: balance; }
 .record footer { font-size: 1.02rem; color: var(--muted); max-width: 52em; }
 
@@ -593,23 +603,23 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .stage-k { display: flex; align-items: center; gap: 10px; min-height: 26px; margin: 0 0 8px; color: var(--muted); font-size: .95rem; font-weight: 600; }
 .stage h3 { font: 650 1.25rem/1.3 var(--sans); margin: 0 0 16px; }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
-.step { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; }
-.step-n { color: var(--accent); font: 700 1.25rem/1.35 var(--sans); }
+@media (min-width: 1100px) { .steps { grid-template-columns: 1fr 1fr; gap: 28px; } .step { grid-template-columns: 1fr; gap: 10px; } }   /* desktop: the four steps in one row, numeral on top */
+.step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; }
+.step-n { color: var(--accent); font: 500 2.6rem/.9 var(--display); }
 .step h4 { margin: 0 0 4px; font: 650 1.02rem/1.35 var(--sans); }
 .step p { margin: 0; color: var(--muted); font-size: .95rem; line-height: 1.55; }
 .tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); font-size: .82rem; font-weight: 600; }
 
 /* Showcase */
 .browser-demo iframe { width: 100%; height: clamp(480px, 70vh, 720px); border: 0; background: var(--surface-2); }
-@media (max-width: 559px) { .browser-demo iframe { height: 440px; } .ba .phone { width: 270px; } .browser-demo + .center { margin-top: 18px; } }   /* the demo's hero to its button; one phone, a bit smaller */
+@media (max-width: 559px) { .browser-demo iframe { height: 504px; } .ba .phone { width: 270px; } .browser-demo + .center { margin-top: 18px; } }   /* the demo's hero to its button; one phone, a bit smaller */
 .browser-demo + .center { margin-top: 28px; }
 
 /* Pricing: the monthly plan in velvet, the one-time on paper */
 .plans { display: grid; gap: 20px; }
 @media (min-width: 820px) { .plans { grid-template-columns: 1fr 1fr; gap: 24px; align-items: stretch; } }
 .plan { display: flex; flex-direction: column; border-radius: 24px; }
-.plan-feature { background: var(--bg); border-color: var(--bg); box-shadow: var(--shadow-lg);
-  background-image: radial-gradient(80% 60% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%); }
+.plan-feature { background: var(--bg); border-color: var(--bg); box-shadow: var(--shadow-lg); }
 .plan-kind { margin: 0 0 .5em; font: 500 .95rem/1.4 var(--sans); color: var(--muted); }
 .plan h3 { font: 600 1.4rem/1.25 var(--sans); margin-bottom: .2em; }
 .price { display: flex; align-items: baseline; gap: 10px; margin: 14px 0 24px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
@@ -647,8 +657,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 
 /* Contact: a velvet letter, signed */
 .contact { padding-top: clamp(56px, 8vw, 96px); }
-.contact-card { position: relative; max-width: 960px; margin-inline: auto; text-align: center; padding: clamp(40px, 7vw, 80px) clamp(20px, 5vw, 64px); border-radius: 32px; background: var(--bg);
-  background-image: radial-gradient(60% 80% at 50% 0%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 70%); box-shadow: var(--shadow-lg); }
+.contact-card { position: relative; max-width: 960px; margin-inline: auto; text-align: center; padding: clamp(40px, 7vw, 80px) clamp(20px, 5vw, 64px); border-radius: 32px; background: var(--bg); box-shadow: var(--shadow-lg); }
 .contact-avatar { margin: 0 auto 22px; border-radius: 50%; box-shadow: 0 0 0 4px var(--bg), 0 0 0 5px color-mix(in srgb, var(--accent) 50%, transparent); }
 .contact-card h2 { max-width: 16em; margin-inline: auto; }
 .contact-card > p { color: var(--muted); font-size: 1.1rem; max-width: 34em; margin-inline: auto; }
