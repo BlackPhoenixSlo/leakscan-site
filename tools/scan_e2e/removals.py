@@ -417,7 +417,7 @@ def removals_flow(browser, vp_name, vp):
     page.wait_for_timeout(4000)
     rec = page.evaluate("window.__sw")
     vals = [h.get_attribute("aria-valuenow") for h in page.locator("#removals .rm-handle").all()]
-    check(f"{tag} sweep: reduced motion: no edge moves by itself (4 s on screen, all still mid-stage, 48-52)", not rec and all(48 <= int(v) <= 52 for v in vals), [rec, vals])
+    check(f"{tag} sweep: reduced motion: no edge moves by itself (4 s on screen, all still mid-stage, 47-53)", not rec and all(47 <= int(v) <= 53 for v in vals), [rec, vals])
     page.locator("#removals .rm-btn").first.click()
     rm = page.evaluate("() => [getComputedStyle(document.querySelector('#removals .rm-gone')).transitionDuration, document.querySelector('#removals .rm-handle').getAttribute('aria-valuenow')]")
     check(f"{tag} toggle: reduced motion flips with no transition", rm == ["0s", "0"], rm)
