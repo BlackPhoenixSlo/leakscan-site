@@ -8,7 +8,7 @@
 // (an iframe started before it holds it, its images too; load is ~1 s on Fast 4G), shown over the poster once its video has
 // a frame. FCP / LCP measured unchanged. Fixed, out of the flow: CLS 0.
 // Placement (Jack's iPhone): position fixed, top-anchored. The home spot = top-right under the sticky header / report nav,
-// min(320px, 45vw); computed ONCE per width from where the scan inputs / Scan now / "Scanned @…" line / CTA bar / Ask-AI
+// min(320px, 45vw) (computer: min(640px, 45vw)); computed ONCE per width from where the scan inputs / Scan now / "Scanned @…" line / CTA bar / Ask-AI
 // launcher / Reveal pill sit at scrollY 0: if it would cover them it gets smaller (>= 168 px) rather than lower (moved below
 // them only if even that covers them). Never re-placed by a scroll (so it stays put while the page scrolls under it); a
 // width / orientation change recomputes it; a height-only change (iOS URL bar, visualViewport resize) moves nothing unless
@@ -20,9 +20,9 @@
 // min(960px, 70vw) centred, fixed right under the sticky header; the page keeps scrolling under it (no lock, nothing over
 // the rest). There a tap on the picture = play / pause; drag it down (follows the finger: translate + scale toward the mini
 // spot; released past 30% or flung down = mini, else snaps back), the chevron button or Esc = back to the mini player.
-// Docked (>= 720 px wide only, and only while that whole spot is on screen under the header): absolute, ~55% of the card's
-// width, hanging off its bottom-right corner (<= 25% of the card, never over a link / button / input: else just outside that
-// corner, else the home spot); re-placed on scroll / when the card changes (in-page scan → report card). Drag (pointer
+// Docked (>= 720 px wide only, and only while that whole spot is on screen under the header): absolute, 2 x 55% of the card's
+// width, over the card's lower right and poking out of its bottom-right corner (it may cover the card's rows, never the scan
+// inputs / Scan now / "Scanned" line: else the home spot); re-placed on scroll / when the card changes (in-page scan → report card). Drag (pointer
 // events, touch too): it stays where it is dropped (kept on-screen, under the header, above the phone toolbar); fling /
 // drag past the left, right or bottom edge → tucked off-screen, a tab with a chevron beside where it went (tap / drag inward
 // = back); Esc (focus inside) tucks. Resize: the top-left corner grip (drag, arrow keys) or a pinch, 16:9, 168 px .. 60%
@@ -37,7 +37,6 @@
   if (!forced && !auto) return;
   var VIDEO = new URL('../video/', me.src);
   var TOP = ['.site-header', '.rnav'], AVOID = ['#scan input', '#scan button[type=submit]', '[data-p=scanned]', '.mobile-cta', '.askai-launcher', '.ph-reveal'];
-  var LIVE = 'a[href], button, input, select, textarea, summary, label, [role="tab"], [role="button"], [tabindex]:not([tabindex="-1"])';
   var EMBED = '.vo{--nb-h:0px}.vo-page{min-height:0;display:block}.vo-stage{width:100vw}.vo-nb,.vo-ui,.vo-wait{display:none!important}';
   var SVG = function (d, c) { return '<svg' + (c ? ' class="' + c + '"' : '') + ' viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + d + '</svg>'; };
   var I = { x: SVG('<path d="M18 6 6 18M6 6l12 12"/>'), exp: SVG('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>'),
@@ -65,26 +64,17 @@
   function vh() { return window.visualViewport ? Math.min(innerHeight, visualViewport.height) : innerHeight; }
   function bot() { return innerWidth < 720 && matchMedia('(pointer: coarse)').matches ? 88 : 8; }   // touch phone: Safari's bottom toolbar
 
-  // ---------- docked: off the hero card's bottom-right corner ----------
-  function dockAt() {   // → viewport rect {x, y, w} or null (no safe spot)
+  // ---------- docked: over the hero card's lower right, poking out of its bottom-right corner ----------
+  function dockAt() {   // → viewport rect {x, y, w} or null (it would cover the form)
     var r = card && card.getBoundingClientRect();
     if (!r || !r.width) return null;
-    var w = Math.round(r.width * DOCK), h = Math.round(w * 9 / 16) + BAR, W = vw();
-    var fit = function (x) { return Math.max(12, Math.min(x, W - w - 12)); };
-    var spots = [{ x: fit(r.right - w * 0.7), y: r.bottom - h * 0.7 }, { x: fit(r.right - w), y: r.bottom + 10 }];
-    var live = [].filter.call(document.querySelectorAll(LIVE), function (el) {
-      if (pip.contains(el) || tab.contains(el) || el.closest('.askai-launcher, .mobile-cta')) return false;   // fixed ones: they sit above the docked player (z)
-      return !!vis(el);
-    }).map(function (el) { return el.getBoundingClientRect(); });
-    for (var i = 0; i < spots.length; i++) {
-      var s = spots[i], ix = Math.max(0, Math.min(s.x + w, r.right) - Math.max(s.x, r.left)), iy = Math.max(0, Math.min(s.y + h, r.bottom) - Math.max(s.y, r.top));
-      if (ix * iy > 0.25 * r.width * r.height) continue;
-      var hit = live.some(function (b) { return b.right > s.x - 4 && b.left < s.x + w + 4 && b.bottom > s.y - 4 && b.top < s.y + h + 4; });
-      if (!hit) return { x: s.x, y: s.y, w: w };
-    }
-    return null;
+    var w0 = r.width * DOCK, h0 = w0 * 9 / 16 + BAR, w = Math.round(w0 * 2), h = Math.round(w * 9 / 16) + BAR, W = vw();
+    var s = { x: Math.max(12, Math.min(r.right + w0 * 0.3 - w, W - w - 12)), y: r.bottom + h0 * 0.3 - h };   // 2x, grown up-left from #79's corner
+    var form = [];   // it may cover the card's own rows (Jack, 2026-11-06), never the scan form
+    AVOID.slice(0, 3).forEach(function (q) { document.querySelectorAll(q).forEach(function (el) { var b = vis(el); if (b) form.push(b); }); });
+    return form.some(function (b) { return b.right > s.x - 4 && b.left < s.x + w + 4 && b.bottom > s.y - 4 && b.top < s.y + h + 4; }) ? null : { x: s.x, y: s.y, w: w };
   }
-  var DOCK = 0.55, BAR = 40, MIN = 168;   // docked width = 55% of the card; bar = 4 x 40 px buttons (+ 8 px padding = MIN)
+  var DOCK = 0.55, BAR = 40, MIN = 168;   // docked width = 2 x 55% of the card; bar = 4 x 40 px buttons (+ 8 px padding = MIN)
   function lim(w) {   // 16:9 + bar, MIN .. 60% (phone 90%) of the width, and it fits the screen's height
     var W = vw(), max = Math.min(W * (innerWidth < 720 ? 0.9 : 0.6), (vh() - topInset() - 8 - BAR) * 16 / 9);
     return Math.round(Math.max(MIN, Math.min(w, max)));
@@ -116,7 +106,7 @@
 
   // ---------- floating: corner, kept under the sticky header / nav and off the obstacles ----------
   function homeAt() {   // the default spot {x, y, w}: computed once per width (never per scroll: a top-anchored box stays put)
-    var W = vw(), ph = innerWidth < 720, w = S.w ? lim(S.w) : Math.round(Math.min(320, innerWidth * 0.45)), k = W + ':' + w;
+    var W = vw(), ph = innerWidth < 720, w = S.w ? lim(S.w) : Math.round(Math.min(ph ? 320 : 640, innerWidth * 0.45)), k = W + ':' + w;   // computer: 2x (Jack)
     if (home && home.k === k) return home; var sy = scrollY;
     var top = topInset(), m = ph ? 12 : 24, rs = [];
     AVOID.forEach(function (s) { document.querySelectorAll(s).forEach(function (el) {   // where they are at scrollY 0 (fixed ones: where they are)

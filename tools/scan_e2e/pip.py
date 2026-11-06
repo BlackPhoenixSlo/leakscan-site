@@ -31,13 +31,6 @@ PIP_NOT = """(sel) => [...document.querySelectorAll(sel)].filter(e => { const r 
   .map(e => { const r = e.getBoundingClientRect(), H = window.visualViewport ? visualViewport.height : innerHeight, ys = [r.top + 2, r.top + r.height / 2, r.bottom - 2].filter(y => y >= 0 && y < H),
     xs = [r.left + 4, r.left + r.width / 2, r.right - 4];
     return ys.every(y => xs.every(x => { const h = document.elementFromPoint(x, y); return !h || !h.closest('.pip, .pip-tab'); })); })"""
-# what is under the docked player: elementFromPoint on a 12x8 grid over its box with the player hidden; any link / button / input there = covered
-PIP_UNDER = """() => { const p = document.querySelector('.pip'), r = p.getBoundingClientRect(), out = new Set();
-  p.style.visibility = 'hidden'; const LIVE = 'a[href], button, input, select, textarea, summary, label, [role="tab"], [role="button"], [tabindex]:not([tabindex="-1"])';
-  for (let i = 0; i <= 12; i++) for (let j = 0; j <= 8; j++) { const x = r.left + 1 + (r.width - 2) * i / 12, y = r.top + 1 + (r.height - 2) * j / 8;
-    if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
-    const h = document.elementFromPoint(x, y), l = h && h.closest(LIVE); if (l && !l.closest('.askai-launcher, .mobile-cta, .pip-tab')) out.add((l.className || l.tagName) + ':' + (l.textContent || '').trim().slice(0, 20)); }
-  p.style.visibility = ''; return [...out]; }"""
 
 
 # inside the player's iframe: pause, seek to t (Range, as Pages serves it), then the <video> source / duration, a 64x36
@@ -181,8 +174,10 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     def shot(pg, name):
         pg.screenshot(path=str(cfg.out / f"{tag.split()[0]}-pip-{name}.png"))
 
-    def float_default(s):   # top-right at min(320 px, 45vw), in the top half
-        return s["mode"] == "float" and abs(s["box"][2] - min(320, 0.45 * s["vw"])) <= 1 and s["box"][0] + s["box"][2] == s["vw"] - M and s["hdr"] <= s["box"][1] < s["vh"] / 2
+    FW = 320 if phone else 640   # default floating width: min(FW, 45vw) (computer: 2x, Jack 2026-11-06)
+
+    def float_default(s):   # top-right at min(FW, 45vw), in the top half
+        return s["mode"] == "float" and abs(s["box"][2] - min(FW, 0.45 * s["vw"])) <= 1 and s["box"][0] + s["box"][2] == s["vw"] - M and s["hdr"] <= s["box"][1] < s["vh"] / 2
 
     def top_right(s):   # right under the header / nav, at the right edge
         return s["mode"] == "float" and s["box"][0] + s["box"][2] == s["vw"] - M and 0 <= s["box"][1] - s["hdr"] <= 8 + 1 + (0 if phone else 16)
@@ -204,12 +199,13 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         ix = max(0, min(b[0] + b[2], c[0] + c[2]) - max(b[0], c[0])); iy = max(0, min(b[1] + b[3], c[1] + c[3]) - max(b[1], c[1]))
         cov = ix * iy / (c[2] * c[3])
         MEASURED[f"{tag} dock {what}"] = {"pip": b, "card": c, "coverage": round(cov, 3)}
-        check(f"{tag} dock: {what}: docked, 55% of the card wide, hanging off its bottom-right corner",
-              s["mode"] == "dock" and abs(b[2] - round(c[2] * 0.55)) <= 1 and b[0] + b[2] >= c[0] + c[2] - 13 and b[1] + b[3] > c[1] + c[3] and b[1] > c[1] + c[3] * 0.5 and ratio_ok(s), [b, c])
-        check(f"{tag} dock: {what}: covers <= 25% of the card", cov <= 0.25, round(cov, 3))
-        under = pg.evaluate(PIP_UNDER)
+        w0 = c[2] * 0.55; h0 = w0 * 9 / 16 + 40   # #79's docked box; now 2x, grown up-left from its bottom-right corner
+        check(f"{tag} dock: {what}: docked, 2 x 55% of the card wide, bottom-right corner where #79's was (card corner + 30%)",
+              s["mode"] == "dock" and abs(b[2] - round(2 * w0)) <= 1 and (abs(b[0] + b[2] - (c[0] + c[2] + 0.3 * w0)) <= 2 or b[0] + b[2] == s["vw"] - 12)
+              and abs(b[1] + b[3] - (c[1] + c[3] + 0.3 * h0)) <= 2 and ratio_ok(s), [b, c])
+        fok, fr = form_clear(pg)
         ok, d = clear(pg)
-        check(f"{tag} dock: {what}: no link / button / input under it (grid), Scan now / header / Ask-AI still clickable", not under and ok, [under, d])
+        check(f"{tag} dock: {what}: scan inputs / Scan now / Scanned line not under it (it may cover the card's rows), header / Ask-AI still clickable", fok and ok, [fr, d, round(cov, 3)])
         check(f"{tag} dock: {what}: start spot off the screen corner (up / left of it)", not (0 <= s["vw"] - (b[0] + b[2]) <= 24 and 0 <= s["vh"] - (b[1] + b[3]) <= 24), b)
 
     # vis: Jack's iPhone report (no player after a scan): landing, no interaction, dark + light; fresh / after a stored scan
@@ -415,7 +411,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     s = ready(pg, "scan/?r=demoR3port01", wake=False)
     lz = pg.evaluate("() => [window.__pipAt, performance.getEntriesByType('navigation')[0].loadEventEnd]")
     check(f"{tag} vis: no lazy wait: player + iframe created before the page's load event", lz[0] and lz[0] < lz[1], lz)
-    check(f"{tag} appear: top-right, {'45% of the screen' if phone else '320 px'} wide, 16:9 picture", float_default(s) and ratio_ok(s), [s["box"], s["pic"]])
+    check(f"{tag} appear: top-right, {'45% of the screen' if phone else '640 px'} wide, 16:9 picture", float_default(s) and ratio_ok(s), [s["box"], s["pic"]])
     check(f"{tag} bar: on the picture only the close X (top-right, >= 40 px) and the 28 px resize corner (top-left), 40 px bar", s["overPic"] == 1 and x_ok(s)
           and s["box"][3] - s["pic"][3] == 40 and s["grip"] == [0, 0, 28, 28], [s["overPic"], s["xbox"], s["box"], s["pic"], s["grip"]])
     check(f"{tag} bar: exactly play / sound / expand, each a >= 40x40 px button, no link",
@@ -610,7 +606,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
       .filter(e => getComputedStyle(e).visibility !== 'hidden').map(e => { const r = e.getBoundingClientRect(); return r.left < p.right && r.right > p.left && r.top < p.bottom && r.bottom > p.top; }); }""")
     ok, d = clear(pg)
     check(f"{tag} vis: cycle: hero out of view → floating top-right under the header, normal size, clear of the CTA bar / Ask-AI launcher",
-          s["on"] and top_right(s) and on_screen(s) and abs(s["box"][2] - min(320, 0.45 * s["vw"])) <= 1 and not any(ov) and ok, [s["box"], s["hdr"], ov, d])
+          s["on"] and top_right(s) and on_screen(s) and abs(s["box"][2] - min(FW, 0.45 * s["vw"])) <= 1 and not any(ov) and ok, [s["box"], s["hdr"], ov, d])
     shot(pg, "9-landing-floating")
     pg.evaluate("scrollTo(0, 0)"); pg.wait_for_timeout(300)
     if phone:
