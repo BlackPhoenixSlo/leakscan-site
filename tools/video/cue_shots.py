@@ -2079,7 +2079,7 @@ def main():
         assert k == 1, "break: google's data-cue-removed not found"
         BREAK["gtime"] = (lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), html, "text/html")
     if a.break_blur:   # wire boundary: css/video.css with the old blur(5px) on .vo .rm-img / .vo-real
-        css, k = re.subn(r"blur\(2px\)", "blur(5px)", BREAK["full"][1] if "full" in BREAK else (ROOT / "site/css/video.css").read_text(encoding="utf-8"))
+        css, k = re.subn(r"filter: blur\(2px\)", "filter: blur(5px)", BREAK["full"][1] if "full" in BREAK else (ROOT / "site/css/video.css").read_text(encoding="utf-8"))
         assert k == 2, f"break: {k} blur(2px) in video.css"
         BREAK["blur"] = ("**/css/video.css", css, "text/css")
     fl = {k: tuple(map(float, re.search(r'data-prefab="%s" data-cue-in="([\d.]+)" data-cue-out="([\d.]+)"' % k, html).groups())) for k in ("intro", "sites")}
