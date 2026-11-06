@@ -175,7 +175,8 @@ def hero_card(run):
     an = page.evaluate("window.__anim.map(a => [a[0].map(k => parseFloat(k.height)), a[1]])")
     hf = page.evaluate("document.querySelector('.report-card').offsetHeight")
     check(f"{tag} hero: the card eases twice, no snap: at Scan up to the skeleton (about the report's height), then to the result's exact height (~320 ms each)",
-          len(an) == 2 and an[0][0][1] > an[0][0][0] + 200 and abs(an[1][0][1] - hf) <= 1 and abs(hf - an[0][0][1]) <= 0.15 * hf
+          (len(an) == 2 or (len(an) == 1 and abs(an[0][0][1] - hf) < 2))   # skeleton already at the result's height: inline-scan.js skips the 2nd ease
+          and an[0][0][1] > an[0][0][0] + 200 and abs(an[-1][0][1] - hf) <= 1 and abs(hf - an[0][0][1]) <= 0.15 * hf
           and all(200 <= a[1] <= 500 for a in an), [an, hf])
     slug = parse_qs(urlsplit(page.url).query).get("r", [""])[0]
     d = served(slug)   # the oracle: what the API sent for this report
