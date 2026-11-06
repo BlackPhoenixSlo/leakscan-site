@@ -8,5 +8,8 @@
 - **Photos**: the showcase demo (`site/showcase/imgs/`) uses Pexels photos (Pexels License), credited per file in
   `tools/showcase/CREDITS.md`. The landing page reuses small crops of those same photos (the fictional demo creator's
   "own" pictures) in two places: `site/assets/phone/` (After phone, Images / Videos tabs) and `site/img/removals/`
-  (blurred thumbnails in the `#removals` mock-ups). Everything else on the landing pages is CSS/SVG drawn for this site
-  (device mockups, gradient thumbnails, initials avatar). Google's name and colours appear only inside illustrative mockups.
+  (blurred thumbnails in the `#removals` mock-ups). The `/video/` demo reuses those same crops in its cards.
+  Everything else on the landing pages is CSS/SVG drawn for this site (device mockups, gradient thumbnails, initials
+  avatar). Google's name and colours appear only inside illustrative mockups.
+- **Video**: `site/video/` ships one file, `jack.webm`, a 40 s placeholder rendered for this site (a drawn silhouette
+  and a timecode, no stock footage), to be replaced by Jack's own recording (see `site/video/CUES.md`).
