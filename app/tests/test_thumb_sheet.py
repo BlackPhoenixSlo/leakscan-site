@@ -22,7 +22,7 @@ G = "https://encrypted-tbn0.gstatic.com/images?q=tbn:"
 class Up:
     """Stands in for _THUMB_OPENER: url → bytes / an exception; counts every fetch."""
     def __init__(self):
-        self.calls, self.lock, self.delay, self.answers = [], threading.Lock(), 0, {}
+        self.calls, self.lock, self.delay, self.answers, self.reads = [], threading.Lock(), 0, {}, []
 
     def open(self, req, timeout=None):
         u = req.full_url
@@ -34,6 +34,7 @@ class Up:
             raise a
         ctype, body = a if isinstance(a, tuple) else ("image/jpeg; x=1", a)
         r = io.BytesIO(body)
+        read, r.read = r.read, lambda n=-1: (self.reads.append(n), read(n))[1]
         r.headers = {"Content-Type": ctype}
         r.__enter__ = lambda: r
         return _Ctx(r)
@@ -129,7 +130,7 @@ class TestThumbSheet(unittest.TestCase):
         r, body = self.get("slug0002")
         m, got = parse(body)
         self.assertEqual(list(got), [G + "ok"])
-        self.assertEqual(sorted(m["dead"]), sorted(G + k for k in ("404", "html", "big")))   # 500 / 429 / net: per-thumb in the client
+        self.assertEqual(sorted(m["dead"]), sorted(G + k for k in ("404", "html")))   # big / 500 / 429 / net: per-thumb in the client
         self.assertEqual(r.getheader("Cache-Control"), "public, max-age=300")   # gaps: briefly
         self.assertEqual(self.get("slug0002")[1], body)
         self.assertEqual(len(self.up.calls), 7)                                 # served from disk
@@ -163,8 +164,16 @@ class TestThumbSheet(unittest.TestCase):
         self.assertEqual(m["dead"], [])
         self.up.answers[G + "huge"] = b"x" * (thumb_sheet.MAX_CELL_BYTES + 1)
         self.row("slug0005", [G + "huge", G + "fine"])
-        m, got = parse(self.get("slug0005")[1])
-        self.assertEqual((list(got), m["dead"]), ([G + "fine"], []))
+        r, body = self.get("slug0005")
+        m, got = parse(body)
+        self.assertEqual((list(got), m["dead"], r.getheader("Cache-Control")), ([G + "fine"], [], "public, max-age=300"))
+
+    def test_a_build_reads_no_more_than_a_cell(self):
+        self.up.answers[G + "huge"] = b"x" * (public_app.THUMB_MAX_BYTES + 1)
+        self.assertIsNone(thumb_sheet.fetch(G + "huge", self.up, public_app.THUMB_MAX_BYTES))
+        self.assertEqual(self.up.reads, [thumb_sheet.MAX_CELL_BYTES + 1])
+        self.assertIsNone(thumb_sheet.fetch(G + "huge", self.up, 10))   # a lower limit of the caller's holds too
+        self.assertEqual(self.up.reads[-1], 11)
 
     def test_no_sheet_cases(self):
         self.row("slug0006", [], [])

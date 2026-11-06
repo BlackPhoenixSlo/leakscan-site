@@ -40,7 +40,8 @@ Serves site/ and the API routes of the contract the scan page talks to:
   logo_png(): a flat site-logo PNG (no person photo: the image views must drop it). STALE → no ACAO unless the URL has
   ?c=1 (a copy cached before the API sent CORS: the views retry once on E.fresh's URL, then drop the logo).
 - GET /api/thumb-sheet/<slug> → app/thumb_sheet.py's body from the same bytes (DEAD in dead[]; NOCELL in neither list). --sheet / POST
-  /__stub/sheet?mode=off|on|500|slow|cut: off (default) = 404, an API without it (every other scenario: the per-thumb path). GET /api/_thumb-log,
+  /__stub/sheet?mode=off|on|500|slow|cut|first: off (default) = 404, an API without it (every other scenario: the per-thumb path); first = on, the
+  result held 1.5 s (a warm sheet: its manifest is read before the JSON). A STALL thumb: no answer for 16 s, then the connection drops. GET /api/_thumb-log,
   /api/_sheet-log: what reached the server. --thumb-bucket rate:burst: /api/thumb's bucket (the API's: 120:60); --seed, --thumb-dir: a saved
   result + real thumb bytes, for local probes only (never committed).
 - demoBrokenT1: the fixture with three page-result thumbs swapped for DEAD / BLANK ones (images[] too), page result #7's
@@ -338,6 +339,8 @@ class Handler(RangeHandler):
         u = urlsplit(self.path)
         if u.path.startswith("/api/scan-result/"):
             slug = u.path.rsplit("/", 1)[1]
+            if OPTS.sheet == "first":
+                time.sleep(1.5)
             return self.send_json(200, STORE[slug]) if slug in STORE else self.send_json(404, {"error": "not_found"})
         if u.path.startswith("/api/profile/"):
             slug = u.path.rsplit("/", 1)[1]
@@ -413,6 +416,10 @@ class Handler(RangeHandler):
                 return self.send_json(400, {"error": "bad_url"})
             if "DEAD" in src:
                 return self.send_json(404, {"error": "not_found"})
+            if "STALL" in src:
+                time.sleep(16)
+                self.close_connection = True
+                return
             ctype, body = thumb_bytes(src)
             self.send_response(200)
             if "STALE" not in src or "c" in parse_qs(u.query):   # STALE: a copy cached before ACAO (no CORS) unless ?c=1

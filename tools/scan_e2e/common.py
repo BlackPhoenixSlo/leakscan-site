@@ -50,6 +50,8 @@ BREAKS = {
     "incremental": ("scan.js", "SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50",
                     "SITES_STEP = 1e9, MORE_SITES = 1e9, LINKS_STEP = 1e9, MORE_LINKS = 1e9"),
     "sheet500": ("scan-engine.js", "var SHEET_MS = ", "var SHEET_MS = "),   # no script change: scan_e2e/sheet.py sets the stub's sheet endpoint to 500
+    "sheetdead": ("scan-engine.js", "{ img.removeAttribute('src'); return setTimeout(function () { img.dispatchEvent(new Event('error')); }); }", "return setTimeout(function () { img.dispatchEvent(new Event('error')); });"),   # a dead thumb's img keeps its old src
+    "askstall": ("scan-engine.js", "function () { ctl.abort(); }, ASK_MS", "function () {}, ASK_MS"),   # a stalled status holds the queue
 }
 
 # the run: set once by configure(); scenarios read cfg.out / cfg.base / cfg.api / cfg.broken

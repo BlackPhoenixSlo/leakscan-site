@@ -411,9 +411,10 @@
   // crossorigin) refused (no status) loads once more on fresh()'s URL, then plain (pixels unread: kept). Anything else is dead at once
   // (the proxy answers 404 / 4xx / 502 for a thumb Google no longer serves). Also right for an image that finished before it was
   // watched. A tile taken off the page is not retried and gets no verdict; a free-standing image (gallery()'s probe) is retried.
-  var BLANK_PX = 16, RETRY_MS = 2500, asks = [], asking = false, coolUntil = 0;
+  var BLANK_PX = 16, RETRY_MS = 2500, ASK_MS = 10000, asks = [], asking = false, coolUntil = 0;
   // One status at a time per page (a frame uses its page's queue): one 429 stops all of them for RETRY_MS, so an empty bucket gets
   // what it refills, not a retry chain per thumb (each a new 429, each tile it kills pulling in the next): answer(status, response).
+  // No headers in ASK_MS: status 0, the queue goes on.
   function askStatus(src, answer) {
     if (host) return host.askStatus(src, answer);
     asks.push([src, answer]);
@@ -423,8 +424,9 @@
     if (asking || !asks.length) return;
     asking = true;
     setTimeout(function () {
-      var job = asks.shift();
-      fetch(job[0], { credentials: 'omit', referrerPolicy: 'no-referrer' }).catch(function () { return { status: 0 }; }).then(function (r) {
+      var job = asks.shift(), ctl = window.AbortController ? new AbortController() : null, timer = ctl && setTimeout(function () { ctl.abort(); }, ASK_MS);
+      fetch(job[0], { credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined }).catch(function () { return { status: 0 }; }).then(function (r) {
+        clearTimeout(timer);
         asking = false;
         if (r.status === 429) { coolUntil = Date.now() + RETRY_MS; asks.push(job); } else job[1](r.status, r);
         askNext();
@@ -446,7 +448,7 @@
     };
     var load = function () {
       var end = function () { finish(img.naturalWidth >= BLANK_PX && img.naturalHeight >= BLANK_PX && (!photo || isPhoto(img))); };
-      if (photo && img.decode && (img.getAttribute('src') || '').slice(0, 5) === 'blob:') img.decode().then(end, end);   // WebKit draws a big blob image subsampled until decoded: other pixels, another verdict
+      if (photo && img.decode) img.decode().then(end, end);   // WebKit can draw a decoding=async tile not decoded yet as blank: no photo, a false dead
       else end();
     };
     var error = function () {
@@ -670,10 +672,10 @@
     if (!probing[src]) probe(src);
   }
   // While a sheet is on its way a thumb it may name waits (no src: no request, no default image beside her); put(img, null) forgets
-  // img's waiting thumb. A thumb the sheet says is dead fails at once: watchThumb's onDead, no request.
+  // img's waiting thumb. A thumb the sheet says is dead fails at once: watchThumb's onDead, no request, no old src left (removals' demo face).
   function put(img, src) {
     if (!src) return held.delete(img);
-    if (verdicts[src] === false) return setTimeout(function () { img.dispatchEvent(new Event('error')); });
+    if (verdicts[src] === false) { img.removeAttribute('src'); return setTimeout(function () { img.dispatchEvent(new Event('error')); }); }
     if (sheetsOut && !via[src] && !cells[src]) { img.removeAttribute('src'); return held.set(img, src); }
     var p = via[src] || (cells[src] ? { u: cells[src] } : { u: thumb(src), cors: XO });
     if (p.cors) img.crossOrigin = 'anonymous';

@@ -4,8 +4,8 @@ Body: 8 ASCII digits = the manifest's length, the manifest JSON {"cells": [[src,
 then every cell's bytes back to back, in manifest order. The bytes are the thumbs' originals (no re-encode): site/js/scan-engine.js
 makes one blob URL per cell, so what E.isPhoto reads is what /api/thumb would have given.
 
-dead: what /api/thumb would refuse for good (upstream 4xx or redirect, not an image, too large). A thumb in neither list (upstream
-5xx / timeout, past the caps) goes through /api/thumb in the client. Own bucket; upstream fetches share one bounded pool; one build
+dead: what /api/thumb would refuse for good (upstream 4xx or redirect, not an image). A thumb in neither list (upstream 5xx / timeout,
+too big for a cell, past the caps) goes through /api/thumb in the client. Own bucket; upstream fetches share one bounded pool; one build
 per list at a time, the rest wait for it; built sheets sit on disk under a size and age bound (one with gaps only briefly)."""
 import concurrent.futures as cf
 import hashlib
@@ -49,19 +49,20 @@ def thumbs_of(row, hosts):
 
 
 def fetch(u, opener, max_bytes):
-    """api_thumb's upstream fetch → (ctype, bytes), "dead" or None (try again later: not known dead)."""
+    """api_thumb's upstream fetch → (ctype, bytes), "dead" or None (not known dead: try again later; too big for a cell: /api/thumb has its own limit)."""
+    limit = min(max_bytes, MAX_CELL_BYTES)
     try:
         req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0", "Accept": "image/*"})
         with opener.open(req, timeout=8) as r:
             ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             if not ctype.startswith("image/"):
                 return "dead"
-            data = r.read(max_bytes + 1)
+            data = r.read(limit + 1)
     except urllib.error.HTTPError as e:
         return None if e.code >= 500 or e.code == 429 else "dead"
     except Exception:
         return None
-    return "dead" if len(data) > max_bytes else (ctype, data)
+    return None if len(data) > limit else (ctype, data)
 
 
 def pack(cells, dead):
@@ -82,7 +83,7 @@ def _build(urls, opener, max_bytes):
             dead.append(u)
         elif got is None:
             complete = False
-        elif len(got[1]) <= MAX_CELL_BYTES and total + len(got[1]) <= MAX_BYTES:
+        elif total + len(got[1]) <= MAX_BYTES:
             cells.append((u, got[0], got[1]))
             total += len(got[1])
     return pack(cells, dead), complete

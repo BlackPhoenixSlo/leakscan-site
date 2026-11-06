@@ -4,7 +4,7 @@
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet]... [--changed [REF]] [--no-reuse]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
-        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-sheet500]
+        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-sheet500] [--break-sheetdead] [--break-askstall]
 
 Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
 `reused green from <run folder>` and skips the browser; --no-reuse forces a run; --changed runs only what the diff reaches; break runs never touch it.
@@ -42,8 +42,9 @@ aborted and none may be attempted (the demo uses system fonts).
 sheet (app/thumb_sheet.py, E.sheet in js/scan-engine.js; phone, desktop, WebKit iPhone 13): the same report with /api/thumb-sheet off (404, an API
 without it: every other scenario runs so) and on: the landing (hero, #free phone, the phones, removals panels, the video's kept / dropped photos; end card
 count = the report's) and scan/?r= (Images, Videos) show exactly the same, DEAD / BLANK / LOGO dropped alike (E.isPhoto on the same bytes); server's log: one sheet for
-page + iframe, no /api/thumb (a thumb the sheet does not name, and only that, goes there); tiles are <img>s on blob URLs; blur, Reveal; a tile paints before the sheet's body ends; a sheet cut halfway: same landing, only the rest asks /api/thumb.
+page + iframe, no /api/thumb (a thumb the sheet does not name, and only that, goes there); tiles are <img>s on blob URLs; blur, Reveal; a tile paints before the sheet's body ends; a sheet cut halfway: same landing, only the rest asks /api/thumb. Its manifest read before the JSON: a dead thumb's removals tile hidden, no demo face beside her. A status with no headers gives up at 10 s, the next one goes.
 --break-sheet500: the stub answers 500: the views stay the same, only the request-count, blob and read-as-it-arrives checks go red.
+--break-sheetdead: a dead thumb's img keeps its old src: the manifest-first tile and landing checks go red. --break-askstall: the queue waits: the status check goes red.
 
 askai (js/chat.js, the "Ask AI before you DM me" popup): launcher covers no hero text at load (phone: hidden while
 the hero is on screen), visible and clear of the hero CTA (desktop) / sticky bar (phone),

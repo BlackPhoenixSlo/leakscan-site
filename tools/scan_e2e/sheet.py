@@ -31,6 +31,16 @@ PEOPLE = "() => window.VideoOverlays && window.VideoOverlays.photos"
 STREAMED = """() => document.querySelector('.report-card a.gi-card img[src^="blob:"], .phone-free a.gi-card img[src^="blob:"]')?.naturalWidth >= 16
   && !performance.getEntriesByType('resource').some(r => r.name.includes('/api/thumb-sheet/'))"""
 SETTLED = "() => { const p = window.VideoOverlays && window.VideoOverlays.photos; return !!p && p.settled; }"
+ENDS = "() => ['/api/thumb-sheet/', '/api/scan-result/'].map(s => (performance.getEntriesByType('resource').find(r => r.name.includes(s)) || {}).responseEnd || 0)"
+# removals' tiles in the panels that are hers → [the thumb behind it, tile hidden, its src]
+HERS = "() => [...document.querySelectorAll('#removals .rm-card[data-rm-for=scan] .rm-img')].map(i => [i.__for || '', i.parentNode.hidden, i.getAttribute('src')])"
+# video-overlays.js thumbs()' own lines (it only gets kept thumbs, so no real flow hands it a dead one) → back on its default?
+DEFAULT = """(dead) => new Promise(done => { const im = document.querySelector('.rm-img'), def = im.getAttribute('src');
+  im.addEventListener('error', () => { im.removeAttribute('crossorigin'); im.setAttribute('src', def); }, {once: true});
+  window.LeakScanEngine.put(im, dead); setTimeout(() => done(!!def && im.getAttribute('src') === def), 200); })"""
+# two statuses queued, the first gets no headers → [[its status, ms], [the next one's status, ms]]
+ASKS = """(urls) => new Promise(done => { const E = window.LeakScanEngine, t0 = Date.now(), out = [];
+  urls.forEach(u => E.askStatus(E.thumb(u), st => { out.push([st, Date.now() - t0]); if (out.length === 2) done(out); })); })"""
 
 
 def landing(browser, vp_name, vp, slug, opts):
@@ -122,8 +132,7 @@ def sheet_flow(pw, chromium, vp_name, vp, engine="chromium"):
             c0.close()
             mode(on)
             c1, page, net1, rgot, th, sh = report(browser, vp_name, vp, slug, opts)
-            # WebKit: main's per-thumb list is not the same run to run either (E.isPhoto on the fixture's 2000 px stand-ins, undecoded: 2026-11-06-perf-sheet-*/webkit_scanpage): how many, not which
-            same = (len(rgot["images"]), rgot["videos"]) == (len(rbase["images"]), rbase["videos"]) if engine == "webkit" else (sorted(rgot["images"]), rgot["videos"]) == (sorted(rbase["images"]), rbase["videos"])   # sorted: see LANDING
+            same = (sorted(rgot["images"]), rgot["videos"]) == (sorted(rbase["images"]), rbase["videos"])   # sorted: see LANDING
             check(f"{tag} scan page shows the same with the sheet: Images tab tiles, Videos rows", same and not any(x in u for u in rgot["images"] for x in ("DEAD", "BLANK", "LOGO")), {k: (rbase[k], rgot[k]) for k in rbase if rbase[k] != rgot[k]})
             check(f"{tag} scan page: one sheet, no /api/thumb", sh == 1 and th == 0, [sh, th])
             c1.close()
@@ -142,6 +151,21 @@ def sheet_flow(pw, chromium, vp_name, vp, engine="chromium"):
             c1, _, _, got, th1, sh1 = landing(browser, vp_name, vp, slug, opts)
             check(f"{tag} sheet cut halfway: same landing; what came stays, only the rest asks /api/thumb", {k: got[k] for k in got if k != "video"} == {k: start[k] for k in start if k != "video"} and got["video"]["kept"] == start["video"]["kept"]
                   and sh1 == 1 and 0 < th1 < th_start, {"requests": [sh1, th1, th_start], **{k: (start[k], got[k]) for k in start if start[k] != got[k]}})
+            c1.close()
+            mode("first")
+            c1, page, _, got, _, _ = landing(browser, vp_name, vp, slug, opts)
+            ends, hers = page.evaluate(ENDS), page.evaluate(HERS)
+            dead = [x for x in hers if "DEAD" in x[0]]
+            check(f"{tag} manifest first: the sheet is here before the JSON", ends[0] and ends[1] - ends[0] > 200, ends)
+            check(f"{tag} manifest first: a dead thumb's removals tile is hidden, no src left", dead and all(x[1] and not x[2] for x in dead), dead[:3])
+            check(f"{tag} manifest first: every tile showing in her panels is her thumb, no demo face", all(x[1] or (x[2] or "").startswith("blob:") for x in hers), [x for x in hers if not x[1]][:3])
+            check(f"{tag} manifest first: same landing (gallery tiles, removals tiles)", {k: got[k] for k in got if k != "video"} == {k: start[k] for k in start if k != "video"} and got["video"]["kept"] == start["video"]["kept"], {k: (start[k], got[k]) for k in start if start[k] != got[k]})
+            fr = page.query_selector(".pip iframe").content_frame()
+            check(f"{tag} video .rm-img on a dead thumb: back on its default", fr.evaluate(DEFAULT, dead[0][0] if dead else ""))
+            if vp_name == "phone":
+                g = "https://encrypted-tbn0.gstatic.com/images?q=tbn:"
+                asks = page.evaluate(ASKS, [g + "STALL0001placeholder", g + "DEMO0001placeholder"])
+                check(f"{tag} a status with no headers gives up at 10 s (status 0), the next one goes", asks[0][0] == 0 and 9000 < asks[0][1] < 14000 and asks[1][0] == 200 and asks[1][1] < 15000, asks)
             c1.close()
     finally:
         mode("off")
