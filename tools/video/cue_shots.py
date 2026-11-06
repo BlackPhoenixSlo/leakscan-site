@@ -834,11 +834,13 @@ def hers(b, base, out, raw_file, no_prod):
         ctx, ext, seen = context(opts, False)
         lp = ctx.new_page()
         lp.goto(f"{base}?pip=1")
-        lp.mouse.wheel(0, 200) if label == "1920" else lp.evaluate("scrollBy(0, 200)")
+        lp.mouse.wheel(0, 200)   # the first scroll mounts the player
         lp.wait_for_timeout(300)
-        lp.mouse.wheel(0, -200) if label == "1920" else lp.evaluate("scrollBy(0, -200)")
+        lp.mouse.wheel(0, -200)
         fr = None
-        for _ in range(60):
+        for i in range(60):
+            if label == "phone" and i % 8 == 4:   # phone: the docked player hangs off the hero card, below the fold: bring it near the screen
+                lp.evaluate("() => { const f = document.querySelector('.pip, [class*=pip]'); (f || document.querySelector('#scan')).scrollIntoView({block: 'center'}); }")
             fr = next((f for f in lp.frames if "/video/" in f.url), None)
             if fr:
                 break
