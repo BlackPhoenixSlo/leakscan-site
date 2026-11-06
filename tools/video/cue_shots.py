@@ -611,12 +611,14 @@ HERS_JS = """t => { const v = document.querySelector('video'); v.pause(); window
 def hers_expect(raw):
     """her result's fields as the cards may show them: hosts (most links first, = js report().hosts), titles, counts, thumbs"""
     rows, n, seen = [], {}, set()
+    agg = {h.strip().lower().removeprefix("www.") for m in raw.get("mega") or [] if isinstance(m, dict) for h in (m.get("host"), m.get("via")) if isinstance(h, str) and h.strip()}
+    under = lambda h, a: h == a or h.endswith("." + a)   # = js/scan-engine.js withoutAggregators(): mega[] share hosts never show
     def add(u, d, title):
         if not isinstance(u, str) or not re.fullmatch(r"https?://[^\s\"'<>\\]+", u, re.I) or u in seen:
             return
         x = urllib.parse.urlsplit(u)
         d = (d if isinstance(d, str) else "").strip().lower().removeprefix("www.") or (x.hostname or "").removeprefix("www.")
-        if not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", d):
+        if not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", d) or any(under(h, a) for h in (d, (x.hostname or "").lower().removeprefix("www.")) for a in agg):
             return
         seen.add(u)
         n[d] = n.get(d, 0) + 1
