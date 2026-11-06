@@ -1,23 +1,34 @@
 // Mini player of site/video/ (picture-in-picture style). The script tag says where it is on by default:
-//   data-pip-auto="dock" (landing): docked on the hero card (below), floating once the hero is out of view;
-//   data-pip-auto="r" (scan report): floating, when the URL has ?r=<slug> (the video personalizes itself with that scan).
+//   data-pip-auto="dock" (landing): fixed top-right; on a wide screen docked on the hero card while that spot is fully in view;
+//   data-pip-auto="r" (scan report): fixed top-right, once the URL has ?r=<slug> (the video personalizes itself with that scan).
 // ?pip=1 forces it on, ?pip=0 off. Same-origin iframe of ../video/ (?r= / ?name= passed through) in embed form: this script
 // injects a style into it (no name bar, no player UI: the stage fills the picture) and drives its <video> (starts muted).
-// Bar under the picture (40 px targets): play / pause, sound, expand / minimize, close. Never a new page / tab.
+// On screen at once: mounted when this deferred script runs (before DOMContentLoaded), the box shows with a poster frame
+// (video/jack-poster.jpg by fetch(): it does not hold the page's load event) and the iframe starts at the page's load event
+// (an iframe started before it holds it, its images too; load is ~1 s on Fast 4G), shown over the poster once its video has
+// a frame. FCP / LCP measured unchanged. Fixed, out of the flow: CLS 0.
+// Placement (Jack's iPhone): position fixed, top-anchored. The home spot = top-right under the sticky header / report nav,
+// min(320px, 45vw); computed ONCE per width from where the scan inputs / Scan now / "Scanned @…" line / CTA bar / Ask-AI
+// launcher / Reveal pill sit at scrollY 0: if it would cover them it gets smaller (>= 168 px) rather than lower (moved below
+// them only if even that covers them). Never re-placed by a scroll (so it stays put while the page scrolls under it); a
+// width / orientation change recomputes it; a height-only change (iOS URL bar, visualViewport resize) moves nothing unless
+// the box would leave the screen (keep()). The viewport meta has no viewport-fit=cover: no safe-area insets to add.
+// Bar under the picture (40 px targets): play / pause, sound, expand / minimize; the close X (40 px) on the picture's
+// top-right corner. X = hidden behind a tab at the top-right corner (the home spot's top, right edge; fixed, so it stays
+// there while scrolling); the tab = back to the same spot (home, dropped, or docked). Never gone, never a new page / tab.
 // Expanded (YouTube style, .big, not kept): a tap on the picture or the expand button = sound on, full width (phone) or
 // min(960px, 70vw) centred, fixed right under the sticky header; the page keeps scrolling under it (no lock, nothing over
 // the rest). There a tap on the picture = play / pause; drag it down (follows the finger: translate + scale toward the mini
 // spot; released past 30% or flung down = mini, else snaps back), the chevron button or Esc = back to the mini player.
-// Docked: absolute (scrolls with the page), ~44% of the card's width, hanging off its bottom-right corner (<= 25% of the
-// card, never over a link / button / input: else just outside that corner, else floating); re-placed when the card
-// changes (in-page scan → report card). Floating: fixed, by default bottom-right at min(320px, 45vw), under the sticky header
-// / report nav and off the hero Scan now button, phone CTA bar, Ask-AI launcher, report Reveal pill. Drag (pointer events,
-// touch too): it stays where it is dropped (kept on-screen, under the header); fling / drag past the left, right or bottom
-// edge → tucked off-screen, a tab with a chevron at the side (tap / drag inward = back); Esc (focus inside) tucks. Resize:
-// the top-left corner grip (drag, arrow keys) or a pinch, 16:9, 168 px .. 60% (phone 90%) of the screen width. A drag / resize /
-// tuck ends docking for the session; size and spot are kept. Created after the page's load + first
-// scroll / pointer / key or idle; the iframe loads once the player is near the screen; paused while off-screen.
-// State (spot, size, tucked side, moved, closed) in sessionStorage 'leakscan.pip'.
+// Docked (>= 720 px wide only, and only while that whole spot is on screen under the header): absolute, ~55% of the card's
+// width, hanging off its bottom-right corner (<= 25% of the card, never over a link / button / input: else just outside that
+// corner, else the home spot); re-placed on scroll / when the card changes (in-page scan → report card). Drag (pointer
+// events, touch too): it stays where it is dropped (kept on-screen, under the header, above the phone toolbar); fling /
+// drag past the left, right or bottom edge → tucked off-screen, a tab with a chevron beside where it went (tap / drag inward
+// = back); Esc (focus inside) tucks. Resize: the top-left corner grip (drag, arrow keys) or a pinch, 16:9, 168 px .. 60%
+// (phone 90%) of the screen width. A drag / resize / fling ends docking for the session; size and spot are kept. Paused
+// while off-screen / hidden. State (spot, size, tucked side, closed by X, moved) in sessionStorage 'leakscan.pip' (#79's
+// "closed" flag x there is ignored: never hidden on a visit).
 (function () {
   'use strict';
   var me = document.currentScript, q = new URLSearchParams(location.search), KEY = 'leakscan.pip';
@@ -25,7 +36,7 @@
   var auto = me.getAttribute('data-pip-auto') || '', forced = q.get('pip') === '1';
   if (!forced && !auto) return;
   var VIDEO = new URL('../video/', me.src);
-  var TOP = ['.site-header', '.rnav'], AVOID = ['#scan button[type=submit]', '.mobile-cta', '.askai-launcher', '.ph-reveal'];
+  var TOP = ['.site-header', '.rnav'], AVOID = ['#scan input', '#scan button[type=submit]', '[data-p=scanned]', '.mobile-cta', '.askai-launcher', '.ph-reveal'];
   var LIVE = 'a[href], button, input, select, textarea, summary, label, [role="tab"], [role="button"], [tabindex]:not([tabindex="-1"])';
   var EMBED = '.vo{--nb-h:0px}.vo-page{min-height:0;display:block}.vo-stage{width:100vw}.vo-nb,.vo-ui,.vo-wait{display:none!important}';
   var SVG = function (d, c) { return '<svg' + (c ? ' class="' + c + '"' : '') + ' viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + d + '</svg>'; };
@@ -33,15 +44,14 @@
     off: SVG('<path d="M11 5 6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6"/>'), on: SVG('<path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>'),
     pp: SVG('<path d="M7 4v16l13-8z" fill="currentColor"/>', 'pip-i-play') + SVG('<path d="M8 5v14M16 5v14"/>', 'pip-i-pause'),
     dn: SVG('<path d="m6 9 6 6 6-6"/>'), rs: SVG('<path d="M5 15V5h10"/>'), l: SVG('<path d="m9 6 6 6-6 6"/>'), r: SVG('<path d="m15 6-6 6 6 6"/>') };
-  var S = { p: null, w: 0, t: '', u: 0, x: 0 }, num = function (v) { return typeof v === 'number' && isFinite(v) ? v : 0; };
+  var S = { p: null, w: 0, t: '', u: 0, c: 0 }, num = function (v) { return typeof v === 'number' && isFinite(v) ? v : 0; };
   try {
     var s0 = JSON.parse(sessionStorage.getItem(KEY) || 'null');
-    if (s0) S = { p: Array.isArray(s0.p) ? [num(s0.p[0]), num(s0.p[1])] : null, w: num(s0.w), t: /^[lr]$/.test(s0.t) ? s0.t : '', u: s0.u ? 1 : 0, x: s0.x ? 1 : 0 };
+    if (s0) S = { p: Array.isArray(s0.p) ? [num(s0.p[0]), num(s0.p[1])] : null, w: num(s0.w), t: /^[lr]$/.test(s0.t) ? s0.t : '', u: s0.u ? 1 : 0, c: s0.c && s0.t ? 1 : 0 };   // no 'x' (#79's closed flag): never gone
   } catch (e) { /* defaults */ }
-  if (S.x) return;
   var save = function () { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } };
   var pip, pic, tab, frame, snd, pp, exp, xb, grip, video = null, wasPlaying = true, offPaused = false, mounted = false, pos = { x: 0, y: 0 };
-  var card = null, hero = null, heroIn = false, mode = '', big = false;
+  var card = null, mode = '', big = false, home = null;
 
   function slug() { var r = new URLSearchParams(location.search).get('r'); return r && /^[A-Za-z0-9_-]{1,64}$/.test(r) ? r : ''; }
   function src() {
@@ -52,6 +62,8 @@
   }
   function vis(el) { var r = el.getBoundingClientRect(); return r.width && r.height && getComputedStyle(el).visibility !== 'hidden' ? r : null; }
   function vw() { return document.documentElement.clientWidth; }
+  function vh() { return window.visualViewport ? Math.min(innerHeight, visualViewport.height) : innerHeight; }
+  function bot() { return innerWidth < 720 && matchMedia('(pointer: coarse)').matches ? 88 : 8; }   // touch phone: Safari's bottom toolbar
 
   // ---------- docked: off the hero card's bottom-right corner ----------
   function dockAt() {   // → viewport rect {x, y, w} or null (no safe spot)
@@ -74,7 +86,7 @@
   }
   var DOCK = 0.55, BAR = 40, MIN = 168;   // docked width = 55% of the card; bar = 4 x 40 px buttons (+ 8 px padding = MIN)
   function lim(w) {   // 16:9 + bar, MIN .. 60% (phone 90%) of the width, and it fits the screen's height
-    var W = vw(), max = Math.min(W * (innerWidth < 720 ? 0.9 : 0.6), (innerHeight - topInset() - 8 - BAR) * 16 / 9);
+    var W = vw(), max = Math.min(W * (innerWidth < 720 ? 0.9 : 0.6), (vh() - topInset() - 8 - BAR) * 16 / 9);
     return Math.round(Math.max(MIN, Math.min(w, max)));
   }
   function hdr() {   // bottom of the sticky header / report nav (0 if none at the top)
@@ -90,34 +102,41 @@
   }
   function miniAt() {   // where minimize lands (viewport): the dock spot, else the floating spot
     var d = docking() ? dockAt() : null;
-    if (d) return d;
-    var w = S.w ? lim(S.w) : Math.min(320, innerWidth * 0.45), f = floatAt(w, w * 9 / 16 + BAR);
+    if (d && inView(d)) return d;
+    var w = homeAt().w, f = floatAt(w, w * 9 / 16 + BAR);
     return { x: f.x, y: f.y, w: w };
   }
-  function keep(x, y, w, h) {   // fully on-screen, under the header
-    return [Math.max(8, Math.min(x, vw() - w - 8)), Math.max(topInset(), Math.min(y, innerHeight - h - 8))];
+  function keep(x, y, w, h) {   // fully on-screen, under the header, above the phone's toolbar
+    return [Math.max(8, Math.min(x, vw() - w - 8)), Math.max(topInset(), Math.min(y, vh() - h - bot()))];
   }
-  function docking() { return auto === 'dock' && card && heroIn && !S.u && !S.t; }
+  function docking() { return auto === 'dock' && card && !S.u && !S.t && innerWidth >= 720; }
+  function inView(d) {   // a dock spot is used only on a wide screen and while all of it is on screen under the header
+    return innerWidth >= 720 && d.y >= topInset() && d.y + Math.round(d.w * 9 / 16) + BAR <= vh() - 8;
+  }
 
   // ---------- floating: corner, kept under the sticky header / nav and off the obstacles ----------
-  function floatAt(w, h) {   // the user's spot, else bottom-right, off the obstacles (for a w x h box)
-    var W = vw(), vh = innerHeight, x, y;
-    if (S.p) { var k = keep(S.p[0], S.p[1], w, h); x = k[0]; y = k[1]; }
-    else {
-      var m = innerWidth < 720 ? 12 : 24, top = topInset(), bot = vh - h - m, rs = [];
-      x = W - w - m; y = bot;
-      AVOID.forEach(function (s) { document.querySelectorAll(s).forEach(function (el) { var r = vis(el); if (r && r.right > x && r.left < x + w && r.bottom > 0 && r.top < vh) rs.push(r); }); });
-      for (var i = 0; i < 4; i++) {
-        var hit = rs.filter(function (r) { return r.top - 8 < y + h && r.bottom + 8 > y; })[0];
-        if (!hit) break;
-        var c = [hit.top - 8 - h, hit.bottom + 8].filter(function (v) { return v >= top && v <= bot; });
-        if (!c.length) break;
-        y = c.sort(function (a, b) { return Math.abs(a - bot) - Math.abs(b - bot); })[0];
-      }
-      y = Math.max(top, Math.min(y, bot));
+  function homeAt() {   // the default spot {x, y, w}: computed once per width (never per scroll: a top-anchored box stays put)
+    var W = vw(), ph = innerWidth < 720, w = S.w ? lim(S.w) : Math.round(Math.min(320, innerWidth * 0.45)), k = W + ':' + w;
+    if (home && home.k === k) return home; var sy = scrollY;
+    var top = topInset(), m = ph ? 12 : 24, rs = [];
+    AVOID.forEach(function (s) { document.querySelectorAll(s).forEach(function (el) {   // where they are at scrollY 0 (fixed ones: where they are)
+      var r = vis(el); if (!r || r.right <= W - w - m) return;
+      var y0 = getComputedStyle(el).position === 'fixed' ? r.top : r.top + sy;
+      if (y0 < vh()) rs.push({ top: y0, bottom: y0 + r.height });
+    }); });
+    var fit = function (y, w) { return !rs.some(function (r) { return r.top - 8 < y + w * 9 / 16 + BAR && r.bottom + 8 > y; }); };
+    if (!S.w) while (w > MIN && !fit(top, w)) w = Math.max(MIN, w - 8);   // at the top, under the header: smaller rather than lower
+    var y = top;
+    if (!fit(top, w)) {   // even the smallest covers the form: just below what it covers (still on screen)
+      var low = vh() - w * 9 / 16 - BAR - bot(), c = rs.map(function (r) { return r.bottom + 8; }).filter(function (v) { return v <= low && fit(v, w); }).sort(function (a, b) { return a - b; });
+      if (c.length) y = c[0];
     }
-    if (S.t) x = S.t === 'l' ? -w - 8 : W + 8;
-    return { x: x, y: y };
+    home = { k: k, x: W - w - m, y: y, w: w };
+    return home;
+  }
+  function floatAt(w, h) {   // the user's spot, else the home spot top-right (for a w x h box); kept on-screen, under the header
+    var W = vw(), o = homeAt(), k = S.p ? keep(S.p[0], S.p[1], w, h) : keep(W - w - (innerWidth < 720 ? 12 : 24), o.y, w, h);
+    return { x: S.t ? (S.t === 'l' ? -w - 8 : W + 8) : k[0], y: k[1] };
   }
   function move(x, y) { pos.x = x; pos.y = y; pip.style.setProperty('--x', Math.round(x) + 'px'); pip.style.setProperty('--y', Math.round(y) + 'px'); }
   function setMode(m) {
@@ -133,6 +152,7 @@
   function place() {
     if (!pip || pip.classList.contains('drag')) return;
     var d = big ? null : docking() ? dockAt() : null;
+    if (d && !inView(d)) d = null;
     if (big) {
       setMode('big');
       var b = bigAt();
@@ -144,7 +164,7 @@
       move(d.x + scrollX, d.y + scrollY);
     } else {
       setMode('float');
-      if (S.w) pip.style.setProperty('--w', lim(S.w) + 'px'); else pip.style.removeProperty('--w');
+      pip.style.setProperty('--w', homeAt().w + 'px');   // the user's size, else the default (smaller if the form is near the top)
       var t = floatAt(pip.offsetWidth, pip.offsetHeight);
       move(t.x, t.y);
     }
@@ -155,10 +175,13 @@
     pip.classList.toggle('tucked', !!S.t);
     if (S.t) pip.setAttribute('inert', ''); else pip.removeAttribute('inert');
     tab.hidden = !S.t;
-    if (S.t) { tab.setAttribute('data-side', S.t); tab.innerHTML = I[S.t]; tab.style.setProperty('--ty', Math.round(pos.y + pip.offsetHeight / 2 - 32) + 'px'); }
+    if (S.t) {   // X: at the top-right corner (the home spot's top); a fling: beside where it went
+      var ty = S.c ? keep(0, homeAt().y, 0, 64)[1] : pos.y + pip.offsetHeight / 2 - 32;
+      tab.setAttribute('data-side', S.t); tab.innerHTML = I[S.t]; tab.style.setProperty('--ty', Math.round(ty) + 'px');
+    }
   }
-  var raf = 0, late = 0;   // + once more after the scroll settles: the phone CTA bar / launcher slide in after it
-  function soon() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; place(); }); clearTimeout(late); late = setTimeout(place, 350); }
+  var raf = 0;   // scroll (desktop dock in / out), card / viewport resize: re-placed once per frame
+  function soon() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; place(); }); }
 
   function sync() {
     if (!video) return;
@@ -207,18 +230,18 @@
   function tuck(side) {
     if (video) { wasPlaying = !video.paused; video.pause(); }
     if (mode === 'dock' || !S.p) { var r = pip.getBoundingClientRect(); S.p = keep(r.left, r.top, r.width, r.height); S.w = Math.round(r.width); }
-    S.t = side; S.u = 1; save(); place(); sync();
+    S.t = side; S.c = 0; S.u = 1; save(); place(); sync();
   }
   function untuck() {
-    S.t = ''; save(); place();
+    S.t = ''; S.c = 0; save(); place();
     if (video && wasPlaying) play();
     sync();
   }
-  function close() {
-    S.x = 1; save();
-    if (video) video.pause();
-    pip.remove(); tab.remove();
-    removeEventListener('scroll', soon); removeEventListener('resize', soon);
+  function close() {   // X: hidden behind a tab at the top-right corner (never gone); the tab = back to the same spot / dock
+    if (big) { big = false; pip.classList.remove('drag'); pip.style.setProperty('--s', '1'); place(); }
+    if (video) { wasPlaying = !video.paused; video.pause(); }
+    S.t = 'r'; S.c = 1; save(); place(); sync();
+    tab.focus();
   }
 
   // ---------- drag: free drop, fling / past the edge = tuck; pinch / grip = resize (any of them ends docking);
@@ -314,7 +337,7 @@
       return;
     }
     var px = pos.x + vx * 250, py = pos.y + vy * 250;   // where a fling would carry it
-    var side = px < -w * 0.4 ? 'l' : px + w > W + w * 0.4 ? 'r' : '', down = !side && py + h > innerHeight + h * 0.4;   // past a side / the bottom
+    var side = px < -w * 0.4 ? 'l' : px + w > W + w * 0.4 ? 'r' : '', down = !side && py + h > vh() + h * 0.4;   // past a side / the bottom
     if (down) side = pos.x + w / 2 < W / 2 ? 'l' : 'r';
     if (side) {
       pip.classList.remove('drag');
@@ -345,15 +368,18 @@
     mounted = true;
     ['scroll', 'pointerdown', 'keydown'].forEach(function (ev) { removeEventListener(ev, mount, true); });
     card = auto === 'dock' ? document.querySelector('.hero .report-card') : null;
-    hero = card && card.closest('.hero');
     pip = document.createElement('div');
     pip.className = 'pip';
     pip.setAttribute('role', 'region');
     pip.setAttribute('aria-label', "Jack's video");
     pip.innerHTML = '<div class="pip-pic"><div class="pip-hit"></div><div class="pip-rs" role="button" tabindex="0" aria-label="Resize video (arrow keys)">' + I.rs +
-      '</div></div><div class="pip-bar"><button class="pip-pp" type="button">' + I.pp +
-      '</button><button class="pip-snd" type="button"></button><i></i><button class="pip-exp" type="button"></button><button class="pip-x" type="button" aria-label="Close video">' + I.x + '</button></div>';
+      '</div><button class="pip-x" type="button" aria-label="Close video">' + I.x + '</button></div><div class="pip-bar"><button class="pip-pp" type="button">' + I.pp +
+      '</button><button class="pip-snd" type="button"></button><i></i><button class="pip-exp" type="button"></button></div>';
     pic = pip.querySelector('.pip-pic');
+    // the poster by fetch(), shown from a blob: a CSS / <img> load would hold the page's load event (and a later load event
+    // lets the landing's own report thumbs hold it seconds more: measured 1.0 s -> 5.0 s with a stored scan)
+    fetch(new URL('jack-poster.jpg', VIDEO)).then(function (r) { return r.ok ? r.blob() : null; })
+      .then(function (b) { if (b) pic.style.backgroundImage = 'url(' + URL.createObjectURL(b) + ')'; }).catch(function () {});
     frame = document.createElement('iframe');
     frame.title = "Jack's video";
     frame.setAttribute('tabindex', '-1');
@@ -370,12 +396,9 @@
     tab.setAttribute('aria-label', "Show Jack's video");
     document.body.appendChild(pip);
     document.body.appendChild(tab);
-    if (hero) {
-      var hb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 64;
-      heroIn = hero.getBoundingClientRect().bottom > hb;
-      new IntersectionObserver(function (en) { heroIn = en[0].isIntersecting; place(); }, { rootMargin: -hb + 'px 0px 0px 0px' }).observe(hero);
-      if ('ResizeObserver' in window) new ResizeObserver(soon).observe(card);
-    }
+    if (card && 'ResizeObserver' in window) new ResizeObserver(soon).observe(card);
+    if (window.visualViewport) visualViewport.addEventListener('resize', soon);   // height only (URL bar): the box stays (keep() clamps)
+    pip.classList.add('on');   // the box + poster at once
     place();
 
     pip.addEventListener('pointerdown', down);
@@ -403,42 +426,49 @@
       tuck(pos.x + pip.offsetWidth / 2 < vw() / 2 ? 'l' : 'r');
       tab.focus();
     });
-    addEventListener('scroll', soon, { passive: true });
+    addEventListener('scroll', place, { passive: true });   // in the scroll event (before the frame paints): dock in / out, no frame late
     addEventListener('resize', soon);
 
     var shown = false;
-    function show() { if (shown) return; shown = true; pip.classList.add('on'); place(); sync(); }
-    frame.addEventListener('load', function () {
-      try {
-        var d = frame.contentDocument, st = d.createElement('style');
-        st.textContent = EMBED;
-        d.head.appendChild(st);
-        video = d.querySelector('.vo-video');
-      } catch (e) { video = null; }
-      if (video) {
-        video.muted = true;
-        video.controls = false;
-        video.disablePictureInPicture = true;
-        video.setAttribute('disablepictureinpicture', '');
-        video.setAttribute('disableremoteplayback', '');
-        ['play', 'pause', 'volumechange'].forEach(function (ev) { video.addEventListener(ev, sync); });
-        if (!S.t && !offPaused) play();
-      }
-      show();
-    });
-    // the iframe loads once the player is near the screen; off-screen = paused (and back on when it returns)
-    new IntersectionObserver(function (en) {
-      var inView = en[0].isIntersecting;
-      if (inView && !frame.src) { frame.src = src(); setTimeout(show, 6000); }
+    function show() { if (shown) return; shown = true; pip.classList.add('live'); place(); sync(); }   // the iframe over the poster
+    function hook() {   // the iframe's <video>, as soon as its DOM has it (its load event waits for every image of the page)
+      if (video) return true;
+      var d, v;
+      try { d = frame.contentDocument; v = d && d.URL !== 'about:blank' && d.querySelector('.vo-video'); } catch (e) { v = null; }
+      if (!v) return false;
+      var st = d.createElement('style');
+      st.textContent = EMBED;
+      (d.head || d.documentElement).appendChild(st);
+      video = v;
+      video.muted = true;
+      video.controls = false;
+      video.disablePictureInPicture = true;
+      video.setAttribute('disablepictureinpicture', '');
+      video.setAttribute('disableremoteplayback', '');
+      ['play', 'pause', 'volumechange'].forEach(function (ev) { video.addEventListener(ev, sync); });
+      if (video.readyState >= 2) show(); else video.addEventListener('loadeddata', show, { once: true });
+      if (!S.t && !offPaused) play();
+      sync();
+      return true;
+    }
+    var poll = setInterval(function () { if (hook()) clearInterval(poll); }, 50);
+    var go = function () {   // at the page's load event (an iframe started before it holds it: its images too)
+      frame.addEventListener('load', function () { clearInterval(poll); if (!hook()) show(); });   // not the initial about:blank's
+      frame.src = src();
+    };
+    if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });
+    setTimeout(show, 8000);
+    new IntersectionObserver(function (en) {   // off-screen = paused (and back on when it returns)
+      var seen = en[0].isIntersecting;
       if (!video || S.t) return;
-      if (!inView && !video.paused) { offPaused = true; video.pause(); }
-      else if (inView && offPaused) { offPaused = false; play(); }
+      if (!seen && !video.paused) { offPaused = true; video.pause(); }
+      else if (seen && offPaused) { offPaused = false; play(); }
     }, { rootMargin: '200px' }).observe(pip);
   }
-  function arm() {
+  // as soon as this deferred script runs (DOM parsed, CSS in); the report page before its result waits for the URL's ?r=
+  mount();
+  if (!mounted) {   // the report page: once its result is in (the URL has ?r= then)
     ['scroll', 'pointerdown', 'keydown'].forEach(function (ev) { addEventListener(ev, mount, { capture: true, passive: true }); });
-    var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 2500); };
-    idle(mount, { timeout: 4000 });
+    document.addEventListener('leakscan:result', function () { setTimeout(mount, 0); });
   }
-  if (document.readyState === 'complete') arm(); else addEventListener('load', arm);
 })();

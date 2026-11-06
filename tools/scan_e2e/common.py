@@ -36,6 +36,11 @@ BREAKS = {
     "tuck": ("pip.js", "  function tuck(side) {\n", "  function tuck(side) {\n    return;\n"),
     "pull": ("pip.js", "    if (drag.big) { pull(e, my); return; }\n", "    if (drag.big) return;\n"),   # expanded: no drag-down
     "dock": ("pip.js", "card = auto === 'dock' ? document.querySelector('.hero .report-card') : null;", "card = null;"),   # no dock anchor
+    "pipload": ("pip.js", "if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });", "go();"),   # the iframe at once: holds the load event
+    "pipfollow": ("pip.js", "    if (home && home.k === k) return home; var sy = scrollY;\n", "    var sy = 0;\n"),   # #79's floating spot: re-placed off the form at every scroll
+    "pipvis": ("pip.js", "&& !S.t && innerWidth >= 720; }\n  function inView(d) {   // a dock spot is used only on a wide screen and while all of it is on screen under the header\n"
+               "    return innerWidth >= 720 && d.y >= topInset() && d.y + Math.round(d.w * 9 / 16) + BAR <= vh() - 8;\n",
+               "&& !S.t; }\n  function inView(d) {\n    return true;\n"),   # #79's dock: on the card even off-screen / on a phone
     "incremental": ("scan.js", "SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50",
                     "SITES_STEP = 1e9, MORE_SITES = 1e9, LINKS_STEP = 1e9, MORE_LINKS = 1e9"),
 }
@@ -71,7 +76,7 @@ def configure(argv):
 def start_stub():
     stub = subprocess.Popen([sys.executable, str(ROOT / "tools" / "scan_stub.py"), "--port", str(cfg.port), "--delay", "0.25"]
                             + (["--omit-results"] if cfg.omit else []) + (["--omit-profile"] if cfg.omit_profile else []),
-                            stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
+                            stderr=open(cfg.out / "stub.err", "w"), stdout=subprocess.PIPE)   # its tracebacks kept with the run
     stub.stdout.readline()
     return stub
 
@@ -120,6 +125,12 @@ def break_routes(ctx, only=None):
         assert old in body, f"break-{k}: marker not found in {name}"
         ctx.route(f"**/{d}/{name}", lambda r, _q=None, b=body.replace(old, new, 1), ct=ct:
                   r.fulfill(body=b, content_type=ct) if r.request.url.startswith("http") else r.continue_())
+
+
+# Declared bypass for flows that test the report, not the mini player: it starts put away, as after its X (a tab at the
+# top-right corner). Floating, it stays top-right while the page scrolls (pip.js, by design) and so covers what sits there
+# (e.g. the demo's full-screen button), where Playwright's click would re-scroll and retry. The pip scenario covers the player.
+PIP_AWAY = "try { if (!sessionStorage.getItem('leakscan.pip')) sessionStorage.setItem('leakscan.pip', JSON.stringify({t: 'r', c: 1})); } catch (e) {}"
 
 
 def new_ctx(browser, vp_name, vp, net=None, *, route=None, console_ok=None, init=(), **opts):

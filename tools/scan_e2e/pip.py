@@ -11,10 +11,12 @@ PIP_J = """() => { const p = document.querySelector('.pip'), t = document.queryS
     v = {paused: e.paused, muted: e.muted, t: e.currentTime, src: e.currentSrc, dur: e.duration}; emb = {nb: getComputedStyle(d.querySelector('.vo-nb')).display, ui: getComputedStyle(d.querySelector('.vo-ui')).display,
     sw: Math.round(st.width), sh: Math.round(st.height), fw: f.clientWidth, fh: f.clientHeight}; } catch (x) { v = String(x); }
   const pic = p.querySelector('.pip-pic').getBoundingClientRect(), ctl = [...p.querySelectorAll('button, a')].map(b => b.getBoundingClientRect()),
-    g = p.querySelector('.pip-rs'), gr = g.getBoundingClientRect(), x = p.querySelector('.pip-exp');
+    g = p.querySelector('.pip-rs'), gr = g.getBoundingClientRect(), x = p.querySelector('.pip-exp'), xb = p.querySelector('.pip-x'), xr = xb && xb.getBoundingClientRect();
   return {cls: p.className, mode: p.dataset.mode, big: p.classList.contains('big'), url: location.href, opens: window.__opens || 0,
     bar: [...p.querySelectorAll('.pip-bar button')].map(b => { const r = b.getBoundingClientRect(); return [b.className, b.getAttribute('aria-label'), Math.round(r.width), Math.round(r.height)]; }),
     exp: x && [x.getAttribute('aria-label'), x.getAttribute('aria-expanded'), x.innerHTML.includes('m6 9') ? 'v' : 'expand'],
+    xbox: xr ? [xr.left - pic.left, xr.top - pic.top, pic.right - xr.right, xr.width, xr.height].map(Math.round) : null,
+    vvh: Math.round(window.visualViewport ? visualViewport.height : innerHeight), live: p.classList.contains('live'),
     grip: getComputedStyle(g).display === 'none' ? null : [gr.left - pic.left, gr.top - pic.top, gr.width, gr.height].map(Math.round), box: R(p), pic: R(p.querySelector('.pip-pic')), card: c ? R(c) : null,
     on: p.classList.contains('on') && !p.classList.contains('tucked'), tucked: p.classList.contains('tucked'),
     overPic: ctl.filter(b => b.right > pic.left && b.left < pic.right && b.bottom > pic.top && b.top < pic.bottom).length,
@@ -25,6 +27,10 @@ PIP_J = """() => { const p = document.querySelector('.pip'), t = document.queryS
 PIP_HIT = """([sel, inside]) => [...document.querySelectorAll(sel)].filter(e => { const r = e.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight && getComputedStyle(e).visibility !== 'hidden'; })
   .map(e => { const r = e.getBoundingClientRect(), pts = [[r.left + r.width / 2, r.top + r.height / 2], [r.left + 4, r.top + r.height / 2], [r.right - 4, r.top + r.height / 2]];
     return pts.every(([x, y]) => { const h = document.elementFromPoint(x, y); return h && h.closest(inside || sel) === e.closest(inside || sel); }); })"""
+PIP_NOT = """(sel) => [...document.querySelectorAll(sel)].filter(e => { const r = e.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight && getComputedStyle(e).visibility !== 'hidden'; })
+  .map(e => { const r = e.getBoundingClientRect(), H = window.visualViewport ? visualViewport.height : innerHeight, ys = [r.top + 2, r.top + r.height / 2, r.bottom - 2].filter(y => y >= 0 && y < H),
+    xs = [r.left + 4, r.left + r.width / 2, r.right - 4];
+    return ys.every(y => xs.every(x => { const h = document.elementFromPoint(x, y); return !h || !h.closest('.pip, .pip-tab'); })); })"""
 # what is under the docked player: elementFromPoint on a 12x8 grid over its box with the player hidden; any link / button / input there = covered
 PIP_UNDER = """() => { const p = document.querySelector('.pip'), r = p.getBoundingClientRect(), out = new Set();
   p.style.visibility = 'hidden'; const LIVE = 'a[href], button, input, select, textarea, summary, label, [role="tab"], [role="button"], [tabindex]:not([tabindex="-1"])';
@@ -60,12 +66,27 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     browser = pw.webkit.launch() if engine == "webkit" else chromium
     M = 12 if phone else 24
 
-    def new_ctx(motion="no-preference"):
+    def new_ctx(motion="no-preference", scheme="light", init=""):
         opts = dict(pw.devices["iPhone 13"]) if engine == "webkit" else dict(viewport=vp, device_scale_factor=2 if phone else 1, is_mobile=phone, has_touch=phone)
-        ctx = browser.new_context(**opts, reduced_motion=motion)
+        ctx = browser.new_context(**opts, reduced_motion=motion, color_scheme=scheme)
+        if init:
+            ctx.add_init_script(init)
         ctx.add_init_script("""window.__opens = 0; const __o = window.open; window.open = function () { window.__opens++; return __o.apply(this, arguments); };
-          window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}
-          new MutationObserver(() => { if (!window.__pipAt && document.querySelector('.pip iframe')) window.__pipAt = performance.now(); }).observe(document, {childList: true, subtree: true});""")
+          window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value, (e.sources || []).some(s => { const n = s.node && (s.node.nodeType === 1 ? s.node : s.node.parentElement); return !!(n && n.closest('.pip, .pip-tab')); })]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}
+          new MutationObserver(() => { if (!window.__pipAt && document.querySelector('.pip iframe')) window.__pipAt = performance.now(); }).observe(document, {childList: true, subtree: true});
+          if (window.top === window) { window.__pt = {}; const tick = () => { const p = document.querySelector('.pip'), T = window.__pt;   // when the box + poster / the first frame show
+            if (p) { const r = p.getBoundingClientRect(), c = getComputedStyle(p), f = p.querySelector('iframe'), H = window.visualViewport ? visualViewport.height : innerHeight;
+              const on = c.visibility === 'visible' && +c.opacity > .5 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= H && r.width > 0;
+              let rs = -1; try { rs = f.contentDocument.querySelector('video').readyState; } catch (e) {}
+              if (on && T.box == null) T.box = performance.now();
+              if (on && T.poster == null && getComputedStyle(p.querySelector('.pip-pic')).backgroundImage.startsWith('url(')   // painted (a blob of the fetched poster)
+                  && performance.getEntriesByType('resource').some(e => e.name.includes('jack-poster') && e.responseEnd > 0)) T.poster = performance.now();
+              if (on && T.frame == null && rs >= 2 && +getComputedStyle(f).opacity > .5) T.frame = performance.now(); }
+            if (window.__pt.frame == null) setTimeout(tick, 25); }; tick();
+            const R = e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); };   // follow: every frame while window.__rs is an array
+            const f = () => { if (window.__rs) { const p = document.querySelector('.pip'), t = document.querySelector('.pip-tab');
+              window.__rs.push([Math.round(scrollY), p ? R(p) : null, t && !t.hidden ? R(t) : null, p ? p.dataset.mode : '', Math.round(window.visualViewport ? visualViewport.height : innerHeight)]); }
+              requestAnimationFrame(f); }; requestAnimationFrame(f); }""")
 
         def route(r, _req):
             if urlsplit(r.request.url).hostname in LOOP:
@@ -78,7 +99,8 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         ctx.route("**/*", route)
         break_routes(ctx)   # --break-tuck: tuck() emptied; --break-dock: no dock anchor (common.BREAKS)
         ctx.on("page", lambda pg: (pg.on("pageerror", lambda e: net["errors"].append(str(e))),
-                                   pg.on("console", lambda m: m.type == "error" and net["errors"].append(m.text))))
+                                   pg.on("console", lambda m: m.type == "error" and net["errors"].append(
+                                       f"{m.text} @ {(m.location or {}).get('url', '')} on {pg.url}"))))   # which resource / page
         pg = ctx.new_page()
         ctx.on("page", lambda p: net["pages"].append(p.url))   # any page after this one (window.open / target=_blank) = a new tab
         return ctx, pg, (ctx.new_cdp_session(pg) if engine == "chromium" and phone else None)
@@ -159,8 +181,22 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     def shot(pg, name):
         pg.screenshot(path=str(cfg.out / f"{tag.split()[0]}-pip-{name}.png"))
 
-    def float_default(s):   # bottom-right at min(320 px, 45vw)
-        return s["mode"] == "float" and abs(s["box"][2] - min(320, 0.45 * s["vw"])) <= 1 and s["box"][0] + s["box"][2] == s["vw"] - M and s["box"][1] > s["vh"] / 2
+    def float_default(s):   # top-right at min(320 px, 45vw), in the top half
+        return s["mode"] == "float" and abs(s["box"][2] - min(320, 0.45 * s["vw"])) <= 1 and s["box"][0] + s["box"][2] == s["vw"] - M and s["hdr"] <= s["box"][1] < s["vh"] / 2
+
+    def top_right(s):   # right under the header / nav, at the right edge
+        return s["mode"] == "float" and s["box"][0] + s["box"][2] == s["vw"] - M and 0 <= s["box"][1] - s["hdr"] <= 8 + 1 + (0 if phone else 16)
+
+    def on_screen(s):   # every px of the player inside the visual viewport, under the header
+        b = s["box"]
+        return s["on"] and b[0] >= 0 and b[0] + b[2] <= s["vw"] and b[1] >= s["hdr"] and b[1] + b[3] <= s["vvh"]
+
+    def x_ok(s):   # the close X: on the picture's top-right corner, >= 40 x 40
+        return bool(s["xbox"]) and s["xbox"][1] == 0 and s["xbox"][2] == 0 and s["xbox"][3] >= 40 and s["xbox"][4] >= 40
+
+    def form_clear(pg):   # elementFromPoint over the on-screen part of the scan inputs, Scan now and the "Scanned @… · Your report" line ≠ the player
+        r = {k: pg.evaluate(PIP_NOT, q) for k, q in (("inputs", "#scan input"), ("scan", "#scan button[type=submit]"), ("scanned", "[data-p=scanned]:not([hidden]) a, [data-p=scanned]:not([hidden]) button"))}
+        return all(all(v) for v in r.values()), r
 
     def dock_checks(pg, s, what):
         c = s["card"]
@@ -176,7 +212,199 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         check(f"{tag} dock: {what}: no link / button / input under it (grid), Scan now / header / Ask-AI still clickable", not under and ok, [under, d])
         check(f"{tag} dock: {what}: start spot off the screen corner (up / left of it)", not (0 <= s["vw"] - (b[0] + b[2]) <= 24 and 0 <= s["vh"] - (b[1] + b[3]) <= 24), b)
 
+    # vis: Jack's iPhone report (no player after a scan): landing, no interaction, dark + light; fresh / after a stored scan
+    # of sophieraiin (localStorage leakscan.last → the stub's demoR3port01) / with an old "closed" flag in sessionStorage.
+    # Box + poster < 1 s after DOMContentLoaded, first frame < 3 s (Chromium: CDP Fast 4G; WebKit can't be throttled:
+    # unthrottled loopback, declared), fully on screen top-right under the header (wide: or docked, fully on screen),
+    # never over the inputs / Scan now / "Scanned" line, X on its top-right → edge tab → back; then after a scroll.
+    SCAN = "localStorage.setItem('leakscan.last', JSON.stringify({slug: 'demoR3port01', handle: 'sophieraiin', platform: 'onlyfans', ts: Date.now()}));"
+    STALE = "if (!sessionStorage.getItem('__seed')) { sessionStorage.setItem('__seed', '1'); sessionStorage.setItem('leakscan.pip', JSON.stringify({p: null, w: 0, t: '', u: 0, x: 1})); }"
+    FAST4G = {"offline": False, "latency": 165, "downloadThroughput": 9e6 / 8 * 0.9, "uploadThroughput": 1.5e6 / 8 * 0.9}   # the DevTools preset
+    for scheme in ("dark", "light"):
+        for what, init in (("fresh", ""), ("stored scan", SCAN), ("old closed flag", SCAN + STALE)):
+            vt = f"{tag} vis: {scheme}, {what}:"
+            ctx, pg, cdp = new_ctx(scheme=scheme, init="try { " + init + " } catch (e) {}")
+            if engine == "chromium":
+                n = cdp or ctx.new_cdp_session(pg)
+                n.send("Network.enable"); n.send("Network.emulateNetworkConditions", FAST4G)
+            pg.goto(cfg.base, wait_until="domcontentloaded")
+            dcl = pg.evaluate("performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd") or pg.evaluate("performance.now()")
+            name = f"vis-{scheme}-{what.split()[0] if what != 'old closed flag' else 'closed'}"
+            at = {}
+            for t in (0.5, 1, 2, 3):
+                pg.wait_for_timeout(max(0, dcl + t * 1000 - pg.evaluate("performance.now()")))
+                at[t] = st(pg)
+                if t in (1, 3) and (what != "old closed flag" or t == 3):
+                    shot(pg, f"{name}-{t}s")
+            spot = lambda s: on_screen(s) and (top_right(s) or (not phone and s["mode"] == "dock"))
+            check(f"{vt} fully on screen{' top-right under the header' if phone else ''} at 0.5 / 1 / 2 s after DOMContentLoaded",
+                  all(at[t] and spot(at[t]) for t in (0.5, 1, 2)), [at[t] and [at[t]["box"], at[t]["mode"]] for t in (0.5, 1, 2)])
+            try:
+                pg.wait_for_function("() => window.__pt && window.__pt.frame != null", timeout=8000)
+            except Exception:   # noqa: BLE001 - reported by the check below
+                pass
+            pt = pg.evaluate("window.__pt")
+            box, pst, frm = [None if pt.get(k) is None else round(pt[k] - dcl) for k in ("box", "poster", "frame")]
+            cls, clsp = pg.evaluate("[window.__ls.reduce((a, e) => a + e[1], 0), window.__ls.filter(e => e[2]).reduce((a, e) => a + e[1], 0)]")
+            MEASURED[f"{vt} ms after DCL"] = {"dcl": round(dcl), "box": box, "poster": pst, "first_frame": frm, "fast4g": engine == "chromium", "cls_page": cls, "cls_player": clsp}
+            pg.wait_for_timeout(400); s = st(pg)
+            check(f"{vt} box + poster on screen < 1 s after DOMContentLoaded (poster bytes in)", box is not None and pst is not None and max(box, pst) < 1000, [box, pst])
+            hold = pg.evaluate("""() => { const n = performance.getEntriesByType('navigation')[0], rs = performance.getEntriesByType('resource');
+                const p = rs.find(e => e.name.includes('jack-poster')), w = document.querySelector('.pip iframe').contentWindow;   // the iframe's navigation start
+                let f = null; try { if (w.location.href !== 'about:blank') f = Math.round(w.performance.timeOrigin - performance.timeOrigin); } catch (e) {}
+                return [p && p.initiatorType, f, Math.round(n.loadEventStart)]; }""")
+            check(f"{vt} the player does not hold the page's load event: poster by fetch(), iframe started at / after it", hold[0] == "fetch" and hold[1] is not None and 0 < hold[2] <= hold[1], hold)   # loadEventStart 0 = not fired yet (held)
+            check(f"{vt} cls: no layout shift from the player over the whole load (layout-shift sources; page total {cls:.4f})", clsp == 0, [clsp, cls])
+            check(f"{vt} first video frame < 3 s after DOMContentLoaded ({'Fast 4G' if engine == 'chromium' else 'WebKit, unthrottled'})", frm is not None and frm < 3000 and s["live"], frm)
+            ok, d = form_clear(pg)
+            check(f"{vt} fully on screen, top-right under the header{'' if phone else ' (or docked, fully on screen)'}",
+                  on_screen(s) and (top_right(s) or (not phone and s["mode"] == "dock")), [s["box"], s["hdr"], s["vvh"], s["mode"]])
+            check(f"{vt} inputs / Scan now / Scanned line not under it (elementFromPoint)", ok, d)
+            check(f"{vt} close X on the picture's top-right corner, >= 40 px", x_ok(s), s["xbox"])
+            if what != "fresh":
+                line = pg.evaluate("(() => { const e = document.querySelector('[data-p=scanned]'); return e && !e.hidden ? e.textContent : null; })()")
+                check(f"{vt} the 'Scanned @… · Your report' line is up (the stored scan)", bool(line) and "Your report" in line, line)
+            if what == "stored scan":
+                b0 = s["box"]
+                pg.click(".pip-x"); pg.wait_for_timeout(600); s = st(pg)
+                check(f"{vt} X → hidden, the tab at the top-right corner (right edge, its top = the player's top, under the header)", s["tucked"] and bool(s["tab"])
+                      and (abs(s["tab"]["box"][1] - b0[1]) <= 1 if phone else 0 <= s["tab"]["box"][1] - s["hdr"] <= 8 + 16 + 1) and s["tab"]["box"][1] >= s["hdr"]
+                      and s["tab"]["box"][0] + s["tab"]["box"][2] == s["vw"], [s["tab"], b0, s["hdr"]])
+                shot(pg, f"{name}-closed-tab")
+                pg.reload(wait_until="domcontentloaded"); pg.wait_for_timeout(1500); s = st(pg)
+                check(f"{vt} after a close + reload: the tab is still there (never gone)", s["tucked"] and bool(s["tab"]), s["tab"])
+                if s["tab"]:
+                    b = s["tab"]["box"]; tap(pg, b[0] + b[2] / 2, b[1] + b[3] / 2); pg.wait_for_timeout(300); s = st(pg)
+                check(f"{vt} tab tapped → back, fully on screen{' top-right' if phone else ''}, same box as before the X", s["on"] and not s["tab"] and on_screen(s) and (top_right(s) or not phone)
+                      and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0, s["tab"]])
+                b0 = s["box"]
+                shot(pg, f"{name}-back")
+                pg.evaluate("(() => { const f = document.querySelector('#scan'); scrollTo(0, f.getBoundingClientRect().top + scrollY - 70); })()")
+                pg.wait_for_timeout(900); s = st(pg)
+                check(f"{vt} scrolled to the scan form: {'same spot (±1 px), ' if phone else ''}fully on screen", on_screen(s) and (not phone or all(abs(a - c) <= 1 for a, c in zip(s["box"], b0))), [s["box"], b0])
+                shot(pg, f"{name}-scroll-form")
+                pg.evaluate("scrollTo(0, document.querySelector('#why').offsetTop)"); pg.wait_for_timeout(900); s = st(pg)
+                check(f"{vt} scrolled down the page: floating top-right, fully on screen", on_screen(s) and top_right(s), [s["box"], s["hdr"]])
+                shot(pg, f"{name}-scrolled")
+            ctx.close()
+
+    # follow (Jack: "when I scroll up and down it didn't follow, it got hidden"): landing after a stored scan, dark. Every
+    # animation frame (rAF sampler) while scrolling 3 screens down and back, slowly and with fast flicks: phone = the same
+    # rect (±1 px) at every scroll position; desktop = fully on screen in every frame, the same rect whenever floating.
+    # Then a URL-bar collapse / expand (viewport height -94 px and back: window + visualViewport resize), a drop mid-screen,
+    # and X → tab at the top-right corner, scrolled, tap → back to the prior spot. Scrolling: Chromium phone = real touch
+    # gestures via CDP (flicks with momentum); desktop = the wheel; WebKit = script scrollBy per frame (bypass, declared:
+    # Playwright's mobile WebKit has no wheel / touch scroll).
+    ft = f"{tag} follow:"
+
+    def scroll(pg, cdp, dy, fast):
+        if cdp:
+            cdp.send("Input.synthesizeScrollGesture", {"x": 60, "y": 560, "yDistance": -dy, "gestureSourceType": "touch",
+                                                         "speed": 6000 if fast else 900, "preventFling": not fast})
+        elif engine == "webkit":
+            pg.evaluate("""async ([dy, n]) => { for (let i = 0; i < n; i++) { scrollBy({top: dy / n, behavior: 'instant'}); await new Promise(r => requestAnimationFrame(r)); } }""",
+                        [dy, 3 if fast else max(1, int(abs(dy)) // 30)])
+        else:
+            pg.mouse.move(200, 600)
+            n = 3 if fast else max(1, int(abs(dy)) // 60)
+            for _ in range(n):
+                pg.mouse.wheel(0, dy / n); pg.wait_for_timeout(8 if fast else 40)
+        pg.wait_for_timeout(900 if fast else 350)
+
+    def rec(pg):
+        return pg.evaluate("(() => { const a = window.__rs || []; window.__rs = []; return a; })()")
+
+    def trip(pg, cdp, H, fast):   # 3 screens down and back to the top
+        if fast:
+            for _ in range(3):
+                scroll(pg, cdp, H * 1.2, True)
+            for _ in range(4):
+                scroll(pg, cdp, -H * 1.2, True)
+        else:
+            for _ in range(3):
+                scroll(pg, cdp, H, False)
+            scroll(pg, cdp, -H * 3.2, False)
+
+    def same(rs, k, ref):   # every sampled rect (index k) within 1 px of ref
+        bad = [r for r in rs if not r[k] or any(abs(a - b) > 1 for a, b in zip(r[k], ref))]
+        return not bad, bad[:3]
+
+    def inside(rs):
+        return [r for r in rs if not r[1] or r[1][0] < 0 or r[1][1] < 0 or r[1][0] + r[1][2] > vpw or r[1][1] + r[1][3] > r[4]][:3]
+
+    ctx, pg, cdp = new_ctx(scheme="dark", init="try { " + SCAN + " } catch (e) {}")
+    pg.goto(cfg.base, wait_until="domcontentloaded")
+    pg.wait_for_function("() => { const p = document.querySelector('.pip'); return p && p.classList.contains('on'); }", timeout=12000)
+    pg.wait_for_timeout(1500)
+    s0 = st(pg); H, vpw, home = s0["vh"], s0["vw"], s0["box"]
+    pg.evaluate("window.__rs = []")
+    shot(pg, "strip-0-top")
+    for i in range(1, 4):
+        scroll(pg, cdp, H, False); shot(pg, f"strip-{i}-screens")
+    scroll(pg, cdp, -H * 3.2, False); shot(pg, "strip-4-back-top")
+    slow = rec(pg)
+    trip(pg, cdp, H, True)
+    fast = rec(pg)
+    for what, rs in (("slow", slow), ("fast flicks", fast)):
+        far = max([r[0] for r in rs] or [0])
+        MEASURED[f"{ft} {what}"] = {"frames": len(rs), "max_scrollY": far, "home": home, "rects": sorted({tuple(r[1]) for r in rs if r[1]})[:6]}
+        check(f"{ft} {what}: reached 3 screens down and back to the top ({len(rs)} frames sampled)", far >= 2.95 * H and rs and rs[-1][0] <= 2, [far, 3 * H, rs[-1][0] if rs else None])
+        if phone:
+            ok, bad = same(rs, 1, home)
+            check(f"{ft} {what}: phone: the same rect (±1 px) in every frame at every scroll position, top-right under the header", ok and top_right(s0), [home, bad])
+        else:
+            fl = [r for r in rs if r[3] == "float"]
+            ok, bad = same(fl, 1, fl[0][1]) if fl else (False, "never floating")
+            check(f"{ft} {what}: desktop: fully on screen in every frame, the same rect (±1 px) whenever floating", not inside(rs) and ok, [inside(rs), bad])
+    if phone:   # URL-bar collapse / expand: the viewport height only (window + visualViewport resize), at the top and 2 screens down
+        vs = pg.viewport_size
+        for y in (0, 2):
+            pg.evaluate(f"scrollTo({{top: {y} * innerHeight, behavior: 'instant'}})"); pg.wait_for_timeout(400)
+            rec(pg)
+            for h in (vs["height"] - 94, vs["height"], vs["height"] - 94, vs["height"]):
+                pg.set_viewport_size({"width": vs["width"], "height": h}); pg.wait_for_timeout(450)
+            rs = rec(pg)
+            ok, bad = same(rs, 1, home)
+            check(f"{ft} URL bar collapse / expand ({vs['height']} → {vs['height'] - 94} → {vs['height']}, x2) at {y} screens: no jump (±1 px), inside the viewport",
+                  ok and not inside(rs) and len({r[4] for r in rs}) > 1, [home, bad, sorted({r[4] for r in rs})])
+        pg.evaluate("scrollTo({top: 0, behavior: 'instant'})"); pg.wait_for_timeout(400)
+    # X → the tab at the top-right corner, scrolled, tap → back
+    b0 = st(pg)["box"]
+    pg.click(".pip-x"); pg.wait_for_timeout(600); s = st(pg); shot(pg, "strip-5-after-x")
+    tb = s["tab"]["box"] if s["tab"] else None
+    check(f"{ft} X → tab at the top-right corner (right edge, under the header, at the home spot's top)",
+          bool(tb) and tb[0] + tb[2] == vpw and tb[1] >= s["hdr"] and (abs(tb[1] - home[1]) <= 1 if phone else tb[1] - s["hdr"] <= 8 + 16 + 1), [tb, home, s["hdr"]])
+    rec(pg); trip(pg, cdp, H, False); trip(pg, cdp, H, True); rs = rec(pg)
+    ok, bad = same(rs, 2, tb or [0, 0, 0, 0])
+    check(f"{ft} tab: the same rect (±1 px) in every frame, slow + flicks, 3 screens down and back", bool(tb) and ok and len(rs) > 10, [tb, bad, len(rs)])
+    pg.evaluate("scrollTo({top: 0, behavior: 'instant'})"); pg.wait_for_timeout(400)
+    if tb:
+        tap(pg, tb[0] + tb[2] / 2, tb[1] + tb[3] / 2); pg.wait_for_timeout(300)
+    s = st(pg); shot(pg, "strip-6-tab-tapped")
+    check(f"{ft} tab tapped → back at the prior spot (±1 px)", s["on"] and not s["tab"] and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0])
+    # dropped mid-screen: stays there while scrolling (and through the URL bar), X / tab → back there
+    s = drop(pg, cdp, s, vpw / 2, H / 2); mid = s["box"]
+    rec(pg); trip(pg, cdp, H, False); trip(pg, cdp, H, True)
+    if phone:
+        vs = pg.viewport_size
+        for h in (vs["height"] - 94, vs["height"]):
+            pg.set_viewport_size({"width": vs["width"], "height": h}); pg.wait_for_timeout(450)
+    rs = rec(pg)
+    ok, bad = same(rs, 1, mid)
+    check(f"{ft} dropped mid-screen, then scrolled (slow + flicks{', URL bar' if phone else ''}): the same rect (±1 px) in every frame", ok and len(rs) > 10, [mid, bad])
+    pg.click(".pip-x"); pg.wait_for_timeout(600); s = st(pg)
+    tb = s["tab"]["box"] if s["tab"] else None
+    rec(pg); trip(pg, cdp, H, True); rs = rec(pg)
+    ok, bad = same(rs, 2, tb or [0, 0, 0, 0])
+    check(f"{ft} dropped, X → tab at the top-right corner, flicks: the same tab rect", bool(tb) and tb[0] + tb[2] == vpw and tb[1] - s["hdr"] <= 8 + 16 + 1 and ok, [tb, bad])
+    if tb:
+        tap(pg, tb[0] + tb[2] / 2, tb[1] + tb[3] / 2); pg.wait_for_timeout(300)
+    s = st(pg)
+    check(f"{ft} dropped, X, tab tapped → back mid-screen where it was dropped (±1 px)", s["on"] and all(abs(a - c) <= 1 for a, c in zip(s["box"], mid)), [s["box"], mid])
+    ctx.close()
+
     # flags: landing ?pip=0 and scan/ without ?r= = no player, no /video/ request
+    net["video"].clear()
     ctx, pg, cdp = new_ctx()
     pg.goto(cfg.base + "?pip=0", wait_until="load"); pg.keyboard.press("Shift"); pg.evaluate("scrollBy(0, 400)"); pg.wait_for_timeout(4500)
     pg.goto(cfg.base + "scan/", wait_until="load"); pg.keyboard.press("Shift"); pg.wait_for_timeout(4500)
@@ -185,12 +413,12 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     # report page: floating, default on with ?r= (idle mount, no interaction)
     s = ready(pg, "scan/?r=demoR3port01", wake=False)
     lz = pg.evaluate("() => [window.__pipAt, performance.getEntriesByType('navigation')[0].loadEventEnd]")
-    check(f"{tag} lazy: iframe created only after the page's load", lz[0] and lz[0] >= lz[1], lz)
-    check(f"{tag} appear: bottom-right, {'45% of the screen' if phone else '320 px'} wide, 16:9 picture", float_default(s) and ratio_ok(s), [s["box"], s["pic"]])
-    check(f"{tag} bar: no control drawn over the picture (only the 28 px resize corner, top-left), 40 px bar", s["overPic"] == 0 and s["box"][3] - s["pic"][3] == 40
-          and s["grip"] == [0, 0, 28, 28], [s["overPic"], s["box"], s["pic"], s["grip"]])
-    check(f"{tag} bar: exactly play / sound / expand / close, each a >= 40x40 px button, no link",
-          [b[0] for b in s["bar"]] == ["pip-pp", "pip-snd", "pip-exp", "pip-x"] and all(b[2] >= 40 and b[3] >= 40 for b in s["bar"])
+    check(f"{tag} vis: no lazy wait: player + iframe created before the page's load event", lz[0] and lz[0] < lz[1], lz)
+    check(f"{tag} appear: top-right, {'45% of the screen' if phone else '320 px'} wide, 16:9 picture", float_default(s) and ratio_ok(s), [s["box"], s["pic"]])
+    check(f"{tag} bar: on the picture only the close X (top-right, >= 40 px) and the 28 px resize corner (top-left), 40 px bar", s["overPic"] == 1 and x_ok(s)
+          and s["box"][3] - s["pic"][3] == 40 and s["grip"] == [0, 0, 28, 28], [s["overPic"], s["xbox"], s["box"], s["pic"], s["grip"]])
+    check(f"{tag} bar: exactly play / sound / expand, each a >= 40x40 px button, no link",
+          [b[0] for b in s["bar"]] == ["pip-pp", "pip-snd", "pip-exp"] and all(b[2] >= 40 and b[3] >= 40 for b in s["bar"])
           and pg.locator(".pip a").count() == 0 and s["exp"] == ["Expand video", "false", "expand"], [s["bar"], s["exp"]])
     t0 = s["v"]["t"] if isinstance(s["v"], dict) else -1
     pg.wait_for_timeout(900); s = st(pg)
@@ -248,7 +476,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
           and s["box"][0] + s["box"][2] == s["vw"] - 8, [w0, s["box"], s["pic"]])
     shot(pg, "6-resized")
     s = grip(pg, cdp, s, 900, 600)
-    check(f"{tag} resize: min 168 px wide (the 4 x 40 px buttons)", s["box"][2] == 168 and ratio_ok(s), s["box"])
+    check(f"{tag} resize: min 168 px wide", s["box"][2] == 168 and ratio_ok(s), s["box"])
     s = drop(pg, cdp, s, s["vw"] / 2, s["vh"] / 2)
     s = grip(pg, cdp, s, -1400, -1000)
     mx_w = min(s["vw"] * (0.9 if phone else 0.6), (s["vh"] - s["hdr"] - 8 - 8 - 40) * 16 / 9)
@@ -274,14 +502,13 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     check(f"{tag} tuck: tucked state kept across a reload", bool(s) and s["tucked"], s and s["cls"])
     pg.focus(".pip-tab"); pg.keyboard.press("Enter"); pg.wait_for_timeout(500); s = st(pg)
     check(f"{tag} tuck: Enter on the tab brings it back, focus inside the player", s["on"] and not s["tab"] and (s["focus"] or "").startswith("pip-"), [s["cls"], s["focus"]])
-    ls = pg.evaluate("() => window.__ls.filter(e => e[0] >= (window.__pipAt || 0)).reduce((a, e) => a + e[1], 0)")
-    check(f"{tag} cls: 0 after the player mounts (report)", ls == 0, ls)
+    ls = pg.evaluate("() => window.__ls.filter(e => e[0] >= (window.__pipAt || 0) && e[2]).reduce((a, e) => a + e[1], 0)")   # shifts of the player (sources)
+    check(f"{tag} cls: 0 from the player after it mounts (report)", ls == 0, ls)
 
     s = ready(pg, "scan/?r=demoR3port01")
-    pg.click(".pip-x"); pg.wait_for_timeout(400)
-    gone = pg.locator(".pip, .pip-tab").count() == 0
-    pg.goto(cfg.base + "scan/?r=demoR3port01", wait_until="load"); pg.keyboard.press("Shift"); pg.wait_for_timeout(1500)
-    check(f"{tag} close: x removes it, stays closed for the session", gone and pg.locator(".pip").count() == 0)
+    pg.click(".pip-x"); pg.wait_for_timeout(500); s = st(pg)
+    check(f"{tag} close: X hides it behind the right edge tab (never gone), paused", s["tucked"] and bool(s["tab"]) and s["tab"]["side"] == "r"
+          and isinstance(s["v"], dict) and s["v"]["paused"], [s["cls"], s["tab"]])
     ctx.close()
 
     # expanded (YouTube style): tap → big under the header, the page scrolls under it, pull down → mini, fling the mini
@@ -315,73 +542,80 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
           y1 - y0 > 200 and big_ok(s) and below[0] and below[1], [y0, y1, s["box"], s["hdr"], below])
     shot(pg, "7c-expanded-scrolled")
     pg.click(".pip-exp"); pg.wait_for_timeout(600); s = st(pg)
-    check(f"{tag} minimize: the chevron → back to the mini player bottom-right", not s["big"] and float_default(s) and s["exp"] == ["Expand video", "false", "expand"], [s["box"], s["exp"]])
+    check(f"{tag} minimize: the chevron → back to the mini player top-right", not s["big"] and float_default(s) and s["exp"] == ["Expand video", "false", "expand"], [s["box"], s["exp"]])
     pg.click(".pip-exp"); pg.wait_for_timeout(600)
     pg.focus(".pip-exp"); pg.keyboard.press("Escape"); pg.wait_for_timeout(600); s = st(pg)
     check(f"{tag} minimize: Esc (focus inside) → mini again, focus kept on the toggle", not s["big"] and float_default(s) and s["focus"] == "pip-exp", [s["box"], s["focus"]])
     tap(pg, *pic_c(s)); pg.wait_for_timeout(300); s = st(pg)
 
-    def pull(s, frac, steps, step, hold):   # finger on the expanded picture, down by frac of the way to the mini spot
+    def pull(s, frac, steps, step, hold, sample=True):   # finger on the expanded picture, down by frac of the way to the mini spot
         x0, y0 = pic_c(s)
         dy = max(120, mini[1] - s["box"][1]) * frac
-        return drag(pg, cdp, [(x0, y0 + dy * i / steps) for i in range(steps + 1)], step, hold, mid=lambda: st(pg))
+        return drag(pg, cdp, [(x0, y0 + dy * i / steps) for i in range(steps + 1)], step, hold, mid=(lambda: st(pg)) if sample else None)
     m = pull(s, 0.15, 8, 30, 200); s = st(pg)
     check(f"{tag} pull: dragged down 15% → follows the finger (lower, scaled down), released → snaps back expanded",
           m["box"][1] > big0[1] + 10 and m["box"][2] < bw - 10 and big_ok(s), [m["box"], s["box"]])
     m = pull(s, 0.5, 12, 30, 200); s = st(pg)
-    check(f"{tag} pull: dragged down 50% → mini player bottom-right, still playing with sound",
+    check(f"{tag} pull: dragged down 50% → mini player top-right, still playing with sound",
           m["box"][2] < bw * 0.85 and not s["big"] and float_default(s) and isinstance(s["v"], dict) and not s["v"]["paused"] and not s["v"]["muted"], [m["box"], s["box"], s["v"]])
     shot(pg, "7d-pulled-mini")
     tap(pg, *pic_c(s)); pg.wait_for_timeout(300); s = st(pg)
-    pull(s, 0.2, 4, 8, 0); s = st(pg)
-    check(f"{tag} pull: a quick flick down (20% of the way) → mini", not s["big"] and float_default(s), s["box"])
+    pull(s, 0.25, 1, 0, 0, sample=False); s = st(pg)   # one move (CDP touch moves land ~33 ms apart: 30 px in 3 = 0.37 px/ms, no flick), no mid sample   # under the 30% distance threshold: only the speed can minimize it
+    check(f"{tag} pull: a quick flick down (25% of the way) → mini", not s["big"] and float_default(s), s["box"])
     if s["big"]:   # the pull broken (--break-pull): back to the mini so the checks below stay independent of it
         pg.click(".pip-exp"); pg.wait_for_timeout(600); s = st(pg)
         if isinstance(s["v"], dict) and s["v"]["paused"]:   # its taps toggled play / pause
             pg.click(".pip-pp"); pg.wait_for_timeout(400); s = st(pg)
     x0, y0 = pic_c(s)
-    drag(pg, cdp, [(x0, y0 + 25 * i) for i in range(7)], 10, 0); s = st(pg)
+    flung = s["box"]
+    dy = (s["vh"] - y0) / 6   # flung from wherever it sits to the bottom edge
+    drag(pg, cdp, [(x0, y0 + dy * i) for i in range(7)], 10, 0); s = st(pg)
     check(f"{tag} tuck: mini flung down past the bottom → hidden, '<' tab at the right edge, paused",
           s["tucked"] and s["box"][0] >= s["vw"] and bool(s["tab"]) and s["tab"]["side"] == "r" and isinstance(s["v"], dict) and s["v"]["paused"], [s["box"], s["tab"]])
     shot(pg, "7e-hidden-tab")
     if s["tab"]:
         b = s["tab"]["box"]; tap(pg, b[0] + b[2] / 2, b[1] + b[3] / 2); s = st(pg)
-    check(f"{tag} tuck: tab tapped → the mini player is back where the flick started, playing", s["on"] and not s["tab"] and abs(s["box"][0] - mini[0]) <= 2
-          and abs(s["box"][1] - mini[1]) <= 2 and isinstance(s["v"], dict) and not s["v"]["paused"], [s["box"], mini])
+    check(f"{tag} tuck: tab tapped → the mini player is back where the flick started, playing", s["on"] and not s["tab"] and abs(s["box"][0] - flung[0]) <= 2
+          and abs(s["box"][1] - flung[1]) <= 2 and isinstance(s["v"], dict) and not s["v"]["paused"], [s["box"], flung])
     shot(pg, "7f-back")
-    pg.click(".pip-x"); pg.wait_for_timeout(400)
-    check(f"{tag} close: x removes it (after expand / pull / hide)", pg.locator(".pip, .pip-tab").count() == 0)
+    tap(pg, *pic_c(s)); pg.wait_for_timeout(300)
+    pg.click(".pip-x"); pg.wait_for_timeout(500); s = st(pg)
+    check(f"{tag} close: X on the expanded player → hidden behind the right edge tab, not expanded", s["tucked"] and not s["big"] and bool(s["tab"]), [s["cls"], s["tab"]])
     check(f"{tag} expand: no new page / tab, no window.open, same URL throughout", not net["pages"] and s["opens"] == 0 and pg.url == url0, [net["pages"], s["opens"], pg.url])
     ctx.close()
 
     # landing, default on: docked on the hero card, floating once the hero is out, re-docked on the way back
     ctx, pg, cdp = new_ctx()
     s = ready(pg, "", card=phone)
-    dock_checks(pg, s, "before a scan (weekly report card)")
+    if phone:   # a phone never docks: with the card's dock spot on screen it is still top-right, clear of the form
+        ok, d = form_clear(pg)
+        check(f"{tag} vis: phone, hero card in view: still floating top-right, fully on screen, scan form clear", top_right(s) and on_screen(s) and ok, [s["box"], s["hdr"], d])
+    else:
+        dock_checks(pg, s, "before a scan (weekly report card)")
     shot(pg, "8-landing-docked")
     ok, d = clear(pg)
     check(f"{tag} landing: Scan now + header clickable with the player up", ok and d["scan"], d)
-    ls = pg.evaluate("() => window.__ls.filter(e => e[0] >= (window.__pipAt || 0)).reduce((a, e) => a + e[1], 0)")
-    check(f"{tag} cls: 0 after the player mounts (landing, docked)", ls == 0, ls)
+    ls = pg.evaluate("() => window.__ls.filter(e => e[0] >= (window.__pipAt || 0) && e[2]).reduce((a, e) => a + e[1], 0)")   # shifts of the player (sources)
+    check(f"{tag} cls: 0 from the player after it mounts (landing, docked)", ls == 0, ls)
     docked = s["box"]
     tap(pg, *pic_c(s)); pg.wait_for_timeout(300); b = st(pg)
     check(f"{tag} landing: tap on the docked player → expanded under the header", b["big"] and abs(b["box"][1] - (b["hdr"] + (0 if phone else 12))) <= 1
           and abs(b["box"][2] - (b["vw"] if phone else min(960, round(b["vw"] * 0.7)))) <= 1, [b["box"], b["hdr"]])
     shot(pg, "8b-landing-expanded")
     pg.click(".pip-exp"); pg.wait_for_timeout(700); s = st(pg)
-    check(f"{tag} landing: minimized → docked on the card again, same box", s["mode"] == "dock" and all(abs(a - c) <= 2 for a, c in zip(s["box"], docked)), [s["box"], docked])
+    check(f"{tag} landing: minimized → {'top-right' if phone else 'docked on the card'} again, same box", s["mode"] == ("float" if phone else "dock") and all(abs(a - c) <= 2 for a, c in zip(s["box"], docked)), [s["box"], docked])
     pg.evaluate("scrollTo(0, document.querySelector('#why').offsetTop)"); pg.wait_for_timeout(1300); s = st(pg)
     ov = pg.evaluate("""() => { const p = document.querySelector('.pip').getBoundingClientRect(); return [...document.querySelectorAll('.mobile-cta.show, .askai-launcher:not([hidden])')]
       .filter(e => getComputedStyle(e).visibility !== 'hidden').map(e => { const r = e.getBoundingClientRect(); return r.left < p.right && r.right > p.left && r.top < p.bottom && r.bottom > p.top; }); }""")
     ok, d = clear(pg)
-    check(f"{tag} cycle: hero out of view → floating, bottom-right, normal size, clear of the CTA bar / Ask-AI launcher",
-          s["on"] and s["mode"] == "float" and abs(s["box"][2] - min(320, 0.45 * s["vw"])) <= 1 and s["box"][0] + s["box"][2] == s["vw"] - M and not any(ov) and ok, [s["box"], ov, d])
+    check(f"{tag} vis: cycle: hero out of view → floating top-right under the header, normal size, clear of the CTA bar / Ask-AI launcher",
+          s["on"] and top_right(s) and on_screen(s) and abs(s["box"][2] - min(320, 0.45 * s["vw"])) <= 1 and not any(ov) and ok, [s["box"], s["hdr"], ov, d])
     shot(pg, "9-landing-floating")
     pg.evaluate("scrollTo(0, 0)"); pg.wait_for_timeout(300)
     if phone:
         pg.evaluate("document.querySelector('.hero .report-card').scrollIntoView({block: 'center', behavior: 'instant'})")
     pg.wait_for_timeout(1200); s = st(pg)
-    check(f"{tag} dock: scrolled back up → docked again on the card", s["mode"] == "dock" and abs(s["box"][2] - docked[2]) <= 1, [s["box"], docked])
+    check(f"{tag} dock: scrolled back up → {'top-right again (phone)' if phone else 'docked again on the card'}", s["mode"] == ("float" if phone else "dock") and abs(s["box"][2] - docked[2]) <= 1, [s["box"], docked])
     mx, my = s["vw"] * 0.4, s["vh"] * 0.45
     s = drop(pg, cdp, s, mx, my)
     moved = s["box"]
@@ -394,7 +628,11 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     # landing after a scan (the hero card is her report): same docking rule
     ctx, pg, cdp = new_ctx()
     s = ready(pg, "?r=demoR3port01", card=True)
-    dock_checks(pg, s, "after a scan (report card)")
+    if phone:
+        ok, d = form_clear(pg)
+        check(f"{tag} vis: phone, report card in view: floating, fully on screen, scan form clear", s["mode"] == "float" and on_screen(s) and ok, [s["box"], d])
+    else:
+        dock_checks(pg, s, "after a scan (report card)")
     shot(pg, "10-landing-docked-report")
     ctx.close()
 
