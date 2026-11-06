@@ -129,7 +129,7 @@ def wave(name, port, want, users, ramp, rnd):
 
     def user(i):
         time.sleep(rnd.uniform(0, ramp) if ramp else 0)
-        slug = rnd.choices(hot, weights)[0]
+        slug = hot[i] if i < len(hot) else rnd.choices(hot, weights)[0]   # every report once, so a warm wave has no first build
         st, b, h, dt = get(port, slug, f"10.{i >> 8 & 255}.{i & 255}.9")
         v = verify(b, want[slug], "max-age=86400" in (h.get("Cache-Control") or "")) if st == 200 else ([], 0, False, [])
         with lock:
