@@ -388,7 +388,8 @@
 
   // An image tile whose thumb fails or loads blank (hotlink-blocked) leaves the grid / pack (no empty square): the next
   // image not shown yet takes its slot (same size: nothing below moves), else the tile goes. The dead thumb stays out of
-  // later renders; so does one that is no person photo. Other thumbs (Videos tab stills, icons) fall back to their grey box.
+  // later renders; so does one that is no person photo. A Videos tab still that fails, loads blank or is no person photo
+  // falls back to its grey box (the row stays: it is a result, counts unchanged).
   function onScreen(e) {   // any part visible: inside the viewport, its scroll row (strip) and the phone's screen
     var r = e.getBoundingClientRect(), cs = [e.parentNode, e.closest('.ph-scroll')].filter(Boolean).map(function (c) { return c.getBoundingClientRect(); });
     return cs.concat([{ left: 0, top: 0, right: innerWidth, bottom: innerHeight }]).every(function (c) {
@@ -400,10 +401,10 @@
     var drop = function () {
       var t = im.closest('.g-tile, .g-pack-b');
       if (!t) { im.parentNode.classList.add('g-img-none'); im.remove(); return; }
-      state.dead[im.getAttribute('src')] = 1;
+      state.dead[E.unfresh(im.getAttribute('src'))] = 1;
       if (!t.isConnected) return;   // an earlier render's tile
       var box = t.parentNode, shown = {};
-      box.querySelectorAll('img').forEach(function (x) { shown[x.getAttribute('src')] = 1; });
+      box.querySelectorAll('img').forEach(function (x) { shown[E.unfresh(x.getAttribute('src'))] = 1; });
       var spare = imageItems(state.data).filter(function (it) { return !shown[thumb(it.src)]; });
       var had = t.contains(document.activeElement), nu, last = box.lastElementChild;
       while (last !== t && last.querySelector('.g-img-none')) last = last.previousElementSibling;   // the last tile still showing an image (after t)
@@ -428,11 +429,12 @@
         if (f) f.focus({ preventScroll: true });
       }
     };
-    im.addEventListener('error', function () {   // a CORS refusal (XO) loads it once more plain: pixels unread, kept
-      if (im.hasAttribute('crossorigin')) im.removeAttribute('crossorigin'); else drop();
+    im.addEventListener('error', function () {   // a CORS refusal (XO): once more on a fresh URL (a stale cached copy
+      var s = im.getAttribute('src');               // without ACAO), then plain: pixels unread, kept
+      if (!im.hasAttribute('crossorigin')) drop(); else if (s !== E.fresh(s)) im.setAttribute('src', E.fresh(s)); else im.removeAttribute('crossorigin');
     });
-    im.addEventListener('load', function () {   // an image tile that is no person photo (a site logo, banner, icon) goes too
-      if (im.naturalWidth < 16 || im.naturalHeight < 16 || (im.closest('.g-tile, .g-pack-b') && !E.isPhoto(im))) drop();
+    im.addEventListener('load', function () {   // an image tile / video still that is no person photo (a site logo, banner, icon) goes too
+      if (im.naturalWidth < 16 || im.naturalHeight < 16 || (im.closest('.g-tile, .g-pack-b, .g-vthumb') && !E.isPhoto(im))) drop();
     }, { once: true });
   }
 

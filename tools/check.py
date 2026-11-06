@@ -28,7 +28,7 @@ Checks every HTML file under site/ (except site/showcase/**):
 - privacy.html names the VPS host the site is also served from (SITE_HOST in deploy/.env.example), so the
   abolita.com cut-over can't leave the policy naming only the old host
 - README.md names every <section id> of index.html as `#id` (its landing-page map can't silently go stale), and
-  CREDITS.md names every directory outside showcase/ that ships .jpg/.jpeg/.webp photos
+  CREDITS.md names every directory outside showcase/ that ships .jpg/.jpeg/.webp photos or .webm/.mp4/.mov video
 - index.html states the track-record stat ("570 of the 633") at most once: it sat in the hero proof box and again in
   #why ~1.5 screens later (backlog #6)
 """
@@ -344,11 +344,12 @@ def main():
     if stat > 1:
         bad(f"index.html states the track-record stat {stat} times: say it once (hero proof box)")
     credits = (ROOT / "CREDITS.md").read_text(encoding="utf-8")
-    photo_dirs = {f.parent.relative_to(ROOT).as_posix() for f in SITE.rglob("*")
-                  if f.suffix.lower() in (".jpg", ".jpeg", ".webp") and "showcase" not in f.relative_to(SITE).parts}
-    for d in sorted(photo_dirs):
+    media_dirs = {f.parent.relative_to(ROOT).as_posix() for f in SITE.rglob("*")
+                  if f.suffix.lower() in (".jpg", ".jpeg", ".webp", ".webm", ".mp4", ".mov")
+                  and "showcase" not in f.relative_to(SITE).parts}
+    for d in sorted(media_dirs):
         if f"`{d}/`" not in credits:
-            bad(f"{d}/ ships photos but CREDITS.md does not name `{d}/` (say where they come from)")
+            bad(f"{d}/ ships photos or video but CREDITS.md does not name `{d}/` (say where they come from)")
 
     for p in problems:
         print(p)

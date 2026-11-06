@@ -21,23 +21,28 @@
 </head>
 <body class="vo-page">
 <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol><symbol id="i-scan-search" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="i-full" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></symbol><symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol><symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol><symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol></svg>
-<!-- Cues: seconds into jack.webm (Jack's one 40 s take, both modes; SCRIPT.md). live = the card pops in (right half), removed =
-     Jack's snap (shake, then the wipe), out = it has slid out again; google-images data-cue-tap = the "Images" tap. Stage:
-     data-cue-say-start / data-cue-say = the browser says the personalized name + "for <name>" pill (named mode only;
-     -say-start sits in the take's 1.5 s silent opening); data-cue-cta = the end card (cta-steps: the landing in a phone, one
-     10 s take, + the name form; named: her handle, the contact row). The video fills the whole stage; at every width the
-     cards are drawn on its right half (no panel); .vo-ui = full screen / theater button (top right), touch play bar (the
-     full stage width), "Rotate" hint. Guessed for a 40 s take: set them from the real one (site/video/CUES.md);
-     tools/video/check_video.py keeps them sane. -->
+<!-- Cues: seconds into jack.webm (Jack's one 56.9 s take, both modes; jack.mp4 = the same take for iPhones without WebM),
+     set from his words by tools/video/cues_from_take.py (site/video/CUES.md). live = the card pops in (right half), removed =
+     his "they get removed" (shake, then the wipe), out = it has slid out again; google-images data-cue-tap = the "Images" tap.
+     Stage: data-cue-say = the "for <name>" pill again after his last word (named only; also 0-2 s; nothing is ever spoken);
+     data-cue-cta = the end card (cta-steps: the landing in a phone, one 10 s take, + the name form; named: also jakabasej,
+     her report, the contact row), on "You can put your name on the website". The video fills the whole stage; at every
+     width the cards are drawn on its right half (no panel); .vo-capt = his words as captions on his left half
+     (transcript.json); .vo-ui = full screen / theater button (top right), CC toggle under it, touch play bar (the full
+     stage width), "Rotate" hint. tools/video/check_video.py keeps them sane. -->
 <main class="vo" id="vo">
   <h1 class="vo-sr">Jack: leaks on Google, X, Reddit and Mega, before and after the removal</h1>
-  <div class="vo-stage" data-cue-say-start="0.2" data-cue-say="37.8" data-cue-cta="32.6">
+  <div class="vo-stage" data-cue-say="52.98" data-cue-cta="34.77">
     <video class="vo-video" controls controlslist="nofullscreen" playsinline preload="auto" width="1920" height="1080">
       <source src="jack.webm" type="video/webm">
+      <source src="jack.mp4" type="video/mp4">
     </video>
+    <!-- captions: his words as spoken (transcript.json), 1-3 at a time, the current one yellow; lower third of his left half,
+         its top band while his face is down there (js/video-overlays.js captions(t)); CC toggle in .vo-ui -->
+    <p class="vo-capt" aria-hidden="true" data-off></p>
     <div class="vo-over"><div class="vo-box">
 
-      <div class="vo-pf" data-prefab="google" data-cue-live="6.2" data-cue-removed="9.4" data-cue-out="12.8" aria-hidden="true">
+      <div class="vo-pf" data-prefab="google" data-cue-live="10" data-cue-removed="12.86" data-cue-out="14.81" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><b>Google</b><span class="vo-st"><span class="vo-st-live">Leaks for <span data-vo="name">Orla Brennick</span></span><span class="vo-st-gone">A few days later: no leaks</span></span></p>
         <div class="phone vo-phone"><div class="phone-screen">
           <div class="m-search"><span data-vo="name">Orla Brennick</span><svg class="icon"><use href="#i-search"/></svg></div>
@@ -63,7 +68,7 @@
         <span class="vo-kw"><span class="vo-kw-live">GOOGLE</span><span class="vo-kw-gone">GONE.</span></span>
       </div>
 
-      <div class="vo-pf vo-gi" data-prefab="google-images" data-cue-live="12.8" data-cue-removed="16" data-cue-out="18.2" data-cue-tap="14.6" aria-hidden="true">
+      <div class="vo-pf vo-gi" data-prefab="google-images" data-cue-live="14.81" data-cue-removed="16.01" data-cue-out="17.96" data-cue-tap="15.26" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><b>Google Images</b><span class="vo-st"><span class="vo-st-live">Leaked photos of <span data-vo="name">Orla Brennick</span></span><span class="vo-st-gone">No leaks: only her own photos</span></span></p>
         <div class="phone vo-phone"><div class="phone-screen">
           <div class="m-search"><span data-vo="name">Orla Brennick</span><svg class="icon"><use href="#i-search"/></svg></div>
@@ -86,7 +91,7 @@
         <span class="vo-kw"><span class="vo-kw-live">IMAGES</span><span class="vo-kw-gone">CLEAN.</span></span>
       </div>
 
-      <div class="vo-pf" data-prefab="x" data-cue-live="18.2" data-cue-removed="19.6" data-cue-out="21.6" aria-hidden="true">
+      <div class="vo-pf" data-prefab="x" data-cue-live="17.96" data-cue-removed="19.52" data-cue-out="21.47" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico rm-ico-x">X</span><b>X</b><span class="vo-st"><span class="vo-st-live">A leak, posted 2 hours ago</span><span class="vo-st-gone">A few hours later: no leaks</span></span></p>
         <div class="vo-panel"><div class="rm-stage vo-rs">
           <div class="rm-layer rm-live xp">
@@ -107,7 +112,7 @@
         <span class="vo-kw"><span class="vo-kw-live">X</span><span class="vo-kw-gone">NOTHING.</span></span>
       </div>
 
-      <div class="vo-pf" data-prefab="reddit" data-cue-live="21.6" data-cue-removed="23" data-cue-out="25" aria-hidden="true">
+      <div class="vo-pf" data-prefab="reddit" data-cue-live="21.47" data-cue-removed="22.88" data-cue-out="24.88" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico rm-ico-rd">r/</span><b>Reddit</b><span class="vo-st"><span class="vo-st-live">A few leaks on Reddit</span><span class="vo-st-gone">No leaks on Reddit</span></span></p>
         <div class="vo-panel"><div class="rm-stage vo-rs">
           <div class="rm-layer rm-live rd">
@@ -129,7 +134,7 @@
         <span class="vo-kw"><span class="vo-kw-live">REDDIT</span><span class="vo-kw-gone">NOTHING.</span></span>
       </div>
 
-      <div class="vo-pf" data-prefab="mega" data-cue-live="25" data-cue-removed="28.2" data-cue-out="30.4" aria-hidden="true">
+      <div class="vo-pf" data-prefab="mega" data-cue-live="24.88" data-cue-removed="26.06" data-cue-out="28.01" aria-hidden="true">
         <p class="vo-cap"><span class="vo-ico rm-ico-mega">M</span><b>Mega</b><span class="vo-st"><span class="vo-st-live">50+ GB of videos</span><span class="vo-st-gone">Gone in a day</span></span></p>
         <div class="vo-panel"><div class="rm-stage vo-rs">
           <div class="rm-layer rm-live mg">
@@ -159,8 +164,7 @@
         <span class="vo-kw"><span class="vo-kw-live">MEGA <span data-vo="mega-gb">52 GB</span></span><span class="vo-kw-gone">GONE.</span></span>
       </div>
 
-      <!-- data-cue-say-start (2 s) / data-cue-say (stays to the end + after it): the browser says the name; this pill shows it
-           too (no-voice browsers). Personalized names only. -->
+      <!-- 0-2 s and data-cue-say (stays to the end + after it): "for <name>". Personalized names only; never spoken. -->
       <div class="vo-pf vo-for" data-off aria-hidden="true"><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
 
       <!-- both modes: from data-cue-cta (default = data-cue-say) to the end, also after it (named: her name typed, the toast = "This is
@@ -196,13 +200,13 @@
               <span class="vo-reveal">Reveal images</span>
               <span class="vo-strip"><i class="vo-th0"></i><i class="vo-th1"></i><i class="vo-th2"></i><i class="vo-th3"></i></span></span></div></div>
           </div>
-          <span class="vo-end"><span class="vo-end-h vo-gen">Rewatch this video with <em>YOUR</em> content</span><span class="vo-end-f vo-gen">for <span class="vo-mini-n">Your name</span></span>
+          <span class="vo-end"><span class="vo-end-h vo-gen">Rewatch this video with <em>YOUR</em> content</span><span class="vo-end-f vo-gen">for <span class="vo-mini-n">SophieStar</span></span>
             <span class="vo-end-h vo-nm">This is what I'd clear for</span><span class="vo-end-f vo-nm"><span class="vo-end-who"></span></span>
             <span class="vo-end-c vo-nm"><span>Telegram @jakabasej</span><span>WhatsApp +386 40 703 992</span><span>me@jackbase.dev</span></span></span>
         </div>
         <form class="vo-cta-f" action="" method="get">
-          <label class="vo-sr" for="vo-name">Your name</label>
-          <input id="vo-name" name="name" type="text" required maxlength="40" autocomplete="off" spellcheck="false" placeholder="Your name">
+          <label class="vo-sr" for="vo-name">Type your name</label>
+          <input id="vo-name" name="name" type="text" required maxlength="40" autocomplete="off" spellcheck="false" placeholder="Type your name">
           <button type="submit">Rebuild it</button>
         </form>
       </div>
@@ -213,6 +217,7 @@
     <!-- player UI: full screen (the stage, so the cards stay; iPhone: rotated "theater"), touch play bar + hint -->
     <div class="vo-ui">
       <button class="vo-fs" type="button" aria-label="Full screen"><svg class="icon vo-fs-go"><use href="#i-full"/></svg><svg class="icon vo-fs-x"><use href="#i-x"/></svg><span class="vo-fs-t">Full screen</span><span class="vo-fs-r">Rotate</span></button>
+      <button class="vo-ccb" type="button" aria-pressed="true" aria-label="Captions" title="Captions">CC</button>
       <button class="vo-hint" type="button">Rotate for full size</button>
       <button class="vo-nb-pill" type="button">Your name</button>
       <span class="vo-big"><svg class="icon"><use href="#i-play"/></svg></span>

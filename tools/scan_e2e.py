@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
-        [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow]
+        [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs three scenarios.
@@ -48,8 +48,8 @@ drift speed 0: only `drift:` checks may go red. --break-phones serves personaliz
 
 tabs (the owner's three asks): (1) report card ?r=demoBrokenT1 (stub: three page-result thumbs answer 404 / a 1×1
 blank, two are a flat site logo, a video still leads images[]): failed / blank / logo tiles leave the strip, the Images grid and the #free phone, the
-next image takes the slot, the label / tab / "+N more" / phone counts say what shows, every tile is painted, no video
-still; (2) #website copy → demo iframe → Before / After phones (in #showcase), their All / Images / Videos tabs switch
+next image takes the slot, the label / tab / "+N more" / phone counts say what shows, every tile is painted, video
+stills only after the real images; (2) #website copy → demo iframe → Before / After phones (in #showcase), their All / Images / Videos tabs switch
 on click and keys without moving anything, the demo pops out to a full-screen layer (Esc / button / backdrop close,
 focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the #free phone: same
 tabs, the illustration without a scan, her handle / rows / tiles / videos + Reveal with ?r=; no horizontal overflow.
@@ -64,18 +64,30 @@ moves the compare edge + clip; arrow keys on the handle; reduced motion = no tra
 /api/thumb, still blurred, no URL rendered; no mega[] → demo fallback; evil values dropped. Screenshots of every panel
 live + removed, light + dark. --break-remove serves removals.js without the Remove click handler: only `toggle:` checks
 may go red. The leak-site panel (`fp:`) = a fapello-style profile page: light shell + search on both layers, gradient-ring
-avatar, name / aliases (scanned with ?r=), pills, Follow / Discuss, counters, >= 6 loaded 160 px tiles (2 / 4 columns) cropped
-by the stage, the first tile row whole inside it (390 / 320 / desktop), removed = 404 + DMCA line; the wordmark = the host
+avatar, name / aliases (scanned with ?r=), pills, Follow / Discuss, counters, >= 6 loaded tiles (phone 112 px / 2 columns, desktop 160 px / 4)
+cropped by the stage, the first tile row whole inside it (phone 390 / 320), removed = 404 + DMCA line; the wordmark = the host
 without its TLD, never cut at 320-390; no sideways scroll at 320 / 360. --break-fprow serves removals.css with the old
 centred (column) profile head: only the `fp: first tile row` checks may go red. Ambient sweep (`sweep:`): no input, on-screen edges glide (CSS transition 1-2 s) to random 15-85 stops, per card
 (not in lockstep), none off screen / while document.hidden (overridden in the page: headless pages are always visible) /
-under reduced motion, CLS 0; a Remove tap, a stage tap, handle keys each stop only that card for good. The toggle / drag
+under reduced motion, CLS 0; a Remove press (before its click), a stage tap, handle keys each stop only that card for good; reduced
+motion switched on mid-visit stops every edge. The toggle / drag
 / key checks first stop every sweep with End on each handle (real input; the edge back at 100). --break-sweep serves
 removals.js with the sweep never stepping: only `sweep:` checks may go red. `sweep: toggle: Remove tap …` is both (--break-remove
 drops the Remove handler, which also stops the sweep).
 personalize also proves the phone sticky bar (`tgcta:`): no slug = "Free scan: type your handle" → #scan; ?r=<slug> =
 "DM me on Telegram" → t.me/jakabasej with the #contact prefill + her absolute report link + @handle; Reset = the original
 bar. --break-tgcta serves personalize.js without the bar swap: only `tgcta:` checks may go red.
+
+pip (js/pip.js, the floating mini player of site/video/): landing without ?pip=1 and scan/ without ?r= show none and load
+no /video/; scan/?r=<slug> mounts it by itself after the page's load (lazy): 16:9, 45% of the phone width / 320 px,
+same-origin iframe of /video/?r=<slug> in embed form (no name bar / player UI, stage = frame), starts muted + playing, a
+tap unmutes; drags snap to the nearest corner (under the sticky header / report nav); a fling past the left / right
+edge tucks it off-screen with a '>' / '<' tab at that edge (paused), a tap or an inward drag on the tab brings it back;
+Esc tucks, Enter on the tab returns; corner / tucked / closed kept in sessionStorage; expand = /video/?r=&t=; x closes
+for the session; header, report nav, Scan now, phone CTA bar and Ask-AI launcher stay clickable (elementFromPoint);
+CLS 0 after it mounts; reduced motion = no transitions; no request off loopback, no console errors. Phone (Chromium,
+real touch via CDP), desktop, and WebKit iPhone 13 (taps are touch, drags use the mouse: pointerType mouse). Screenshots:
+<vp>-pip-*.png. --break-tuck serves pip.js with tuck() emptied: only `tuck:` checks may go red.
 """
 import base64
 import json, pathlib, re, socket, subprocess, sys, time, urllib.request
@@ -88,7 +100,7 @@ out = pathlib.Path(sys.argv[1]).expanduser()
 out.mkdir(parents=True, exist_ok=True)
 omit = "--omit-results" in sys.argv
 omit_profile = "--omit-profile" in sys.argv
-SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai", "inline", "tabs", "removals"]
+SCENARIOS = [sys.argv[sys.argv.index("--only") + 1]] if "--only" in sys.argv else ["scan", "personalize", "askai", "inline", "tabs", "removals", "pip"]
 BREAK_ALLOWLIST = "--break-allowlist" in sys.argv
 BREAK_DRIFT = "--break-drift" in sys.argv
 BREAK_PHONES = "--break-phones" in sys.argv
@@ -99,6 +111,7 @@ BREAK_SWEEP = "--break-sweep" in sys.argv
 BREAK_TGCTA = "--break-tgcta" in sys.argv
 BREAK_FPROW = "--break-fprow" in sys.argv
 BREAK_INCREMENTAL = "--break-incremental" in sys.argv
+BREAK_TUCK = "--break-tuck" in sys.argv
 GS_RE = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 PEOPLE = {"imgs/portrait.webp", "imgs/hero-wide.webp", "imgs/studio-portrait.webp"}   # showcase hero defaults: Pexels people photos (tools/showcase/CREDITS.md)
 
@@ -110,8 +123,9 @@ dead_thumb = lambda u, extra=(): "DEAD" in u or "BLANK" in u or "LOGO" in u or a
 
 def _images(fx, alive=False, extra=()):
     """Mirror of inline-scan.js model().images: images[] (with the result that has that thumb) then results' thumbs,
-    gstatic only, deduped, video results' stills skipped, max 60; the ones with a link first. alive: minus the thumbs
-    the stub answers 404 or blank, plus `extra` (route-level 404s; gallery() drops them all). → [(src, link, domain)]"""
+    gstatic only, deduped, video results' stills skipped, max 60; the ones with a link first; then the video results'
+    stills (top-up), max 60 in all. alive: minus the thumbs the stub answers 404 or blank, plus `extra` (route-level 404s;
+    gallery() drops them all). → [(src, link, domain)]"""
     ok = lambda u: isinstance(u, str) and len(u) <= 600 and GS_RE.match(u)
     res = [r for r in fx.get("results", []) if r.get("link")]
     by, seen, out = {}, set(), []
@@ -129,7 +143,15 @@ def _images(fx, alive=False, extra=()):
         add(r.get("thumb"), r)
     out = out[:60]
     out = [o for o in out if o[1]] + [o for o in out if not o[1]]
+    had = {o[0] for o in out}
+    out = (out + [(u, by[u]["link"], by[u]["domain"]) for u, v in _scan_images(fx) if v and u not in had])[:60]
     return [o for o in out if not dead_thumb(o[0], extra)] if alive else out
+
+
+def _band(fx, ims):
+    """The #free band's Images grid: first 9 of `ims` minus the stills its Videos tab shows (first 3 video results)."""
+    v3 = {r.get("thumb") for r in [r for r in fx.get("results", []) if r.get("link") and is_video(r)][:3]}
+    return [x for x in ims if x[0] not in v3][:9]
 
 
 def _scan_images(fx, alive=False):
@@ -2006,7 +2028,7 @@ def inline_flow(browser, vp_name, vp):
     NI = len(IM)
     tile_href = lambda it: it[1] or base + "scan/?r=" + slug
     want_tiles = lambda k: [[tile_href(it), "_blank" if it[1] else "", "noopener noreferrer nofollow" if it[1] else "",
-                             API + "/api/thumb?u=" + quote(it[0], safe="")] for it in IM[:k]]
+                             API + "/api/thumb?u=" + quote(it[0], safe="")] for it in (_band(FX, IM) if k == 9 else IM[:k])]
     i = ill(page)
     check(f"{tag} thumbs: band: #free phone Images tab = her first 9 image results (link → result in a new tab, else the report)",
           i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] == "group"
@@ -2385,6 +2407,7 @@ def tabs_flow(browser, vp_name, vp):
             pg.on("pageerror", lambda e: net["errors"].append(str(e)))
             pg.on("console", lambda msg: msg.type == "error" and urlsplit(msg.location.get("url") or "").hostname not in FONT_HOSTS
                   and not (msg.text.startswith("Failed to load resource") and "DEAD" in unquote(msg.location.get("url") or ""))
+                  and not ("STALE" in unquote(msg.text + (msg.location.get("url") or "")) and ("CORS" in msg.text or "ERR_FAILED" in msg.text))   # the stale copy's refusal (then E.fresh)
                   and net["console"].append(msg.text + " @ " + (msg.location.get("url") or "")))
         ctx.on("page", on_page)
         return ctx
@@ -2421,8 +2444,32 @@ def tabs_flow(browser, vp_name, vp):
           st["label"] == f"{len(A)} images on Google Images" and st["tab"] == str(len(A)) and st["more"] == (f"+ {len(A) - G} more in the full report" if len(A) > G else None), st)
     check(f"{tag} thumbs: every grid tile painted (loaded, >= 16 px, opacity 1), no empty square", len(st["painted"]) == min(G, len(A)) and all(st["painted"]), st["painted"])
     check(f"{tag} thumbs: strip = first 24 that load", st["strip"] == [x[0] for x in A[:24]], st["strip"][:3])
-    check(f"{tag} videos: no video still among the image tiles (grid, strip)", not (set(st["grid"] + st["strip"]) & vids) and any(u in vids for u in BROKEN["images"][:1]), sorted(vids)[:2])
+    vs = [u in vids for u in st["strip"]]
+    check(f"{tag} videos: video stills only after every real image (strip; images[]' leading still moved back), none if photos fill it",
+          any(u in vids for u in BROKEN["images"][:1]) and vs == sorted(vs) and st["strip"][:1] != BROKEN["images"][:1], [sum(vs), len(vs)])
     shot(page, "1-card-images-broken-removed", ".report-card")
+    # #free band Videos rows: a logo still (no person photo) leaves its 16:9 box grey + play mark, the row stays
+    page.locator("#free").scroll_into_view_if_needed()
+    page.locator("#mt-free-videos").click()
+    page.wait_for_timeout(1500)
+    BV = [r for r in BROKEN["results"] if is_video(r)][:3]
+    bv = page.evaluate("""() => [...document.querySelectorAll('[data-live=band-videos] a.m-link')].map(a => { const i = a.querySelector('.m-vthumb img');
+        return [a.href, i ? (i.complete && i.naturalWidth >= 16) : null, !!a.querySelector('.m-vthumb .m-play')]; })""")
+    check(f"{tag} videos: #free Videos rows: logo still dropped (grey box + play kept, row stays), the rest painted",
+          [x[0] for x in bv] == [r["link"] for r in BV] and [x[1] for x in bv] == [None if dead_thumb(r.get("thumb") or "DEAD") else True for r in BV]
+          and all(x[2] for x in bv) and any("LOGO" in (r.get("thumb") or "") for r in BV), bv)
+    # row icons (Links + Sites): a person photo of the row's own site or the neutral letter: never a logo / dead thumb,
+    # never another site's photo; a site whose own thumb fails borrows one of its other results' photos
+    tdom = {}
+    for r in BROKEN["results"]:
+        if r.get("thumb"):
+            tdom.setdefault(r["thumb"], set()).add(r["domain"])
+    ri = page.evaluate("""() => [...document.querySelectorAll('.report-card .live-rows a.live-link, .report-card .live-sites a.live-link')].map(a => {
+        const i = a.querySelector('.live-ico img'); return [a.querySelector('.live-dom').textContent, i ? decodeURIComponent(i.getAttribute('src').split('u=')[1] || '') : '']; })""")
+    bad_doms = {d for t, ds in tdom.items() if dead_thumb(t) for d in ds}
+    check(f"{tag} thumbs: row icons (Links + Sites): own-site person photos or the letter, no logo / failed thumb, a failed site borrows its own other photo",
+          ri and not any(dead_thumb(u) for _d, u in ri if u) and all(d in tdom.get(u, ()) for d, u in ri if u)
+          and any(d in bad_doms and u for d, u in ri), [x for x in ri if x[1] and (dead_thumb(x[1]) or x[0] not in tdom.get(x[1], ()))] or [x[0] for x in ri if x[0] in bad_doms])
     # the same report on the scan page: failed tiles leave its Images grid too
     ctx.close()
     ctx = new_ctx()
@@ -2433,6 +2480,14 @@ def tabs_flow(browser, vp_name, vp):
     page.wait_for_timeout(1500)
     sp = page.evaluate("() => [...document.querySelectorAll('.g-grid .g-tile img')].map(i => [decodeURIComponent(i.getAttribute('src').split('u=')[1]), i.complete && i.naturalWidth >= 16])")
     check(f"{tag} thumbs: scan page Images grid: failed / blank tiles removed, the rest painted", sp and all(ok for _u, ok in sp) and not any(dead_thumb(u) for u, _ok in sp), [u[-24:] for u, ok in sp if not ok][:4])
+    page.locator("#g-tab-videos").click()
+    page.wait_for_timeout(1500)
+    VS = [r for r in BROKEN["results"] if r.get("kind") == "video"]
+    sv = page.evaluate("() => [...document.querySelectorAll('#g-panel .g-v .g-vthumb')].map(a => { const i = a.querySelector('img'); return [a.href, i ? (i.complete && i.naturalWidth >= 16) : a.querySelector('.g-img-none') ? null : false]; })")
+    check(f"{tag} videos: scan page Videos tab: logo still → grey box (row stays, count honest), the rest painted",
+          [x[0] for x in sv] == [r["link"] for r in VS[:len(sv)]] and len(sv) == min(5 if vp_name == "phone" else 8, len(VS))
+          and [x[1] for x in sv] == [None if dead_thumb(r.get("thumb") or "DEAD") else True for r in VS[:len(sv)]]
+          and any("LOGO" in (r.get("thumb") or "") for r in VS[:len(sv)]), sv)
     ctx.close()
     if vp_name == "desktop":   # desktop Images: every thumb answers late (after the tab is up): same-size tiles, nothing moves
         ctx = new_ctx()
@@ -2478,7 +2533,7 @@ def tabs_flow(browser, vp_name, vp):
               d0 >= 0 and len(s1[0]) == (len(s0) if len(AS) > len(s0) else len(AS)) and all(ok for _u, ok in s1[0]) and [u for u, _ok in s1[0][:d0]] == s0[:d0]
               and not dead_thumb(s1[0][d0][0]) and not any(dead_thumb(u) for u, _ok in s1[0]) and not s1[1], [len(s0), len(AS), len(s1[0]), d0, s1[1][:2]])
         page.locator("#device input[value=computer]").check(force=True)
-        page.wait_for_timeout(300)
+        page.wait_for_timeout(1000)   # a thumb the phone never showed: its probe (a STALE one: refusal, E.fresh retry) settles
         back = page.evaluate("() => [...document.querySelectorAll('#g-stage img')].map(i => decodeURIComponent(i.getAttribute('src').split('u=')[1] || ''))")
         check(f"{tag} thumbs: a device switch keeps failed thumbs out (Computer view lists none of them)", back and not any(dead_thumb(u) for u in back), [u[-24:] for u in back if dead_thumb(u)])
         ctx.close()
@@ -2710,7 +2765,7 @@ def tabs_flow(browser, vp_name, vp):
           vids: q('[data-live=band-videos] a.m-link').map(a => a.href), illus: q('.m-illus').filter(e => e.offsetParent !== null).length}; }""")
     check(f"{tag} free: report → search = @handle, All = her first 4 rows (new tab), Images = first 9 that load + count, Videos = her video results",
           lv["search"] == "@demo.creator" and lv["label"] == "Google results for @demo.creator" and [x[0] for x in lv["all"]] == [r[2] for r in rows[:4]]
-          and all(x[1] == "_blank" for x in lv["all"]) and lv["tiles"] == [x[0] for x in IMs[:9]] and lv["n"] == f"{len(IMs)} images"
+          and all(x[1] == "_blank" for x in lv["all"]) and lv["tiles"] == [x[0] for x in _band(FX, IMs)] and lv["n"] == f"{len(IMs)} images"
           and lv["vids"] == [r["link"] for r in VID[:3]] and lv["illus"] == 0, lv)
     for k in ("all", "images", "videos"):
         page.locator(f"#mt-free-{k}").click()
@@ -2814,7 +2869,7 @@ def tabs_flow(browser, vp_name, vp):
     ctx.close()
     hosts = {urlsplit(u).hostname for u in net["outside"]}
     check(f"{tag} no request left loopback but the demo's aborted Google Fonts", hosts <= FONT_HOSTS, sorted(hosts))
-    check(f"{tag} no JS errors, no console errors (the stub's 404 thumbs aside)", not net["errors"] and not net["console"], net["errors"] + net["console"])
+    check(f"{tag} no JS errors, no console errors (the stub's 404 thumbs and STALE CORS refusals aside)", not net["errors"] and not net["console"], net["errors"] + net["console"])
 
 # ---------- removals (js/removals.js, css/removals.css: the #removals "Where I remove from" panels) ----------
 RM_PANELS = ("mega", "x", "reddit", "site")
@@ -3238,6 +3293,220 @@ def removals_flow(browser, vp_name, vp):
           sorted(hosts) + net["errors"])
 
 
+PIP_J = """() => { const p = document.querySelector('.pip'), t = document.querySelector('.pip-tab'), R = e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); };
+  if (!p) return null; const f = p.querySelector('iframe'); let v = null, emb = null;
+  try { const d = f.contentDocument, e = d.querySelector('.vo-video'), st = d.querySelector('.vo-stage').getBoundingClientRect();
+    v = {paused: e.paused, muted: e.muted, t: e.currentTime}; emb = {nb: getComputedStyle(d.querySelector('.vo-nb')).display, ui: getComputedStyle(d.querySelector('.vo-ui')).display,
+    sw: Math.round(st.width), sh: Math.round(st.height), fw: f.clientWidth, fh: f.clientHeight}; } catch (x) { v = String(x); }
+  return {cls: p.className, box: R(p), on: p.classList.contains('on') && !p.classList.contains('tucked'), tucked: p.classList.contains('tucked'),
+    tab: t && !t.hidden ? {box: R(t), side: t.dataset.side, chev: t.innerHTML.includes('m9 6') ? '>' : t.innerHTML.includes('m15 6') ? '<' : '?'} : null,
+    v, emb, src: f.src, focus: document.activeElement && document.activeElement.className, vw: document.documentElement.clientWidth, vh: innerHeight}; }"""
+PIP_HIT = """([sel, inside]) => [...document.querySelectorAll(sel)].filter(e => { const r = e.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight && getComputedStyle(e).visibility !== 'hidden'; })
+  .map(e => { const r = e.getBoundingClientRect(), pts = [[r.left + r.width / 2, r.top + r.height / 2], [r.left + 4, r.top + r.height / 2], [r.right - 4, r.top + r.height / 2]];
+    return pts.every(([x, y]) => { const h = document.elementFromPoint(x, y); return h && h.closest(inside || sel) === e.closest(inside || sel); }); })"""
+
+
+def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
+    """js/pip.js: the floating mini player of site/video/ (report page default with ?r=, landing with ?pip=1)."""
+    tag = f"{vp_name}{'-webkit' if engine == 'webkit' else ''} pip:"
+    net = {"outside": [], "errors": [], "video": []}
+    phone = vp_name == "phone"
+    browser = pw.webkit.launch() if engine == "webkit" else chromium
+
+    def new_ctx(motion="no-preference"):
+        opts = dict(pw.devices["iPhone 13"]) if engine == "webkit" else dict(viewport=vp, device_scale_factor=2 if phone else 1, is_mobile=phone, has_touch=phone)
+        ctx = browser.new_context(**opts, reduced_motion=motion)
+        ctx.add_init_script("""window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}
+          new MutationObserver(() => { if (!window.__pipAt && document.querySelector('.pip iframe')) window.__pipAt = performance.now(); }).observe(document, {childList: true, subtree: true});""")
+
+        def route(r, _req):
+            if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost"):
+                if "/video/" in r.request.url:
+                    net["video"].append(r.request.url)
+                r.continue_()
+            else:
+                net["outside"].append(r.request.url)
+                r.abort()
+        ctx.route("**/*", route)
+        if BREAK_TUCK:   # wire boundary: pip.js served with the tuck handler gone (same bytes otherwise)
+            body = (ROOT / "site" / "js" / "pip.js").read_text(encoding="utf-8")
+            old = "  function tuck(side) {\n"
+            assert old in body, "break: marker not found in pip.js"
+            ctx.route("**/js/pip.js", lambda r: r.fulfill(body=body.replace(old, old + "    return;\n", 1), content_type="application/javascript"))
+        ctx.on("page", lambda pg: (pg.on("pageerror", lambda e: net["errors"].append(str(e))),
+                                   pg.on("console", lambda m: m.type == "error" and net["errors"].append(m.text))))
+        pg = ctx.new_page()
+        return ctx, pg, (ctx.new_cdp_session(pg) if engine == "chromium" and phone else None)
+
+    def st(pg):
+        return pg.evaluate(PIP_J)
+
+    def ready(pg, url, wake=True):
+        pg.goto(base + url, wait_until="load")
+        if wake:
+            pg.keyboard.press("Shift")   # an interaction mounts it at once (else: idle)
+        pg.wait_for_function("() => { const p = document.querySelector('.pip'); return p && p.classList.contains('on'); }", timeout=10000)
+        pg.wait_for_timeout(500)
+        return st(pg)
+
+    def tap(pg, x, y):
+        if phone:
+            pg.touchscreen.tap(x, y)
+        else:
+            pg.mouse.click(x, y)
+        pg.wait_for_timeout(450)
+
+    def drag(pg, cdp, pts, step=16, hold=0):   # real touch via CDP (Chromium phone), else the mouse (WebKit: pointerType mouse, declared)
+        if cdp:
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": pts[0][0], "y": pts[0][1]}]})
+            for x, y in pts[1:]:
+                pg.wait_for_timeout(step)
+                cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x, "y": y}]})
+            pg.wait_for_timeout(hold)
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        else:
+            pg.mouse.move(*pts[0]); pg.mouse.down()
+            for x, y in pts[1:]:
+                pg.wait_for_timeout(step)
+                pg.mouse.move(x, y)
+            pg.wait_for_timeout(hold)
+            pg.mouse.up()
+        pg.wait_for_timeout(600)
+
+    def centre(s):
+        b = s["box"]
+        return b[0] + b[2] / 2, b[1] + b[3] / 2
+
+    def to_corner(pg, cdp, s, corner):   # slow drag + hold (no fling) to the middle of that quadrant
+        x0, y0 = centre(s)
+        x1 = s["vw"] * (0.25 if corner[1] == "l" else 0.75)
+        y1 = s["vh"] * (0.3 if corner[0] == "t" else 0.7)
+        drag(pg, cdp, [(x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12) for i in range(13)], 30, 200)
+        return st(pg)
+
+    def fling(pg, cdp, s, dx):
+        x0, y0 = centre(s)
+        drag(pg, cdp, [(x0 + dx * i / 6, y0) for i in range(7)], 10, 0)
+        return st(pg)
+
+    def clear(pg):   # header / report nav / Scan now / CTA bar / launcher still get the click with the player up
+        hdr = all(pg.evaluate(PIP_HIT, [".site-header a, .site-header button", ""]))
+        nav = all(pg.evaluate(PIP_HIT, [".rnav a, .rnav button", ""]))
+        scan = all(pg.evaluate(PIP_HIT, ["#scan button[type=submit]", ""]))
+        bars = all(pg.evaluate(PIP_HIT, [".mobile-cta.show, .askai-launcher:not([hidden])", ""]))
+        return hdr and nav and scan and bars, {"hdr": hdr, "nav": nav, "scan": scan, "bars": bars}
+
+    def shot(pg, name):
+        pg.screenshot(path=str(out / f"{tag.split()[0]}-pip-{name}.png"))
+
+    # flags: landing without ?pip=1, scan/ without ?r= = no player, no /video/ request
+    ctx, pg, cdp = new_ctx()
+    pg.goto(base, wait_until="load"); pg.keyboard.press("Shift"); pg.evaluate("scrollBy(0, 400)"); pg.wait_for_timeout(4500)
+    pg.goto(base + "scan/", wait_until="load"); pg.keyboard.press("Shift"); pg.wait_for_timeout(4500)
+    check(f"{tag} flag: landing without ?pip=1 and scan/ without ?r= show no player, load no /video/",
+          pg.locator(".pip").count() == 0 and not net["video"], net["video"])
+
+    # report page: default on with ?r= (idle mount, no interaction)
+    s = ready(pg, "scan/?r=demoR3port01", wake=False)
+    lz = pg.evaluate("() => [window.__pipAt, performance.getEntriesByType('navigation')[0].loadEventEnd]")
+    check(f"{tag} lazy: iframe created only after the page's load", lz[0] and lz[0] >= lz[1], lz)
+    w, h, vw = s["box"][2], s["box"][3], s["vw"]
+    check(f"{tag} appear: 16:9, {'45% of the screen' if phone else '320 px'} wide", abs(w - (min(320, 0.45 * vw))) <= 1 and abs(w * 9 / 16 - h) <= 1.5, s["box"])
+    t0 = s["v"]["t"] if isinstance(s["v"], dict) else -1
+    pg.wait_for_timeout(900); s = st(pg)
+    check(f"{tag} appear: starts muted and playing", isinstance(s["v"], dict) and s["v"]["muted"] and not s["v"]["paused"] and s["v"]["t"] > t0 and "muted" in s["cls"], s["v"])
+    u = urlsplit(s["src"])
+    check(f"{tag} appear: same-origin iframe of /video/?r=<slug>", f"{u.scheme}://{u.netloc}/" == base and u.path == "/video/" and parse_qs(u.query).get("r") == ["demoR3port01"], s["src"])
+    e = s["emb"] or {}
+    check(f"{tag} embed: no name bar / player UI, the stage fills the frame", e.get("nb") == "none" and e.get("ui") == "none" and abs(e.get("sw", 0) - e.get("fw", -9)) <= 1 and abs(e.get("sh", 0) - e.get("fh", -9)) <= 1, e)
+    ok, d = clear(pg)
+    check(f"{tag} clear: header + report nav clickable with the player up (bottom corner)", ok, d)
+    shot(pg, "1-appear")
+    tap(pg, *centre(s)); s = st(pg)
+    check(f"{tag} unmute: a tap on the player turns the sound on, keeps playing", isinstance(s["v"], dict) and not s["v"]["muted"] and not s["v"]["paused"] and "muted" not in s["cls"], s["v"])
+    shot(pg, "2-unmuted")
+    s = to_corner(pg, cdp, s, "tl")
+    top_clear = pg.evaluate("() => Math.max(...['.site-header', '.rnav'].map(q => document.querySelector(q)).filter(Boolean).map(e => { const r = e.getBoundingClientRect(); return r.top < 140 ? r.bottom : 0; }))")
+    check(f"{tag} drag: snapped to the top-left corner, under the sticky header / nav", s["on"] and s["box"][0] == (12 if phone else 24) and s["box"][1] >= top_clear, [s["box"], top_clear])
+    ok, d = clear(pg)
+    check(f"{tag} clear: header + report nav clickable with the player in the top corner", ok, d)
+    shot(pg, "3-dragged-tl")
+    s = fling(pg, cdp, s, -150)
+    check(f"{tag} tuck: fling left → off-screen, '>' tab at the left edge, paused",
+          s["tucked"] and s["box"][0] + s["box"][2] <= 0 and bool(s["tab"]) and s["tab"]["side"] == "l" and s["tab"]["chev"] == ">" and s["tab"]["box"][0] == 0
+          and isinstance(s["v"], dict) and s["v"]["paused"], [s["box"], s["tab"]])
+    shot(pg, "4-tucked-left")
+    if s["tab"]:
+        b = s["tab"]["box"]; tap(pg, b[0] + b[2] / 2, b[1] + b[3] / 2); s = st(pg)
+    check(f"{tag} tuck: tab tapped → back on screen in its corner, playing", s["on"] and not s["tab"] and s["box"][0] == (12 if phone else 24) and isinstance(s["v"], dict) and not s["v"]["paused"], s["box"])
+    shot(pg, "5-back")
+
+    s = ready(pg, "scan/?r=demoR3port01")   # fresh page: corner from sessionStorage
+    check(f"{tag} state: corner kept in sessionStorage across a reload", s["on"] and s["box"][0] == (12 if phone else 24) and s["box"][1] < s["vh"] / 2, s["box"])
+    s = to_corner(pg, cdp, s, "tr")
+    check(f"{tag} drag: snapped to the top-right corner", s["on"] and s["box"][0] + s["box"][2] == s["vw"] - (12 if phone else 24), s["box"])
+    s = fling(pg, cdp, s, 150)
+    check(f"{tag} tuck: fling right → off-screen, '<' tab at the right edge", s["tucked"] and s["box"][0] >= s["vw"] and bool(s["tab"]) and s["tab"]["side"] == "r"
+          and s["tab"]["chev"] == "<" and s["tab"]["box"][0] + s["tab"]["box"][2] == s["vw"], [s["box"], s["tab"]])
+    shot(pg, "6-tucked-right")
+    if s["tab"]:
+        b = s["tab"]["box"]; cx, cy = b[0] + b[2] / 2, b[1] + b[3] / 2
+        drag(pg, cdp, [(cx - 12 * i, cy) for i in range(7)], 16, 0); s = st(pg)
+    check(f"{tag} tuck: tab dragged inward → back in the top-right corner", s["on"] and not s["tab"] and s["box"][0] + s["box"][2] == s["vw"] - (12 if phone else 24), s["box"])
+
+    s = ready(pg, "scan/?r=demoR3port01")
+    pg.focus(".pip-snd"); pg.keyboard.press("Escape"); pg.wait_for_timeout(500); s = st(pg)
+    check(f"{tag} tuck: Esc inside the player tucks it, focus on the tab", s["tucked"] and bool(s["tab"]) and s["focus"] == "pip-tab", [s["cls"], s["focus"]])
+    s = ready(pg, "scan/?r=demoR3port01")
+    check(f"{tag} tuck: tucked state kept across a reload", s is not None and s["tucked"] if s else False, s and s["cls"])
+    pg.focus(".pip-tab"); pg.keyboard.press("Enter"); pg.wait_for_timeout(500); s = st(pg)
+    check(f"{tag} tuck: Enter on the tab brings it back, focus inside the player", s["on"] and not s["tab"] and (s["focus"] or "").startswith("pip-"), [s["cls"], s["focus"]])
+    ls = pg.evaluate("() => window.__ls.filter(e => e[0] >= (window.__pipAt || 0)).reduce((a, e) => a + e[1], 0)")
+    check(f"{tag} cls: 0 after the player mounts", ls == 0, ls)
+
+    s = ready(pg, "scan/?r=demoR3port01")
+    pg.wait_for_timeout(1200)
+    pg.click(".pip-exp"); pg.wait_for_url("**/video/**", timeout=8000); pg.wait_for_selector(".vo-stage")
+    u = urlsplit(pg.url); qq = parse_qs(u.query)
+    check(f"{tag} expand: opens the full /video/ page with ?r= and the time", u.path == "/video/" and qq.get("r") == ["demoR3port01"] and qq.get("t", ["x"])[0].isdigit() and pg.locator(".pip").count() == 0, pg.url)
+    shot(pg, "7-expanded")
+    s = ready(pg, "scan/?r=demoR3port01")
+    pg.click(".pip-x"); pg.wait_for_timeout(400)
+    gone = pg.locator(".pip, .pip-tab").count() == 0
+    shot(pg, "8-closed")
+    pg.goto(base + "scan/?r=demoR3port01", wait_until="load"); pg.keyboard.press("Shift"); pg.wait_for_timeout(1500)
+    check(f"{tag} close: x removes it, stays closed for the session", gone and pg.locator(".pip").count() == 0)
+    ctx.close()
+
+    # landing ?pip=1: Scan now + header + phone CTA bar / launcher stay clickable
+    ctx, pg, cdp = new_ctx()
+    s = ready(pg, "?pip=1")
+    ok, d = clear(pg)
+    check(f"{tag} landing ?pip=1: shown, Scan now + header clickable", s["on"] and "r=" not in s["src"] and ok and d["scan"], d)
+    shot(pg, "9-landing")
+    pg.evaluate("scrollTo(0, document.querySelector('#why').offsetTop)"); pg.wait_for_timeout(1200)
+    bar = pg.locator(".mobile-cta.show").count() == 1
+    ov = pg.evaluate("""() => { const p = document.querySelector('.pip').getBoundingClientRect(); return [...document.querySelectorAll('.mobile-cta.show, .askai-launcher:not([hidden])')]
+      .filter(e => getComputedStyle(e).visibility !== 'hidden').map(e => { const r = e.getBoundingClientRect(); return r.left < p.right && r.right > p.left && r.top < p.bottom && r.bottom > p.top; }); }""")
+    ok, d = clear(pg)
+    check(f"{tag} landing ?pip=1: past the hero the player sits clear of the CTA bar / Ask-AI launcher", not any(ov) and ok and (bar or not phone) and len(ov) >= 1, [bar, ov, d])
+    shot(pg, "10-landing-scrolled")
+    ctx.close()
+
+    ctx, pg, cdp = new_ctx(motion="reduce")
+    ready(pg, "scan/?r=demoR3port01")
+    td = pg.evaluate("() => getComputedStyle(document.querySelector('.pip')).transitionDuration")
+    check(f"{tag} motion: prefers-reduced-motion = no transitions", all(float(x.strip()[:-1]) == 0 for x in td.split(",")), td)
+    ctx.close()
+    if engine == "webkit":
+        browser.close()
+    # allowed: the landing's lazy demo iframe's disclosed Google Fonts (aborted here, hence ERR_FAILED); Playwright's WebKit build has
+    # no native media-control icons ("Button failed to load", the /video/ page's own <video controls>, also without the player)
+    hosts = sorted({urlsplit(x).hostname for x in net["outside"] if x.startswith("http")} - FONT_HOSTS)
+    errs = [x for x in net["errors"] if "net::ERR_FAILED" not in x and not x.startswith("Button failed to load, iconName")]
+    check(f"{tag} no request left loopback (but the demo's disclosed fonts), no console / JS errors", not hosts and not errs, hosts + errs[:5])
+
+
 with socket.socket() as s:
     s.bind(("127.0.0.1", 0))
     port = s.getsockname()[1]
@@ -3289,6 +3558,10 @@ try:
                 tabs_flow(browser, vp_name, vp)
             if "removals" in SCENARIOS:
                 removals_flow(browser, vp_name, vp)
+            if "pip" in SCENARIOS:
+                pip_flow(pw, browser, vp_name, vp)
+        if "pip" in SCENARIOS:
+            pip_flow(pw, browser, "phone", None, "webkit")   # iPhone 13 (Playwright device), WebKit
         browser.close()
 finally:
     stub.terminate()
@@ -3296,5 +3569,6 @@ finally:
 (out / "e2e-summary.json").write_text(json.dumps({"fails": fails, "omit_results": omit, "omit_profile": omit_profile,
                                                   "scenarios": SCENARIOS, "break_allowlist": BREAK_ALLOWLIST, "break_thumbs": BREAK_THUMBS, "break_people": BREAK_PEOPLE,
                                                   "break_incremental": BREAK_INCREMENTAL, "break_sweep": BREAK_SWEEP, "break_tgcta": BREAK_TGCTA, "break_fprow": BREAK_FPROW,
+                                                  "break_tuck": BREAK_TUCK,
                                                   "measured": MEASURED}, indent=1))
 sys.exit(1 if fails else 0)

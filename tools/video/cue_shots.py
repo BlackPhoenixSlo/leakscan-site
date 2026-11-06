@@ -2,7 +2,7 @@
 """Real-path proof for site/video/: serve site/ (Range-capable, tools/video/serve.py), open video/?t=<cue> in BOTH modes,
 generic (no name, no scan) and named (?name=NAME), at phone 390x844 and desktop 1440x900, wait until the <video> has
 seeked there, screenshot, and assert: only the cue's prefab is on screen, in the right state (wipe --p 100 live / 0
-removed), the mode's name in it ("Your name" / NAME), html[data-vo-mode], at both widths (phone too: no stacking) it
+removed), the mode's name in it ("SophieStar" / NAME), html[data-vo-mode], at both widths (phone too: no stacking) it
 sits inside the stage's right half, vertically centred (left >= 50 %, centre within 5 % of the middle: Jack on the left stays uncovered), the rolling
 counters (google "About 4,120 results" → "About 3 results", mega "52 GB · 318 videos" → "0 GB · 0 videos"), no request
 leaves 127.0.0.1, no console error, jack.webm is the playing source. Each prefab
@@ -18,9 +18,10 @@ Plus:
   frame-1920-generic-cta.png: the full 1920x1080 frame = the framing proofs
 - sfx: AudioContext wrapped (declared) to log oscillators / noise sources: none before the play gesture, a pop at the
   live cue, whoosh + thud at the removed cue, nothing with ?sfx=0
-- speech (named only): speechSynthesis.speak stubbed (declared: no voice in headless); Space = the play gesture; spoken
-  once at data-cue-say-start and once at data-cue-say with NAME, rate 0.95, video ducked to 0.25 then restored, "for
-  NAME" pill (start; at data-cue-say = data-cue-cta the named flow instead); generic → never spoken; data-cue-say moved past the end (declared) → spoken + end card on `ended`
+- no AI overvoice: window.speechSynthesis.speak + SpeechSynthesisUtterance hooked in every context (declared: count only,
+  never speaks); Space = the play gesture; named: played 0 .. 2.4 s and across data-cue-say → 0 calls, 0 utterances, volume
+  untouched, "for NAME" pill at the start (at data-cue-say = data-cue-cta the named flow instead); generic → 0 calls, no
+  pill; data-cue-say moved past the end (declared) → the named flow / end card on `ended`, still 0 calls
 - the name bar's scan (declared, wire boundary, every context): POST /api/public-scan answers an SSE `failed` (serve.py has
   no API), so a rebuild stays text only
 - personalized (tools/scan_stub.py, ?r=demoRemove1): named mode, texts from the scan result in every prefab; every
@@ -44,7 +45,7 @@ Plus:
   ends the post-roll clock keeps it looping to the flip (frame-1920-generic-cta-flip-postroll.png); phone portrait +
   iPhone theater: every phase shot (phone-{portrait,theater}-generic-cta-<n>-<phase>.png), typed handle on screen >= 11 px
   portrait / >= 20 px theater, the toast's letters >= 11 px portrait
-- named flow (?name=NAME, data-cue-cta): the same take with handle(NAME) typed, '@handle' on the scan / report cards, the toast
+- named flow (?name=NAME, data-cue-cta): the same take with handle(DEMO) "jakabasej" typed, '@jakabasej' on the scan / report cards, the toast
   "This is what I'd clear for NAME" + the contact row (Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev), no
   title / form / flip / pill; held to cta + 14.6 (named loop 15 s), looping after the take ends; 1920 + phone portrait + iPhone
   theater phases (frame-1920-named-cta-*.png, phone-{portrait,theater}-named-cta-*.png), toast + contacts >= 11 px portrait
@@ -59,27 +60,44 @@ Plus:
   right half of the centred 16:9 picture
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
 --break-img serves video-overlays.js with report()'s image field wrong (it.title for it.src): only the "prod img:" checks go red.
-- name bar + in-place swap (phone 390x844, desktop 1440x900, frame 1920x1156 = a 1920x1080 stage + the bar), speech stubbed
-  (declared): generic at 0 s the bar sits under the stage, in view, with the pulsing "type your name" pill (gone after the
+- name bar + in-place swap (phone 390x844, desktop 1440x900, frame 1920x1156 = a 1920x1080 stage + the bar), speech hooked
+  (declared: counts calls): generic at 0 s the bar sits under the stage, in view, with the pulsing "type your name" pill (gone after the
   first focus); an invalid name is rejected inline (message, URL unchanged); phone: in theater (declared: Fullscreen API
   removed, as iPhone) the "Your name" pill closes it and focuses the input; played past 2.4 s, SWAP_NAME + Enter →
   at once (no rebuild card: no .vo-rb in the page, no pause event): ?name=<encoded> (replaceState, same document), named
-  mode, within 1 s playing from < 1 s ({vp}-swap-settled.png); spoken with SWAP_NAME at data-cue-say-start (desktop: and at data-cue-say), "for" pill; google at its live cue
+  mode, within 1 s playing from < 1 s ({vp}-swap-settled.png); 0 speak calls (desktop: also across data-cue-say), "for" pill; google at its live cue
   shows SWAP_NAME; cta-steps never shown (MutationObserver); Change re-opens the input prefilled; Reset → generic, URL
   without query, restarted, end card back. Proof PNGs: frame-1920-swap-bar-generic-0s.png (page), frame-1920-swap-settled.png,
   frame-1920-swap-google-live.png (1920x1080 stage).
 - full frame (1920x1080, 1280x800, phone 390x844, iPhone theater, desktop full screen): the <video> box == the stage box,
   the drawn picture (object-fit + videoWidth / Height) covers the whole stage (full screen: the centred 16:9 picture, the
   overlay = its right half); .vo-over / .vo-box = the stage's right half, transparent (no background, no shadow: the
-  cards are drawn straight on the video); at a card-free time (3 s) the screen's right half = the video frame's right half
-  (screenshot, native controls + player UI off (declared), vs drawImage(video), 8x8 grid, every cell |diff| < 8) -> full-frame-<vp>.png
+  cards are drawn straight on the video); at a card-free, still time (7.2 s) the screen's right half = the video frame's right half
+  (screenshot, native controls + player UI off (declared), vs drawImage(video), 8x8 grid, mean |diff| < 3, every cell < 24) -> full-frame-<vp>.png
 --break-full serves css/video.css with the old split layout appended (the video in the left half, an opaque panel behind
   the cards): only the "full frame:" checks go red.
 --break-thumbs serves video-overlays.js without the thumb src assignment: only the thumbs check goes red.
 --break-steps serves index.html without the cta-steps phone (.vo-steps): only the "cta-steps:" checks go red.
 --break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
---break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the "cta-steps: typed … DEMO" check goes red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name Tessa] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img]
+--break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the typed-handle checks (generic "cta-steps: typed …
+  DEMO", the "named flow" / "prod … end card" jakabasej ones) go red.
+- prod real images: every leak image on every card (.rm-img, .vo-real) blurred >= 5px (video cards: blur(5px), the floor =
+  styles.css .live-ico; removals.css / the report untouched), the after photos unblurred; the cards use people photos only:
+  "prod logos:" the landing report (?r=PROD_SLUG, js/inline-scan.js gallery() + E.isPhoto, same proxy) and the video drop
+  the same thumbs (its Images tab = the video's kept count, every landing tile in the video's kept set, none dropped by
+  the video); per card a trigger (live + 0.15) + settled (live settled, removed + 2) shot: prod-<label>-<card>-<state>.png
+- no "Tessa" in the DOM text (generic + named; the test name is Jaka Basej)
+- persona (generic = the demo persona "SophieStar"), 1920x1080 + phone 390x844 + iPhone theater: at every card's live +
+  removed cue the card's text has "SophieStar", no "Your name" / "Tessa"; google / google-images after state = sophiestar.com
+  + instagram.com › sophiestar; the end card (cta + 0.6) and its flip (cta + 9.65, + the post-roll) stay "SophieStar", a name
+  typed in the end card form (not submitted) flips in instead; named ?name=Jaka%20Basej: every card has "Jaka Basej", no
+  "SophieStar" -> persona-<view>-<mode>-<card>-<state>.png
+--break-persona serves video-overlays.js with GENERIC = 'Your name' (the old placeholder): only the "persona:" checks go red.
+--skip-prod skips the production-image part (break runs: no production GETs).
+--break-voice serves video-overlays.js with the old overvoice (speechSynthesis.speak(name) 0.5 s in): only the "no overvoice"
+  / swap speak checks go red. --only voice = the speech + desktop swap part.
+--break-logos serves video-overlays.js with its E.isPhoto test off (logos kept): only the "prod logos:" check goes red.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--skip-prod] [--only prod|captions|voice]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, json, pathlib, re, socket, subprocess, sys, time, urllib.parse, urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -98,7 +116,8 @@ def take_len():   # the take's length (s): the end-of-take checks seek just befo
 
 
 END = take_len()
-GENERIC = "Your name"
+GENERIC = "SophieStar"   # the generic demo persona (js/video-overlays.js GENERIC)
+GENERIC_SITE, GENERIC_IG = "sophiestar.com", "sophiestar"
 CTA_TEXT = "Type your name in the link → this video rebuilds with YOUR leaks"
 VIEWPORTS = {"phone": dict(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True),
              "desktop": dict(viewport={"width": 1440, "height": 900})}
@@ -128,8 +147,14 @@ FX = """pid => { const e = document.querySelector(`.vo-pf[data-prefab="${pid}"]`
           [+g.opacity, g.clipPath], e.offsetWidth, e.offsetHeight]; }"""
 LEAK_HOSTS = re.compile(r"\.example\b|leak|pirate|forum-dump|free-galleries", re.I)
 IMGS = "() => [...document.querySelectorAll('.rm-img')].map(i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter])"
-SAY_STUB = """window.__said = []; if ('speechSynthesis' in window) speechSynthesis.speak = u => { const v = document.querySelector('video');
-  __said.push([u.text, v.currentTime, v.volume, u.rate, u.lang]); setTimeout(() => u.onend && u.onend(), 400); };"""
+PIP_EMBED = re.search(r"var EMBED = '([^']+)'", (ROOT / "site/js/pip.js").read_text(encoding="utf-8"))[1]   # the mini player's embed style
+PIP_CAPT = """() => { const s = document.querySelector('.vo-stage').getBoundingClientRect(), c = document.querySelector('.vo-capt');
+  const r = getComputedStyle(c).display === 'none' ? [] : [...c.querySelectorAll('span')].map(e => e.getBoundingClientRect()).filter(x => x.width);
+  return r.length ? (Math.max(...r.map(x => x.right)) - s.left) / s.width : null; }"""
+SAY_STUB = """window.__said = []; window.__utt = 0; if ('speechSynthesis' in window) speechSynthesis.speak = u => {
+  __said.push([u && u.text, document.querySelector('video')?.currentTime]); };   /* the page must never call it (no AI overvoice) */
+  if (window.SpeechSynthesisUtterance) { const U = window.SpeechSynthesisUtterance; window.SpeechSynthesisUtterance = class extends U {
+  constructor(...a) { super(...a); __utt++; } }; }"""
 SFX_STUB = """window.__sfx = []; window.__actx = 0; { const A = window.AudioContext; if (A) window.AudioContext = class extends A {
   constructor(...a) { super(...a); __actx++; }
   createOscillator() { __sfx.push(['osc', +document.querySelector('video').currentTime.toFixed(2)]); return super.createOscillator(); }
@@ -188,8 +213,8 @@ def check(name, ok, detail=""):
     return ok
 
 
-def after_ok(pid, name, txt, imgs):
-    site = re.sub(r"[^a-z0-9-]", "", name.lower()) + ".com"
+def after_ok(pid, name, txt, imgs):   # name None (generic): the site is persona()'s check
+    site = re.sub(r"[^a-z0-9-]", "", name.lower()) + ".com" if name else ".com"
     if pid == "google":
         return site in txt and "instagram.com" in txt and not LEAK_HOSTS.search(txt)
     own = [i for i in imgs if i[1] > 0 and i[2] == "none" and not i[3]]
@@ -264,7 +289,7 @@ def personalized(b, out, break_thumbs):
         pg.goto(f"{base}video/?r=demoRemove1&t=15.3")
         try:
             pg.wait_for_function("() => document.querySelector('[data-vo=name]').textContent === 'Mira Example'", timeout=8000)
-            pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete)", timeout=8000)
+            pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete && i.src.includes('/api/thumb'))", timeout=12000)
         except Exception:
             pass
         pg.wait_for_timeout(500)
@@ -283,12 +308,12 @@ def personalized(b, out, break_thumbs):
         check(f"personalized ?r=demoRemove1: the {len(own)} after photos = the scan's own photos ({api}/api/media/demoRemove1/<n>.jpg), unblurred",
               len(own) == 6 and all(s.startswith(api + "/api/media/demoRemove1/") and w > 0 and f == "none" for s, w, f in own), own[:3])
         # evidence shots drawn with the pure draw(t) (the stub has no Range, so the page's <video> can't seek to a cue)
-        cues = {m[1]: (float(m[2]), float(m[3]), float(m[5] or 0)) for m in re.finditer(
-            r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="[\d.]+"( data-cue-tap="([\d.]+)")?',
+        cues = {m[1]: (float(m[2]), float(m[3]), float(m[6] or 0), float(m[4])) for m in re.finditer(
+            r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"( data-cue-tap="([\d.]+)")?',
             (ROOT / "site/video/index.html").read_text(encoding="utf-8"))}
         for pid, state in (("google-images", "live"), ("x", "live"), ("google", "removed"), ("google-images", "removed")):
-            live, rem, tap = cues[pid]
-            pg.evaluate(DRAW, (min(rem - 0.1, tap + 1.0) if tap else live + 1.0) if state == "live" else rem + 2.0)
+            live, rem, tap, off = cues[pid]
+            pg.evaluate(DRAW, (min(rem - 0.1, tap + 1.0) if tap else live + 1.0) if state == "live" else min(rem + 2.0, off - 0.45))
             pg.wait_for_timeout(800)   # decode + paint of the blurred thumbs
             pg.screenshot(path=str(out / f"desktop-personalized-demoRemove1-{pid}-{state}.png"))
             if state == "removed":
@@ -310,7 +335,13 @@ GSTATIC = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 REAL = """() => { const q = s => [...document.querySelectorAll(s)], im = i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter];
   return {g: q('.vo-pf[data-prefab="google"] .rm-live .rm-img').map(im), grows: q('.vo-pf[data-prefab="google"] .rm-live .m-site').map(e => e.textContent),
           grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
-          own: q('.vo-own').map(im), count: (document.querySelector('[data-vo="g-count"]') || {}).textContent}; }"""
+          own: q('.vo-own').map(im), count: (document.querySelector('[data-vo="g-count"]') || {}).textContent, photos: window.VideoOverlays.photos,
+          cards: q('.vo-pf[data-prefab]').map(e => [e.dataset.prefab, [...e.querySelectorAll('.rm-img, .vo-real')].map(im)])}; }"""
+BLUR = lambda f: float(m[1]) if (m := re.search(r"blur\(([\d.]+)px\)", f or "")) else 0.0
+BLUR_MIN = 5   # px: the video cards' leak-image blur floor (= styles.css .live-ico, the site's lightest rule)
+# the landing report (?r=, js/inline-scan.js) once its probes settled: [Images tab count, every strip / grid tile src]
+LANDING = """() => { const n = document.querySelector('#lt-images .live-tab-n');
+  return [n ? +n.textContent : null, [...document.querySelectorAll('.live-strip-track .gi-img, .live-grid .gi-img')].map(i => i.getAttribute('src'))]; }"""
 
 
 def prod_expect(raw):
@@ -383,7 +414,7 @@ def prod(b, base, out, cues, cta):
     raw = stored(PROD_SLUG)[0]
     sse = "".join(f"event: {e}\ndata: {d}\n\n" for e, d in [("progress", "Searching Google, step 1 of 9"), ("progress", "Searching Google, step 6 of 9"),
                                                              ("result", json.dumps(raw)), ("done", "")])
-    proxied = []
+    proxied, cache = [], {}
 
     def proxy(r):   # declared bypass: the page's same-origin API GETs → the production API, read-only
         u = urllib.parse.urlsplit(r.request.url)
@@ -391,8 +422,16 @@ def prod(b, base, out, cues, cta):
             return r.abort()
         if u.path == "/api/thumb" and not GSTATIC.match(urllib.parse.parse_qs(u.query).get("u", [""])[0]):
             return r.fulfill(status=404, body="")   # never ask production for a non-gstatic thumb
-        proxied.append(u.path.split("/")[2])
-        r.fulfill(response=r.fetch(url=PROD + u.path + ("?" + u.query if u.query else ""), timeout=30000))
+        key = u.path + ("?" + u.query if u.query else "")
+        if key not in cache:   # memoized: each production GET once per run (the video's probe, its slots, the landing: same URLs; no 429s)
+            proxied.append(u.path.split("/")[2])
+            res = r.fetch(url=PROD + key, timeout=30000)
+            hit = (res.status, {k: v for k, v in res.headers.items() if k.lower() in ("content-type", "cache-control")}, res.body())
+            if res.status != 200 or "/api/media/" in key and key.count("/") == 3:   # only stable answers (the media index may still grow)
+                return r.fulfill(status=hit[0], headers=hit[1], body=hit[2])
+            cache[key] = hit
+        st, hd, body = cache[key]
+        r.fulfill(status=st, headers=hd, body=body)
 
     def run(label, opts, theater, slug):
         _, want, paths = stored(slug)
@@ -442,7 +481,7 @@ def prod(b, base, out, cues, cta):
                 r.fulfill(status=200, content_type="text/event-stream", body=sse)
         try:
             pg.wait_for_function("s => location.search === '?r=' + s || document.documentElement.dataset.voMode === 'named'", arg=slug, timeout=15000)
-            pg.wait_for_function("""() => [...document.querySelectorAll('.rm-img, .vo-real')].every(i => i.complete)
+            pg.wait_for_function("""() => window.VideoOverlays.photos.kept.length > 0 && [...document.querySelectorAll('.rm-img, .vo-real')].every(i => i.complete)
                 && [...document.querySelectorAll('.vo-own')].every(i => i.src.includes('/api/media/') && i.complete)""", timeout=30000)
         except Exception:
             pass
@@ -454,30 +493,73 @@ def prod(b, base, out, cues, cta):
             v = pg.evaluate("() => [document.querySelector('video').paused, document.querySelector('video').currentTime]")
             check(f"prod ({label}): the held take plays on after the result", v[0] is False, v)
         real = pg.evaluate(REAL)
-        thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and "blur(" in x[2] for x in xs)
+        thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and BLUR(x[2]) >= BLUR_MIN for x in xs)
         check(f"prod img ({label}): Google: 3 real thumbs on the first row, loaded, blurred", len(real["g"]) == 3 and thumb(real["g"], 3), real["g"])
         check(f"prod img ({label}): Google Images: 6 real thumbs, loaded, blurred", len(real["grid"]) == 6 and thumb(real["grid"], 6), real["grid"][:2])
         check(f"prod img ({label}): cta-steps report: 9 real thumbs (rows + strip), loaded, blurred", len(real["rep"]) == 9 and thumb(real["rep"], 9), real["rep"][:2])
         check(f"prod img ({label}): every .rm-img = a real /api/thumb one, loaded, blurred", thumb(real["all"], 13), [x for x in real["all"] if not x[0].startswith("/api/thumb")][:2])
         check(f"prod ({label}): Google rows = her real domains, count {want['count']!r}", real["grows"] == want["rows"][:4] and real["count"] == want["count"], (real["grows"], real["count"]))
+        weak = [(c, x[0][-24:], x[2]) for c, xs in real["cards"] for x in xs if BLUR(x[2]) < BLUR_MIN]
+        n_leak = sum(len(xs) for _, xs in real["cards"])
+        check(f"prod blur ({label}): every leak image on every card ({n_leak} on {', '.join(c for c, xs in real['cards'] if xs)}) blurred >= {BLUR_MIN}px",
+              n_leak >= 22 and not weak, weak[:3] or sorted({x[2] for _, xs in real["cards"] for x in xs}))
+        kept, dropped = real["photos"]["kept"], real["photos"]["dropped"]
+        print(f"prod ({label}): people photos kept {len(kept)}, dropped {len(dropped)} (logos / banners / icons / dead)")
         own = real["own"]
         check(f"prod ({label}): after photos = her own (/api/media/{slug}/<n>.jpg), loaded, unblurred",
               len(own) == 6 and all(x[0].startswith(f"/api/media/{slug}/") and x[1] > 0 and x[2] == "none" for x in own), own[:2])
         live, rem, _ = cues["google-images"]
-        for name, t in (("google-live", cues["google"][0] + 1.3), ("google-images-live", min(rem - 0.1, float(TAP or live + 0.6) + 1.0)), ("google-images-removed", rem + 2.0),
-                        ("x-live", cues["x"][0] + 1.0), ("report", cta + 8.6)):
+        for pid in ("google", "google-images", "x", "reddit", "mega"):   # per card: trigger + settled, live and removed
+            l0, r0, _ = cues[pid]
+            settled = min(r0 - 0.1, float(TAP or l0 + 0.6) + 1.0) if pid == "google-images" else l0 + min(1.3, r0 - l0 - 0.1)
+            for state, t in (("trigger", l0 + 0.15), ("settled", settled), ("removed-trigger", r0 + 0.1), ("removed-settled", r0 + 2.0)):
+                pg.evaluate(DRAW, t)
+                pg.wait_for_timeout(300)
+                (pg if theater else pg.locator(".vo-stage")).screenshot(path=str(out / f"prod-{label}-{pid}-{state}.png"))
+        for name, t in (("cta-typed", cta + 3.05), ("google-live", cues["google"][0] + 1.3), ("google-images-live", min(rem - 0.1, float(TAP or live + 0.6) + 1.0)), ("google-images-removed", rem + 2.0),
+                        ("x-live", cues["x"][0] + 1.0), ("report", cta + 8.6), ("end", cta + 9.65)):
             pg.evaluate(DRAW, t)
             pg.wait_for_timeout(500)
             f = out / f"prod-{label}-{name}.png"
             (pg if theater else pg.locator(".vo-stage")).screenshot(path=str(f))
+            if name in ("cta-typed", "end"):
+                s2 = pg.evaluate(STEPS)
+                ok = s2["typed"] == handle(DEMO) and s2["at"] == "@" + handle(DEMO) if name == "cta-typed" else named_end(s2, st[4])
+                check(f"prod end card ({label}): " + (f"typed onlyfans.com/{handle(DEMO)} + '@{handle(DEMO)}' (not her {PROD_HANDLE!r})" if name == "cta-typed"
+                      else f"ends 'This is what I'd clear for {st[4]}' + contacts") + f" -> {f.name}", ok, s2 and (s2["typed"], s2["at"], s2["shown"]))
             if name == "report":
                 s2 = pg.evaluate(STEPS)
                 tabs = [int(re.sub(r"\D", "", x)) for x in s2["tabs"]]
-                check(f"prod ({label}): report = her real counts{' (not the placeholder ' + str(TABS) + ')' if want['tabs'] != TABS else ''} Links / Images / Sites {want['tabs']}, '+ {want['tabs'][0] - 5} more', her rows -> {f.name}",
-                      tabs == want["tabs"] and s2["more"] == f"+ {want['tabs'][0] - 5} more in the full report" and s2["rows"] == want["rows"], (tabs, s2["more"], s2["rows"]))
+                want_t = [want["tabs"][0], len(kept), want["tabs"][2]]   # Images = the people photos kept (as the landing's tab)
+                check(f"prod ({label}): report = her real counts{' (not the placeholder ' + str(TABS) + ')' if want_t != TABS else ''} Links / Images (kept) / Sites {want_t}, '+ {want['tabs'][0] - 5} more', her rows, '@{handle(DEMO)}' -> {f.name}",
+                      tabs == want_t and s2["at"] == "@" + handle(DEMO) and s2["more"] == f"+ {want['tabs'][0] - 5} more in the full report" and s2["rows"] == want["rows"], (tabs, s2["more"], s2["rows"]))
         text = pg.evaluate("() => document.body.innerText + ' ' + document.querySelector('.vo').textContent")
         bad = [x for x in paths if x in text][:3] + re.findall(r"https?://\S+", text)[:3]
         check(f"prod ({label}): no leak URL in the DOM text ({len(paths)} paths checked, no http(s)://)", not bad, bad)
+        if label == "1920":   # the landing report on the same result, same proxy: it must drop the same thumbs
+            lctx = ctx_new(b, **opts)   # own context: the landing's own requests (its Google Fonts css: aborted, declared) are not the video's
+            for pat in ("**/api/scan-result/**", "**/api/thumb?**", "**/api/media/**"):
+                lctx.route(pat, proxy)
+            lext = guard(lctx, (base,))
+            lp = lctx.new_page()
+            lp.goto(f"{base}?r={slug}")
+            try:   # its probes settled: the Images tab says what is left
+                lp.wait_for_function("k => { const n = document.querySelector('#lt-images .live-tab-n'); return n && +n.textContent === k; }", arg=len(kept), timeout=20000)
+            except Exception:
+                pass
+            lp.wait_for_timeout(1500)
+            n_l, tiles = lp.evaluate(LANDING)
+            lp.locator("#lt-images").first.click()
+            lp.wait_for_timeout(1200)
+            card = lp.locator(".live-card, .hero-card, #hero-card").first
+            (card if card.count() else lp).screenshot(path=str(out / "prod-landing-report-images.png"))
+            ks = set(kept)
+            check(f"prod logos: the video cards and the landing report (?r={slug}) drop the same thumbs: landing Images {n_l} == video kept {len(kept)}"
+                  f" (of {len(kept) + len(dropped)}, {len(dropped)} dropped), all {len(tiles)} landing tiles in the video's kept set -> prod-landing-report-images.png",
+                  n_l == len(kept) and tiles and all(t in ks for t in tiles) and not ks & set(dropped), (n_l, len(kept), [t[-30:] for t in tiles if t not in ks][:3]))
+            (out / "prod-photos.json").write_text(json.dumps({"slug": slug, "kept": kept, "dropped": dropped, "landing_count": n_l, "landing_tiles": tiles}, indent=1))
+            print(f"prod logos: landing page requests outside 127.0.0.1 aborted (declared, the landing's own, not the video's): {sorted(set(lext))}")
+            lctx.close()
         check(f"prod ({label}): every request to 127.0.0.1 (production only through the declared proxy), no console error",
               not ext and all(u.startswith(base) for u in seen) and not errs, (ext[:3], errs[:3]))
         ctx.close()
@@ -486,7 +568,7 @@ def prod(b, base, out, cues, cta):
     run("1920", dict(viewport={"width": 1920, "height": 1080}), False, PROD_SLUG)
     run("phone", VIEWPORTS["phone"], False, PROD_SLUG)
     run("theater", VIEWPORTS["phone"], True, PROD_SLUG2)
-    print(f"prod: proxied read-only GETs: " + ", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))))
+    print(f"prod: proxied read-only GETs to production (memoized): " + ", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))))
 
 
 def play(pg, until):
@@ -497,8 +579,9 @@ def play(pg, until):
 
 
 def speech(b, base, out, name, cues):
-    start, say = cues["say-start"], cues["say"]
-    for label, query, t, until in (("start", f"name={name}", 0, start + 0.6), ("end", f"name={name}", say - 0.6, say + 0.6)):
+    """no AI overvoice: the page never calls speechSynthesis.speak (named or generic); the "for <name>" pill stays"""
+    say = cues["say"]
+    for label, query, t, until in (("start", f"name={name}", 0, 1.0), ("end", f"name={name}", say - 0.6, say + 0.6)):
         ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
         ctx.add_init_script(SAY_STUB)
         pg = ctx.new_page()
@@ -506,18 +589,20 @@ def speech(b, base, out, name, cues):
         play(pg, until)
         pg.wait_for_timeout(100)
         pill = pg.evaluate("() => { const e = document.querySelector('.vo-for'); return [e.hasAttribute('data-off'), e.innerText.replace(/\\s+/g, ' ').trim()]; }")
-        pg.screenshot(path=str(out / f"desktop-named-say-{label}-{name}.png"))
-        pg.wait_for_timeout(400)
-        said, vol = pg.evaluate("() => [__said, document.querySelector('video').volume]")
-        at = start if label == "start" else say
-        check(f"speech ?name={name} ({label}, data-cue-say{'-start' if label == 'start' else ''}={at}): spoken once with the name, rate 0.95, en, ducked to 0.25 then restored",
-              len(said) == 1 and said[0][0] == name and at <= said[0][1] < at + 0.5 and said[0][2] == 0.25 and abs(said[0][3] - 0.95) < 1e-6
-              and said[0][4] == "en" and vol == 1, (said, vol))
+        pg.screenshot(path=str(out / f"desktop-named-{label}-{name}.png"))
         if label == "start":
-            check(f"speech ?name={name} ({label}): 'for {name}' pill on screen", not pill[0] and pill[1].endswith(f"for {name}"), pill)
+            pg.wait_for_function("() => document.querySelector('video').currentTime > 2.4", timeout=10000)
+        else:
+            pg.wait_for_timeout(400)
+        said, utt, vol = pg.evaluate("() => [__said, __utt, document.querySelector('video').volume]")
+        span = "0 .. 2.4 s" if label == "start" else f"data-cue-say {say} ± 0.6"
+        check(f"no overvoice ?name={name} ({label}, played {span}): speechSynthesis.speak called 0 times, 0 utterances, volume 1",
+              said == [] and utt == 0 and vol == 1, (said, utt, vol))
+        if label == "start":
+            check(f"pill ?name={name} (start, 1.0 s): 'for {name}' pill on screen", not pill[0] and pill[1].endswith(f"for {name}"), pill)
         else:   # data-cue-say = data-cue-cta: the named flow carries the name, no pill
             vis = [v[0] for v in pg.evaluate(VISIBLE)]
-            check(f"named flow: speech ?name={name} ({label}): cta-steps on screen at data-cue-say, no pill", vis == ["cta-steps"] and pill[0], (vis, pill))
+            check(f"named flow: ?name={name} ({label}): cta-steps on screen at data-cue-say, no pill", vis == ["cta-steps"] and pill[0], (vis, pill))
         ctx.close()
     # generic: never spoken, no pill, the end card instead
     ctx = ctx_new(b, viewport={"width": 1440, "height": 900})
@@ -526,7 +611,7 @@ def speech(b, base, out, name, cues):
     goto(pg, base, "", say - 0.6)
     play(pg, say + 0.6)
     got = pg.evaluate("() => [__said, document.querySelector('.vo-for').hasAttribute('data-off'), (document.querySelector('.vo-cta')?.hasAttribute('data-off') ?? 'missing')]")
-    check("speech, generic (no ?name, no scan): never spoken, no pill, end card shown", got == [[], True, False], got)
+    check("no overvoice, generic (no ?name, no scan): speak called 0 times, no pill, end card shown", got == [[], True, False], got)
     ctx.close()
     # data-cue-say past the end of the take (declared: moved to 99): the video's `ended` brings the name / the end card
     for query in (f"name={name}", ""):
@@ -538,8 +623,7 @@ def speech(b, base, out, name, cues):
         play(pg, 99)
         pg.wait_for_timeout(300)
         got = pg.evaluate("() => [__said.map(s => s[0]), document.querySelector('.vo-for').hasAttribute('data-off'), (document.querySelector('.vo-cta')?.hasAttribute('data-off') ?? 'missing')]")
-        want = [[name], True, False] if query else [[], True, False]
-        check(f"{'named flow: ' if query else ''}ended before data-cue-say ({'named' if query else 'generic'}): {'name spoken + the named flow' if query else 'end card'} at the end", got == want, got)
+        check(f"{'named flow: ' if query else ''}ended before data-cue-say ({'named' if query else 'generic'}): {'the named flow' if query else 'end card'} at the end, speak called 0 times", got == [[], True, False], got)
         ctx.close()
 
 
@@ -595,8 +679,8 @@ def cta_steps(pg, base, out, cta, name_q):
                   s and s["so"][2] > .9 and s["so"][:2] == [0, 0] and s["count"] == f"{LEAKS} links found" and s["tabs"] == ["Links 87", "Images 12", "Sites 31"]
                   and len(s["rows"]) == 5 and all(r.endswith(".example") for r in s["rows"]) and s["more"] == "+ 82 more in the full report", s)
         if name == "7-flip":
-            check(f"cta-steps: cta + 9.65 = 'Rewatch this video with YOUR content' + the name flipped in (its handle = {full!r}) -> frame-1920-generic-cta-7-flip.png",
-                  s and s["so"][2] > .9 and s["eo"] > .9 and s["end"] == "Rewatch this video with YOUR content" and s["mini"] != GENERIC and handle(s["mini"]) == full, s)
+            check(f"cta-steps: cta + 9.65 = 'Rewatch this video with YOUR content' + the name flip -> frame-1920-generic-cta-7-flip.png",
+                  s and s["so"][2] > .9 and s["eo"] > .9 and s["end"] == "Rewatch this video with YOUR content" and s["mini"], s)
     walk = []
     for dt in (4.5, 5.0, 5.5, 6.0, 6.4, 7.4):
         pg.evaluate(DRAW, cta + dt)
@@ -614,15 +698,16 @@ def cta_steps(pg, base, out, cta, name_q):
     pg.wait_for_function("() => document.querySelector('video').ended", timeout=8000)
     try:
         pg.wait_for_function("() => { const s = document.querySelectorAll('.vo-step'); return s.length === 3 && +getComputedStyle(s[2]).opacity > .9"
-                             " && document.querySelector('.vo-mini-n').textContent !== 'Your name'"
+                             " && +getComputedStyle(document.querySelector('.vo-end')).opacity > .9"
                              " && document.querySelector('.vo-steps').style.getPropertyValue('--fp') === '1.000'; }", timeout=12000)
     except Exception:
         pass
     f = out / "frame-1920-generic-cta-flip-postroll.png"
     pg.locator(".vo-stage").screenshot(path=str(f))
     s = pg.evaluate(STEPS)
-    check(f"cta-steps: after the video ends it keeps looping to the end: the toast + the name flipped in (handle {full!r}) -> {f.name}",
-          s and full and s["so"][2] > .9 and s["eo"] > .5 and handle(s["mini"]) == full and pg.evaluate("() => document.querySelector('video').ended"), s)
+    check(f"cta-steps: after the video ends it keeps looping to the end: the toast + the flip -> {f.name}",
+          s and full and s["so"][2] > .9 and s["eo"] > .5 and pg.evaluate("() => document.querySelector('video').ended"), s)
+    check(f"persona: post-roll flip stays {GENERIC!r} (nothing typed) -> {f.name}", s and s["mini"] == GENERIC, s and s["mini"])
     return full
 
 
@@ -642,13 +727,13 @@ def named_flow(pg, base, out, cta, name_q):
         shot(name)
         s = pg.evaluate(STEPS)
         if name == "3-typed":
-            check(f"named flow: cta + 3.05 the field holds handle({nm!r}) = {handle(nm)!r}, camera zoomed -> frame-1920-named-cta-3-typed.png",
-                  s and s["typed"] == handle(nm) and s["cz"][0] >= 2.2, s and s["typed"])
+            check(f"named flow: cta + 3.05 the field holds handle(DEMO) {handle(DEMO)!r} (not {handle(nm)!r}), camera zoomed -> frame-1920-named-cta-3-typed.png",
+                  s and s["typed"] == handle(DEMO) and s["cz"][0] >= 2.2, s and s["typed"])
         if name == "5-scanning":
-            check(f"named flow: cta + 5.6 the scan card for '@{handle(nm)}', 'Searching <place>, step N of 9…'", s and s["so"] == [0, 1, 0] and s["at"] == "@" + handle(nm)
+            check(f"named flow: cta + 5.6 the scan card for '@{handle(DEMO)}', 'Searching <place>, step N of 9…'", s and s["so"] == [0, 1, 0] and s["at"] == "@" + handle(DEMO)
                   and PROGRESS.fullmatch(s["ms"] or ""), s and (s["at"], s["ms"]))
         if name == "6-report":
-            check(f"named flow: cta + 8.3 the report '{LEAKS} links found' for '@{handle(nm)}'", s and s["so"][2] > .9 and s["count"] == f"{LEAKS} links found" and s["at"] == "@" + handle(nm), s and s["count"])
+            check(f"named flow: cta + 8.3 the report '{LEAKS} links found' for '@{handle(DEMO)}'", s and s["so"][2] > .9 and s["count"] == f"{LEAKS} links found" and s["at"] == "@" + handle(DEMO), s and (s["count"], s["at"]))
         if name == "7-flip":
             check(f"named flow: cta + 9.65 'This is what I'd clear for {nm}' + Telegram / WhatsApp / email, no 'Rewatch', no flip -> frame-1920-named-cta-7-flip.png",
                   s and s["eo"] > .9 and named_end(s, nm), s and (s["shown"], s["contacts"], s["chrome"]))
@@ -669,8 +754,8 @@ def named_flow(pg, base, out, cta, name_q):
     pg.locator(".vo-stage").screenshot(path=str(f))
     s = pg.evaluate(STEPS)
     t1 = pg.evaluate("() => [document.documentElement.dataset.voT, document.querySelector('video').ended, document.querySelector('.vo-for').hasAttribute('data-off')]")
-    check(f"named flow: after the take ends it keeps playing (clock {t0} → {t1[0]}), cta-steps with '@{handle(nm)}', pill off -> {f.name}",
-          s and not s["off"] and t1[1] and t1[2] and float(t1[0]) > float(t0) + 1 and s["at"] == "@" + handle(nm), (t0, t1, s and s["at"]))
+    check(f"named flow: after the take ends it keeps playing (clock {t0} → {t1[0]}), cta-steps with '@{handle(DEMO)}', pill off -> {f.name}",
+          s and not s["off"] and t1[1] and t1[2] and float(t1[0]) > float(t0) + 1 and s["at"] == "@" + handle(DEMO), (t0, t1, s and s["at"]))
 
 
 def cta_phone(b, base, out, cta, full):
@@ -716,9 +801,61 @@ def named_phone(b, base, out, cta, name_q):
         pg.evaluate(DRAW, cta + 9.65)
         s = pg.evaluate(STEPS)
         lo = 11 if view == "portrait" else 20
-        check(f"named flow (phone {view}): typed {handle(nm)!r} >= {lo} px, end toast for {nm!r} + contacts >= 11 px -> phone-{view}-named-cta-*.png",
-              s3 and s3["typed"] == handle(nm) and s3["px"] >= lo and named_end(s, nm) and s["nmpx"] >= 11, (s3 and (s3["typed"], s3["px"]), s and (s["shown"], s["nmpx"])))
+        check(f"named flow (phone {view}): typed {handle(DEMO)!r} >= {lo} px, end toast for {nm!r} + contacts >= 11 px -> phone-{view}-named-cta-*.png",
+              s3 and s3["typed"] == handle(DEMO) and s3["px"] >= lo and named_end(s, nm) and s["nmpx"] >= 11, (s3 and (s3["typed"], s3["px"]), s and (s["shown"], s["nmpx"])))
     ctx.close()
+
+
+def persona(b, base, out, pf, tap, cta, name_q, nm):
+    """generic = the demo persona GENERIC on every card (1920, phone portrait, iPhone theater); named = nm on every card"""
+    for view, opts in (("1920", dict(viewport={"width": 1920, "height": 1080})), ("phone", VIEWPORTS["phone"]), ("theater", VIEWPORTS["phone"])):
+        ctx = ctx_new(b, **opts)
+        if view == "theater":
+            ctx.add_init_script(IPHONE_FS)
+        pg = ctx.new_page()
+        for mode, query in (("generic", ""), ("named", name_q)):
+            who, other = (GENERIC, nm) if mode == "generic" else (nm, GENERIC)
+            goto(pg, base, query, 1.0)
+            if view == "theater":
+                pg.locator(".vo-fs").tap()
+                pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+                pg.wait_for_timeout(300)
+            bad = []
+            for pid, live, rem, off in pf:
+                tl = round(live + min(1.3, rem - live - 0.1), 2)
+                if pid == "google-images":
+                    tl = round(min(rem - 0.1, max(tl, (float(tap[1]) if tap else live + 0.6) + 1.0)), 2)
+                for state, t in (("live", tl), ("removed", round(min(rem + 2.0, off - 0.45), 2))):
+                    pg.evaluate("t => { const v = document.querySelector('video'); v.pause(); v.currentTime = t; }", t)
+                    pg.wait_for_function(SEEKED, arg=t, timeout=15000)
+                    pg.wait_for_timeout(250)
+                    pg.screenshot(path=str(out / f"persona-{view}-{mode}-{pid}-{state}.png"))
+                    st = pg.evaluate(VISIBLE)
+                    tx = st[0][2] if len(st) == 1 else ""
+                    ok = who in tx and other not in tx and "Your name" not in tx and "tessa" not in tx.lower()   # "Type your name" (the form) stays
+                    if ok and mode == "generic" and state == "removed" and pid in ("google", "google-images"):
+                        at = pg.evaluate(AFTER)[0]
+                        ok = GENERIC_SITE in at and ("instagram.com › " + GENERIC_IG if pid == "google" else "Instagram") in at
+                    if not ok:
+                        bad.append((pid, state, tx[:120]))
+            check(f"persona: {view} {mode}: every card live + removed shows {who!r}, no {other!r} / 'Your name' / 'Tessa'"
+                  + (f", after = {GENERIC_SITE} + instagram {GENERIC_IG}" if mode == "generic" else "") + f" -> persona-{view}-{mode}-*.png", not bad, bad)
+            if mode == "generic":   # the end card + its flip: stays GENERIC; a typed (not submitted) name flips in
+                res = []
+                for ph, t in (("end", cta + 0.6), ("flip", cta + 9.65)):
+                    pg.evaluate(DRAW, t)
+                    pg.screenshot(path=str(out / f"persona-{view}-generic-{ph}.png"))
+                    st, s = pg.evaluate(VISIBLE), pg.evaluate(STEPS)
+                    tx = st[0][2] if len(st) == 1 else ""
+                    res.append((ph, s and s["mini"], "Your name" in tx or "tessa" in tx.lower()))
+                pg.evaluate("n => { const i = document.querySelector('#vo-name'); i.value = n; }", "Mia Lune")
+                pg.evaluate(DRAW, cta + 9.65)
+                pg.screenshot(path=str(out / f"persona-{view}-generic-flip-typed.png"))
+                s = pg.evaluate(STEPS)
+                pg.evaluate("() => { document.querySelector('#vo-name').value = ''; }")
+                check(f"persona: {view} end card: {GENERIC!r} at cta + 0.6 + the flip (no 'Your name' / 'Tessa'), a typed 'Mia Lune' flips in -> persona-{view}-generic-{{end,flip,flip-typed}}.png",
+                      [r[1:] for r in res] == [(GENERIC, False), (GENERIC, False)] and s and s["mini"] == "Mia Lune", (res, s and s["mini"]))
+        ctx.close()
 
 
 # offset layout (theater-proof) of the stage, the play bar, the full screen button, every visible .vo-ui box
@@ -801,7 +938,7 @@ def swap(b, base, out, cues, cta, vp, opts):
     play(pg, 2.4)
     before = pg.evaluate("() => document.querySelector('video').currentTime")
     pg.fill("#vo-nb-in", SWAP_NAME)
-    pg.evaluate("() => { window.__same = 1; window.__said.length = 0; window.__pauses = 0; document.querySelector('video').addEventListener('pause', () => __pauses++); }")
+    pg.evaluate("() => { window.__same = 1; window.__pauses = 0; document.querySelector('video').addEventListener('pause', () => __pauses++); }")
     t0 = time.monotonic()
     pg.press("#vo-nb-in", "Enter")
     now = pg.evaluate("() => [document.querySelector('.vo-rb'), location.search, document.documentElement.dataset.voMode, document.querySelector('video').currentTime < 1]")
@@ -820,15 +957,11 @@ def swap(b, base, out, cues, cta, vp, opts):
     pauses = pg.evaluate("() => __pauses")
     check(f"swap ({vp}): {dt:.2f} s after Enter: {want_q}, same document, named mode, restarted from {before:.1f} s, playing within 1 s, never paused, bar 'Rebuilt for {SWAP_NAME}' -> {vp}-swap-settled.png",
           done and got[4] and got[5] == SWAP_NAME and pauses == 0, (got, dt, pauses))
-    try:
-        pg.wait_for_function("() => __said.length > 0", timeout=3000)
-    except Exception:
-        pass
-    pg.wait_for_timeout(150)
-    said = pg.evaluate("() => __said")
+    pg.wait_for_function("() => document.querySelector('video').currentTime > 1.2", timeout=5000)
+    said = pg.evaluate("() => [__said, __utt]")
     pill = pg.evaluate("() => { const e = document.querySelector('.vo-for'); return [e.hasAttribute('data-off'), e.innerText.replace(/\\s+/g, ' ').trim()]; }")
-    check(f"swap ({vp}): spoken once with {SWAP_NAME!r} at data-cue-say-start {cues['say-start']} after the restart, 'for' pill",
-          len(said) == 1 and said[0][0] == SWAP_NAME and cues["say-start"] <= said[0][1] < cues["say-start"] + 0.5 and not pill[0] and pill[1].endswith(f"for {SWAP_NAME}"), (said, pill))
+    check(f"swap ({vp}): restarted named, 0 speak calls / utterances, 'for {SWAP_NAME}' pill",
+          said == [[], 0] and not pill[0] and pill[1].endswith(f"for {SWAP_NAME}"), (said, pill))
     g = cues["google"]
     tg = round(g[0] + 1.3, 2)
     pg.evaluate("t => { const v = document.querySelector('video'); v.pause(); v.currentTime = t; }", tg)
@@ -843,12 +976,9 @@ def swap(b, base, out, cues, cta, vp, opts):
         pg.evaluate("t => { document.querySelector('video').currentTime = t; }", say - 0.6)
         pg.wait_for_function(SEEKED, arg=say - 0.6, timeout=15000)
         pg.evaluate("() => document.querySelector('video').play()")
-        try:
-            pg.wait_for_function("() => __said.length > 1", timeout=3000)
-        except Exception:
-            pass
-        said = pg.evaluate("() => __said")
-        check(f"swap (desktop): spoken again with {SWAP_NAME!r} at data-cue-say {say}", len(said) == 2 and said[1][0] == SWAP_NAME and say <= said[1][1] < say + 0.5, said)
+        pg.wait_for_function(f"() => document.querySelector('video').currentTime > {say + 0.6}", timeout=5000)
+        said = pg.evaluate("() => [__said, __utt]")
+        check(f"swap (desktop): played across data-cue-say {say}: 0 speak calls / utterances", said == [[], 0], said)
         pg.evaluate("() => document.querySelector('video').pause()")
     tc = round(cta + 0.6, 2)
     early = pg.evaluate("() => __ctaSeen")
@@ -868,7 +998,7 @@ def swap(b, base, out, cues, cta, vp, opts):
     pg.evaluate("() => document.querySelector('.vo-nb-rst').click()")
     try:
         pg.wait_for_function("""() => { const v = document.querySelector('video'); return location.search === '' && document.documentElement.dataset.voMode === 'generic'
-            && !v.paused && v.currentTime < 2 && document.querySelector('[data-vo=name]').textContent === 'Your name'; }""", timeout=3000)
+            && !v.paused && v.currentTime < 2 && document.querySelector('[data-vo=name]').textContent !== '""" + SWAP_NAME + """'; }""", timeout=3000)
     except Exception:
         pass
     got = pg.evaluate("() => [location.search, document.documentElement.dataset.voMode, document.querySelector('[data-vo=name]').textContent, !document.querySelector('video').paused, document.querySelector('video').currentTime, getComputedStyle(document.querySelector('.vo-nb-f')).display, window.__same === 1]")
@@ -876,8 +1006,8 @@ def swap(b, base, out, cues, cta, vp, opts):
     pg.wait_for_function(SEEKED, arg=tc, timeout=15000)
     pg.wait_for_timeout(300)
     vis = [v[0] for v in pg.evaluate(VISIBLE)]
-    check(f"swap ({vp}): Reset → generic in place (URL without query, 'Your name', restarted + playing, the form back), end card back at {tc:g}",
-          got[0] == "" and got[1:4] == ["generic", GENERIC, True] and got[4] < 2 and got[5] != "none" and got[6] and vis == ["cta-steps"], (got, vis))
+    check(f"swap ({vp}): Reset → generic in place (URL without query, {SWAP_NAME!r} gone, restarted + playing, the form back), end card back at {tc:g}",
+          got[0] == "" and got[1] == "generic" and got[2] != SWAP_NAME and got[3] is True and got[4] < 2 and got[5] != "none" and got[6] and vis == ["cta-steps"], (got, vis))
     check(f"bar ({vp}): no console errors, no request outside the local server", not errs and not ext, (errs, sorted(set(ext))))
     ctx.close()
 
@@ -992,7 +1122,7 @@ def full_frame(b, base, out):
         if how == "theater":
             ctx.add_init_script(IPHONE_FS)
         pg = ctx.new_page()
-        goto(pg, base, "", 3)   # card-free: before google's live cue
+        goto(pg, base, "", 7.2)   # card-free (before google's live cue) and still: his hand out of the right half (6.9-7.5 s, the take's stillest right half)
         if how:
             pg.locator(".vo-fs").click()
             pg.wait_for_function("w => document.documentElement.dataset.voFull === w", arg=how, timeout=4000)
@@ -1016,15 +1146,179 @@ def full_frame(b, base, out):
               near(ov[0], st[2] / 2) and near(ov[1], 0) and near(ov[2], st[2] / 2) and near(ov[3], st[3]) and clear(pov) and clear(pbx), (st, ov, pov, pbx))
         if how is None:   # the theater is rotated on screen: its geometry above is enough
             a_, v_ = pg.evaluate(PIX, [base64.b64encode(png).decode(), [.56, .1, .96, .9]])
-            check(f"full frame: {vp}: the screen's right half (no card at 3 s) = the video frame's right half", max(abs(x - y) for x, y in zip(a_, v_)) < 8,
-                  max(abs(x - y) for x, y in zip(a_, v_)))
+            d = [abs(x - y) for x, y in zip(a_, v_)]   # real footage: fine moving detail (the phone on his whiteboard) moves single cells
+            check(f"full frame: {vp}: the screen's right half (no card at 7.2 s) = the video frame's right half (mean |diff| < 3, max < 24)",
+                  sum(d) / len(d) < 3 and max(d) < 24, (round(sum(d) / len(d), 2), max(d)))
         ctx.close()
+
+
+# captions (site/video/transcript.json → js/video-overlays.js captions(t)): [shown, words, highlighted, band, plain, box, cards, transform]
+# box / cards in stage fractions [x0, y0, x1, y1] of the UNROTATED stage (theater: the stage is turned 90deg clockwise)
+CAPT = """() => { const st = document.querySelector('.vo-stage'), s = st.getBoundingClientRect(), th = document.documentElement.dataset.voFull === 'theater';
+  const fr = r => th ? [(r.top - s.top) / s.height, (s.right - r.right) / s.width, (r.bottom - s.top) / s.height, (s.right - r.left) / s.width]
+                     : [(r.left - s.left) / s.width, (r.top - s.top) / s.height, (r.right - s.left) / s.width, (r.bottom - s.top) / s.height];
+  const c = document.querySelector('.vo-capt'), cs = getComputedStyle(c), on = c.querySelector('.on');
+  return [cs.display !== 'none', [...c.children].map(e => e.textContent), on ? on.textContent : null, c.dataset.band || null, c.hasAttribute('data-plain'),
+          fr(c.getBoundingClientRect()), [...document.querySelectorAll('.vo-pf')].filter(e => !e.hasAttribute('data-off')).map(e => fr(e.getBoundingClientRect())), cs.transform]; }"""
+TRANSCRIPT = json.loads((ROOT / "site/video/transcript.json").read_text(encoding="utf-8"))
+WORDS = TRANSCRIPT["words"]
+
+
+def said(t, before=1.2, after=0.4):   # the transcript words around t (the shot log: what Jack says at that moment)
+    return " ".join(w[0] for w in WORDS if w[2] >= t - before and w[1] <= t + after)
+
+
+def word_at(t):   # the word he is saying (or just said) at t; None before the first word / > 0.5 s after the last one said
+    k = max((i for i, w in enumerate(WORDS) if w[1] <= t), default=None)
+    return None if k is None or t > WORDS[k][2] + 0.5 else WORDS[k][0]
+
+
+def overlap(a, b):
+    return max(0, min(a[2], b[2]) - max(a[0], b[0])) * max(0, min(a[3], b[3]) - max(a[1], b[1]))
+
+
+def captions(b, base, out, name_q):
+    """every word: drawn at its middle (pure draw(t), declared), the highlighted caption word = the transcript's word at t,
+    the caption inside the stage's left half (x1 <= .5), in its band (lo: the lower third, y0 >= .62; hi: top, y1 <= .2), no
+    overlap with a visible card; real seeks (?t=) at low-face / card / end moments shot; CC toggle + localStorage; reduced
+    motion = plain lines; at 1920x1080, phone 390x844, iPhone theater; generic + named (captions never personalized)"""
+    views = (("1920", dict(viewport={"width": 1920, "height": 1080}), False), ("phone", VIEWPORTS["phone"], False), ("theater", VIEWPORTS["phone"], True))
+    for vp, opts, th in views:
+        for mode, query in (("generic", ""), ("named", name_q)):
+            if vp != "1920" and mode == "named":
+                continue
+            ctx = ctx_new(b, **opts)
+            if th:
+                ctx.add_init_script(IPHONE_FS)
+            ext = guard(ctx, (base,))
+            pg = ctx.new_page()
+            errs = []
+            console(pg, errs)
+            goto(pg, base, query, 3)
+            pg.wait_for_function("() => document.querySelector('.vo-capt').children.length || document.querySelector('.vo-capt').hasAttribute('data-off')", timeout=5000)
+            if th:
+                pg.locator(".vo-fs").tap()
+                pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+                pg.wait_for_timeout(300)
+            wrong, outside, band_bad, hits, shown = [], [], [], [], 0
+            for i, w in enumerate(WORDS):
+                t = round((w[1] + w[2]) / 2, 3)
+                pg.evaluate(DRAW, t)
+                on, words, hl, band, plain, box, cards, tr = pg.evaluate(CAPT)
+                shown += on
+                if not on or hl != w[0] or w[0] not in words:
+                    wrong.append((t, w[0], hl, words))
+                if on and not (box[0] >= -0.001 and box[2] <= 0.5 + 1e-3):
+                    outside.append((t, [round(x, 3) for x in box]))
+                if on and not ((band == "lo" and box[1] >= 0.62 and box[3] <= 0.86) or (band == "hi" and box[1] >= 0.02 and box[3] <= 0.2)):
+                    band_bad.append((t, band, [round(x, 3) for x in box]))
+                if on and any(overlap(box, c) > 0 for c in cards):
+                    hits.append((t, [round(x, 3) for x in box], cards))
+            check(f"captions {vp} {mode}: at each of the {len(WORDS)} words (its middle) the highlighted caption word = the transcript's word", not wrong, wrong[:4])
+            check(f"captions {vp} {mode}: inside the stage's left half (x1 <= .5)", shown and not outside, outside[:3])
+            check(f"captions {vp} {mode}: in their band (lo = the lower third y .62-.86, hi = top band y .02-.2)", shown and not band_bad, band_bad[:3])
+            check(f"captions {vp} {mode}: never over a visible card", not hits, hits[:2])
+            # real seeks: the drawn frame (video + captions), the face-low moments (hi band) and card cues
+            for t in (1.6, 7.7, 12.95, 22.95, 30.2, 36.2, 51.3):
+                if th:
+                    pg.evaluate("t => { const v = document.querySelector('video'); v.currentTime = t; }", t)
+                    pg.wait_for_function(SEEKED, arg=t, timeout=15000)
+                    pg.wait_for_timeout(600)
+                else:
+                    goto(pg, base, query, t)
+                on, words, hl, band, plain, box, cards, tr = pg.evaluate(CAPT)
+                f = out / f"capt-{vp}-{mode}-t{t:05.2f}.png"
+                (pg.locator(".vo-stage") if vp == "phone" else pg).screenshot(path=str(f))
+                print(f"captions {vp} {mode} t={t:g}: shown={on} {band} {' '.join(words)!r} highlighted={hl!r} | said: {said(t)!r} -> {f.name}")
+                want = word_at(t)
+                check(f"captions {vp} {mode} t={t:g} (seek): shows {want!r}", (want is None and not on) or (on and hl == want), (on, hl, words))
+            if vp == "1920" and mode == "generic":
+                goto(pg, base, "", 12.95)
+                st0 = pg.evaluate("() => [document.querySelector('.vo-ccb').getAttribute('aria-pressed'), getComputedStyle(document.querySelector('.vo-capt')).display]")
+                pg.click(".vo-ccb")
+                st1 = pg.evaluate("() => [document.querySelector('.vo-ccb').getAttribute('aria-pressed'), getComputedStyle(document.querySelector('.vo-capt')).display, localStorage.getItem('leakscan.cc')]")
+                pg.screenshot(path=str(out / "capt-1920-cc-off.png"))
+                goto(pg, base, "", 12.95)
+                st2 = pg.evaluate("() => [document.querySelector('.vo-ccb').getAttribute('aria-pressed'), getComputedStyle(document.querySelector('.vo-capt')).display]")
+                pg.click(".vo-ccb")
+                st3 = pg.evaluate("() => [document.querySelector('.vo-ccb').getAttribute('aria-pressed'), getComputedStyle(document.querySelector('.vo-capt')).display, localStorage.getItem('leakscan.cc')]")
+                check("captions: CC on by default; click → off (saved '0'), still off after a reload; click → on (saved '1') -> capt-1920-cc-off.png",
+                      st0 == ["true", "block"] and st1 == ["false", "none", "0"] and st2 == ["false", "none"] and st3 == ["true", "block", "1"], (st0, st1, st2, st3))
+            check(f"captions {vp} {mode}: no console errors, no requests outside the local server", not errs and not ext, (errs[:2], ext[:2]))
+            ctx.close()
+    # reduced motion: plain lines (no highlight, no pop), the line holds the word
+    ctx = ctx_new(b, viewport={"width": 1920, "height": 1080}, reduced_motion="reduce")
+    pg = ctx.new_page()
+    goto(pg, base, "", 13.1)
+    lines = TRANSCRIPT["lines"]
+    bad = []
+    for ln in lines:
+        w = WORDS[ln[0]]
+        t = round((w[1] + w[2]) / 2, 3)
+        pg.evaluate(DRAW, t)
+        on, words, hl, band, plain, box, cards, tr = pg.evaluate(CAPT)
+        want = [x[0] for x in WORDS[ln[0]:ln[1] + 1]]
+        if not (on and plain and hl is None and words == want and tr == "none" and box[2] <= 0.5 + 1e-3):
+            bad.append((t, words, want, plain, hl, tr))
+    pg.evaluate(DRAW, 13.1)
+    pg.screenshot(path=str(out / "capt-1920-reduced.png"))
+    check(f"captions reduced motion: each of the {len(lines)} lines plain (no highlight / pop), its words, left half -> capt-1920-reduced.png", not bad, bad[:3])
+    ctx.close()
+    # the landing's mini player (js/pip.js: an iframe of ../video/, min(320px, 45vw), its embed style): the stage = the frame
+    for w in (320, 260, 175):
+        ctx = ctx_new(b, viewport={"width": w, "height": round(w * 9 / 16)})
+        pg = ctx.new_page()
+        goto(pg, base, "", 0)
+        pg.add_style_tag(content=PIP_EMBED)
+        pg.wait_for_timeout(300)
+        edge, shown = 0.0, 0
+        for x in WORDS:
+            pg.evaluate(DRAW, (x[1] + x[2]) / 2)
+            g = pg.evaluate(PIP_CAPT)
+            if g is not None:
+                shown, edge = shown + 1, max(edge, g)
+        pg.evaluate(DRAW, 13.1)
+        pg.screenshot(path=str(out / f"capt-pip-{w}.png"))
+        if w >= 260:
+            check(f"captions mini player {w}px: every word shown, each chunk inside the left half (right edge {edge:.3f} <= .5) -> capt-pip-{w}.png",
+                  shown == len(WORDS) and edge <= 0.5, (shown, edge))
+        else:
+            check(f"captions mini player {w}px (< 260): no captions (unreadable) -> capt-pip-{w}.png", shown == 0, shown)
+        ctx.close()
+
+
+def sources(p, b, base, out):
+    """the take: jack.webm plays in Chromium, 56.9 s (= transcript.json's duration); WebKit with jack.webm unreachable
+    (declared: routed to 404, as an iPhone that cannot play WebM skips it) plays jack.mp4, same length"""
+    dur = TRANSCRIPT["duration"]
+    wk = p.webkit.launch()
+    for eng, br, block in (("chromium", b, False), ("webkit", wk, True), ("webkit-as-is", wk, False)):
+        ctx = br.new_context(viewport={"width": 1280, "height": 720})
+        ctx.route("**/api/public-scan", lambda r: r.fulfill(status=200, content_type="text/event-stream", body=SCAN_FAILED))
+        if block:
+            ctx.route("**/video/jack.webm", lambda r: r.fulfill(status=404, body="no webm here"))
+        pg = ctx.new_page()
+        pg.goto(f"{base}video/")
+        try:
+            pg.wait_for_function("() => document.querySelector('video').readyState >= 1", timeout=20000)
+            pg.evaluate("() => { const v = document.querySelector('video'); v.muted = true; return v.play(); }")
+            pg.wait_for_function("() => document.querySelector('video').currentTime > 1", timeout=20000)
+            st = pg.evaluate("() => { const v = document.querySelector('video'); return [v.currentSrc, v.duration, v.currentTime, v.videoWidth, v.videoHeight]; }")
+        except Exception as e:
+            st = ["", 0, 0, 0, 0, str(e)[:200]]
+        pg.screenshot(path=str(out / f"source-{eng}.png"))
+        want = "/video/jack.mp4" if block else "/video/jack.webm" if eng == "chromium" else "/video/jack."
+        print(f"source {eng}: {st}")
+        check(f"source {eng}{' (webm blocked, declared)' if block else ''}: plays {want.rsplit('/', 1)[1]}*, {st[1]:.2f} s ~ the take's {dur} s, advancing",
+              want in (st[0] or "") and abs(st[1] - dur) < 0.2 and st[2] > 1, st)
+        ctx.close()
+    wk.close()
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
-    ap.add_argument("--name", default="Tessa")
+    ap.add_argument("--name", default="Jaka Basej")
     ap.add_argument("--break-thumbs", action="store_true")
     ap.add_argument("--break-steps", action="store_true")
     ap.add_argument("--break-swap", action="store_true")
@@ -1032,7 +1326,12 @@ def main():
     ap.add_argument("--break-full", action="store_true")
     ap.add_argument("--break-named", action="store_true")
     ap.add_argument("--break-img", action="store_true")
-    ap.add_argument("--only", choices=["prod"], help="run only this part (iteration)")
+    ap.add_argument("--break-logos", action="store_true")
+    ap.add_argument("--break-persona", action="store_true")
+    ap.add_argument("--skip-prod", action="store_true")
+    ap.add_argument("--break-captions", action="store_true")
+    ap.add_argument("--break-voice", action="store_true")
+    ap.add_argument("--only", choices=["prod", "captions", "voice"], help="run only this part (iteration)")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -1064,15 +1363,46 @@ def main():
         broken, k = re.subn(r"E\.thumb\(it\.src\)", "E.thumb(it.title)", js)
         assert k == 1, "break: E.thumb(it.src) not found"
         BREAK["img"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_logos:   # wire boundary: video-overlays.js with the people-photo test off (every loaded thumb kept)
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"&& E\.isPhoto\(im\) \?", "?", js)
+        assert k == 1, "break: E.isPhoto(im) not found"
+        BREAK["logos"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_persona:   # wire boundary: video-overlays.js with the old generic placeholder
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"GENERIC = '[^']*'", "GENERIC = 'Your name'", js)
+        assert k == 1, "break: GENERIC not found"
+        BREAK["persona"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_captions:   # wire boundary: transcript.json with every word 2 s late (captions out of sync)
+        tj = dict(TRANSCRIPT, words=[[w[0], round(w[1] + 2, 2), round(w[2] + 2, 2)] for w in WORDS])
+        BREAK["captions"] = ("**/video/transcript.json", json.dumps(tj), "application/json")
+    if a.break_voice:   # wire boundary: video-overlays.js with the old AI overvoice back (the name spoken once, 0.5 s in)
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"draw\(t\); sounds\(t\);", "draw(t); if (who && t > 0.5 && !window.__v) { window.__v = 1; "
+                            "speechSynthesis.speak(new SpeechSynthesisUtterance(who)); } sounds(t);", js)
+        assert k == 1, "break: the play loop's draw(t); sounds(t); not found"
+        BREAK["voice"] = ("**/js/video-overlays.js", broken, "application/javascript")
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
     tap = re.search(r'data-prefab="google-images"[^>]*data-cue-tap="([\d.]+)"', html)
     cues = {p[0]: p[1:] for p in pf}
-    cues["say-start"], cues["say"] = stage_attr(html, "data-cue-say-start"), stage_attr(html, "data-cue-say")
+    cues["say"] = stage_attr(html, "data-cue-say")
     cta = stage_attr(html, "data-cue-cta") or cues["say"]
     name_q = "name=" + urllib.parse.quote(a.name)
     with serve() as base, sync_playwright() as p:
         b = p.chromium.launch()
+        if a.only == "captions":
+            captions(b, base, out, name_q)
+            sources(p, b, base, out)
+            for f in fails:
+                print("FAIL", f)
+            return 1 if fails else 0
+        if a.only == "voice":
+            speech(b, base, out, a.name, cues)
+            swap(b, base, out, cues, cta, "desktop", SWAP_VIEWPORTS["desktop"])
+            for f in fails:
+                print("FAIL", f)
+            return 1 if fails else 0
         if a.only == "prod":
             prod(b, base, out, cues, cta)
             for f in fails:
@@ -1099,13 +1429,13 @@ def main():
                             pg.screenshot(path=str(shot))
                         st = pg.evaluate(VISIBLE)
                         vis = [s[0] for s in st]
-                        ok = vis == [pid] and float(st[0][1]) == (100 if state == "live" else 0) and who in st[0][2]
+                        ok = vis == [pid] and float(st[0][1]) == (100 if state == "live" else 0) and (mode == "generic" or who in st[0][2])   # generic name: persona()
                         box = [round(x, 3) for x in st[0][3]] if st else None
                         corner = (box and box[0] >= .5 and box[1] >= 0 and box[2] <= 1 and box[3] <= 1
                                                    and abs((box[1] + box[3]) / 2 - .5) <= .05)
-                        print(f"{vp} {mode} t={t:g} {pid} {state}: visible={vis} p={[s[1] for s in st]} box={box} rolls={st[0][4] if st else None} -> {shot.name}")
+                        print(f"{vp} {mode} t={t:g} {pid} {state}: visible={vis} p={[s[1] for s in st]} box={box} rolls={st[0][4] if st else None} | said: {said(t)!r} -> {shot.name}")
                         if not ok:
-                            check(f"{vp} {mode} t={t:g}: only {pid} {state} with {who!r}", False, [(s[0], s[1]) for s in st])
+                            check(f"{vp} {mode} t={t:g}: only {pid} {state}" + (f" with {who!r}" if mode == "named" else ""), False, [(s[0], s[1]) for s in st])
                         if not corner:
                             check(f"{vp} {mode} t={t:g}: {pid} on the right half, vertically centred (left >= .5, centre .5 +- .05)", False, box)
                         if (pid, state) in COUNT and st and COUNT[(pid, state)] not in st[0][4]:
@@ -1114,7 +1444,7 @@ def main():
                             txt, imgs = pg.evaluate(AFTER)
                             check(f"{vp} {mode} t={t:g}: {pid} after state = {who}'s site + Instagram"
                                   + (", >= 4 unblurred own photos" if pid == "google-images" else "") + ", no leak host",
-                                  after_ok(pid, who, txt, imgs), (txt[:160], imgs[:2]))
+                                  after_ok(pid, who if mode == "named" else None, txt, imgs), (txt[:160], imgs[:2]))
                 # the end card / pill
                 t = round(cta + 0.6, 2)
                 goto(pg, base, query, t)
@@ -1128,6 +1458,10 @@ def main():
                     ok = ok and box[0] >= .5 and box[2] <= 1 and abs((box[1] + box[3]) / 2 - .5) <= .05
                 check(f"{'' if mode == 'generic' else 'named flow: '}{vp} {mode} t={t:g}: end = {'the Type-your-name card + form' if mode == 'generic' else 'cta-steps without title / form, no pill'}, right half -> {shot.name}", ok, got)
                 mode_attr = pg.evaluate("() => document.documentElement.dataset.voMode")
+                if vp == "desktop":
+                    tx = pg.evaluate("() => document.documentElement.textContent + ' ' + document.title")
+                    check(f"{vp} {mode}: no 'Tessa' in the DOM text" + (f", {a.name!r} shown" if mode == "named" else ""),
+                          "tessa" not in tx.lower() and (mode == "generic" or a.name in tx), re.findall(r".{20}tessa.{20}", tx, re.I)[:2])
                 check(f"{vp} {mode}: html[data-vo-mode={mode}]", mode_attr == mode, mode_attr)
                 check(f"{vp} {mode}: no console errors", not errs, errs)
                 check(f"{vp} {mode}: no requests outside the local server", not ext, sorted(set(ext)))
@@ -1210,8 +1544,12 @@ def main():
         ui_full(b, base, out, name_q)
         speech(b, base, out, a.name, cues)
         sfx(b, base, cues)
+        persona(b, base, out, pf, tap, cta, name_q, a.name)
         personalized(b, out, a.break_thumbs)
-        prod(b, base, out, cues, cta)
+        captions(b, base, out, name_q)
+        sources(p, b, base, out)
+        if not a.skip_prod:
+            prod(b, base, out, cues, cta)
     for f in fails:
         print("FAIL", f)
     return 1 if fails else 0

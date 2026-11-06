@@ -26,9 +26,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   an aggregator page and is never shown), else a mega.nz hit's title; X poster + text, Reddit subreddit + title, the
   most-seen other host (+ the leak-site profile: her name, `<handle>, <name>` aliases), `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
 - Video page `site/video/` (noindex, not in the sitemap; `css/video.css` + `js/video-overlays.js`, own files): Jack's
-  face video (full frame, Jack on the left half; `jack.webm` = the one take, a 40 s placeholder until Jack's recording; drop-in: CUES.md "After recording") with 5
+  face video (full frame, Jack on the left half; `jack.webm` = his real one take, 56.9 s, + `jack.mp4` for old iPhones; cues + `transcript.json` from his words by `tools/video/cues_from_take.py`, CUES.md) with his words as word-by-word captions on his left half (`.vo-capt`, CC toggle) and 5
   overlay prefabs drawn on the video's right half, no panel of their own (640x720 box scaled to 960x1080, vertically centred; Google phone, Google
-  Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → Jack's snap = shake + flash + "GONE." → the
+  Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → his "they get removed" = shake + flash + "GONE." → the
   #removals compare wipe with rolling counters → "Removed" slam + CSS confetti → slide out; reduced motion = fades;
   WebAudio-synthesized pop / whoosh + thud after the play gesture, `?sfx=0` off; Google / Images after = the landing
   after-phone: her `<name>.com` + Instagram + TikTok, her own unblurred photos), driven by `video.currentTime`
@@ -37,8 +37,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   from `js/removals.js`: texts; site / Instagram / TikTok from its profile, as personalize.js; with a scan result the
   cards show her production images: real Google domains / titles / counts, `/api/thumb` thumbs blurred in every card,
   `/api/media/<slug>` own photos in the after states, text only on failure): one take `jack.webm` for both modes
-  (the name bar runs the landing's `/api/public-scan`, holding the take before the first card while it runs), speaks the name at `data-cue-say-start` + `data-cue-say` (`speechSynthesis`, video ducked) + "for
-  <name>" pill; generic = "Your name", no speech, end card `cta-steps` at `data-cue-cta` (default `-say`):
+  (the name bar runs the landing's `/api/public-scan`, holding the take before the first card while it runs), never speaks (no AI overvoice: Jack's voice only), "for
+  <name>" pill at the start + from `data-cue-say`; generic = "SophieStar", no pill, end card `cta-steps` at `data-cue-cta` (default `-say`):
   a phone replica of the landing, one 10 s take (hero, camera zooms onto the onlyfans.com/ field and types the name
   as a handle → scan card → report card → "Rewatch this video with YOUR content" + name flip; keeps looping after the
   take ends) over a name form. Name bar under the stage (theater / full screen: a pill opens it; pulsing "type your
@@ -48,11 +48,20 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   theater (Esc / X / back closes); touch: own play bar, tap-to-play + "Rotate for full size" hint. Script (one take):
   `site/video/SCRIPT.md`; cue sheet + SFX + where the webm goes: `site/video/CUES.md`. Gate: `tools/video/check_video.py`
   (CI). Proof: `tools/video/cue_shots.py OUT` (both modes, cue shots, right-half geometry at both widths, full frame: video box = stage box + transparent overlay (`--break-full`), after state,
-  counters, end card + form + cta-steps, name bar + in-place swap (`--break-swap`), snap, reduced motion, sfx, speech, production images (`prod`, `--break-img`), player: tap / theater / full
+  counters, end card + form + cta-steps, name bar + in-place swap (`--break-swap`), snap, reduced motion, sfx, no overvoice (`--break-voice`), production images (`prod`, `--break-img`), player: tap / theater / full
   screen, scan-stub texts + thumbs); cues from a take (`.webm` / `.mp4`)
   (whisper / faster-whisper word timestamps → `data-cue-*` diff, untested on a real take):
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).
+- Mini player (`js/pip.js` + `css/pip.css`): a floating 16:9 player of `video/` (min(320 px, 45vw), fixed, CLS 0). On by default on
+  the scan report (`scan/?r=<slug>`: the video personalizes itself with that scan); on the landing only with `?pip=1`; `?pip=0`
+  off. Created after the page's load + first scroll / pointer / key or idle; same-origin iframe of `video/?r=&name=` made
+  embed-only from the host (injected style: no name bar / player UI; `<video>` driven directly: starts muted, tap = unmute,
+  then play / pause). Drag (pointer events, touch) snaps to the nearest corner under the sticky header / report nav, off the
+  Scan now button, phone CTA bar, Ask-AI launcher and report Reveal pill; a fling / drag past the left or right edge tucks it
+  (paused) leaving a `>` / `<` tab at that edge (tap / drag inward = back; Esc inside tucks, Enter on the tab returns); expand
+  = `video/?r=&t=`; x closes for the session; corner / tucked / closed in sessionStorage `leakscan.pip`. E2E:
+  `scan_e2e.py OUT --only pip` (phone, desktop, WebKit iPhone 13; `--break-tuck`).
 - Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
   `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
@@ -161,7 +170,7 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   the `# one-project` Vary line in `api_thumb`; `media_gather.py` carries one `# one-project` line: `PUBLIC_ORIGIN` defaults to empty = relative media src).
   The rest is the prod tree snapshot.
 - `app/site_static.py`: stdlib static server for `site/` (`SITE_DIR`, default `<repo>/site`; realpath-confined, no
-  dotfiles, dir → `index.html`, missing → `404.html`, html `no-cache`, assets `max-age=86400`, GET/HEAD, single
+  dotfiles, dir → `index.html`, missing → `404.html`, html / js / css `no-cache` + Last-Modified → 304 (a deploy reaches returning visitors at once), other assets `max-age=86400`, GET/HEAD, single
   `Range` → 206 for `<video>`). If
   `SITE_DIR` is missing it logs once and `/` falls back to the legacy UI.
 - Local run: `SITE_DIR=site PUBLIC_PORT=18084 python3 app/public_app.py` → http://127.0.0.1:18084/ (no API keys =
@@ -195,12 +204,20 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   `scan/`, which also reads `h=`, `ig=`, `x=` (and old `p=`).
 - `js/scan-engine.js` (`window.LeakScanEngine`): the one SSE / fetch transport, API origin rule, error mapping, message
   links and `leakscan.last` writer, used by `js/scan.js` and `js/inline-scan.js`. Its `isPhoto(img)` keeps image tiles
-  to people photos (strip, Images tab, #free phone, scan page strip / Images grid; not Videos): a thumb drawn at 48x48
+  to people photos (strip, Images tab, #free phone, scan page strip / Images grid): a thumb drawn at 48x48
   with little soft texture or almost no skin (a site logo, banner, icon, placeholder) is dropped like a failed one;
-  pixels read via a CORS load of `/api/thumb` (refused / unreadable = kept). Thresholds + measured confusion: comment there.
+  a video still (scan page Videos tab, #free Videos rows) likewise falls back to its grey box, the row stays; a
+  landing Links / Sites row icon shows its thumb only once it passed (same probe), else another photo of the same site
+  that passed, else the neutral letter (never another site's photo);
+  pixels read via a CORS load of `/api/thumb`; refused → once more on `E.fresh`'s URL (`?c=1&u=`: a copy cached before
+  the API sent ACAO / Vary would refuse forever), then plain (unreadable = kept). Thresholds + measured confusion: comment there.
+  Landing (`inline-scan.js`, API cross-origin): tiles, row icons, video stills show the exact URL + mode the probe passed
+  with (`g.put`): its cached copy, one request per image (a plain load would be a 2nd cache entry: ~2x requests, past the
+  `/api/thumb` burst → 429, photos dropped).
 - `js/inline-scan.js`: with JS the form never leaves the page. The hero card turns into the live report (progress →
   first 5 links: domain + title, badge Live = `live: true`, Indexed = Google result, else Found; "N links found";
-  Open full report `scan/?r=`; Send me the report; demo photo status), the "Free scan report" illustration shows the
+  Open full report `scan/?r=`; Send me the report; demo photo status; its image strip / Images tab / #free phone list the
+  real images first, then video results' stills, no badge; the #free grid skips stills its Videos tab shows), the "Free scan report" illustration shows the
   real per-site counts, `LeakScanPersonalize.apply()` does the phones / showcase / demo (`socials` win the IG / X rows),
   URL becomes `?r=<slug>` (reload restores the card). Errors stay inline (busy / bad handle / failed + DM links); a
   new scan resets everything, "Reset page" too. Own elements only, never personalize's `data-p` slots.

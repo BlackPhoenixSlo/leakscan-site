@@ -44,9 +44,34 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 [data-vo-touch] .vo-fs { padding: 6px; min-height: 0; }   /* icon only: the "Rotate for full size" hint says it */
 [data-vo-full] .vo-fs-x { display: block; }
 [data-vo-full] .vo-fs { padding: 8px; }
-.vo-hint { position: absolute; left: 25%; bottom: 40px; display: none; padding: 7px 14px; border: 3px solid #000; border-radius: 999px; background: #ffd400;
+.vo-hint { position: absolute; left: 75%; bottom: 40px; display: none; padding: 7px 14px; border: 3px solid #000; border-radius: 999px; background: #ffd400;
   color: #000; font: 900 .85rem/1 var(--sans); white-space: nowrap; transform: translateX(-50%); cursor: pointer; }
 [data-vo-hint]:not([data-vo-full]) .vo-hint { display: block; }
+/* CC toggle (captions on by default, localStorage leakscan.cc): under the full screen button (touch: the play bar's right end) */
+.vo-ccb { position: absolute; top: 48px; right: 8px; min-height: 28px; padding: 5px 9px; border: 0; border-radius: 6px; background: rgb(0 0 0 / .55);
+  color: #fff; font: 900 .78rem/1 var(--sans); letter-spacing: .04em; cursor: pointer; }
+[data-vo-touch] .vo-ccb { top: auto; bottom: 2px; right: 6px; min-height: 26px; padding: 4px 7px; }   /* touch: the play bar's right end */
+[data-vo-touch] .vo-ui > .vo-ctl { padding-right: 52px; }
+.vo-ccb[aria-pressed="false"] { opacity: .6; text-decoration: line-through; }
+/* captions (.vo-capt, js/video-overlays.js captions(t)): his words as spoken, 1-3 at a time, bold white with a black
+   stroke, the current word yellow; Jack's left half, lower third ("lo": bottom 16 %, above the touch play bar), or its
+   top band ("hi": top 4 %) while his face is down there (transcript.json chunks, tools/video/cues_from_take.py BANDS);
+   --sw = the stage width in px (fit()); the 14 px floor shrinks on small stages (the landing's mini player) so a chunk stays
+   in the left half; under 260 px (data-vo-tiny) no captions (unreadable); reduced motion: plain lines, no pop, no highlight */
+.vo-capt { position: absolute; left: 2%; bottom: 16%; z-index: 3; width: 46%; margin: 0; color: #fff; text-align: center; text-transform: uppercase;
+  white-space: nowrap; pointer-events: none; font: 900 max(min(14px, calc(var(--sw, 1920) * .036px)), calc(var(--sw, 1920) * .034px))/1.12 var(--sans); letter-spacing: .01em;
+  text-shadow: 0 .07em 0 #000, .07em 0 0 #000, 0 -.07em 0 #000, -.07em 0 0 #000, .05em .05em 0 #000, -.05em .05em 0 #000, .05em -.05em 0 #000,
+    -.05em -.05em 0 #000, 0 .14em .25em rgb(0 0 0 / .55);
+  transform: scale(var(--ccs, 1)); transform-origin: 50% 100%; }
+.vo-capt[data-band="hi"] { top: 4%; bottom: auto; transform-origin: 50% 0; }
+.vo-capt span { display: inline-block; margin: 0 max(3px, .14em); transform: scale(var(--ws, 1)); }
+.vo-capt .on { color: #ffd400; }
+.vo-capt[data-plain] { white-space: normal; text-transform: none; font-size: max(min(13px, calc(var(--sw, 1920) * .034px)), calc(var(--sw, 1920) * .026px)); font-weight: 800; transform: none; }
+.vo-capt[data-plain] span { transform: none; }
+.vo-capt[data-off], [data-vo-cc="off"] .vo-capt, .vo-stage[data-vo-tiny] .vo-capt { display: none; }
+.vo-stage:fullscreen .vo-capt { left: calc((100vw - min(100vw, 177.78vh)) / 2 + min(100vw, 177.78vh) * .02); width: calc(min(100vw, 177.78vh) * .46);
+  bottom: calc((100vh - min(100vh, 56.25vw)) / 2 + min(100vh, 56.25vw) * .16); }
+.vo-stage:fullscreen .vo-capt[data-band="hi"] { top: calc((100vh - min(100vh, 56.25vw)) / 2 + min(100vh, 56.25vw) * .04); bottom: auto; }
 .vo-big { position: absolute; left: 25%; top: 50%; display: none; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: rgb(0 0 0 / .55);
   color: #fff; transform: translate(-50%, -50%); }
 [data-vo-touch]:not([data-vo-playing]) .vo-big { display: grid; }
@@ -105,6 +130,9 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 .vo-phone .vo-rs { flex: 1; height: auto; }
 .vo-g { background: #fff; }
 .vo-g .thumb .rm-img { position: relative; z-index: 1; }   /* the scan's thumbs (or the defaults) over the gradient tile */
+/* leak images on the video cards: lighter than removals.css / the report (5px = styles.css .live-ico, the site's lightest rule;
+   the floor), scale kept; never on the after state's own photos (.vo-own) */
+.vo .rm-img { filter: blur(5px) saturate(.95); }
 .vo .rm-live { isolation: isolate; }   /* keeps that z-index inside the live layer: the after layer (clip-path wipe) stays on top */
 
 /* Google Images prefab: "All" results, a tap on "Images" (--tap 0..1), the leak grid fades in (--g 0..1), then the wipe to her
@@ -216,10 +244,10 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 .vo-ttl { overflow: hidden; color: var(--muted); font-size: .84rem; line-height: 1.35; white-space: nowrap; text-overflow: ellipsis; }
 .vo-go { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); }
 .vo-go::after { content: "↗"; display: grid; place-items: center; height: 100%; color: var(--accent); font: 700 .8rem/1 var(--sans); }
-/* placeholder thumbs: blurred grey blobs; named + a scan result: her real thumbs (.vo-real, blurred like the landing's tiles) */
+/* placeholder thumbs: blurred grey blobs; named + a scan result: her real thumbs (.vo-real, blurred 5px like the landing's .live-ico) */
 .vo-th { width: 36px; height: 36px; border-radius: 10px; }
 .vo-th, .vo-strip i { overflow: hidden; }
-.vo-real { display: block; width: 100%; height: 100%; object-fit: cover; filter: blur(7px) saturate(.8); transform: scale(1.2); }
+.vo-real { display: block; width: 100%; height: 100%; object-fit: cover; filter: blur(5px) saturate(.95); transform: scale(1.2); }
 .vo-th0 { background: radial-gradient(60% 70% at 40% 40%, #a39d97, #5d5853 80%); }
 .vo-th1 { background: radial-gradient(55% 65% at 60% 45%, #8b8681, #3f3b38 85%); }
 .vo-th2 { background: radial-gradient(60% 60% at 45% 55%, #b5afa9, #6b6661 80%); }
