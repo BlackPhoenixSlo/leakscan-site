@@ -17,7 +17,7 @@ def by_site(d):
     return out
 
 
-NODE_BUDGET = 900   # whole page after the report renders (main before this change: ~3,800 at this size)
+NODE_BUDGET = 905   # whole page after the report renders (main before this change: ~3,800 at this size); 900 + analytics.js's script + footer link
 IN_VIEW = """() => { const a = document.activeElement, r = a.getBoundingClientRect(), s = a.closest('.ph-scroll');
     let top = document.querySelector('.rnav').getBoundingClientRect().bottom, bot = innerHeight;   /* clear of the sticky nav, */
     if (s) { const sr = s.getBoundingClientRect(), t = s.querySelector('.g-tabs');                 /* inside the phone screen, */

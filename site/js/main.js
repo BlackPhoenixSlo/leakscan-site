@@ -1,4 +1,4 @@
-// Nav toggle, fade-in on scroll, mobile sticky CTA. No tracking, no third parties.
+// Nav toggle, fade-in on scroll, mobile sticky CTA. This file: no tracking, no third parties (ads: js/analytics.js).
 (function () {
   var toggle = document.querySelector('.nav-toggle');
   var nav = document.getElementById('nav');

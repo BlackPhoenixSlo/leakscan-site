@@ -1,7 +1,7 @@
 # leakscan-site
 
 Google Ads landing site for Abolita: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
-cookies, no third-party requests on the landing pages. `site/` is what ships. `site/showcase/` is the demo of
+cookies or third-party requests on the landing pages except `js/analytics.js` (Google Ads, see below). `site/` is what ships. `site/showcase/` is the demo of
 the official site each client gets (fictional creator, built from the tessa template); the landing page links and
 iframes it as `showcase/`. The demo uses system fonts too (no Google Fonts); `tools/check.py` fails if it loads any
 third-party host that `privacy.html` does not disclose. Its own
@@ -150,6 +150,13 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   links are live only for existing `#ids` and `https://` t.me, wa.me, blackphoenixslo.github.io, abolita.com, jackbase.me,
   the scan server, plus `mailto:me@jackbase.dev`. Chat lives in sessionStorage only. Stub: `/api/chat` with magic words
   `stub-fail` / `stub-429`. E2E: `scan_e2e.py OUT_DIR --only askai` (`--break-allowlist` for the break-it run).
+- Google Ads + consent banner: `js/analytics.js` only (one `defer` script per page, `data-cookie-settings` = reopen link,
+  shipped `hidden`; `showcase/` and `404.html` have neither: a client's demo, and no relative paths). Paste `ADS_ID`, `LABEL_SCAN`, `LABEL_CONTACT` at
+  its top; while `ADS_ID` is empty it does nothing, in a frame too. gtag.js directly, no GTM; Consent Mode v2, denied by default everywhere
+  (US auto-grant: the marked commented line, off). Scan conversion = the `leakscan:result` event, contact = delegated click on
+  Jaka's t.me / wa.me / mailto links, once per page load. gtag.js copies `document.title` into conversion hits whatever `page_title` says
+  (measured), so no page that loads it may put a handle or name in its title. Proof (sub-path, real gtag.js, beacons recorded + aborted):
+  `tools/analytics_e2e.py OUT` (`--break-order`).
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
 - Gate: `python3 tools/check.py` (silent + exit 0 when green; prints each problem + exit 1). Runs in CI on every push/PR.
   `.github/workflows/ci.yml` also runs `python3 -m pytest -q app/tests`.
