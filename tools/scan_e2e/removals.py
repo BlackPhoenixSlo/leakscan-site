@@ -56,7 +56,7 @@ def brand(d):   # js/removals.js brand(): the leak-site wordmark = host without 
 SW_REC = """() => { window.__sw = []; document.querySelectorAll('#removals .rm-handle').forEach((h, i) => new MutationObserver(() =>
   window.__sw.push([Math.round(performance.now()), i, +h.getAttribute('aria-valuenow')])).observe(h, {attributes: true, attributeFilter: ['aria-valuenow']})); }"""
 SW_SEEN = """() => [...document.querySelectorAll('#removals .rm-card')].map(c => { const r = c.querySelector('.rm-stage').getBoundingClientRect();
-  return r.bottom > 0 && r.top < innerHeight; })"""
+  return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; })"""   # phone swipe row: cards past the screen's side are off screen too (IntersectionObserver agrees)
 FP_STATE = """() => { const c = document.querySelector('#removals .rm-card[data-rm="site"]'), q = s => c.querySelector(s), cs = e => getComputedStyle(e);
   const live = q('.rm-live'), st = q('.rm-stage').getBoundingClientRect();
   return {ring: cs(q('.fp-ring')).backgroundImage, av: [cs(q('.fp-av')).borderTopWidth, cs(q('.fp-av')).borderTopColor, cs(q('.fp-av')).borderTopLeftRadius],
@@ -133,12 +133,14 @@ def sweep_flow(ctx_, vp_name, tag):
     rec = since(t0)
     vis = [i for i in range(4) if seen[i]]
     per = {i: [e[2] for e in rec if e[1] == i] for i in vis}
-    check(f"{tag} sweep: on-screen edges glide by themselves, no input (9 s: 2+ stops each, all in 15-85)", len(vis) >= 2 and all(
+    need = 1 if vp_name == "phone" else 2   # phone: the swipe row shows one card (the next peeks with its stage off screen)
+    check(f"{tag} sweep: on-screen edges glide by themselves, no input (9 s: 2+ stops each, all in 15-85; {need}+ cards on screen)", len(vis) >= need and all(
         len(per[i]) >= 2 and all(15 <= v <= 85 for v in per[i]) for i in vis), {"visible": vis, "per": per})
     times = {i: [e[0] for e in rec if e[1] == i] for i in vis}
     synced = [(i, j) for i in vis for j in vis if i < j and len(times[i]) == len(times[j]) and all(abs(x - y) < 50 for x, y in zip(times[i], times[j]))]
-    check(f"{tag} sweep: cards not in lockstep (each its own stops and times)", len(vis) >= 2 and len({tuple(per[i]) for i in vis}) == len(vis)
-          and not synced, {"times": times, "per": per, "synced": synced})
+    if vp_name != "phone":   # needs 2+ cards on screen: desktop's 2x2 (same JS on phones)
+        check(f"{tag} sweep: cards not in lockstep (each its own stops and times)", len(vis) >= 2 and len({tuple(per[i]) for i in vis}) == len(vis)
+              and not synced, {"times": times, "per": per, "synced": synced})
     secs = float(dur[:-1]) if dur.endswith("s") and dur[:-1].replace(".", "", 1).isdigit() else 0
     ls = page.evaluate("() => [window.__ls.filter(e => !e[2] && e[3]).reduce((a, e) => a + e[1], 0), [...document.querySelectorAll('#removals .rm-card')].every((c, i) => JSON.stringify(c.getBoundingClientRect()) === window.__box[i])]")
     check(f"{tag} sweep: glide = CSS transition 1-2 s, CLS 0 in #removals, card boxes unchanged", 1 <= secs <= 2 and ls == [0, True], [dur, ls])

@@ -341,7 +341,8 @@ def scan_page(t):
               f"play badge on the {len(want & stills)} video results' stills, Videos tab reaches {nvid}",
               src(sv) == src(iv) and set(src(sv)) == want and len(sv) == len(want) and not tiles_ok(sv, vd, videos=True) and not tiles_ok(iv, vd, videos=True)
               and sb == ib == want & stills and sb and vn == nvid and badge[0] == '""' and badge[1] == "24px" and badge[2] == "absolute",
-              [len(sv), len(iv), len(want), len(sb), len(ib), tiles_ok(sv, vd, videos=True), vn, badge])
+              [len(sv), len(iv), len(want), len(sb), len(ib), tiles_ok(sv, vd, videos=True), vn, badge,
+               {"iv_not_wanted": sorted(set(src(iv)) - want)[:4], "iv_dupes": len(src(iv)) - len(set(src(iv))), "iv_bad": tiles_ok(iv, vd, videos=True)}])
         ctx.close()
     # every thumb fails (late, after the report is up): the All strip keeps its height (visible slots stay as empty tiles), nothing below moves
     ctx = ctx_()
@@ -536,7 +537,7 @@ def order_popout(t):
     page.wait_for_timeout(1200)
     LAY = """() => { const r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top + scrollY), Math.round(b.width), Math.round(b.height)]; };
         const f = document.querySelector('#showcase .browser-demo');
-        return {y: Math.round(scrollY), ba: r(document.querySelector('.ba')), head: r(document.querySelector('#showcase .section-head')), link: r(document.querySelector('#showcase a.btn[data-p=demo]')),
+        return {y: Math.round(scrollY), ba: r(document.querySelector('.ba')), head: r(document.querySelector('#showcase .showcase-head')), link: r(document.querySelector('#showcase a.btn[data-p=demo]')),
           pop: f.classList.contains('is-pop'), fig: (b => [Math.round(b.left), Math.round(b.top), Math.round(b.right), Math.round(b.bottom)])(f.getBoundingClientRect()),
           vw: innerWidth, vh: innerHeight, role: f.getAttribute('role'), modal: f.getAttribute('aria-modal'), lock: document.documentElement.classList.contains('pop-lock'),
           focus: document.activeElement.className, inert: document.querySelector('.site-header, header').inert && document.getElementById('pricing').inert,

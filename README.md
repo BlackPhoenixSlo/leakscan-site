@@ -40,7 +40,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   Light theme: header + hero on blush paper, flat surfaces (no gradients, no button glows), cards / fields = 1px line +
   one soft shadow; dark: velvet. Section heads vary: eyebrow only on hero, pricing, website. Phones: "Meet Jaka" video
   full width, caption under it; its poster is CSS (name, "60-second intro · 0:57", play mark; a plain box, the player docks over it).
-  Jaka's portrait everywhere = the CSS `.mono` "J" disc (no photo). Eyebrow rule line only in the hero. FAQ leads with
+  Jaka's portrait everywhere = the CSS `.jdisc` "J" disc (not `.mono`: scan.css's monospace class) (no photo). Eyebrow rule line only in the hero. FAQ leads with
   privacy, what you need, timing; Ask-AI lives only in its launcher. "Meet Jaka" player under 520px: overlay cards
   shrink to the right edge (`data-vo-small`), off the captions.
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
@@ -88,7 +88,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
 - Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
   `?pip=0` off. Landing: docked (absolute, scrolls with the page) right-aligned just below the hero card, exactly over the
   `.meet-pic` poster (at rest a "Meet Jaka" caption bar; the controls on hover / focus, or for 4 s after a tap) (example report,
-  or the scan report card after a scan) at 55% of its width, never over a link / button / pill (else over the card's
+  or the scan report card after a scan) at 55% of its width (phones: its full width, under it), never over a link / button / pill (else over the card's
   bottom-right, never > 25% of it); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
   user dragged, resized, tucked or closed it. Created after load + first scroll / pointer / key or idle; same-origin
   iframe of `video/?r=&name=` made embed-only from the host (injected style; `<video>` driven directly: muted start, tap =
@@ -123,7 +123,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   Slug: `?r=` → `localStorage['leakscan.last']` (written by `scan-engine.js`) → none (page unchanged, no API call):
   `E.currentSlug()`, the one lookup for every script. One
   `GET /api/scan-result/<slug>` per tab (sessionStorage cache, 8 s timeout, failure = defaults; on the landing the hero
-  card's request from `js/scan-engine.js` is shared, and a `?r=` link opened with the card below the fold scrolls it up); every value is
+  card's request from `js/scan-engine.js` is shared, and a `?r=` link opened with the card starting in the screen's lower half scrolls it up); every value is
   validated and rendered with textContent / built elements, never leak titles or snippets. Landing: hero line +
   Reset, the phone sticky bar ("Free scan: type your handle" → "DM me on Telegram", `t.me/jakabasej` prefilled like
   #contact's with her report link + @handle), the After phone (name, her own pages, the most-seen leak domain as the one "Removed" row, IG / TikTok /
@@ -301,8 +301,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 
 ## Replace before launch
 
-- **Jaka's photo** (optional): the page uses a CSS "J" monogram (`.mono`) and a CSS video poster; to use a real
-  portrait, add a clothed, camera-facing square photo and swap the `.mono` spans for `<img>`, then run the gate.
+- **Jaka's photo** (optional): the page uses a CSS "J" monogram (`.jdisc`) and a CSS video poster; to use a real
+  portrait, add a clothed, camera-facing square photo and swap the `.jdisc` spans for `<img>`, then run the gate.
 - **Imprint**: add registration number (matična številka) and tax number (davčna številka) to `site/imprint.html`
   if you want them shown.
 

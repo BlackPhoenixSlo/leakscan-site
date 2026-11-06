@@ -639,7 +639,14 @@
       // moves; same for a top-up video still: after both, rank). Nothing left to show: it just leaves; with still(el) (a view where nothing seen may move: the scan
       // page) the last live tile moves into the slot if it and every tile after it are off screen, else the slot stays
       // as still(el) (an empty tile, data-hole). Then the box fills up to max, in order.
+      // One pass at a time: a cached thumb's load verdict lands inside add() (watchThumb → verdict → g.sync), and a
+      // nested pass on the same box would re-add what the outer one is still adding (measured: 10-15 repeated tiles).
       v.sync = function () {
+        if (v.busy) { v.again = true; return; }
+        v.busy = true;
+        try { do { v.again = false; pass(); } while (v.again); } finally { v.busy = false; }
+      };
+      var pass = function () {
         var have = {}, by = {}, kids = Array.prototype.slice.call(box.children);
         var src = function (el) { return el.getAttribute('data-src'); };
         var live = function (el) { return verdicts[src(el)] !== false && !el.hasAttribute('data-hole'); };

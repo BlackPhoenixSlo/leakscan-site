@@ -416,8 +416,8 @@ def hero_look(run):
     check(f"{tag} hero: row hover tint only where hover exists (phone: none after a tap; no :hover rule, a:hover included, outside @media (hover: hover))", (hv == "rgba(0, 0, 0, 0)") == (not hov) and not bare, [hv, hov, bare])
     page.mouse.move(0, 0)
     # the Ask AI pill never sits on the card's actions or on the before / after phones
-    def pill_clear(sel):
-        bring(page, sel, "end")
+    def pill_clear(sel):   # its bottom 30 px above the screen's: in the pill's band (block "end" stops at the 84 px scroll padding)
+        page.evaluate(f"() => {{ const r = document.querySelector('{sel}').getBoundingClientRect(); scrollTo({{top: scrollY + r.bottom - innerHeight + 30, behavior: 'instant'}}); }}")
         page.wait_for_timeout(600)
         return page.evaluate(f"""() => {{ const L = document.querySelector('.askai-launcher'), b = L.getBoundingClientRect(), r = document.querySelector('{sel}').getBoundingClientRect();
             const over = r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom;

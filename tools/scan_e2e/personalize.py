@@ -378,7 +378,12 @@ def scan_only(t):
     # C25: navigating inside the demo is never undone: its About link carries ?r= (scan-only too) and stays there; a page
     # opened without ?r= (an early click, the API down) is left alone, not sent back to the demo home
     page.evaluate(LOADS)
-    bring(page, "iframe[data-p=demo]", "center")   # its own top nav clear of the landing's sticky one
+    if t.vp_name == "phone":   # phones show a still of the demo: a tap opens the live frame full screen
+        bring(page, "#showcase .demo-shot", "center")
+        page.locator("#showcase .demo-shot").click()
+        page.wait_for_timeout(400)
+    else:
+        bring(page, "iframe[data-p=demo]", "center")   # its own top nav clear of the landing's sticky one
     frame.locator("a[href*='about.html']:visible").first.click()
     try:
         page.wait_for_function(f"() => {FRAME_AT}('about.html')", timeout=9000)
@@ -507,8 +512,12 @@ def malicious(t):
             check(f"{tag} profile: malicious profile falls back to the valid username", texts(page, "[data-p=search]") == ["evil.user"],
                   texts(page, "[data-p=search]"))
             live = texts(page, ".phone-free [data-live=free-all] .m-site")
-            check(f"{tag} malicious hits: only the valid domain is shown (Removed row, Before phone)", page.locator('[data-p="gone"] .m-site').inner_text() == "safe-leak.example"
-                  and set(live) <= {"safe-leak.example"}, live)
+            ev = served("evilR3port01")   # the oracle: the hosts of its well-formed http(s) urls (an evil `domain` field never shows)
+            ok_d = {urlsplit(u).hostname for u in (str(x.get("url") or x.get("link") or "") for x in ev.get("hits", []) + ev.get("results", []))
+                    if re.fullmatch(r"https?://[a-z0-9.-]+(/\S*)?", u)}
+            check(f"{tag} malicious hits: only valid domains are shown (Removed row = the top valid hit; Before phone = well-formed hits / results only)",
+                  page.locator('[data-p="gone"] .m-site').inner_text() == "safe-leak.example" and live and set(live) <= ok_d
+                  and not any("evil" in d or "<" in d for d in live), (live, sorted(ok_d)))
     check(f"{tag} malicious fixture: nothing reaches the DOM, no dialog", not bad and not net["dialogs"], bad + net["dialogs"])
     ctx.close()
 

@@ -140,6 +140,7 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .rd.rm-layer { display: flex; flex-direction: column; }
 .rd.rm-layer > * { flex: none; }
 .rd.rm-layer .rd-media { flex: 1 1 auto; min-height: 150px; height: auto; }
+.rd.rm-layer .rd-acts { margin-top: 14px; line-height: 24px; }   /* the photo ends above the idle knob's corner (52 px up) */
 .rd-acts { display: flex; gap: 18px; margin-top: 10px; color: var(--rd-mut); font-size: .8rem; font-weight: 600; }
 .rd-gone .rd-title { color: var(--rd-mut); opacity: .6; margin-bottom: 4px; }
 .rd-note { margin-bottom: 8px; color: var(--rd-mut); font-size: .88rem; }

@@ -545,7 +545,7 @@ strong { font-weight: 600; }
 .demo-pop::after { content: ""; position: absolute; inset: -8px -4px; }
 .demo-pop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 559px) { .demo-pop-t { display: none; } .demo-pop { padding: 0; width: 36px; justify-content: center; } .browser-demo .url { margin-right: 40px; } }
-.browser-demo.is-pop { position: fixed; z-index: 1000; inset: clamp(0px, 2vw, 24px); margin: 0; display: flex; flex-direction: column; border-radius: clamp(0px, 1.2vw, 16px); }
+.showcase .browser-demo.is-pop { position: fixed; z-index: 1000; inset: clamp(0px, 2vw, 24px); margin: 0; display: flex; flex-direction: column; border-radius: clamp(0px, 1.2vw, 16px); }
 .browser-demo.is-pop iframe { flex: 1; height: auto; min-height: 0; }
 .demo-backdrop { position: fixed; inset: 0; z-index: 999; background: rgb(20 8 24 / .74); }
 html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
@@ -573,7 +573,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 @media (min-width: 960px) {
   .js .showcase { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "head head" "demo tabs" "demo ba" "btn ba"; column-gap: 48px; align-items: start; }
   .js .showcase-head { grid-area: head; }
-  .js .showcase .browser-demo { grid-area: demo; }
+  .js .showcase .browser-demo, .js .showcase .demo-hold { grid-area: demo; }   /* popped out: its placeholder keeps the cell */
   .js .showcase .browser-demo + .center { grid-area: btn; }
   .js .ba-tabs { grid-area: tabs; margin-top: clamp(18px, 3vw, 28px); }
   .js .showcase .ba { grid-area: ba; }
@@ -585,9 +585,9 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .why-intro p:not(.eyebrow) { color: var(--muted); font-size: 1.1rem; }
 .person { display: flex; align-items: center; gap: 16px; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
 /* Jaka's monogram (no photo): one flat disc, Bodoni J */
-.mono { display: inline-grid; place-items: center; flex: none; width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+.jdisc { display: inline-grid; place-items: center; flex: none; width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
   font: 500 2rem/1 var(--display); font-variation-settings: "opsz" 24; }
-.mono-88 { width: 88px; height: 88px; font-size: 2.7rem; }
+.jdisc-88 { width: 88px; height: 88px; font-size: 2.7rem; }
 .person p { margin: 0 !important; font-size: .97rem !important; line-height: 1.45; }
 .person strong { display: block; color: var(--ink); font: 600 1.05rem/1.3 var(--sans); margin-bottom: 2px; }
 .why-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; align-content: start; border-top: 1px solid var(--line); }

@@ -159,13 +159,17 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         ix = max(0, min(b[0] + b[2], c[0] + c[2]) - max(b[0], c[0])); iy = max(0, min(b[1] + b[3], c[1] + c[3]) - max(b[1], c[1]))
         cov = ix * iy / (c[2] * c[3])
         MEASURED[f"{tag} dock {what}"] = {"pip": b, "card": c, "coverage": round(cov, 3)}
-        check(f"{tag} dock: {what}: docked, 55% of the card wide, hanging off its bottom-right corner",
-              s["mode"] == "dock" and abs(b[2] - round(c[2] * 0.55)) <= 1 and b[0] + b[2] >= c[0] + c[2] - 13 and b[1] + b[3] > c[1] + c[3] and b[1] > c[1] + c[3] * 0.5 and ratio_ok(s), [b, c])
+        wide = s["vw"] < 720   # phones: the card's full width, under it (the .meet-pic slot); else 55%, off its bottom-right
+        check(f"{tag} dock: {what}: docked, {'the card wide, under it' if wide else '55% of the card wide, hanging off its bottom-right corner'}",
+              s["mode"] == "dock" and abs(b[2] - round(c[2] * (1 if wide else 0.55))) <= 1 and b[0] + b[2] >= c[0] + c[2] - 13 and b[1] + b[3] > c[1] + c[3] and b[1] > c[1] + c[3] * 0.5 and ratio_ok(s), [b, c])
         check(f"{tag} dock: {what}: covers <= 25% of the card", cov <= 0.25, round(cov, 3))
         under = pg.evaluate(PIP_UNDER)
         ok, d = clear(pg)
         check(f"{tag} dock: {what}: no link / button / input under it (grid), Scan now / header / Ask-AI still clickable", not under and ok, [under, d])
-        check(f"{tag} dock: {what}: start spot off the screen corner (up / left of it)", not (0 <= s["vw"] - (b[0] + b[2]) <= 24 and 0 <= s["vh"] - (b[1] + b[3]) <= 24), b)
+        if wide:   # full width: never the floating player's size, wherever the page sits
+            check(f"{tag} dock: {what}: not the floating player (full card width, not 45vw)", b[2] > 0.6 * s["vw"], b)
+        else:
+            check(f"{tag} dock: {what}: start spot off the screen corner (up / left of it)", not (0 <= s["vw"] - (b[0] + b[2]) <= 24 and 0 <= s["vh"] - (b[1] + b[3]) <= 24), b)
 
     # flags: landing ?pip=0 and scan/ without ?r= = no player, no /video/ request
     ctx, pg, cdp = new_ctx()

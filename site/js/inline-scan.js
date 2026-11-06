@@ -405,9 +405,10 @@
       heroOpen(m.handle, m.platform).setAttribute('data-handle', m.handle);
       heroResult(m);
       if (F) F.render(m);
-      // A shared report link (?r=, no #section) opened where the card sits below the fold (phones: under the hero
-      // text): bring it up, unless she already scrolled / typed. A restored scroll position or a #link is left alone.
-      if (shared && !location.hash && card.getBoundingClientRect().top >= window.innerHeight) bring();
+      // A shared report link (?r=, no #section) opened where the card starts in the screen's lower half or below
+      // (phones: under the hero text): bring it up, unless she already scrolled / typed. A restored scroll position
+      // or a #link is left alone.
+      if (shared && !location.hash && card.getBoundingClientRect().top > window.innerHeight / 2) bring();
     }, function () { /* unknown / unreachable: the page keeps its illustration */ });
   }
 })();
