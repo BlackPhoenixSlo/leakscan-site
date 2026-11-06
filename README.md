@@ -15,13 +15,16 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs, `js/main.js`) ·
   `#pricing` · `#faq` · `#removals` · `#contact`. `tools/check.py` fails if a section id is missing here.
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
-  Reddit, a leak site), each a live leak vs. its removed state. Remove / Show again animates the compare edge; the
-  handle drags (pointer anywhere on the stage, arrow / PageUp / PageDown / Home / End on the handle); "Reveal images"
-  unblurs the `img/removals/` thumbs. Personalized from the same shared scan result as the hero card (`?r=` or last
+  Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
+  photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state. On
+  screen each edge glides by itself (1-2 s CSS transition) to a random 15-85 % and holds 1-3 s, per card, never in step;
+  paused off screen / tab hidden, none under reduced motion; a card's first input stops its sweep for good. Remove / Show
+  again animates the compare edge; the handle drags (pointer anywhere on the stage, arrow / PageUp / PageDown / Home / End
+  on the handle); "Reveal images" unblurs the `img/removals/` thumbs. Personalized from the same shared scan result as the hero card (`?r=` or last
   scan, and after an in-page scan by wrapping `LeakScanPersonalize.apply`): Mega from the result's top-level `mega[]`
   (always present, `[]` = none; first item's `title`, `size` in bytes, `images`, `videos`, `age` ISO UTC; its `url` is
   an aggregator page and is never shown), else a mega.nz hit's title; X poster + text, Reddit subreddit + title, the
-  most-seen other host, `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
+  most-seen other host (+ the leak-site profile: her name, `<handle>, <name>` aliases), `/api/thumb` thumbs. textContent only; leak URLs are read for host / path, never rendered.
 - Video page `site/video/` (noindex, not in the sitemap; `css/video.css` + `js/video-overlays.js`, own files): Jack's
   face video (full frame, Jack on the left half; `jack.webm` = the one take, a 40 s placeholder until Jack's recording; drop-in: CUES.md "After recording") with 5
   overlay prefabs drawn on the video's right half, no panel of their own (640x720 box scaled to 960x1080, vertically centred; Google phone, Google
@@ -75,7 +78,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `GET /api/scan-result/<slug>` per tab (sessionStorage cache, 8 s timeout, failure = defaults; on the landing the hero
   card's request from `js/scan-engine.js` is shared, and a `?r=` link opened with the card below the fold scrolls it up); every value is
   validated and rendered with textContent / built elements, never leak titles or snippets. Landing: hero line +
-  Reset, both "Your website" phones (name, top-4 leak domains by occurrences, blurred `/api/thumb` thumbs, IG / TikTok /
+  Reset, the phone sticky bar ("Free scan: type your handle" → "DM me on Telegram", `t.me/jakabasej` prefilled like
+  #contact's with her report link + @handle), both "Your website" phones (name, top-4 leak domains by occurrences, blurred `/api/thumb` thumbs, IG / TikTok /
   site rows hidden when unknown), hero card handles, showcase url bar + iframe `showcase/?r=`. Slots are `data-p="…"`.
   Demo: only with `profile` (else Orla stays); name / bio / facts / links from `data-p-tpl` templates, everything not
   marked is hidden (no pottery next to her name), avatar via `/api/avatar/<slug>` when `profile.avatar`, `?r=` kept on
@@ -106,7 +110,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `--only scan|personalize|askai|inline|tabs|removals` (`tabs`: phone tabs + demo pop-out; `removals`: the panels,
   toggle, drag, keys, `mega[]` / hit personalization). Break-it flags (each turns only its own checks red):
   `--break-allowlist`, `--break-drift`, `--break-phones`, `--break-thumbs`, `--break-people` (logo tiles kept), `--break-remove`, `--break-incremental`
-  (every explorer step 1e9: only `incremental:` checks). `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
+  (every explorer step 1e9: only `incremental:` checks), `--break-sweep` (removals' ambient sweep never steps: only
+  `sweep:`), `--break-tgcta` (no Telegram sticky bar after a scan: only `tgcta:`), `--break-fprow` (leak-site profile head
+  stacked again: only `fp: first tile row`). `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
   blog: Orla's posts without a profile, starter cards + post pages with one,
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.

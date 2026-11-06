@@ -18,7 +18,9 @@
 @media (prefers-color-scheme: dark) { .rm-ico-x { background: #e7e9ea; color: #0f1419; } }
 
 /* the compare stage: fixed height (no layout shift), removed layer on top, clipped from the left at --p % */
-.rm-stage { position: relative; height: var(--rm-h); overflow: hidden; border-radius: 12px; border: 1px solid var(--line); touch-action: pan-y;
+/* overflow: clip, not hidden: a hidden box still scrolls to show a focused child, and the stage-wide handle at 100 % sits
+   past its right edge, so focusing it (Tab, a tap) slid both layers out of view */
+.rm-stage { position: relative; height: var(--rm-h); overflow: hidden; overflow: clip; border-radius: 12px; border: 1px solid var(--line); touch-action: pan-y;
   user-select: none; -webkit-user-select: none; cursor: ew-resize; }
 html:not(.js) .rm-stage { cursor: auto; }
 .rm-layer { position: absolute; inset: 0; overflow: hidden; }
@@ -45,8 +47,9 @@ html:not(.js) .rm-stage { cursor: auto; }
 }
 .rm-handle:focus-visible .rm-knob { outline: 2px solid var(--ink); outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) {
-  .rm-anim .rm-gone { transition: clip-path .7s cubic-bezier(.6, 0, .25, 1); }
-  .rm-anim .rm-handle { transition: transform .7s cubic-bezier(.6, 0, .25, 1); }
+  /* --rm-t: the ambient sweep's glide time (js/removals.js), unset = the .7s Remove / Show again flip */
+  .rm-anim .rm-gone { transition: clip-path var(--rm-t, .7s) cubic-bezier(.6, 0, .25, 1); }
+  .rm-anim .rm-handle { transition: transform var(--rm-t, .7s) cubic-bezier(.6, 0, .25, 1); }
   .rm-knob { transition: transform .2s, opacity .2s; }
 }
 .rm-act { margin: 0; }
@@ -121,17 +124,67 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .rd-gone .rd-media { height: 170px; }
 .rd-gone .rd-acts { opacity: .5; }
 
-/* 4. a custom leak site (dark, ad-heavy look) */
-.cs { background: #101114; color: #e9e9ec; font: 400 .88rem/1.4 var(--sans); }
-.cs-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: #1c1d22; border-bottom: 2px solid #e53a6b; }
-.cs-logo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ff5c8a; font: 800 .9rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.cs-nav { flex: none; color: #9a9ca5; font-size: .74rem; }
-.cs-title { margin: 12px 14px 0 !important; font-weight: 700; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cs-meta { margin: 2px 14px 10px !important; color: #9a9ca5; font-size: .78rem; }
-.cs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 0 14px; }
-.cs-grid .rm-th { height: 92px; border-radius: 6px; }
-.cs-gone { display: flex; flex-direction: column; text-align: center; }
-.cs-gone .cs-bar { text-align: left; }
-.cs-404 { margin: 54px 0 0 !important; font: 900 4.5rem/1 var(--sans); color: #3a3c44; letter-spacing: .04em; }
-.cs-gh { margin-top: 10px !important; font-weight: 700; font-size: 1.05rem; }
-.cs-gone .cs-meta { margin-top: 6px !important; }
+/* 4. a leak site, drawn after a real one (fapello-style profile page: light, Tailwind palette, pink-500 accent).
+   System fonts only (theirs is Inter: no font request here). The live layer is cropped by the stage like a screenshot.
+   Container queries on the layer: the stage's own width decides phone (2 columns, 112 px tiles, tight head) vs wide (4, 160 px).
+   The head is fapello's desktop row (avatar left, the rest right) at every width, so the first tile row shows whole at 320. */
+.fp { --fp-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; container-type: inline-size;
+  background: #f0f2f5; color: #111827; font: 400 .85rem/1.35 var(--fp-sans); }
+.fp-bar { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.fp-menu { flex: none; width: 20px; height: 20px; color: #374151; }
+.fp-logo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 1rem/1.2 var(--fp-sans); letter-spacing: -.03em; }
+.fp-logo::first-letter { color: #ec4899; }
+.fp-pill { flex: none; padding: 3px 8px; border-radius: 6px; color: #fff; font: 700 .68rem/1.3 var(--fp-sans); }
+.fp-p1 { background: #ec4899; }
+.fp-p2 { background: #3b82f6; }
+.fp-p3 { display: none; background: #8b5cf6; }
+.fp .fp-search { display: flex; align-items: center; gap: 6px; max-width: 280px; height: 30px; margin: 6px auto 0; padding: 0 10px; border-radius: 6px;
+  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .12); color: #9ca3af; }
+.fp-search .icon { width: 14px; height: 14px; }
+.fp-head { display: flex; align-items: center; gap: 12px; margin: 8px 12px 0; }
+.fp-ring { flex: none; padding: 4px; border-radius: 50%; background: linear-gradient(to top right, #ca8a04, #db2777); }
+.fp-av { display: block; width: 72px; height: 72px; border: 4px solid #fff; border-radius: 50%; }
+.fp-who { display: grid; flex: 1; justify-items: start; gap: 4px; min-width: 0; }
+.fp-name, .fp-aka { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-name { font: 600 1rem/1.2 var(--fp-sans); }
+.fp-aka { color: #4b5563; font-size: .74rem; font-weight: 600; }
+.fp-tags, .fp-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.fp-tags span, .fp-follow, .fp-disc { border-radius: 6px; color: #fff; font-weight: 600; }
+.fp-tags span { padding: 1px 5px; font-size: .66rem; }
+.fp-of { background: #93c5fd; }
+.fp-pt { background: #f9a8d4; }
+.fp-ig { background: #d8b4fe; }
+.fp-follow, .fp-disc { padding: 3px 9px; font-size: .74rem; }
+.fp-follow { background: #ec4899; }
+.fp-disc { background: #3b82f6; }
+.fp-heart { color: #ec4899; font-size: 1.15rem; line-height: 1; }
+.fp-count { display: grid; grid-template-columns: auto auto; gap: 14px; color: #374151; font-size: .76rem; }
+.fp-count b { color: #111827; }
+.fp .fp-hr { display: flex; align-items: center; gap: 8px; margin: 8px 12px 6px; color: #9ca3af; }
+.fp-hr::before, .fp-hr::after { content: ""; flex: 1; height: 1px; background: #d1d5db; }
+.fp-hr .icon { width: 14px; height: 14px; }
+.fp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 0 12px; }
+.fp-grid .rm-th { height: 112px; border-radius: 6px; }
+.fp .fp-next { margin: 12px 0 0; color: #ec4899; font-weight: 700; text-align: center; }
+@container (min-width: 440px) {
+  .fp-menu { display: none; }
+  .fp-p3 { display: inline; }
+  .fp-head { gap: 18px; margin: 12px 16px 0; }
+  .fp-who { gap: 5px; }
+  .fp-name { font-size: 1.1rem; }
+  .fp-tags span { padding: 1px 7px; font-size: .7rem; }
+  .fp-follow, .fp-disc { padding: 4px 12px; font-size: .78rem; }
+  .fp-av { width: 88px; height: 88px; }
+  .fp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 0 16px; }
+  .fp-grid .rm-th { height: 160px; }
+}
+/* 320 px phones: the wordmark keeps its room; a smaller avatar + shorter tiles keep the first tile row whole */
+@container (max-width: 299px) {
+  .fp-p2 { display: none; }
+  .fp-head { gap: 10px; }
+  .fp-av { width: 60px; height: 60px; }
+  .fp-grid .rm-th { height: 96px; }
+}
+/* removed: the same site shell, the profile gone */
+.fp .fp-404 { margin: 52px 0 0; color: #d1d5db; font: 900 4.5rem/1 var(--fp-sans); letter-spacing: .04em; text-align: center; }
+.fp .fp-gh { margin: 12px 24px 0; color: #374151; font-size: 1rem; font-weight: 600; text-align: center; }

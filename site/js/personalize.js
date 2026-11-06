@@ -332,6 +332,16 @@
       if (el.getAttribute(k) !== demo) el.setAttribute(k, demo);
     });
 
+    // phone sticky bar: "Free scan" → "DM me on Telegram", prefilled like #contact's Telegram channel with her report link
+    // (scan-engine.js's REPORT_BASE, absolute) + handle. Set again on every apply(); Reset reloads = the original bar.
+    var bar = document.querySelector('.mobile-cta'), E = window.LeakScanEngine;
+    if (bar) {
+      var link = (E && E.REPORT_BASE ? E.REPORT_BASE : new URL('scan/?r=', location.href).href) + encodeURIComponent(m.slug);
+      bar.setAttribute('href', 'https://t.me/jakabasej?text=' + encodeURIComponent('Hi Jaka, I ran the free scan. My report link and handle: ' + link + ' @' + m.handle));
+      bar.querySelector('use').setAttribute('href', '#i-send');
+      bar.lastChild.textContent = 'DM me on Telegram';
+    }
+
     var line = q('scanned');
     if (line) {
       var reset = make('button', { type: 'button', 'class': 'linkish' }, ['Reset page']);
