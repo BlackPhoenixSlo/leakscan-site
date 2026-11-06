@@ -299,6 +299,7 @@ def removals_flow(browser, vp_name, vp):
         cols = page.evaluate("() => { const cs = [...document.querySelectorAll('#removals .rm-card')].map(c => c.getBoundingClientRect()); return [new Set(cs.map(r => Math.round(r.x))).size, new Set(cs.map(r => Math.round(r.y + scrollY))).size, cs.length, cs.every(r => r.width > 0 && r.height > 0 && r.left >= 0 && r.right <= innerWidth), document.querySelectorAll('.swipe-nav').length]; }")
         check(f"{tag} {scheme}: layout {'one column (4 rows)' if vp_name == 'phone' else '2x2'}, all 4 cards on the page within its width, no carousel nav",
               cols == ([1, 4, 4, True, 0] if vp_name == "phone" else [2, 2, 4, True, 0]), cols)
+        page.locator("#removals .rm-grid").screenshot(path=str(cfg.out / f"removals-{vp_name}-{scheme}-0-layout.png"))
         if scheme == "light":
             fp_checks(tag, vp_name, page.evaluate(FP_STATE), "Orla Brennick", "brennickclay, orlabrennick", vp["width"])
         before = page.evaluate(RM_STATE)
