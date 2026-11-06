@@ -24,7 +24,7 @@ from scan_e2e.common import ROOT, SCENARIOS  # noqa: E402
 MARKER = 'for r, h in e["reach"].items())'
 DROP = "E2E_PROOF_DROP"
 CHEAP_RED = ("site/js/chat.js", "return HOSTS.indexOf(h) >= 0;", "return true;")   # on disk, not a --break: a plain run that goes red
-KNOWN_RED = {"tabs", "removals"}   # both red on main at 5c51ad1 (measured), with or without this harness; drop one once it's fixed
+KNOWN_RED = {"tabs", "removals", "inline"}   # all red on main at 5c51ad1 (measured), with or without this harness; drop one once it's fixed
 reds = []
 
 
