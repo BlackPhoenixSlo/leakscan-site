@@ -451,21 +451,22 @@
   }
   // people photos only: every thumb probed once as the landing report's gallery() does (js/inline-scan.js: CORS load when
   // the API is another origin, refused → a plain one; kept if >= 16 px both sides and E.isPhoto), done(kept) when all
-  // settled (at most PROBE_MAX s: an unsettled one is left out)
+  // settled (at most PROBE_MAX s: an unsettled one is left out until it settles, then done(kept) again: the Images count
+  // ends = the landing's, which waits for every one)
   var BLANK = 16, PROBE_MAX = 6, people = { kept: [], dropped: [] };
   function photoOnly(list, done) {
-    var left = list.length, ok = {}, fin = false, end = function () {
-      if (fin) return;
+    var left = list.length, ok = {}, fin = false, end = function (late) {
+      if (fin && !late) return;
       fin = true;
       people = { kept: list.filter(function (u) { return ok[u] === 1; }), dropped: list.filter(function (u) { return ok[u] !== 1; }) };
       if (api) api.photos = people;
-      done(people.kept);
+      done(people.kept, !!late);
     };
     if (!left) return end();
     setTimeout(end, PROBE_MAX * 1000);
     list.forEach(function (u) {
       var probe = function (cors) {
-        var im = new Image(), set = function (v) { if (ok[u] == null) { ok[u] = v; if (!--left) end(); } };
+        var im = new Image(), set = function (v) { if (ok[u] == null) { ok[u] = v; left--; if (!left || fin && v) end(fin); } };
         im.referrerPolicy = 'no-referrer';
         if (cors) im.crossOrigin = 'anonymous';
         im.onload = function () { set(im.naturalWidth >= BLANK && im.naturalHeight >= BLANK && E.isPhoto(im) ? 1 : 0); };
@@ -491,10 +492,11 @@
     real = r;
     wall(r.hosts);
     realize();   // her rows now, her images once probed
-    photoOnly(all, function (kept) {
+    photoOnly(all, function (kept, late) {
       if (g !== gen || real !== r) return;
-      r.imgs = kept;
       r.nimg = kept.length;   // the report's Images tab: what is left, as on the landing
+      if (late) return draw(video.currentTime);   // a probe past PROBE_MAX: only the count (no thumb reshuffle mid-play)
+      r.imgs = kept;
       thumbs(kept.length ? kept : all.length ? [] : m.thumbs);   // all dropped: the defaults stay (text only)
       realize();
       draw(video.currentTime);

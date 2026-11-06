@@ -364,7 +364,7 @@ VIDEO_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|
 GSTATIC = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 REAL = """() => { const q = s => [...document.querySelectorAll(s)], im = i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter];
   return {g: q('.vo-pf[data-prefab="google"] .rm-live .rm-img').map(im), grows: q('.vo-pf[data-prefab="google"] .rm-live .m-site').map(e => e.textContent),
-          grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
+          grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-cta .vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
           own: q('.vo-own').map(im), count: (document.querySelector('[data-vo="g-count"]') || {}).textContent, photos: window.VideoOverlays.photos,
           cards: q('.vo-pf[data-prefab]').map(e => [e.dataset.prefab, [...e.querySelectorAll('.rm-img, .vo-real')].map(im)])}; }"""
 BLUR = lambda f: float(m[1]) if (m := re.search(r"blur\(([\d.]+)px\)", f or "")) else 0.0
