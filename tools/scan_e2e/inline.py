@@ -257,11 +257,13 @@ def hero_tiles(run):
     strip_t = page.evaluate(TILES, ".report-card .live-strip a.gi-card")
     tile_shape = lambda x: (x[1] == "_blank" and x[2] == "noopener noreferrer nofollow") or (x[0] == report_url(slug) and x[1] == "" and x[2] == "")
     free_t = [[unquote(t[3].split("u=")[1]), t[0], t[1]] for t in i["tiles"]]
+    # its first 9 = the strip's; past them a dead slot's refill depends on the view's size (E.gallery), so any strip tile
     b18 = [t[:3] for t in strip_t[:18]]
-    check(f"{tag} thumbs: band: #free phone Images tab = the first 18 tiles of the report (as the hero strip), count = the hero's, link → result in a new tab, else the report",
+    check(f"{tag} thumbs: band: #free phone Images tab = 18 of the report's tiles (the first 9 as the hero strip), count = the hero's, link → result in a new tab, else the report",
           i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] == "group" and len(i["tiles"]) == len(b18)
           and all(t[3].startswith(cfg.api + "/api/thumb?u=") for t in i["tiles"]) and all(tile_shape(t) for t in i["tiles"])
-          and free_t == b18 and not tiles_ok([x + [True] for x in free_t], d, (DEAD_THUMB,)), (NI, i["tiles"][:2], tiles_ok([x + [True] for x in free_t], d, (DEAD_THUMB,))))
+          and free_t[:9] == b18[:9] and all(t in [x[:3] for x in strip_t] for t in free_t) and not tiles_ok([x + [True] for x in free_t], d, (DEAD_THUMB,)), (NI, i["pill"], len(i["tiles"]), len(b18), [(k, a[0][-24:], b[0][-24:]) for k, (a, b) in enumerate(zip(free_t, b18)) if a != b][:3],
+           tiles_ok([x + [True] for x in free_t], d, (DEAD_THUMB,))))
     check(f"{tag} band: same height before/after results (row reserved, no shift)", abs(i["h"] - band_h0) <= 1, [band_h0, i["h"]])
     check(f"{tag} band: 'Send me the report' = Telegram with the report link", (i["send"] or "").startswith("https://t.me/jakabasej?text=")
           and quote(report_url(slug), safe="") in i["send"], i["send"])
