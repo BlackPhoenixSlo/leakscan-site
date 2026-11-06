@@ -365,10 +365,11 @@ PROD_SLUG, PROD_HANDLE = "MT4kpWQI3QXp", "sophieraiin"
 PROD_SLUG2 = "2_YPj7TbK4rm"   # an older scan of the same handle: other counts than the placeholder's (the ?r= / theater run)
 VIDEO_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|embed|clips?|vod)(?:[/?#.-]|$)", re.I)
 GSTATIC = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
+# REAL count = the g-count slot's value (__src), not its roll frame (the read happens mid-play)
 REAL = """() => { const q = s => [...document.querySelectorAll(s)], im = i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter];
   return {g: q('.vo-pf[data-prefab="google"] .rm-live .rm-img').map(im), grows: q('.vo-pf[data-prefab="google"] .rm-live .m-site').map(e => e.textContent),
           grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-cta .vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
-          own: q('.vo-own').map(im), count: (e => e && (e.__src || e.textContent))(document.querySelector('[data-vo="g-count"]')),   // the slot's value, not its roll frame photos: window.VideoOverlays.photos,
+          own: q('.vo-own').map(im), count: (e => e && (e.__src || e.textContent))(document.querySelector('[data-vo="g-count"]')), photos: window.VideoOverlays.photos,
           cards: q('.vo-pf[data-prefab]').map(e => [e.dataset.prefab, [...e.querySelectorAll('.rm-img, .vo-real')].map(im)])}; }"""
 BLUR = lambda f: float(m[1]) if (m := re.search(r"blur\(([\d.]+)px\)", f or "")) else 0.0
 BLUR_MIN = 5   # px: the video cards' leak-image blur floor (= styles.css .live-ico, the site's lightest rule)
