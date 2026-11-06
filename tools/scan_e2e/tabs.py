@@ -4,7 +4,7 @@ import json
 import types
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from .common import (COUNTS, FX, MEASURED, TILES, bring, cfg, check, dead_thumb, digits, links, new_ctx, scan_images, served, settled_count, swipe,
+from .common import (COUNTS, FX, MEASURED, PIP_AWAY, TILES, bring, cfg, check, dead_thumb, digits, links, new_ctx, scan_images, served, settled_count, swipe,
                      tiles_ok, video_stills)
 from .huge import IN_VIEW
 
@@ -15,7 +15,7 @@ LS_SOURCES = "window.__ls = []; try { new PerformanceObserver(l => l.getEntries(
 def dead_tail(browser, vp_name, vp, net, tag):
     """C12: demoDeadTail1 = 24 live thumbs, then 8 dead / blank ones that no view shows at first (past the strip's 24).
     Sampled every 0.5 s from load: no count ever says more than 24, and every one settles at 24."""
-    ctx = new_ctx(browser, vp_name, vp, net, console_ok=lambda m: m.text.startswith("Failed to load resource")
+    ctx = new_ctx(browser, vp_name, vp, net, init=[PIP_AWAY], console_ok=lambda m: m.text.startswith("Failed to load resource")
                   and ("DEAD" in unquote(m.location.get("url") or "") or "BLANK" in unquote(m.location.get("url") or "")))[0]
     page = ctx.new_page()
     page.goto(cfg.base + "?r=demoDeadTail1", wait_until="load")
@@ -42,7 +42,7 @@ def tabs_flow(browser, vp_name, vp):
     m = MEASURED.setdefault(vp_name, {})
 
     def ctx_(motion="no-preference"):
-        return new_ctx(browser, vp_name, vp, net, init=[LS_SOURCES], reduced_motion=motion, console_ok=lambda msg: (
+        return new_ctx(browser, vp_name, vp, net, init=[LS_SOURCES, PIP_AWAY], reduced_motion=motion, console_ok=lambda msg: (
             msg.text.startswith("Failed to load resource") and "DEAD" in unquote(msg.location.get("url") or "")
             or "STALE" in unquote(msg.text + (msg.location.get("url") or "")) and ("CORS" in msg.text or "ERR_FAILED" in msg.text)))[0]   # the stale copy's refusal (then E.fresh)
 

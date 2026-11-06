@@ -4,7 +4,7 @@
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
-        [--break-dock] [--break-pull]
+        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs the scenarios below. Expected values come from what the stub serves
@@ -96,27 +96,46 @@ personalize also proves the phone sticky bar (`tgcta:`): no slug = "Free scan: t
 "DM me on Telegram" → t.me/jakabasej with the #contact prefill + her absolute report link + @handle; Reset = the original
 bar. --break-tgcta serves personalize.js without the bar swap: only `tgcta:` checks may go red.
 
-pip (js/pip.js, the mini player of site/video/): ?pip=0 and scan/ without ?r= show none and load no /video/. Landing
-(default on): docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report, or the
-scan report card after an in-page / ?r= scan) at 55% of the card width, coverage <= 25%, no live element under it
-(elementFromPoint grid), start spot off the screen corner, else just below the card; hero out = floating bottom-right
+pip (js/pip.js, the mini player of site/video/): ?pip=0 and scan/ without ?r= show none and load no /video/. vis (always on
+screen, Jack's iPhone report): landing with no interaction, dark + light, fresh / after a stored scan of sophieraiin
+(localStorage, seeded as personalize.js stores it: bypass, declared) / with an old "closed" flag: box + poster bytes < 1 s
+after DOMContentLoaded, first video frame < 3 s (Chromium: CDP Fast 4G; WebKit unthrottled, declared), CLS 0 over the whole
+load, fully inside the visual viewport top-right under the header at 0.5 / 1 / 2 s (wide: or docked, fully on screen),
+elementFromPoint at the inputs / Scan now / "Scanned" line = not the player, close X on the picture's top-right (>= 40 px)
+→ tab at the top-right corner (kept across a reload) → tap = back, same box; scrolled to the form / down: same spot.
+follow (Jack: "it didn't follow, it got hidden"): a rAF sampler records the rect every frame while scrolling 3 screens
+down and back, slowly and with fast flicks (Chromium phone: CDP touch gestures, flicks with momentum; desktop: wheel;
+WebKit: script scrollBy per frame, declared): phone = the same rect ±1 px in every frame; desktop = fully on screen in
+every frame, the same rect whenever floating; URL-bar collapse / expand (viewport height -94 px and back, x2, at the top
+and 2 screens down: window + visualViewport resize) = no jump; dropped mid-screen, scrolled + URL bar = stays; X → tab at
+the top-right corner, same tab rect in every frame while scrolling, tap → back to the prior spot (home / dropped).
+Screenshot strip <vp>-pip-strip-*.png (0 / 1 / 2 / 3 screens, back to 0, after X, after the tab tap). Mounted before the page's load event (no lazy wait). Landing: a phone never docks (top-right, clear of
+the form); wide: docked (absolute) over the bottom-right of the hero card (Weekly report, or the scan report card after
+an in-page / ?r= scan) at 55% of the card width while that whole spot is on screen, coverage <= 25%, no live element
+under it (elementFromPoint grid), start spot off the screen corner, else just below the card; else floating top-right
 at normal size clear of Scan now / CTA bar / Ask-AI; scroll back re-docks unless dragged / resized / tucked. scan/?r=:
-floating bottom-right. Lazy (after load), 16:9, same-origin embed (no name bar / player UI), muted + playing, tap
-expands; bar under the picture = play / sound / expand / close, 40 px buttons, no link (resize = 28 px top-left corner).
+floating top-right. 16:9, same-origin embed (no name bar / player UI), muted + playing, tap expands; bar under the
+picture = play / sound / expand, 40 px buttons, no link; on the picture only the X (top-right) and the 28 px resize
+corner (top-left). X = hidden behind the right edge tab, never removed.
 Expanded (YouTube style): tap → full width (phone) / min(960, 70vw) centred right under the header, sound on, same URL;
 the page scrolls under it (CDP touch scroll / wheel; WebKit: script scroll, declared), content right below it; chevron /
 Esc → mini; pull down follows the finger (15% → snaps back, 50% or a quick flick → mini); mini flung down → hidden with a
 '<' tab, tap → back; no new page / window.open anywhere. Free drop (stays mid-screen, kept on-screen under the header); fling or
 drag past the left / right edge tucks with a '>' / '<' tab (tap / inward drag = back where it was); corner grip / pinch
-resizes (16:9, min 168 px, max 60% / 90% phone width); Esc tucks, Enter on the tab returns; spot / size / tucked /
-closed kept in sessionStorage; x closes; CLS 0; reduced motion = no transitions; no request
+resizes (16:9, min 168 px, max 60% / 90% phone width); Esc tucks, Enter on the tab returns; spot / size / tucked kept in
+sessionStorage; CLS 0; reduced motion = no transitions; no request
 off loopback, no console errors. Phone (Chromium, real touch via CDP), desktop 1440, WebKit iPhone 13 (taps are touch,
 drags use the mouse). take: inside the iframe (seeks via Range, as Pages): currentSrc = the first <source> the engine
 plays (jack.webm / jack.mp4), duration ~56.9 s, the 3 s frame is the real take (luminance / colourfulness, vs the
 placeholder's), google card off at 9 s / on at 11.5 s in the picture's right half, caption 'real' at 2.95 s (hidden under
 260 px, #72), floating and docked. Screenshots: <vp>-pip-*.png. --break-tuck serves pip.js with tuck() emptied: only `tuck:` checks
 may go red; --break-dock serves it with no dock anchor (card = null): only `dock:` checks may go red; --break-pull serves it with no
-drag-down on the expanded player: only `pull:` checks may go red.
+drag-down on the expanded player: only `pull:` checks may go red; --break-pipvis serves it with the old dock rule (on the
+card whatever the screen: off-screen on a phone): only `vis:` / `follow:` / phone dock-spot checks may go red; --break-pipfollow
+serves it with #79's floating spot (re-computed off the form at the current scroll, every scroll): only `follow:` checks may go red.
+--break-pipload serves it with the iframe started at once (before the load event): only the `vis:` load-event checks may go red.
+Declared bypass: the tabs and huge flows start with the player put away, as after its X (common.PIP_AWAY): floating it
+stays top-right while scrolling (by design) and covers what sits there, e.g. the demo's full-screen button.
 
 A scenario part that raises (a Playwright timeout, a missing element) prints one FAIL line for it and the run goes on.
 """

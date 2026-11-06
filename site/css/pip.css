@@ -1,7 +1,8 @@
-/* js/pip.js: mini player of site/video/. Picture (16:9, the iframe, nothing drawn over it) + a thin control bar under it.
-   Docked (.docked, landing): absolute, hanging off the bottom-right corner of the hero card, scrolls with the page.
-   Floating: fixed, min(320px, 45vw), dropped anywhere; fling / drag past a side or the bottom → tucked off-screen,
-   .pip-tab (chevron) brings it back. Expanded (.big): fixed under the header, full width (phone) / min(960px, 70vw); the page
+/* js/pip.js: mini player of site/video/. Picture (16:9: a poster frame at once, the iframe over it once its video has a
+   frame (.live); the close X on its top-right corner) + a thin control bar under it.
+   Docked (.docked, landing, wide screens): absolute, hanging off the bottom-right corner of the hero card, scrolls with the page.
+   Floating: fixed, top-anchored, min(320px, 45vw), top-right under the header by default (never moved by a scroll), dropped
+   anywhere; X / fling / drag past a side or the bottom → tucked off-screen, .pip-tab (chevron) brings it back. Expanded (.big): fixed under the header, full width (phone) / min(960px, 70vw); the page
    scrolls under it. Size changes animate as transform only (--s scale, origin top-left). z 44: under the header (50) and
    the Ask-AI launcher (45). Never in the flow: CLS 0. */
 .pip { --bar: 40px; position: fixed; left: 0; top: 0; z-index: 44; width: var(--w, min(320px, 45vw)); border-radius: 12px; overflow: hidden;
@@ -17,8 +18,13 @@
 .pip.drag { cursor: grabbing; }
 .pip.pop { animation: pip-pop .25s ease both; }
 @keyframes pip-pop { from { opacity: 0; } }
-.pip-pic { position: relative; aspect-ratio: 16 / 9; background: #000; }
-.pip iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.pip-pic { position: relative; aspect-ratio: 16 / 9; background: #000 center / cover no-repeat; }   /* the poster: set by pip.js (fetch -> blob, not holding the load event) */
+.pip iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.pip.live iframe { opacity: 1; }
+.pip-pic .pip-x { position: absolute; right: 0; top: 0; z-index: 1; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  padding: 0; border: 0; border-radius: 0 0 0 10px; background: rgb(0 0 0 / .45); color: #fff; cursor: pointer; }
+.pip-pic .pip-x svg { width: 20px; height: 20px; stroke-width: 2.6; filter: drop-shadow(0 0 2px rgb(0 0 0 / .8)); }
+@media (hover: hover) { .pip-pic .pip-x:hover { background: rgb(0 0 0 / .7); } }
 .pip-hit { position: absolute; inset: 0; }
 .pip-bar { display: flex; align-items: center; height: var(--bar); padding: 0 4px; background: #16181c; }
 .pip-bar i { flex: 1; }
@@ -36,7 +42,7 @@
 .pip-tab[data-side="l"] { left: 0; border-radius: 0 10px 10px 0; }
 .pip-tab[data-side="r"] { right: 0; border-radius: 10px 0 0 10px; }
 .pip-tab svg { width: 20px; height: 20px; fill: none; stroke: #ffd400; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-@media (prefers-reduced-motion: reduce) { .pip, .pip.on, .pip.on.tucked { transition: none; } .pip.pop { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .pip, .pip.on, .pip.on.tucked, .pip iframe { transition: none; } .pip.pop { animation: none; } }
 .pip-rs { position: absolute; left: 0; top: 0; width: 28px; height: 28px; display: flex; color: #fff; cursor: nwse-resize; touch-action: none; }
 .pip-rs svg { width: 16px; height: 16px; margin: 5px; stroke-width: 2.6; filter: drop-shadow(0 0 2px rgb(0 0 0 / .8)); opacity: .85; }
 @media (hover: hover) and (pointer: fine) { .pip-rs svg { opacity: 0; transition: opacity .15s; } .pip:hover .pip-rs svg, .pip-rs:focus-visible svg { opacity: .9; } }

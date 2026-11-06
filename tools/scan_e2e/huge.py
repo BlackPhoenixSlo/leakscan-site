@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import TimeoutError as PWTimeout
 
-from .common import cfg, check, digits, new_ctx, scan_images, served
+from .common import PIP_AWAY, cfg, check, digits, new_ctx, scan_images, served
 
 
 def by_site(d):
@@ -90,7 +90,7 @@ def huge_flow(browser, vp_name, vp):
     --break-incremental (scan.js with every step = 1e9, everything rendered) must turn red; nothing else may."""
     phone = vp_name == "phone"
     tag = f"{vp_name} huge:"
-    ctx, net = new_ctx(browser, vp_name, vp, accept_downloads=True)
+    ctx, net = new_ctx(browser, vp_name, vp, init=[PIP_AWAY], accept_downloads=True)   # player put away (common.PIP_AWAY)
     bad, thumbs = [], []
     page = ctx.new_page()
     page.on("response", lambda r: r.status >= 500 and bad.append(f"{r.status} {r.url}"))
@@ -113,8 +113,9 @@ def huge_flow(browser, vp_name, vp):
     biggest = max(sites, key=lambda d: len(sites[d]))
     ms = page.evaluate("performance.getEntriesByName('leakscan:report')[0].duration")
     check(f"{tag} report painted < 1500 ms after the result event (CPU x4)", ms < 1500, f"{ms:.0f} ms")
-    nodes = page.evaluate("document.getElementsByTagName('*').length")
-    check(f"{tag} incremental: page DOM <= {NODE_BUDGET} elements after render", nodes <= NODE_BUDGET, nodes)
+    nodes, pipn = page.evaluate("""() => [document.getElementsByTagName('*').length,   // the mini player (fixed, same size on every page) not the report's
+        [...document.querySelectorAll('.pip, .pip-tab')].reduce((n, e) => n + 1 + e.getElementsByTagName('*').length, 0)]""")
+    check(f"{tag} incremental: page DOM <= {NODE_BUDGET} elements after render (the mini player's own elements aside)", nodes - pipn <= NODE_BUDGET, [nodes, pipn])
     check(f"{tag} summary + section nav say 100 sites / 1,000 pages", (digits(page.locator("[data-stat=domains]").inner_text()),
           digits(page.locator("[data-stat=pages]").inner_text()), page.locator("#rnav-n").inner_text()) == (100, 1000, "100"))
     check(f"{tag} heading line: every site + link counted", page.locator("#lx-sub").inner_text() == f"100 sites · {n_links:,} links (1,000 indexed pages + {n_links - 1000} more Google results) · most copies first",
