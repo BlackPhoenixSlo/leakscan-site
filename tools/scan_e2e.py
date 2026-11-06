@@ -3,7 +3,7 @@
 
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
-        [--break-incremental] [--break-tuck]
+        [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs three scenarios.
@@ -63,7 +63,20 @@ moves the compare edge + clip; arrow keys on the handle; reduced motion = no tra
 ?r=demoRemove1 personalizes from the backend's top-level `mega` list + x.com / reddit.com / top other host hits, thumbs via
 /api/thumb, still blurred, no URL rendered; no mega[] → demo fallback; evil values dropped. Screenshots of every panel
 live + removed, light + dark. --break-remove serves removals.js without the Remove click handler: only `toggle:` checks
-may go red.
+may go red. The leak-site panel (`fp:`) = a fapello-style profile page: light shell + search on both layers, gradient-ring
+avatar, name / aliases (scanned with ?r=), pills, Follow / Discuss, counters, >= 6 loaded tiles (phone 112 px / 2 columns, desktop 160 px / 4)
+cropped by the stage, the first tile row whole inside it (phone 390 / 320), removed = 404 + DMCA line; the wordmark = the host
+without its TLD, never cut at 320-390; no sideways scroll at 320 / 360. --break-fprow serves removals.css with the old
+centred (column) profile head: only the `fp: first tile row` checks may go red. Ambient sweep (`sweep:`): no input, on-screen edges glide (CSS transition 1-2 s) to random 15-85 stops, per card
+(not in lockstep), none off screen / while document.hidden (overridden in the page: headless pages are always visible) /
+under reduced motion, CLS 0; a Remove press (before its click), a stage tap, handle keys each stop only that card for good; reduced
+motion switched on mid-visit stops every edge. The toggle / drag
+/ key checks first stop every sweep with End on each handle (real input; the edge back at 100). --break-sweep serves
+removals.js with the sweep never stepping: only `sweep:` checks may go red. `sweep: toggle: Remove tap …` is both (--break-remove
+drops the Remove handler, which also stops the sweep).
+personalize also proves the phone sticky bar (`tgcta:`): no slug = "Free scan: type your handle" → #scan; ?r=<slug> =
+"DM me on Telegram" → t.me/jakabasej with the #contact prefill + her absolute report link + @handle; Reset = the original
+bar. --break-tgcta serves personalize.js without the bar swap: only `tgcta:` checks may go red.
 
 pip (js/pip.js, the floating mini player of site/video/): landing without ?pip=1 and scan/ without ?r= show none and load
 no /video/; scan/?r=<slug> mounts it by itself after the page's load (lazy): 16:9, 45% of the phone width / 320 px,
@@ -94,6 +107,9 @@ BREAK_PHONES = "--break-phones" in sys.argv
 BREAK_THUMBS = "--break-thumbs" in sys.argv
 BREAK_PEOPLE = "--break-people" in sys.argv
 BREAK_REMOVE = "--break-remove" in sys.argv
+BREAK_SWEEP = "--break-sweep" in sys.argv
+BREAK_TGCTA = "--break-tgcta" in sys.argv
+BREAK_FPROW = "--break-fprow" in sys.argv
 BREAK_INCREMENTAL = "--break-incremental" in sys.argv
 BREAK_TUCK = "--break-tuck" in sys.argv
 GS_RE = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
@@ -161,6 +177,7 @@ def break_routes(ctx):
                                  (BREAK_PHONES, "personalize.js", "    phones(m, d);\n", "\n"),
                                  (BREAK_THUMBS, "inline-scan.js", "      if (g.dead[src]) return;\n", "      return;\n"),
                                  (BREAK_PEOPLE, "scan-engine.js", "    return !s || !(", "    return true || !("),
+                                 (BREAK_TGCTA, "personalize.js", "    if (bar) {\n", "    if (false) {\n"),
                                  (BREAK_INCREMENTAL, "scan.js", "SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50",
                                   "SITES_STEP = 1e9, MORE_SITES = 1e9, LINKS_STEP = 1e9, MORE_LINKS = 1e9")):
         if not flag:
@@ -963,6 +980,24 @@ def baseline_index():
     return "no-p-scripts", re.sub(r"<body\b", f'<body data-api="{API}"', html, count=1)
 
 
+TG_DEFAULT = ["Free scan: type your handle", "#scan", "#i-scan-search", None]
+tg_bar = lambda page: page.evaluate("""() => { const a = document.querySelector('.mobile-cta');
+  return [a.textContent.trim(), a.getAttribute('href'), a.querySelector('use').getAttribute('href'), a.getAttribute('target')]; }""")
+
+
+def tg_shot(page, name):
+    """Phone: the sticky bar in view (hero scrolled away, #pricing on screen), viewport screenshot."""
+    if not page.evaluate("innerWidth < 720"):
+        return
+    page.locator("#pricing").scroll_into_view_if_needed()
+    try:
+        page.wait_for_selector(".mobile-cta.show", timeout=3000)
+    except PWTimeout:
+        pass
+    page.wait_for_timeout(400)
+    page.screenshot(path=str(out / name))
+
+
 def personalize_flow(browser, vp_name, vp):
     tag = f"{vp_name} personalize"
     net = {"outside": [], "api": [], "dialogs": [], "errors": []}
@@ -1010,6 +1045,8 @@ def personalize_flow(browser, vp_name, vp):
     then = p2.evaluate("document.body.innerText")
     check(f"{tag} no slug: visible text identical to the page without the scripts", now == then, f"{len(now)} vs {len(then)} chars")
     check(f"{tag} no slug: no API call", not no_api, no_api)
+    check(f"{tag} tgcta: no slug: sticky bar = 'Free scan: type your handle' → #scan (scan icon)", tg_bar(page) == TG_DEFAULT, tg_bar(page))
+    tg_shot(page, f"{vp_name}-p0-bar-default.png")
     static = page.evaluate("""() => ({links: document.querySelectorAll('.ba a').length,
         roles: [...document.querySelectorAll('.ba .phone')].map(p => p.getAttribute('role') + ':' + /^Illustration/.test(p.getAttribute('aria-label'))),
         hidden: [...document.querySelectorAll('.ba .phone-screen')].map(s => s.getAttribute('aria-hidden')), hint: !!document.querySelector('.ba-hint'),
@@ -1040,6 +1077,13 @@ def personalize_flow(browser, vp_name, vp):
     check(f"{tag} hero line links back to the report", "Scanned @demo.creator" in page.locator("[data-p=scanned]").inner_text()
           and page.locator("[data-p=scanned] a").get_attribute("href") == "scan/?r=" + FX["slug"])
     page.locator(".hero").screenshot(path=str(out / f"{vp_name}-p1-hero-line.png"))
+    want_tg = f"Hi Jaka, I ran the free scan. My report link and handle: {base}scan/?r={FX['slug']} @demo.creator"
+    tb = tg_bar(page)
+    check(f"{tag} tgcta: ?r=: sticky bar = 'DM me on Telegram' (send icon) → t.me/jakabasej, #contact prefill + absolute report link + @handle, URL-encoded",
+          tb == ["DM me on Telegram", "https://t.me/jakabasej?text=" + quote(want_tg, safe="!*'()"), "#i-send", None]
+          and parse_qs(urlsplit(tb[1]).query).get("text") == [want_tg], tb)
+    (out / f"{vp_name}-tgcta-href.txt").write_text(f"no slug: {TG_DEFAULT[1]}\n?r={FX['slug']}: {tb[1]}\ndecoded text: {parse_qs(urlsplit(tb[1]).query).get('text')}\n")
+    tg_shot(page, f"{vp_name}-p1-bar-telegram.png")
     name = PROFILE["display_name"]
     check(f"{tag} profile: both phones search for the name", texts(page, "[data-p=search]") == [name, name], texts(page, "[data-p=search]"))
     sites = [page.locator(f'[data-p="leak-{i}"] .m-site').inner_text() for i in range(1, 5)]
@@ -1369,6 +1413,8 @@ def personalize_flow(browser, vp_name, vp):
     page.wait_for_timeout(1000)
     check(f"{tag} Reset restores the defaults", texts(page, "[data-p=search]") == ["yourname", "yourname"]
           and page.evaluate("localStorage.getItem('leakscan.last')") is None and page.locator("[data-p=scanned]").is_hidden())
+    check(f"{tag} tgcta: Reset → the original sticky bar", tg_bar(page) == TG_DEFAULT, tg_bar(page))
+    tg_shot(page, f"{vp_name}-p9-bar-after-reset.png")
     ctx.close()
 
     # H. public API for a later inline scan: apply(result) without reload, twice, with other data
@@ -2839,6 +2885,181 @@ RM_STATE = """() => { const y0 = scrollY, out = [...document.querySelectorAll('#
 RM_TEXT = """() => Object.fromEntries([...document.querySelectorAll('#removals [data-rm-k]')].map(e => [e.dataset.rmK, e.textContent]))"""
 
 
+def fp_break(ctx):
+    """--break-fprow: removals.css with the leak-site head stacked (the centred column layout), same bytes otherwise."""
+    if BREAK_FPROW:
+        body = (ROOT / "site" / "css" / "removals.css").read_text(encoding="utf-8")
+        old = ".fp-head { display: flex; align-items: center;"
+        assert old in body, "break: marker not found in removals.css"
+        ctx.route("**/css/removals.css", lambda r: r.fulfill(body=body.replace(old, ".fp-head { display: flex; flex-direction: column; align-items: center;", 1), content_type="text/css"))
+
+
+def brand(d):   # js/removals.js brand(): the leak-site wordmark = host without its TLD
+    p = d.split(".")[:-1]
+    if len(p) > 1 and p[-1] in ("co", "com", "net", "org"):
+        p.pop()
+    return p[-1]
+
+
+# every aria-valuenow change of the 4 handles from here on: [ms, card index, value]
+SW_REC = """() => { window.__sw = []; document.querySelectorAll('#removals .rm-handle').forEach((h, i) => new MutationObserver(() =>
+  window.__sw.push([Math.round(performance.now()), i, +h.getAttribute('aria-valuenow')])).observe(h, {attributes: true, attributeFilter: ['aria-valuenow']})); }"""
+SW_SEEN = """() => [...document.querySelectorAll('#removals .rm-card')].map(c => { const r = c.querySelector('.rm-stage').getBoundingClientRect();
+  return r.bottom > 0 && r.top < innerHeight; })"""
+
+
+FP_STATE = """() => { const c = document.querySelector('#removals .rm-card[data-rm="site"]'), q = s => c.querySelector(s), cs = e => getComputedStyle(e);
+  const live = q('.rm-live'), st = q('.rm-stage').getBoundingClientRect();
+  return {ring: cs(q('.fp-ring')).backgroundImage, av: [cs(q('.fp-av')).borderTopWidth, cs(q('.fp-av')).borderTopColor, cs(q('.fp-av')).borderTopLeftRadius],
+    name: q('.rm-live .fp-name').textContent, aka: q('.fp-aka').textContent, hosts: [...c.querySelectorAll('.fp-logo')].map(e => e.textContent),
+    tags: [...c.querySelectorAll('.fp-tags span')].map(e => [e.textContent, cs(e).backgroundColor, cs(e).color]),
+    acts: [...c.querySelectorAll('.fp-acts span')].map(e => [e.textContent, cs(e).backgroundColor]),
+    count: [...c.querySelectorAll('.fp-count span')].map(e => [e.textContent.replace(/\\s+/g, ' ').trim(), cs(e.querySelector('b')).fontWeight]),
+    search: [q('.fp-search').textContent.trim(), cs(q('.fp-search')).backgroundColor], bars: c.querySelectorAll('.fp-bar').length,
+    bar: cs(q('.fp-bar')).backgroundColor, bg: cs(live).backgroundColor, font: cs(live).fontFamily,
+    tiles: [...c.querySelectorAll('.fp-grid .rm-img')].map(i => [i.complete && i.naturalWidth > 0, Math.round(i.parentElement.getBoundingClientRect().height)]),
+    cols: cs(q('.fp-grid')).gridTemplateColumns.split(' ').length, next: q('.rm-live .fp-next').textContent, gone: [q('.fp-404').textContent, q('.fp-gh').textContent],
+    goneShell: !!q('.rm-gone .fp-bar') && !!q('.rm-gone .fp-search'), crop: [live.scrollHeight > live.clientHeight, cs(live).overflowY, Math.round(st.height)],
+    logo: [q('.fp-logo').scrollWidth, q('.fp-logo').clientWidth],
+    row1: (() => { const ts = [...c.querySelectorAll('.fp-grid .rm-th')], y = Math.round(ts[0].getBoundingClientRect().top);
+      return ts.filter(t => Math.round(t.getBoundingClientRect().top) === y).map(t => { const r = t.getBoundingClientRect(); return [Math.round(r.top - st.top), Math.round(st.bottom - r.bottom)]; }); })(),
+    sexual: /live sex|undress|brazzers|porn/i.test(c.textContent)}; }"""
+
+
+def fp_row(tag, w, fp):
+    check(f"{tag} fp: first tile row fully inside the stage at edge 100 ({w} px)", len(fp["row1"]) >= 2 and all(t >= 0 and b >= 0 for t, b in fp["row1"]), fp["row1"])
+
+
+def fp_checks(tag, vp_name, fp, name, aka, vp=None):
+    """C: the "Leak sites" panel drawn after fapello.com's profile page (structure + palette, default texts)."""
+    check(f"{tag} fp: leak-site live layer = light fapello-style page (#f0f2f5, white bar + search, system sans), same shell on the removed layer",
+          fp["bg"] == "rgb(240, 242, 245)" and fp["bar"] == "rgb(255, 255, 255)" and fp["search"] == ["Search", "rgb(255, 255, 255)"] and fp["bars"] == 2
+          and fp["goneShell"] and "Inter" not in fp["font"] and "system-ui" in fp["font"] and not fp["sexual"], fp)
+    check(f"{tag} fp: avatar = yellow-600 → pink-600 gradient ring + 4px white border, round",
+          "linear-gradient" in fp["ring"] and "rgb(202, 138, 4)" in fp["ring"] and "rgb(219, 39, 119)" in fp["ring"]
+          and fp["av"][0] == "4px" and fp["av"][1] == "rgb(255, 255, 255)" and fp["av"][2] == "50%", [fp["ring"], fp["av"]])
+    check(f"{tag} fp: name + aka, OnlyFans / Patreon / Instagram pills (blue / pink / purple-300), Follow (pink-500) + Discuss (7) (blue-500) + heart",
+          fp["name"] == name and fp["aka"] == aka and fp["tags"] == [["OnlyFans", "rgb(147, 197, 253)", "rgb(255, 255, 255)"],
+          ["Patreon", "rgb(249, 168, 212)", "rgb(255, 255, 255)"], ["Instagram", "rgb(216, 180, 254)", "rgb(255, 255, 255)"]]
+          and [a[0] for a in fp["acts"]] == ["Follow", "Discuss (7)", "\u2665"] and fp["acts"][0][1] == "rgb(236, 72, 153)" and fp["acts"][1][1] == "rgb(59, 130, 246)",
+          [fp["name"], fp["aka"], fp["tags"], fp["acts"]])
+    check(f"{tag} fp: counters '74 Media' / '137 Likes' (bold labels)", fp["count"] == [["74 Media", "700"], ["137 Likes", "700"]], fp["count"])
+    th = 112 if vp_name == "phone" else 160
+    check(f"{tag} fp: grid of {len(fp['tiles'])} photo tiles (>= 6, all loaded, {th} px tall, {2 if vp_name == 'phone' else 4} columns), 'Next Page', cropped by the stage (no inner scroll)",
+          len(fp["tiles"]) >= 6 and all(t == [True, th] for t in fp["tiles"]) and fp["cols"] == (2 if vp_name == "phone" else 4)
+          and fp["next"] == "Next Page" and fp["crop"] == [True, "hidden", 372], [fp["tiles"], fp["cols"], fp["next"], fp["crop"]])
+    if vp_name == "phone":   # the ask is phones (desktop: 160 px tiles, its approved look)
+        fp_row(tag, vp, fp)
+    check(f"{tag} fp: wordmark = the host without its TLD, never cut", name != "Orla Brennick" or (fp["hosts"] == ["leak-mirror"] * 2 and fp["logo"][0] <= fp["logo"][1]), [fp["hosts"], fp["logo"]])
+    check(f"{tag} fp: removed layer = '404' + 'This model has been removed due to a DMCA complaint.'",
+          fp["gone"] == ["404", "This model has been removed due to a DMCA complaint."], fp["gone"])
+
+
+def sweep_flow(new_ctx, vp_name, tag):
+    """The ambient sweep, never touched first: glides on screen, per card, stops for good on that card's first input."""
+    ctx = new_ctx()
+    page = ctx.new_page()
+    page.goto(base, wait_until="load")
+    page.evaluate(SW_REC)
+    page.wait_for_timeout(2500)
+    off = page.evaluate("window.__sw")
+    check(f"{tag} sweep: off screen nothing moves (2.5 s at the page top)", not off, off)
+    cards = page.locator("#removals .rm-card").all()
+    hds = page.locator("#removals .rm-handle").all()
+    val = lambda i: int(hds[i].get_attribute("aria-valuenow"))
+    since = lambda t0: [e for e in page.evaluate("window.__sw") if e[0] >= t0]
+    tnow = lambda: page.evaluate("Math.round(performance.now())")
+    page.evaluate("() => document.querySelector('#removals .rm-card').scrollIntoView({block: 'start', behavior: 'instant'})")
+    seen = page.evaluate(SW_SEEN)
+    page.evaluate("() => { window.__ls.length = 0; window.__box = [...document.querySelectorAll('#removals .rm-card')].map(c => JSON.stringify(c.getBoundingClientRect())); }")
+    t0 = tnow()
+    page.wait_for_timeout(2600)
+    dur = page.evaluate("() => getComputedStyle(document.querySelector('#removals .rm-gone')).transitionDuration")
+    page.screenshot(path=str(out / f"removals-{vp_name}-sweep-1.png"))
+    m1 = [val(i) for i in range(4)]
+    page.wait_for_timeout(3600)
+    page.screenshot(path=str(out / f"removals-{vp_name}-sweep-2.png"))
+    m2 = [val(i) for i in range(4)]
+    page.wait_for_timeout(2800)
+    rec = since(t0)
+    vis = [i for i in range(4) if seen[i]]
+    per = {i: [e[2] for e in rec if e[1] == i] for i in vis}
+    check(f"{tag} sweep: on-screen edges glide by themselves, no input (9 s: 2+ stops each, all in 15-85)", len(vis) >= 2 and all(
+        len(per[i]) >= 2 and all(15 <= v <= 85 for v in per[i]) for i in vis), {"visible": vis, "per": per})
+    times = {i: [e[0] for e in rec if e[1] == i] for i in vis}
+    synced = [(i, j) for i in vis for j in vis if i < j and len(times[i]) == len(times[j]) and all(abs(x - y) < 50 for x, y in zip(times[i], times[j]))]
+    check(f"{tag} sweep: cards not in lockstep (each its own stops and times)", len(vis) >= 2 and len({tuple(per[i]) for i in vis}) == len(vis)
+          and not synced, {"times": times, "per": per, "synced": synced})
+    secs = float(dur[:-1]) if dur.endswith("s") and dur[:-1].replace(".", "", 1).isdigit() else 0
+    ls = page.evaluate("() => [window.__ls.filter(e => !e[2] && e[3]).reduce((a, e) => a + e[1], 0), [...document.querySelectorAll('#removals .rm-card')].every((c, i) => JSON.stringify(c.getBoundingClientRect()) === window.__box[i])]")
+    check(f"{tag} sweep: glide = CSS transition 1-2 s, CLS 0 in #removals, card boxes unchanged", 1 <= secs <= 2 and ls == [0, True], [dur, ls])
+    (out / f"removals-{vp_name}-sweep.txt").write_text(f"moment 1 edges (mega, x, reddit, site): {m1}\nmoment 2 edges: {m2}\n"
+                                                         f"visible cards: {vis}\nrecorded stops per visible card: {per}\nglide transition: {dur}\n")
+
+    # input stops only that card: Remove pressed (held 5.5 s, then released) on card 0, card 1 keeps going
+    cards[0].locator(".rm-btn").hover()
+    page.mouse.down()
+    t1 = tnow()
+    page.wait_for_timeout(5500)   # > the longest step gap (2 s glide + 3 s hold)
+    held = [e for e in since(t1) if e[1] == 0]
+    page.mouse.up()
+    check(f"{tag} sweep: pressing Remove (held 5.5 s) already stops that card, before the click", not held, held)
+    a0, t1 = val(0), tnow()
+    page.wait_for_timeout(6000)
+    rec = since(t1)
+    check(f"{tag} sweep: toggle: Remove tap stops that card for good (6 s still), the next card keeps gliding",
+          a0 in (0, 100) and not [e for e in rec if e[1] == 0] and any(e[1] == 1 for e in rec), [a0, rec])
+    page.screenshot(path=str(out / f"removals-{vp_name}-sweep-3-stopped.png"))
+    # a tap on card 1's stage
+    cards[1].locator(".rm-stage").scroll_into_view_if_needed()
+    r = cards[1].locator(".rm-stage").bounding_box()
+    page.mouse.click(r["x"] + r["width"] * .3, r["y"] + r["height"] * .4)
+    a1, t1 = val(1), tnow()
+    page.wait_for_timeout(5500)
+    rec = [e for e in since(t1) if e[1] == 1]
+    check(f"{tag} sweep: a tap on the stage stops it there (5.5 s still)", 27 <= a1 <= 33 and not rec and val(1) == a1, [a1, rec])
+    # handle keys on card 2, once it is gliding
+    cards[2].scroll_into_view_if_needed()
+    try:
+        page.wait_for_function("() => document.querySelectorAll('#removals .rm-handle')[2].getAttribute('aria-valuenow') !== '100'", timeout=4500)
+    except PWTimeout:
+        pass
+    moving = val(2) != 100
+    hds[2].focus()
+    page.keyboard.press("ArrowLeft")
+    a2, t1 = val(2), tnow()
+    page.evaluate("document.activeElement.blur()")
+    page.wait_for_timeout(5500)
+    rec = [e for e in since(t1) if e[1] == 2]
+    check(f"{tag} sweep: ArrowLeft on a gliding card's handle steps 10 and stops it (5.5 s still)", moving and not rec and val(2) == a2, [moving, a2, rec])
+    # document hidden: card 3 pauses, resumes when visible again
+    cards[3].scroll_into_view_if_needed()
+    try:
+        page.wait_for_function("() => document.querySelectorAll('#removals .rm-handle')[3].getAttribute('aria-valuenow') !== '100'", timeout=4500)
+    except PWTimeout:
+        pass
+    vis_flip = "h => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => h}); Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => h ? 'hidden' : 'visible'}); document.dispatchEvent(new Event('visibilitychange')); }"
+    page.evaluate(vis_flip, True)
+    t1 = tnow()
+    page.wait_for_timeout(5500)
+    hid = [e for e in since(t1) if e[1] == 3]
+    page.evaluate(vis_flip, False)
+    t1 = tnow()
+    try:
+        page.wait_for_function("t => window.__sw.some(e => e[1] === 3 && e[0] >= t)", arg=t1, timeout=4000)
+    except PWTimeout:
+        pass
+    back = [e for e in since(t1) if e[1] == 3]
+    check(f"{tag} sweep: pauses while the tab is hidden (5.5 s), resumes when visible", not hid and bool(back), [hid, back])
+    # reduced motion switched on mid-visit (OS setting flipped): card 3, still gliding, stops
+    page.emulate_media(reduced_motion="reduce")
+    t1 = tnow()
+    page.wait_for_timeout(5000)
+    rm = since(t1)
+    check(f"{tag} sweep: reduced motion switched on mid-visit: no edge moves after (5 s)", bool(back) and not rm, rm)
+    ctx.close()
+
+
 def removals_flow(browser, vp_name, vp):
     tag = f"{vp_name} removals:"
     net = {"outside": [], "errors": [], "results": [], "dialogs": []}
@@ -2846,7 +3067,8 @@ def removals_flow(browser, vp_name, vp):
     def new_ctx(scheme="light", motion="no-preference"):
         ctx = browser.new_context(viewport=vp, device_scale_factor=2 if vp_name == "phone" else 1, is_mobile=vp_name == "phone",
                                   has_touch=vp_name == "phone", color_scheme=scheme, reduced_motion=motion)
-        ctx.add_init_script("window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value, e.hadRecentInput]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}")
+        # [ms, score, hadRecentInput, a shifted node inside #removals] (the Ask AI launcher slides up with the sticky bar elsewhere)
+        ctx.add_init_script("window.__ls = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__ls.push([e.startTime, e.value, e.hadRecentInput, (e.sources || []).some(x => x.node && x.node.closest && !!x.node.closest('#removals'))]))).observe({type: 'layout-shift', buffered: true}); } catch (e) {}")
 
         def route(r, _req):
             if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost"):
@@ -2860,6 +3082,12 @@ def removals_flow(browser, vp_name, vp):
             old = "card.querySelector('.rm-btn').addEventListener('click',"
             assert old in body, "break: marker not found in removals.js"
             ctx.route("**/js/removals.js", lambda r: r.fulfill(body=body.replace(old, "(function () {})(", 1), content_type="application/javascript"))
+        fp_break(ctx)
+        if BREAK_SWEEP:   # wire boundary: removals.js served with the sweep never stepping (same bytes otherwise)
+            body = (ROOT / "site" / "js" / "removals.js").read_text(encoding="utf-8")
+            old = "  function step(c) {\n    c.t = 0;\n"
+            assert old in body, "break: marker not found in removals.js"
+            ctx.route("**/js/removals.js", lambda r: r.fulfill(body=body.replace(old, old + "    return;\n", 1), content_type="application/javascript"))
 
         def on_page(pg):
             pg.on("pageerror", lambda e: net["errors"].append(str(e)))
@@ -2868,12 +3096,21 @@ def removals_flow(browser, vp_name, vp):
         ctx.on("page", on_page)
         return ctx
 
-    def open_(ctx, q=""):
+    first = {}
+
+    def open_(ctx, q="", settle=True):
         page = ctx.new_page()
         page.goto(base + q, wait_until="load")
+        first["state"] = page.evaluate(RM_STATE)   # one sync task: no sweep step can run before it
         page.locator("#removals .section-head").scroll_into_view_if_needed()
         page.locator("#removals .rm-grid").scroll_into_view_if_needed()
         page.wait_for_timeout(700)
+        if settle:   # the ambient sweep stops on input: End on each handle = real input, edge back at 100
+            for hd in page.locator("#removals .rm-handle").all():
+                hd.focus()
+                page.keyboard.press("End")
+            page.evaluate("document.activeElement.blur()")
+            page.wait_for_timeout(300)
         return page
 
     def settled_imgs(page):
@@ -2891,22 +3128,25 @@ def removals_flow(browser, vp_name, vp):
             t = page.evaluate(RM_TEXT)
             check(f"{tag} defaults: demo creator (Orla Brennick / brennickclay) in every panel",
                   t.get("name") == "Orla Brennick" and t.get("mega-title") == "brennickclay – pack" and t.get("x-l1") == "Orla Brennick leaked"
-                  and t.get("album") == "Orla Brennick – album" and t.get("host") == "leak-mirror.example", t)
+                  and t.get("aka") == "brennickclay, orlabrennick" and t.get("host") == "leak-mirror", t)
             outs = page.eval_on_selector_all("#removals .rm-out", "es => es.map(e => e.textContent)")
             check(f"{tag} one outcome line per panel", outs == ["Mega: folder disabled", "X: media disabled after copyright report",
-                                                             "Reddit: removed on copyright notice", "Leak sites: album deleted or 404"], outs)
+                                                             "Reddit: removed on copyright notice", "Leak sites: profile 404 after a DMCA notice"], outs)
             check(f"{tag} no links in the section (mock-ups only)", page.locator("#removals a").count() == 0)
         settled_imgs(page)
         blur = page.eval_on_selector_all("#removals .rm-img", "es => es.map(e => [e.getAttribute('src'), getComputedStyle(e).filter, e.naturalWidth])")
-        check(f"{tag} {scheme}: every leak-side image blurred by default, loaded from site/img", len(blur) == 10 and all(
+        check(f"{tag} {scheme}: every leak-side image blurred by default, loaded from site/img", len(blur) == 13 and all(
             "blur(" in b[1] and b[0].startswith("img/removals/") and b[2] > 0 for b in blur), blur)
         sw = page.evaluate("() => [document.documentElement.scrollWidth, innerWidth, Math.max(...[...document.querySelectorAll('#removals *')].map(e => e.parentElement.closest('.rm-stage') ? 0 : e.getBoundingClientRect().right))]")
         check(f"{tag} {scheme}: no horizontal overflow", sw[0] <= sw[1] and sw[2] <= sw[1] + 0.5, sw)
         cols = page.evaluate("() => new Set([...document.querySelectorAll('#removals .rm-card')].map(c => Math.round(c.getBoundingClientRect().x))).size")
         check(f"{tag} {scheme}: layout {'stacked' if vp_name == 'phone' else '2x2'}", cols == (1 if vp_name == "phone" else 2), cols)
+        if scheme == "light":
+            fp = page.evaluate(FP_STATE)
+            fp_checks(tag, vp_name, fp, "Orla Brennick", "brennickclay, orlabrennick", vp["width"])
         before = page.evaluate(RM_STATE)
         check(f"{tag} {scheme}: starts live (edge at 100, removed layer clipped away)", all(
-            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Remove" and s["shown"] == "live" for s in before), before)
+            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Remove" and s["shown"] == "live" for s in first["state"] + before), first["state"])
         for k, card in zip(RM_PANELS, page.locator("#removals .rm-card").all()):
             card.screenshot(path=str(out / f"removals-{vp_name}-{scheme}-{k}-1-live.png"))
         page.evaluate("() => { window.__ls.length = 0; }")
@@ -2956,11 +3196,37 @@ def removals_flow(browser, vp_name, vp):
 
     # reduced motion: no transition, the flip is immediate
     ctx = new_ctx(motion="reduce")
-    page = open_(ctx)
+    page = open_(ctx, settle=False)
+    page.evaluate(SW_REC)
+    page.wait_for_timeout(4000)
+    rec = page.evaluate("window.__sw")
+    vals = [h.get_attribute("aria-valuenow") for h in page.locator("#removals .rm-handle").all()]
+    check(f"{tag} sweep: reduced motion: no edge moves by itself (4 s on screen, all at 100)", not rec and vals == ["100"] * 4, [rec, vals])
     page.locator("#removals .rm-btn").first.click()
     rm = page.evaluate("() => [getComputedStyle(document.querySelector('#removals .rm-gone')).transitionDuration, document.querySelector('#removals .rm-handle').getAttribute('aria-valuenow')]")
     check(f"{tag} toggle: reduced motion flips with no transition", rm == ["0s", "0"], rm)
     ctx.close()
+
+    sweep_flow(new_ctx, vp_name, tag)
+
+    # the narrowest phones: nothing in the section (the leak-site header included) runs sideways. Not is_mobile: that widens
+    # the layout viewport to the page's widest box (#free is 360 px wide at 320 today, outside this section)
+    if vp_name == "phone":
+        for w, hgt in ((320, 640), (360, 740)):
+            nctx = browser.new_context(viewport={"width": w, "height": hgt}, device_scale_factor=2, has_touch=True)
+            nctx.route("**/*", lambda r, _q: r.continue_() if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost") else r.abort())
+            fp_break(nctx)
+            pg = nctx.new_page()
+            pg.goto(base, wait_until="load")
+            pg.locator('#removals .rm-card[data-rm="site"]').scroll_into_view_if_needed()
+            pg.wait_for_timeout(400)
+            sw = pg.evaluate("""() => [document.documentElement.scrollWidth, innerWidth, Math.max(...[...document.querySelectorAll('#removals *')].map(e => e.parentElement.closest('.rm-stage') ? 0 : e.getBoundingClientRect().right)),
+              [...document.querySelectorAll('#removals .fp-bar, #removals .fp-head, #removals .fp-who > *')].filter(e => e.scrollWidth > e.clientWidth + 1 && !/fp-(name|aka)/.test(e.className)).map(e => e.className)]""")
+            check(f"{tag} fp: {w} px: nothing in #removals runs past the screen, leak-site header (wordmark uncut) / profile rows fit their box", sw[1] == w and sw[2] <= w + 0.5 and not sw[3], sw)
+            if w == 320:
+                fp_row(tag, w, pg.evaluate(FP_STATE))
+            pg.locator('#removals .rm-card[data-rm="site"]').screenshot(path=str(out / f"removals-phone{w}-site-1-live.png"))
+            nctx.close()
 
     # personalized: ?r=<slug> (shared scan-result request), the backend's mega[], x / reddit / leak-site hits, thumbs still blurred
     MEGA = {"title": "demo.creator MEGA pack 2026", "meta": "6.2 GB · 412 images · 88 videos · 3 days ago"}
@@ -2981,7 +3247,7 @@ def removals_flow(browser, vp_name, vp):
                   and t.get("mega-vid") == "88 files", t)
             check(f"{tag} ?r=: x.com hit → X post, reddit.com hit → subreddit + title, top other host → leak-site chrome",
                   t.get("x-at") == "@demo_reposter" and t.get("x-l1") == "Mira Example leaked full set" and t.get("sub") == "r/demo_leaksub"
-                  and t.get("rd-title") == "Mira Example new pack in comments" and t.get("host") == top_leak, t)
+                  and t.get("rd-title") == "Mira Example new pack in comments" and t.get("host") == brand(top_leak), t)
             html = page.inner_html("#removals")
             check(f"{tag} ?r=: no URL rendered, no links", "mega.nz/" not in html and "x.com/" not in html and "reddit.com/" not in html
                   and page.locator("#removals a").count() == 0)
@@ -2989,11 +3255,19 @@ def removals_flow(browser, vp_name, vp):
         th = page.eval_on_selector_all("#removals .rm-img", "es => es.map(e => [e.getAttribute('src'), getComputedStyle(e).filter, e.naturalWidth])")
         check(f"{tag} ?r= {scheme}: real thumbs via <API>/api/thumb, still blurred", all(
             s[0].startswith(API + "/api/thumb?u=") and "blur(" in s[1] and s[2] > 0 for s in th), th[:2])
+        if scheme == "light":
+            fp = page.evaluate(FP_STATE)
+            check(f"{tag} fp: ?r=: leak-site profile = scanned name + '<handle>, <name>' aka, top other host without its TLD as the wordmark (both layers, not cut)",
+                  fp["name"] == FX["profile"]["display_name"] and fp["aka"] == "demo.creator, " + re.sub(r"[^a-z0-9]+", "", FX["profile"]["display_name"].lower())
+                  and fp["hosts"] == [brand(top_leak)] * 2 and fp["logo"][0] <= fp["logo"][1], [fp["name"], fp["aka"], fp["hosts"], fp["logo"]])
+        site = page.locator('#removals .rm-card[data-rm="site"]')
         page.locator("#removals .rm-grid").screenshot(path=str(out / f"removals-{vp_name}-{scheme}-personalized-1-live.png"))
+        site.screenshot(path=str(out / f"removals-{vp_name}-{scheme}-site-personalized-1-live.png"))
         for b in page.locator("#removals .rm-btn").all():
             b.click()
         page.wait_for_timeout(1000)
         page.locator("#removals .rm-grid").screenshot(path=str(out / f"removals-{vp_name}-{scheme}-personalized-2-removed.png"))
+        site.screenshot(path=str(out / f"removals-{vp_name}-{scheme}-site-personalized-2-removed.png"))
         ctx.close()
 
     # no mega[] / no x / reddit hits → demo shapes with her name; hostile values never reach the DOM
@@ -3294,6 +3568,7 @@ finally:
 
 (out / "e2e-summary.json").write_text(json.dumps({"fails": fails, "omit_results": omit, "omit_profile": omit_profile,
                                                   "scenarios": SCENARIOS, "break_allowlist": BREAK_ALLOWLIST, "break_thumbs": BREAK_THUMBS, "break_people": BREAK_PEOPLE,
-                                                  "break_incremental": BREAK_INCREMENTAL, "break_tuck": BREAK_TUCK,
+                                                  "break_incremental": BREAK_INCREMENTAL, "break_sweep": BREAK_SWEEP, "break_tgcta": BREAK_TGCTA, "break_fprow": BREAK_FPROW,
+                                                  "break_tuck": BREAK_TUCK,
                                                   "measured": MEASURED}, indent=1))
 sys.exit(1 if fails else 0)

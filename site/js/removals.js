@@ -1,6 +1,8 @@
 // #removals "Where I remove from": four mock panels (Mega, X, Reddit, a leak site), each a live leak vs. its removed
 // state. Remove / Show again animates the compare edge; the handle (drag anywhere on the stage, arrow keys on the
 // handle) moves it: left of it = the live leak, right = removed. Own file so it merges next to other work.
+// Ambient sweep: on screen each edge glides by itself to a random spot and holds there, per card, never in step;
+// the first input on a card stops its sweep for good. None under prefers-reduced-motion.
 // Personalized from the scan result the page already fetches (?r=<slug> or the last scan: js/scan-engine.js
 // fetchResult, one request shared with the hero card), and again after an in-page scan (wraps LeakScanPersonalize.apply).
 // textContent only; leak URLs are read for their host / subreddit / poster, never rendered or linked.
@@ -106,12 +108,54 @@
     b.textContent = gone ? 'Show again' : 'Remove';
   }
   var now = function (card) { return +card.querySelector('.rm-handle').getAttribute('aria-valuenow'); };
-  each(root.querySelectorAll('.rm-card'), function (card) {
+
+  // ---------- ambient sweep: glide (CSS transition, --rm-t 1-2 s) to a random 15-85, hold 1-3 s, repeat ----------
+  // Timers only, no per-frame JS. Runs while the card is on screen (IntersectionObserver) and the tab is visible.
+  // reduced motion: no sweep at all; switched on mid-visit: the next step is skipped (edges stay put)
+  var mq = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+  var still = !window.IntersectionObserver || !mq || mq.matches;
+  var cards = [], io = null;
+  var rnd = function (a, b) { return a + Math.random() * (b - a); };
+  function step(c) {
+    c.t = 0;
+    if (c.dead || !c.seen || document.hidden || mq.matches) return;
+    var p = now(c.card), to, dur = Math.round(rnd(1000, 2000));
+    do { to = Math.round(rnd(15, 85)); } while (Math.abs(to - p) < 15);   // a visible move every time
+    c.stage.style.setProperty('--rm-t', dur + 'ms');
+    set(c.card, to, true);
+    c.t = setTimeout(function () { step(c); }, dur + rnd(1000, 3000));
+  }
+  function wake(c, wait) { if (!c.t && !c.dead && c.seen && !document.hidden) c.t = setTimeout(function () { step(c); }, wait); }
+  function stop(c) {   // the user's input from here on: transitions back to the .7s default
+    if (c.dead) return;
+    c.dead = true;
+    clearTimeout(c.t);
+    c.stage.style.removeProperty('--rm-t');
+    if (io) io.unobserve(c.card);
+  }
+  if (!still) {
+    io = new IntersectionObserver(function (en) {
+      en.forEach(function (e) {
+        var c = cards.filter(function (x) { return x.card === e.target; })[0];
+        c.seen = e.isIntersecting;
+        if (c.seen) wake(c, rnd(300, 1500)); else { clearTimeout(c.t); c.t = 0; }
+      });
+    });
+    document.addEventListener('visibilitychange', function () {
+      cards.forEach(function (c) { if (document.hidden) { clearTimeout(c.t); c.t = 0; } else wake(c, rnd(300, 1500)); });
+    });
+  }
+
+  each(root.querySelectorAll('.rm-card'), function (card, i) {
     var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), drag = null;
-    card.querySelector('.rm-btn').addEventListener('click', function () { set(card, now(card) <= 50 ? 100 : 0, true); });
+    var c = cards[i] = { card: card, stage: stage, t: 0, seen: false, dead: still };
+    // a press (pointer or key) stops the sweep before its click: no glide may flip Remove / Show again under the finger
+    each(['pointerdown', 'keydown'], function (t) { card.querySelector('.rm-btn').addEventListener(t, function () { stop(c); }); });
+    card.querySelector('.rm-btn').addEventListener('click', function () { stop(c); set(card, now(card) <= 50 ? 100 : 0, true); });
     var at = function (e) { var r = stage.getBoundingClientRect(); return (e.clientX - r.left) / r.width * 100; };
     stage.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
+      stop(c);
       drag = e.pointerId;
       try { stage.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ }
       set(card, at(e), false);
@@ -126,9 +170,11 @@
         : k === 'PageDown' ? p - 25 : k === 'PageUp' ? p + 25 : k === 'Home' ? 0 : k === 'End' ? 100 : null;
       if (n === null) return;
       e.preventDefault();
+      stop(c);
       set(card, n, false);
     });
     set(card, 100, false);
+    if (io) io.observe(card);
   });
   var rev = root.querySelector('.rm-reveal');
   if (rev) rev.addEventListener('click', function () {
@@ -142,6 +188,10 @@
   var DEF = {}, IMGS = root.querySelectorAll('.rm-img'), DEF_IMG = [];
   each(root.querySelectorAll('[data-rm-k]'), function (el) { DEF[el.getAttribute('data-rm-k')] = el.textContent; });
   each(IMGS, function (im) { DEF_IMG.push(im.getAttribute('src')); });
+  // leak-site profile's aliases line: "<handle>, <name squashed>" (the way those sites list a model), just the handle without one
+  // leak-site wordmark: the host without its TLD ("leakvault.example" → "leakvault"), like fapello's bare logo
+  function brand(d) { var p = d.split('.'); p.pop(); if (p.length > 1 && /^(co|com|net|org)$/.test(p[p.length - 1])) p.pop(); return p[p.length - 1]; }
+  function aka(m) { var v = m.name.toLowerCase().replace(/[^a-z0-9]+/g, ''); return v && v !== m.handle ? m.handle + ', ' + v : m.handle; }
   function render(m) {
     var v = {
       name: m.name,
@@ -151,7 +201,7 @@
       'x-l1': m.xtext || m.name + ' leaked', 'x-l2': m.xtext ? '' : m.name + ' ' + m.plat,
       sub: m.sub || 'r/' + (m.handle.replace(/[^A-Za-z0-9_]/g, '').slice(0, 14) || 'creator') + '_leaks',
       'rd-title': m.rtitle || m.name + ' full pack, link in comments',
-      host: m.host || DEF.host, album: m.name + ' \u2013 album'
+      host: m.host ? brand(m.host) : DEF.host, aka: aka(m)
     };
     each(root.querySelectorAll('[data-rm-k]'), function (el) {
       var k = el.getAttribute('data-rm-k');
