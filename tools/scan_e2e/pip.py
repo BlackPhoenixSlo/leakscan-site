@@ -377,11 +377,12 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     rec(pg); trip(pg, cdp, H, False); trip(pg, cdp, H, True); rs = rec(pg)
     ok, bad = same(rs, 2, tb or [0, 0, 0, 0])
     check(f"{ft} tab: the same rect (±1 px) in every frame, slow + flicks, 3 screens down and back", bool(tb) and ok and len(rs) > 10, [tb, bad, len(rs)])
-    pg.evaluate("scrollTo({top: 0, behavior: 'instant'})"); pg.wait_for_timeout(400)
+    pg.evaluate("scrollTo({top: 2 * innerHeight, behavior: 'instant'})"); pg.wait_for_timeout(400)   # tapped scrolled down (WebKit sent no click there)
     if tb:
         tap(pg, tb[0] + tb[2] / 2, tb[1] + tb[3] / 2); pg.wait_for_timeout(300)
     s = st(pg); shot(pg, "strip-6-tab-tapped")
-    check(f"{ft} tab tapped → back at the prior spot (±1 px)", s["on"] and not s["tab"] and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0])
+    check(f"{ft} tab tapped 2 screens down → back at the prior spot (±1 px)", s["on"] and not s["tab"] and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0])
+    pg.evaluate("scrollTo({top: 0, behavior: 'instant'})"); pg.wait_for_timeout(400)
     # dropped mid-screen: stays there while scrolling (and through the URL bar), X / tab → back there
     s = drop(pg, cdp, s, vpw / 2, H / 2); mid = s["box"]
     rec(pg); trip(pg, cdp, H, False); trip(pg, cdp, H, True)
