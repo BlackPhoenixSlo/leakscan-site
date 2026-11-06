@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 FX = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())   # the stub's fixture: expected profile / copy
-SCENARIOS = ("scan", "personalize", "askai", "inline", "tabs", "removals", "pip")
+SCENARIOS = ("scan", "personalize", "askai", "inline", "tabs", "removals", "pip", "sheet")
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 LOOP = ("127.0.0.1", "localhost")
 PROD_HOSTS = ("scan.srv1395798.hstgr.cloud", "72.62.92.114", "jackbase.me")
@@ -43,6 +43,7 @@ BREAKS = {
                "&& !S.t; }\n  function inView(d) {\n    return true;\n"),   # #79's dock: on the card even off-screen / on a phone
     "incremental": ("scan.js", "SITES_STEP = 10, MORE_SITES = 25, LINKS_STEP = 10, MORE_LINKS = 50",
                     "SITES_STEP = 1e9, MORE_SITES = 1e9, LINKS_STEP = 1e9, MORE_LINKS = 1e9"),
+    "sheet500": ("scan-engine.js", "var SHEET_MS = ", "var SHEET_MS = "),   # no script change: scan_e2e/sheet.py sets the stub's sheet endpoint to 500
 }
 
 # the run: set once by configure(); scenarios read cfg.out / cfg.base / cfg.api / cfg.broken
@@ -149,7 +150,7 @@ def new_ctx(browser, vp_name, vp, net=None, *, route=None, console_ok=None, init
 
     def _route(r, _req):
         u = r.request.url
-        if urlsplit(u).hostname in LOOP or u.startswith("file:"):
+        if urlsplit(u).hostname in LOOP or u.startswith(("file:", "blob:")):   # WebKit routes blob: URLs too
             if not (route and route(r)):
                 r.continue_()
         else:
@@ -160,7 +161,7 @@ def new_ctx(browser, vp_name, vp, net=None, *, route=None, console_ok=None, init
 
     def on_page(pg):
         pg.on("pageerror", lambda e: net["errors"].append(e.stack or str(e)))
-        pg.on("console", lambda m: m.type == "error" and not (console_ok and console_ok(m))
+        pg.on("console", lambda m: m.type == "error" and not (console_ok and console_ok(m)) and "/api/thumb-sheet/" not in (m.location.get("url") or "")   # no sheet: per-thumb, sheet.py checks it
               and net["console"].append(f"{m.text} @ {m.location.get('url') or ''}"))
         pg.on("dialog", lambda d: (net["dialogs"].append(d.message), d.dismiss()))
     ctx.on("page", on_page)

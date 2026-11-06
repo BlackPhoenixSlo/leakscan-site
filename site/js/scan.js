@@ -236,8 +236,11 @@
     }).join('') + '</span>';
   }
   function img(u, alt, video) {   // video: a video result's still, play badge (css: .g-vid)
-    return '<span class="g-img' + (video ? ' g-vid' : '') + '"><img src="' + esc(thumb(u)) + '" alt="' + esc(video ? 'Video: ' + (alt || 'video result') : alt || '') +
-      '"' + (E.XO ? ' crossorigin="anonymous"' : '') + ' loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';   // XO: readable pixels (watchThumb)
+    return '<span class="g-img' + (video ? ' g-vid' : '') + '"><img data-thumb="' + esc(u) + '" alt="' + esc(video ? 'Video: ' + (alt || 'video result') : alt || '') +
+      '" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>';
+  }
+  function putThumbs(el) {   // img()s just made: E.put is the one way a thumb gets its src
+    el.querySelectorAll('img[data-thumb]').forEach(function (im) { E.put(im, im.getAttribute('data-thumb')); im.removeAttribute('data-thumb'); });
   }
   function a(u, cls, inner) {
     return '<a class="' + cls + '" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer nofollow">' + inner + '</a>';
@@ -341,6 +344,7 @@
     }
     var stage = $('g-stage');
     stage.innerHTML = h;
+    putThumbs(stage);
     stage.querySelectorAll('[data-view]').forEach(function (box) {   // data-view: how many tiles ("all": every image)
       var n = box.getAttribute('data-view');
       state.pics.view(box, n === 'all' ? Infinity : +n, htmlTile(box.classList.contains('g-grid') ? gridTile : packTile), emptySlot);
@@ -378,7 +382,7 @@
     }, { threshold: 0.5 });
     riseIo.observe(b);
   }
-  var htmlTile = function (fn) { return function (it) { var w = document.createElement('div'); w.innerHTML = fn(it); return w.firstElementChild; }; };
+  var htmlTile = function (fn) { return function (it) { var w = document.createElement('div'); w.innerHTML = fn(it); putThumbs(w); return w.firstElementChild; }; };
   function stripEdges(strip) {
     var w = strip.parentNode, s0 = strip.scrollLeft < 4, s1 = strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 4;
     w.classList.toggle('at-start', s0);

@@ -254,9 +254,10 @@
     each($$('[data-p="thumbs"] .thumb'), function (span, i) {
       var u = m.images[i];
       if (!u) return;
-      var img = make('img', 'p-img', [], { src: E.thumb(u), alt: '', width: '60', height: '60',
+      var img = make('img', 'p-img', [], { alt: '', width: '60', height: '60',
         loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
       E.watchThumb(img, function () { img.remove(); });   // dead / blank: the illustration's gradient stays
+      E.put(img, u);
       span.appendChild(img);
     });
     row('ig', d.ig ? '' : null, d.ig ? name + ' (@' + d.ig + ')' : '');

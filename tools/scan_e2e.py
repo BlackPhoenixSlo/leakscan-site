@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
-        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload]
+        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-sheet500]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs the scenarios below. Expected values come from what the stub serves
@@ -35,6 +35,12 @@ the malicious fixture never reaches the DOM; scan → report card → landing �
 leakscan:result event re-personalizes in place and idempotently (the only export is pollMedia). Checks that need the
 profile are named "profile: …" (the --omit-profile break run must turn only those red). Non-loopback requests are
 aborted and none may be attempted (the demo uses system fonts).
+
+sheet (app/thumb_sheet.py, E.sheet in js/scan-engine.js; phone, desktop, WebKit iPhone 13): the same report with /api/thumb-sheet off (404, an API
+without it: every other scenario runs so) and on: the landing (hero, #free phone, the phones, removals panels, the video's kept / dropped photos; end card
+count = the report's) and scan/?r= (Images, Videos) show exactly the same, DEAD / BLANK / LOGO dropped alike (E.isPhoto on the same bytes); server's log: one sheet for
+page + iframe, no /api/thumb (a thumb the sheet does not name, and only that, goes there); tiles are <img>s on blob URLs; blur, Reveal. --break-sheet500: the
+stub answers 500: the views stay the same, only the request-count and blob checks go red.
 
 askai (js/chat.js, the "Ask AI before you DM me" popup): launcher covers no hero text at load (phone: hidden while
 the hero is on screen), visible and clear of the hero CTA (desktop) / sticky bar (phone),

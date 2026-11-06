@@ -12,6 +12,7 @@ from .pip import pip_flow
 from .removals import removals_flow
 from .huge import huge_flow
 from .scan import scan_flow
+from .sheet import sheet_flow
 from .tabs import tabs_flow
 
 
@@ -47,8 +48,12 @@ def run(argv=None):
                     flow(removals_flow, vp_name, browser, vp_name, vp)
                 if "pip" in cfg.scenarios:
                     flow(pip_flow, vp_name, pw, browser, vp_name, vp)
+                if "sheet" in cfg.scenarios:
+                    flow(sheet_flow, vp_name, pw, browser, vp_name, vp)
             if "pip" in cfg.scenarios:
                 flow(pip_flow, "phone-webkit", pw, browser, "phone", None, "webkit")   # iPhone 13 (Playwright device), WebKit
+            if "sheet" in cfg.scenarios:
+                flow(sheet_flow, "phone-webkit", pw, browser, "phone", None, "webkit")
             browser.close()
     finally:
         stub.terminate()

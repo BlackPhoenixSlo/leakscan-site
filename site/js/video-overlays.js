@@ -334,13 +334,14 @@
       ig: ok(so.instagram) || acc('instagram') || (plat === 'instagram' ? ok(raw.handle) : null), tt: acc('tiktok') || (plat === 'tiktok' ? ok(raw.handle) : null) };
   }
   // the scan's thumbs into every .rm-img, cycled, same as js/removals.js render(); a failed one falls back to its default
-  function thumbs(list, raw) {   // raw: list = raw scan thumbs, shown via E.put (the probe's cached load, no second request)
+  function thumbs(list) {   // list = raw scan thumbs, shown via E.put (the probe's cached load, no second request)
     if (!list || !list.length) return;
     Array.prototype.forEach.call(root.querySelectorAll('.rm-img'), function (im, i) {
-      var def = im.getAttribute('src'), src = list[i % list.length];
+      var def = im.getAttribute('src');
       im.referrerPolicy = 'no-referrer';
-      if (raw) { im.removeAttribute('crossorigin'); E.put(im, src); src = im.getAttribute('src'); } else im.setAttribute('src', src);
-      im.addEventListener('error', function () { if (im.getAttribute('src') === src) { im.removeAttribute('crossorigin'); im.setAttribute('src', def); } }, { once: true });
+      im.removeAttribute('crossorigin');
+      im.addEventListener('error', function () { im.removeAttribute('crossorigin'); im.setAttribute('src', def); }, { once: true });
+      E.put(im, list[i % list.length]);
     });
   }
   // ---------- the production scan result → her real rows, counts, thumbs (= js/inline-scan.js model(), not loaded here) ----------
@@ -476,7 +477,7 @@
         if (ok[u] != null) return;
         ok[u] = v ? 1 : 0; left--;
         if (!left || fin) end(fin);
-        setTimeout(lane, GAP * 1000);
+        setTimeout(lane, E.paced(u, GAP * 1000));
       });
     };
     for (var k = 0; k < LANES; k++) lane();
@@ -502,7 +503,7 @@
       r.nimg = kept.length;   // the report's Images tab: what is left, as on the landing
       if (late && r.imgs.length) return draw(video.currentTime);   // a probe past PROBE_MAX: only the count (no thumb reshuffle mid-play)
       r.imgs = kept;
-      if (kept.length) thumbs(kept, true); else if (!all.length) thumbs(m.thumbs);   // all dropped: the defaults stay (text only)
+      if (kept.length) thumbs(kept); else if (!all.length) thumbs(m.thumbs);   // all dropped: the defaults stay (text only)
       realize();
       draw(video.currentTime);
       if (done) { done(); done = null; }   // once: a late first photo comes through here too
