@@ -687,6 +687,7 @@ def cta_steps(pg, base, out, cta, name_q):
     pg.wait_for_function("() => document.querySelector('video').ended", timeout=8000)
     try:
         pg.wait_for_function("() => { const s = document.querySelectorAll('.vo-step'); return s.length === 3 && +getComputedStyle(s[2]).opacity > .9"
+                             " && +getComputedStyle(document.querySelector('.vo-end')).opacity > .9"
                              " && document.querySelector('.vo-steps').style.getPropertyValue('--fp') === '1.000'; }", timeout=12000)
     except Exception:
         pass
