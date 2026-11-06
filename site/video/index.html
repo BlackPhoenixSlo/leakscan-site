@@ -25,8 +25,8 @@
      set from his words by tools/video/cues_from_take.py (site/video/CUES.md). live = the card pops in (right half), removed =
      his "they get removed" (shake, then the wipe), out = it has slid out again; google-images data-cue-tap = the "Images" tap.
      Stage: data-cue-say = the "for <name>" pill again after his last word (named only; also 0-2 s; nothing is ever spoken);
-     data-cue-cta = the end card (cta-steps: the landing in a phone, one 10 s take, + the name form; named: also jakabasej,
-     her report, the contact row), on "You can put your name on the website". The video fills the whole stage; at every
+     data-cue-cta = the end card (cta-steps: the landing in a phone, one 10 s take, + the name form; named: the same
+     jakabasej demo, a compact contact row instead of the form), on "You can put your name on the website". The video fills the whole stage; at every
      width the cards are drawn on its right half (no panel); .vo-capt = his words as captions on his left half
      (transcript.json); .vo-ui = full screen / theater button (top right), CC toggle under it, touch play bar (the full
      stage width), "Rotate" hint. tools/video/check_video.py keeps them sane. -->
@@ -143,7 +143,7 @@
       </div>
 
       <div class="vo-pf" data-prefab="mega" data-cue-live="24.88" data-cue-removed="26.06" data-cue-out="28.01" aria-hidden="true">
-        <p class="vo-cap"><span class="vo-ico rm-ico-mega">M</span><b>Mega</b><span class="vo-st"><span class="vo-st-live">50+ GB of videos</span><span class="vo-st-gone">Gone in a day</span></span></p>
+        <p class="vo-cap"><span class="vo-ico rm-ico-mega">M</span><b>Mega</b><span class="vo-st"><span class="vo-st-live"><span data-vo="mega-cap">50+ GB</span> of videos</span><span class="vo-st-gone">Gone in a day</span></span></p>
         <div class="vo-panel"><div class="rm-stage vo-rs">
           <div class="rm-layer rm-live mg">
             <div class="agg">
@@ -183,13 +183,13 @@
       <!-- 0-2 s and data-cue-say (stays to the end + after it): "for <name>". Personalized names only; never spoken. -->
       <div class="vo-pf vo-for" data-off aria-hidden="true"><p class="vo-cap"><span class="vo-ico vo-ico-g">G</span><span class="vo-st">for</span><b data-vo="name">Orla Brennick</b></p></div>
 
-      <!-- both modes: from data-cue-cta (default = data-cue-say) to the end, also after it (named: her name typed, the toast = "This is
-           what I'd clear for <name>" + the contact row (.vo-nm), no title / form; generic: .vo-gen + the title + form). One 10 s take
+      <!-- both modes: from data-cue-cta (default = data-cue-say) to the end, also after it (named: the same demo, jakabasej typed, never
+           her data / name; the toast = the compact contact row (.vo-nm), no title / form; generic: .vo-gen + the title + form). One 10 s take
            in a phone-shaped replica of the landing (site tokens, dark): 1 the hero, the camera zooms onto the onlyfans.com/ field,
            types "Jaka Basej" as a handle (or the viewer's typed name) + "Scan now" pressed, 2 the scan card ("Searching Google,
            step N of 9…", bar, skeleton rows), 3 the report card ("87 links found" rolling, tabs, rows, blurred strip) + "Rewatch
            this video with YOUR content" with the name flip; its form = the name bar's in-place rebuild. Placeholder sites only
-           (*.example); named + a scan result: js fills her real counts / rows / thumbs (textContent, blurred) -->
+           (*.example), every mode -->
       <div class="vo-pf vo-cta" data-prefab="cta-steps" data-off>
         <p class="vo-cta-t">Type your name in the link → this video rebuilds with YOUR leaks</p>
         <div class="vo-steps" aria-hidden="true">
@@ -217,7 +217,6 @@
               <span class="vo-strip"><i class="vo-th0"></i><i class="vo-th1"></i><i class="vo-th2"></i><i class="vo-th3"></i></span></span></div></div>
           </div>
           <span class="vo-end"><span class="vo-end-h vo-gen">Rewatch this video with <em>YOUR</em> content</span><span class="vo-end-f vo-gen">for <span class="vo-mini-n">SophieStar</span></span>
-            <span class="vo-end-h vo-nm">This is what I'd clear for</span><span class="vo-end-f vo-nm"><span class="vo-end-who"></span></span>
             <span class="vo-end-c vo-nm"><span>Telegram @jakabasej</span><span>WhatsApp +386 40 703 992</span><span>me@jackbase.dev</span></span></span>
         </div>
         <form class="vo-cta-f" action="" method="get">

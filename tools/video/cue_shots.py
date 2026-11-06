@@ -46,9 +46,9 @@ Plus:
   iPhone theater: every phase shot (phone-{portrait,theater}-generic-cta-<n>-<phase>.png), typed handle on screen >= 11 px
   portrait / >= 20 px theater, the toast's letters >= 11 px portrait
 - named flow (?name=NAME, data-cue-cta): the same take with handle(DEMO) "jakabasej" typed, '@jakabasej' on the scan / report cards, the toast
-  "This is what I'd clear for NAME" + the contact row (Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev), no
+  = only the compact contact row (Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev), never NAME, no
   title / form / flip / pill; held to cta + 14.6 (named loop 15 s), looping after the take ends; 1920 + phone portrait + iPhone
-  theater phases (frame-1920-named-cta-*.png, phone-{portrait,theater}-named-cta-*.png), toast + contacts >= 11 px portrait
+  theater phases (frame-1920-named-cta-*.png, phone-{portrait,theater}-named-cta-*.png), contacts >= 8 px portrait
 - no half-width UI (phone portrait, iPhone theater, 1920): touch play bar = the full stage width at its bottom, thin (<= 34 px),
   no .vo-ui box 40-60 % of the stage wide, the full screen button in the stage's top-right quarter (off Jack's left half)
 --break-named serves video-overlays.js with named mode's cta-steps off (ctac = null): only the "named flow:" checks go red.
@@ -81,7 +81,7 @@ Plus:
 --break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
 --break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the typed-handle checks (generic "cta-steps: typed …
   DEMO", the "named flow" / "prod … end card" jakabasej ones) go red.
-- prod real images: every leak image on every card (.rm-img, .vo-real) blurred >= 5px (video cards: blur(5px), the floor =
+- prod real images: every leak image on every card (.rm-img) blurred >= 5px (video cards: blur(5px), the floor =
   styles.css .live-ico; removals.css / the report untouched), the after photos unblurred; the cards use people photos only:
   "prod logos:" the landing report (?r=PROD_SLUG, js/inline-scan.js gallery() + E.isPhoto, same proxy) and the video drop
   the same thumbs (its Images tab = the video's kept count, every landing tile in the video's kept set, none dropped by
@@ -93,7 +93,16 @@ Plus:
   typed in the end card form (not submitted) flips in instead; named ?name=Jaka%20Basej: every card has "Jaka Basej", no
   "SophieStar" -> persona-<view>-<mode>-<card>-<state>.png
 --break-persona serves video-overlays.js with GENERIC = 'Your name' (the old placeholder): only the "persona:" checks go red.
---skip-prod skips the production-image part (break runs: no production GETs).
+--skip-prod skips the production-image part (break runs: no production GETs); hers() then runs only with --hers-raw (thumbs / media 404).
+- hers (hers(), checks "hers …"): her result (PROD_SLUG, --hers-raw = its saved JSON, else one read-only production GET; declared: served
+  locally for /api/scan-result, thumb / media proxied read-only, POST /api/public-scan = an SSE of that same result) via ?r= AND via the
+  last scan (the landing's in-page scan → leakscan.last → /video/ with no query), 1920 + phone 390x844 + iPhone theater; pure draw(t)
+  (declared) + shots at 5 / 12 / 16.5 / 19 / 23 / 26 / 31 / 40 / 47 s (hers-<r|last>-<view>-t<t>.png): every card 10-34.6 s shows >= 1
+  field of her result (host / title / count / her thumb loaded), the wall = her top sites first, no SophieStar / Your name / Orla Brennick
+  on screen or in a slot, the "for <name>" pill at 1 s; the end card (40 / 47 s) = the jakabasej demo, no "ophierai" / her name /
+  "This is what I'd clear", the contact footer <= 20 % of the phone; the landing's mini player (?pip=1, iframe loaded before the scan)
+  turns hers in place on the storage event (hers-pip-1920-t12.png).
+--break-hers serves video-overlays.js with a loaded result never applied: the "hers" checks (and the stub's ?r= "personalized" ones) go red.
 --break-voice serves video-overlays.js with the old overvoice (speechSynthesis.speak(name) 0.5 s in): only the "no overvoice"
   / swap speak checks go red. --only voice = the speech + desktop swap part.
 --break-logos serves video-overlays.js with its E.isPhoto test off (logos kept): only the "prod logos:" check goes red.
@@ -192,8 +201,8 @@ STEPS = """() => { const c = document.querySelector('.vo-cta'), s = c && c.query
 DEMO, LEAKS = "Jaka Basej", 87
 TABS = [LEAKS, 12, 31]   # = js TABS: the placeholder report's Links / Images / Sites
 CONTACTS = ["Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"]   # = site/imprint.html
-def named_end(s, nm):   # the named toast: "This is what I'd clear for NAME" + the contact row, nothing generic, no title / form
-    return (s and s["shown"] == ["This is what I'd clear for", nm, "".join(CONTACTS)] and s["contacts"] == CONTACTS and s["inbox"]
+def named_end(s, nm):   # the named toast: only the compact contact row (never NAME), nothing generic, no title / form
+    return (s and s["shown"] == ["".join(CONTACTS)] and s["contacts"] == CONTACTS and s["inbox"] and nm not in "".join(s["shown"])
             and s["chrome"] == ["none", "none"])
 HERO_H1 = "Leaked content, taken down by a real person. Me."
 handle = lambda n: re.sub(r"[^\w.]", "", n.lower()) or "creator"   # = js handle(): "Jaka Basej" → "jakabasej"
@@ -509,13 +518,13 @@ def prod(b, base, out, cues, cta):
         thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and BLUR(x[2]) >= BLUR_MIN for x in xs)
         check(f"prod img ({label}): Google: 3 real thumbs on the first row, loaded, blurred", len(real["g"]) == 3 and thumb(real["g"], 3), real["g"])
         check(f"prod img ({label}): Google Images: 6 real thumbs, loaded, blurred", len(real["grid"]) == 6 and thumb(real["grid"], 6), real["grid"][:2])
-        check(f"prod img ({label}): cta-steps report: 9 real thumbs (rows + strip), loaded, blurred", len(real["rep"]) == 9 and thumb(real["rep"], 9), real["rep"][:2])
+        check(f"prod img ({label}): cta-steps report = the jakabasej demo: none of her thumbs (no .vo-real)", not real["rep"], real["rep"][:2])
         check(f"prod img ({label}): every .rm-img = a real /api/thumb one, loaded, blurred", thumb(real["all"], 13), [x for x in real["all"] if not x[0].startswith("/api/thumb")][:2])
         check(f"prod ({label}): Google rows = her real domains, count {want['count']!r}", real["grows"] == want["rows"][:4] and real["count"] == want["count"], (real["grows"], real["count"]))
         weak = [(c, x[0][-24:], x[2]) for c, xs in real["cards"] for x in xs if BLUR(x[2]) < BLUR_MIN]
         n_leak = sum(len(xs) for _, xs in real["cards"])
         check(f"prod blur ({label}): every leak image on every card ({n_leak} on {', '.join(c for c, xs in real['cards'] if xs)}) blurred >= {BLUR_MIN}px",
-              n_leak >= 22 and not weak, weak[:3] or sorted({x[2] for _, xs in real["cards"] for x in xs}))
+              n_leak >= 13 and not weak, weak[:3] or sorted({x[2] for _, xs in real["cards"] for x in xs}))
         kept, dropped = real["photos"]["kept"], real["photos"]["dropped"]
         print(f"prod ({label}): people photos kept {len(kept)}, dropped {len(dropped)} (logos / banners / icons / dead)")
         own = real["own"]
@@ -539,13 +548,13 @@ def prod(b, base, out, cues, cta):
                 s2 = pg.evaluate(STEPS)
                 ok = s2["typed"] == handle(DEMO) and s2["at"] == "@" + handle(DEMO) if name == "cta-typed" else named_end(s2, st[4])
                 check(f"prod end card ({label}): " + (f"typed onlyfans.com/{handle(DEMO)} + '@{handle(DEMO)}' (not her {PROD_HANDLE!r})" if name == "cta-typed"
-                      else f"ends 'This is what I'd clear for {st[4]}' + contacts") + f" -> {f.name}", ok, s2 and (s2["typed"], s2["at"], s2["shown"]))
+                      else f"ends on the contact row only (no {st[4]!r})") + f" -> {f.name}", ok, s2 and (s2["typed"], s2["at"], s2["shown"]))
             if name == "report":
                 s2 = pg.evaluate(STEPS)
                 tabs = [int(re.sub(r"\D", "", x)) for x in s2["tabs"]]
-                want_t = [want["tabs"][0], len(kept), want["tabs"][2]]   # Images = the people photos kept (as the landing's tab)
-                check(f"prod ({label}): report = her real counts{' (not the placeholder ' + str(TABS) + ')' if want_t != TABS else ''} Links / Images (kept) / Sites {want_t}, '+ {want['tabs'][0] - 5} more', her rows, '@{handle(DEMO)}' -> {f.name}",
-                      tabs == want_t and s2["at"] == "@" + handle(DEMO) and s2["more"] == f"+ {want['tabs'][0] - 5} more in the full report" and s2["rows"] == want["rows"], (tabs, s2["more"], s2["rows"]))
+                check(f"prod ({label}): report = the jakabasej demo (her result loaded): Links / Images / Sites {TABS}, '+ {LEAKS - 5} more', 5 *.example rows, '@{handle(DEMO)}' -> {f.name}",
+                      tabs == TABS and s2["at"] == "@" + handle(DEMO) and s2["more"] == f"+ {LEAKS - 5} more in the full report"
+                      and len(s2["rows"]) == 5 and all(r.endswith(".example") for r in s2["rows"]), (tabs, s2["more"], s2["rows"]))
         text = pg.evaluate("() => document.body.innerText + ' ' + document.querySelector('.vo').textContent")
         bad = [x for x in paths if x in text][:3] + re.findall(r"https?://\S+", text)[:3]
         check(f"prod ({label}): no leak URL in the DOM text ({len(paths)} paths checked, no http(s)://)", not bad, bad)
@@ -582,6 +591,219 @@ def prod(b, base, out, cues, cta):
     run("phone", VIEWPORTS["phone"], False, PROD_SLUG)
     run("theater", VIEWPORTS["phone"], True, PROD_SLUG2)
     print(f"prod: proxied read-only GETs to production (memoized): " + ", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))))
+
+
+# ---------- hers: her result in every card 0-34.6 s, the end card = Jack's jakabasej demo (?r= and the last scan) ----------
+HERS_TS = (1, 5, 12, 16.5, 19, 23, 26, 31, 40, 47)   # 1 = the "for <name>" pill (no shot)
+HERS_CARD = {12: "google", 16.5: "google-images", 19: "x", 23: "reddit", 26: "mega", 31: "sites"}
+PERSONA_RE = re.compile(r"SophieStar|sophiestar|Your name|Orla|Brennick|brennick")   # case-sensitive: the hero copy says "in your name"
+HERS_JS = """t => { const v = document.querySelector('video'); v.pause(); window.VideoOverlays.draw(t);
+  const on = [...document.querySelectorAll('.vo-pf')].filter(e => !e.hasAttribute('data-off')), c = document.querySelector('.vo-cta');
+  const s = c.querySelector('.vo-steps').getBoundingClientRect(), e = c.querySelector('.vo-end').getBoundingClientRect();
+  const ix = Math.max(0, Math.min(s.right, e.right) - Math.max(s.left, e.left)) * Math.max(0, Math.min(s.bottom, e.bottom) - Math.max(s.top, e.top));
+  return {on: on.map(e => e.dataset.prefab), text: on.map(e => e.innerText).join(' | '), over: document.querySelector('.vo-over').innerText,
+    imgs: on.flatMap(e => [...e.querySelectorAll('img.rm-img')].map(i => [i.getAttribute('src'), i.naturalWidth])),
+    sites: [...document.querySelectorAll('.vo-sites-l b')].map(b => b.textContent), slots: [...document.querySelectorAll('[data-vo]')].map(e => e.textContent).join(' | '),
+    cta: c.innerText, contacts: [...c.querySelectorAll('.vo-end-c > span')].map(x => x.textContent), eo: +getComputedStyle(c.querySelector('.vo-end')).opacity,
+    cov: +(ix / (s.width * s.height)).toFixed(3), mode: document.documentElement.dataset.voMode, search: location.search}; }"""
+
+
+def hers_expect(raw):
+    """her result's fields as the cards may show them: hosts (most links first, = js report().hosts), titles, counts, thumbs"""
+    rows, n, seen = [], {}, set()
+    agg = {h.strip().lower().removeprefix("www.") for m in raw.get("mega") or [] if isinstance(m, dict) for h in (m.get("host"), m.get("via")) if isinstance(h, str) and h.strip()}
+    under = lambda h, a: h == a or h.endswith("." + a)   # = js/scan-engine.js withoutAggregators(): mega[] share hosts never show
+    def add(u, d, title):
+        if not isinstance(u, str) or not re.fullmatch(r"https?://[^\s\"'<>\\]+", u, re.I) or u in seen:
+            return
+        x = urllib.parse.urlsplit(u)
+        d = (d if isinstance(d, str) else "").strip().lower().removeprefix("www.") or (x.hostname or "").removeprefix("www.")
+        if not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", d) or any(under(h, a) for h in (d, (x.hostname or "").lower().removeprefix("www.")) for a in agg):
+            return
+        seen.add(u)
+        n[d] = n.get(d, 0) + 1
+        rows.append((d, title if isinstance(title, str) else None))
+    for h in (raw.get("hits") or [])[:1000]:
+        if h:
+            add(h.get("url"), h.get("domain"), h.get("title"))
+    for r in (raw.get("results") or [])[:200]:
+        if r:
+            add(r.get("link"), r.get("domain"), r.get("title"))
+    hosts = sorted(n, key=lambda d: -n[d])   # stable: first seen on a tie
+    g, megas = raw.get("google_total"), [m for m in raw.get("mega") or [] if isinstance(m, dict)]   # any of her folders (js/removals.js picks one)
+    counts = ([f"About {g:,} results"] if isinstance(g, int) and g > 0 else []) + [f"{n} {u}" for mg in megas for k, us in (("images", ("images", "files")), ("videos", ("videos", "files"))) if isinstance(mg.get(k), int) and mg[k] > 0
+                                                                            for n in {f"{mg[k]}", f"{mg[k]:,}"} for u in us]
+    thumbs = {u for u in (raw.get("images") or []) if isinstance(u, str)} | {r.get("thumb") for r in raw.get("results") or [] if r and isinstance(r.get("thumb"), str)}
+    pr = raw.get("profile") or {}
+    return {"hosts": hosts, "titles": [t.strip() for _, t in rows if t and len(t.strip()) >= 12], "counts": counts, "thumbs": thumbs,
+            "name": pr.get("display_name") or raw.get("handle"), "handle": raw.get("handle")}
+
+
+def hers(b, base, out, raw_file, no_prod):
+    """her result everywhere: ?r=PROD_SLUG and the last scan (the landing's in-page scan → /video/ with no query, and the landing's
+    mini player iframe ?pip=1 loaded BEFORE the scan → turns hers on the storage event), 1920 + phone 390x844 + iPhone theater"""
+    if raw_file:
+        raw = json.loads(pathlib.Path(raw_file).read_text(encoding="utf-8"))
+    else:   # read-only GET of the stored result (no new scan)
+        raw = json.load(urllib.request.urlopen(f"{PROD}/api/scan-result/{PROD_SLUG}", timeout=30))
+    (out / f"hers-scan-result-{PROD_SLUG}.json").write_text(json.dumps(raw, indent=1))
+    X = hers_expect(raw)
+    print(f"hers: {X['handle']} {PROD_SLUG}: {len(X['hosts'])} hosts, top {X['hosts'][:4]}, counts {X['counts']}, {len(X['thumbs'])} thumbs, "
+          f"thumbs/media {'404 (no production, declared)' if no_prod else 'proxied read-only to production'}")
+    body = json.dumps(raw).encode()
+    sse = "".join(f"event: {e}\ndata: {d}\n\n" for e, d in [("progress", "Searching Google, step 1 of 9"), ("result", json.dumps(raw)), ("done", "")])
+    memo, proxied = {}, []
+
+    def api(r):   # declared bypass, wire boundary: scan-result = her saved result; thumb / media → production read-only GET (memoized), or 404
+        u = urllib.parse.urlsplit(r.request.url)
+        if r.request.method != "GET":
+            return r.abort()
+        if u.path.startswith("/api/scan-result/"):
+            return r.fulfill(body=body, content_type="application/json") if u.path.endswith("/" + PROD_SLUG) else r.fulfill(status=404, body="{}")
+        if no_prod or u.path == "/api/thumb" and not GSTATIC.match(urllib.parse.parse_qs(u.query).get("u", [""])[0]):
+            return r.fulfill(status=404, body="")
+        key = u.path + ("?" + u.query if u.query else "")
+        if key not in memo:
+            proxied.append(u.path.split("/")[2])
+            res = r.fetch(url=PROD + key, timeout=30000)
+            memo[key] = (res.status, {k: v for k, v in res.headers.items() if k.lower() in ("content-type", "cache-control")}, res.body())
+        st, hd, bd = memo[key]
+        r.fulfill(status=st, headers=hd, body=bd)
+
+    def context(opts, theater):
+        ctx = ctx_new(b, **opts)
+        if theater:
+            ctx.add_init_script(IPHONE_FS)
+        for pat in ("**/api/scan-result/**", "**/api/thumb?**", "**/api/media/**"):
+            ctx.route(pat, api)
+        ctx.route("**/api/public-scan", lambda r: r.fulfill(status=200, content_type="text/event-stream", body=sse))   # declared: her saved result as the SSE
+        seen = []
+        return ctx, guard(ctx, (base,), seen), seen
+
+    def settle(pg):
+        try:
+            pg.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=10000)
+            if not no_prod:
+                pg.wait_for_function("() => window.VideoOverlays.photos.kept.length > 0 && [...document.querySelectorAll('.rm-img')].every(i => i.complete)", timeout=30000)
+        except Exception:
+            pass
+        pg.wait_for_timeout(500)
+
+    def mine(text, imgs):   # the fields of her result in this text / these images
+        f = [h for h in X["hosts"] if h in text][:3] + [c for c in X["counts"] if c in text][:2] + [t[:30] for t in X["titles"] if t in text][:1]
+        th = [s for s, w in imgs if w > 0 and s.startswith("/api/thumb?u=") and urllib.parse.parse_qs(urllib.parse.urlsplit(s).query).get("u", [""])[0] in X["thumbs"]]
+        return f + ([f"{len(th)} of her thumbs"] if th else [])
+
+    def sweep(pg, label, theater):
+        for t in HERS_TS:
+            s = pg.evaluate(HERS_JS, t)
+            pg.wait_for_timeout(350)
+            if t != 1:
+                f = out / f"hers-{label}-t{t:g}.png"
+                (pg if theater else pg.locator(".vo-stage")).screenshot(path=str(f))
+            bad = PERSONA_RE.findall(s["over"]) + PERSONA_RE.findall(s["slots"])
+            check(f"hers ({label}) t={t:g}: named, no placeholder persona text (SophieStar / Your name / Orla Brennick) on screen or in a slot",
+                  s["mode"] == "named" and not bad, (s["mode"], bad[:3]))
+            if t == 1:
+                check(f"hers ({label}) t=1: the 'for {X['name']}' pill (her result's name)", "for" in s["text"] and X["name"] in s["text"], s["text"][:80])
+            if t == 5:
+                check(f"hers ({label}) t=5: the intro types onlyfans.com/jakabasej (not her handle) -> {f.name}", s["on"] == ["intro"] and "jakabasej" in s["text"]
+                      and X["handle"] not in s["text"], (s["on"], s["text"][-200:]))
+            if t in HERS_CARD:
+                pid, got = HERS_CARD[t], mine(s["text"], s["imgs"])
+                check(f"hers ({label}) t={t:g}: {pid} shows her result ({', '.join(got[:4]) or 'nothing'}) -> {f.name}", s["on"] == [pid] and len(got) >= 1, (s["on"], s["text"][:200]))
+            if t == 31:
+                k = min(12, len(X["hosts"]))
+                check(f"hers ({label}) t=31: the 10,000+ wall = her {k} top sites first (most links), then his whiteboard names",
+                      s["sites"][:k] == X["hosts"][:k] and len(s["sites"]) == 12, s["sites"])
+            if t in (40, 47):
+                low = s["cta"].lower()
+                ok = s["on"] == ["cta-steps"] and "jakabasej" in low and "ophierai" not in low and X["name"].lower() not in low and "clear for" not in low
+                msg = f"hers end ({label}) t={t:g}: the jakabasej demo, no 'ophierai' / {X['name']!r} / 'This is what I'd clear'"
+                if t == 47:
+                    ok = ok and s["eo"] > .9 and s["contacts"] == CONTACTS and s["cov"] <= .20
+                    msg += f", contact footer covers {s['cov']:.1%} of the phone (<= 20 %)"
+                check(msg + f" -> {f.name}", ok, (s["on"], s["cov"], s["eo"], s["cta"][-160:]))
+        txt = pg.evaluate("() => document.body.innerText")
+        check(f"hers ({label}): no URL in the page text", not re.findall(r"https?://\S+", txt), re.findall(r"https?://\S+", txt)[:2])
+
+    for label, opts, theater in (("1920", dict(viewport={"width": 1920, "height": 1080}), False), ("phone", VIEWPORTS["phone"], False), ("theater", VIEWPORTS["phone"], True)):
+        # a: the shared link ?r=<slug>
+        ctx, ext, seen = context(opts, theater)
+        pg = ctx.new_page()
+        errs = []
+        console(pg, errs)
+        pg.goto(f"{base}video/?r={PROD_SLUG}")
+        settle(pg)
+        if theater:
+            pg.locator(".vo-fs").tap()
+            pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+        sweep(pg, f"r-{label}", theater)
+        check(f"hers (r-{label}): every request to 127.0.0.1, no console error", not ext and not errs, (ext[:3], errs[:3]))
+        ctx.close()
+        # b: the last scan: the landing's in-page scan (her saved result as the SSE), then /video/ opened directly, no query
+        ctx, ext, seen = context(opts, theater)
+        lp = ctx.new_page()
+        lp.goto(f"{base}?pip=0")
+        lp.fill("#scan .scan-handle", PROD_HANDLE)
+        lp.locator("#scan button[type=submit]").click()
+        try:
+            lp.wait_for_function("s => (JSON.parse(localStorage.getItem('leakscan.last') || 'null') || {}).slug === s", arg=PROD_SLUG, timeout=15000)
+        except Exception:
+            pass
+        last = lp.evaluate("() => [location.search, localStorage.getItem('leakscan.last')]")
+        check(f"hers (last-{label}): the landing's scan stored leakscan.last = {PROD_SLUG}", PROD_SLUG in (last[1] or ""), last)
+        lp.close()
+        pg = ctx.new_page()
+        errs = []
+        console(pg, errs)
+        pg.goto(f"{base}video/")
+        settle(pg)
+        if theater:
+            pg.locator(".vo-fs").tap()
+            pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+        check(f"hers (last-{label}): /video/ with no query plays hers", pg.evaluate("() => location.search") == "" and pg.evaluate("() => document.documentElement.dataset.voMode") == "named")
+        sweep(pg, f"last-{label}", theater)
+        check(f"hers (last-{label}): video requests all to 127.0.0.1 (landing fonts etc. aborted, declared), no console error on /video/",
+              all(u.startswith(base) for u in seen if "/video/" in u or "/api/" in u) and not errs, errs[:3])
+        ctx.close()
+    # c: the landing's mini player (?pip=1), its iframe loaded BEFORE her scan: the scan → storage event → hers, in place
+    ctx, ext, seen = context(dict(viewport={"width": 1920, "height": 1080}), False)
+    lp = ctx.new_page()
+    lp.goto(f"{base}?pip=1")
+    lp.mouse.wheel(0, 200)
+    lp.wait_for_timeout(300)
+    lp.mouse.wheel(0, -200)
+    fr = None
+    for _ in range(60):
+        fr = next((f for f in lp.frames if "/video/" in f.url), None)
+        if fr:
+            break
+        lp.wait_for_timeout(250)
+    before = None
+    if fr:
+        fr.wait_for_load_state()
+        fr.wait_for_function("() => window.VideoOverlays", timeout=10000)
+        before = fr.evaluate("() => document.documentElement.dataset.voMode")
+    check(f"hers (pip): the landing's mini player iframe loaded before the scan, generic ({fr and fr.url})", fr is not None and before == "generic", (fr and fr.url, before))
+    lp.fill("#scan .scan-handle", PROD_HANDLE)
+    lp.locator("#scan button[type=submit]").click()
+    s = None
+    if fr:
+        try:
+            fr.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=15000)
+        except Exception:
+            pass
+        lp.wait_for_timeout(800)
+        s = fr.evaluate(HERS_JS, 31)
+        fr.evaluate(HERS_JS, 12)
+        lp.wait_for_timeout(400)
+    lp.screenshot(path=str(out / "hers-pip-1920-t12.png"))
+    k = min(12, len(X["hosts"]))
+    check(f"hers (pip): after the landing scan the mini player turns hers in place (iframe {fr and urllib.parse.urlsplit(fr.url).query or 'no query'}): named, her sites wall -> hers-pip-1920-t12.png",
+          s is not None and s["mode"] == "named" and s["sites"][:k] == X["hosts"][:k], s and (s["mode"], s["sites"][:3]))
+    ctx.close()
+    print(f"hers: production GETs (read-only, memoized): " + (", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))) or "none"))
 
 
 def play(pg, until):
@@ -748,7 +970,7 @@ def named_flow(pg, base, out, cta, name_q):
         if name == "6-report":
             check(f"named flow: cta + 8.3 the report '{LEAKS} links found' for '@{handle(DEMO)}'", s and s["so"][2] > .9 and s["count"] == f"{LEAKS} links found" and s["at"] == "@" + handle(DEMO), s and (s["count"], s["at"]))
         if name == "7-flip":
-            check(f"named flow: cta + 9.65 'This is what I'd clear for {nm}' + Telegram / WhatsApp / email, no 'Rewatch', no flip -> frame-1920-named-cta-7-flip.png",
+            check(f"named flow: cta + 9.65 the contact row Telegram / WhatsApp / email only (no {nm!r}), no 'Rewatch', no flip -> frame-1920-named-cta-7-flip.png",
                   s and s["eo"] > .9 and named_end(s, nm), s and (s["shown"], s["contacts"], s["chrome"]))
     pg.evaluate(DRAW, cta + 13.5)
     shot("8-hold")
@@ -814,8 +1036,8 @@ def named_phone(b, base, out, cta, name_q):
         pg.evaluate(DRAW, cta + 9.65)
         s = pg.evaluate(STEPS)
         lo = 11 if view == "portrait" else 20
-        check(f"named flow (phone {view}): typed {handle(DEMO)!r} >= {lo} px, end toast for {nm!r} + contacts >= 11 px -> phone-{view}-named-cta-*.png",
-              s3 and s3["typed"] == handle(DEMO) and s3["px"] >= lo and named_end(s, nm) and s["nmpx"] >= 11, (s3 and (s3["typed"], s3["px"]), s and (s["shown"], s["nmpx"])))
+        check(f"named flow (phone {view}): typed {handle(DEMO)!r} >= {lo} px, the contact row (no {nm!r}) >= 8 px -> phone-{view}-named-cta-*.png",
+              s3 and s3["typed"] == handle(DEMO) and s3["px"] >= lo and named_end(s, nm) and s["nmpx"] >= 8, (s3 and (s3["typed"], s3["px"]), s and (s["shown"], s["nmpx"])))
     ctx.close()
 
 
@@ -1001,7 +1223,7 @@ def swap(b, base, out, cues, cta, vp, opts):
     vis = [v[0] for v in pg.evaluate(VISIBLE)]
     pg.evaluate(DRAW, cta + 9.65)
     s = pg.evaluate(STEPS)
-    check(f"named flow: swap ({vp}): {'' if vp == 'desktop' else 'no cta-steps before its cue; '} at cta + 0.6 = {tc:g} the named flow ({vis}), ending 'This is what I'd clear for {SWAP_NAME}'",
+    check(f"named flow: swap ({vp}): {'' if vp == 'desktop' else 'no cta-steps before its cue; '} at cta + 0.6 = {tc:g} the named flow ({vis}), ending on the contact row (no {SWAP_NAME!r})",
           (early is False or vp == "desktop") and vis == ["cta-steps"] and named_end(s, SWAP_NAME) and pg.evaluate("() => document.documentElement.dataset.voMode") == "named", (early, vis, s and s["shown"]))
     pg.evaluate("() => document.querySelector('.vo-nb-chg').click()")   # DOM click: hidden (no swap) must fail the check, not abort
     pg.wait_for_timeout(200)
@@ -1473,7 +1695,9 @@ def main():
     ap.add_argument("--break-captions", action="store_true")
     ap.add_argument("--break-voice", action="store_true")
     ap.add_argument("--break-intro", action="store_true")
-    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill"], help="run only this part (iteration)")
+    ap.add_argument("--break-hers", action="store_true")
+    ap.add_argument("--hers-raw", help="her saved scan result (JSON) instead of the read-only production GET")
+    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers"], help="run only this part (iteration)")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -1528,6 +1752,11 @@ def main():
         broken, k = re.subn(r'(data-prefab="intro") data-cue-in="[\d.]+" data-cue-out="[\d.]+"', r"\1", BREAK["steps"][1] if "steps" in BREAK else html)
         assert k == 1, "break: the intro's data-cue-in / -out not found"
         BREAK["intro"] = (lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), broken, "text/html")
+    if a.break_hers:   # wire boundary: video-overlays.js with a loaded result never applied (?r= / the last scan stay generic)
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"if \(g === gen && \(who === null \|\| real\)\) useResult\(raw\);", "", js)
+        assert k == 1, "break: load()'s useResult(raw) not found"
+        BREAK["hers"] = ("**/js/video-overlays.js", broken, "application/javascript")
     fl = {k: tuple(map(float, re.search(r'data-prefab="%s" data-cue-in="([\d.]+)" data-cue-out="([\d.]+)"' % k, html).groups())) for k in ("intro", "sites")}
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
@@ -1553,6 +1782,11 @@ def main():
             return 1 if fails else 0
         if a.only == "fill":
             fill(b, base, out, name_q, a.name, fl["intro"], fl["sites"], cta)
+            for f in fails:
+                print("FAIL", f)
+            return 1 if fails else 0
+        if a.only == "hers":
+            hers(b, base, out, a.hers_raw, a.skip_prod)
             for f in fails:
                 print("FAIL", f)
             return 1 if fails else 0
@@ -1702,6 +1936,8 @@ def main():
         captions(b, base, out, name_q)
         sources(p, b, base, out)
         fill(b, base, out, name_q, a.name, fl["intro"], fl["sites"], cta)
+        if a.hers_raw or not a.skip_prod:
+            hers(b, base, out, a.hers_raw, a.skip_prod)
         if not a.skip_prod:
             prod(b, base, out, cues, cta)
     for f in fails:
