@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet]... [--changed [REF]] [--no-reuse]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet|again]... [--changed [REF]] [--no-reuse]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
         [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]
-        [--break-sheet500] [--break-sheetdead] [--break-askstall]
+        [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again]
 
 Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
 `reused green from <run folder>` and skips the browser; --no-reuse forces a run; --changed runs only what the diff reaches; break runs never touch it.
@@ -164,6 +164,11 @@ after a pause / a blocked autoplay / the mini player tucked or off-screen / the 
 Declared bypass: the tabs and huge flows put the player away as soon as it mounts, by a script click on its X
 (common.PIP_AWAY, focus kept where it was): floating it
 stays top-right while scrolling (by design) and covers what sits there, e.g. the demo's full-screen button.
+
+again (the "Scanned 2 hours ago · Scan again" line, js/scan-engine.js agedLine; hero card and scan page): none on a young report or without as_of;
+?r=demoAged1 shows it; a click re-POSTs the same handle, platform and both socials with fresh:true (the stub's log), the fresh result
+replaces the report (new ?r=, its counts, no line), a reload keeps it; the hero form's own scan never sends fresh. --break-again serves
+scan-engine.js without fresh in the body: only the `again: POST` checks may go red. Screenshots: <vp>-again-*.png.
 
 A scenario part that raises (a Playwright timeout, a missing element) prints one FAIL line for it and the run goes on.
 """

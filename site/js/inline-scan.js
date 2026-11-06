@@ -72,7 +72,7 @@
       make('div', 'report-head', [
         make('div', '', [make('p', 'report-kicker live-kicker', ['Free scan · ' + E.PLATFORMS[platform]]),
           make('p', 'report-title live-title', ['@' + handle], { tabindex: '-1' }), make('p', 'live-socials', [], { hidden: '' }),
-          make('p', 'live-aliases', [], { hidden: '' })]),
+          make('p', 'live-aliases', [], { hidden: '' }), make('div', 'live-aged')]),
         make('div', 'live-head-end', [make('span', 'chip chip-live live-count', [], { hidden: '' }),
           make('a', 'live-open-top', ['Open full report ', make('span', '', ['→'], { 'aria-hidden': 'true' })], { hidden: '' })])]),
       make('p', 'live-status', [], { role: 'status' }),
@@ -153,6 +153,9 @@
     q('.live-aliases').textContent = m.discovered.length ? 'Also found as ' + m.discovered.map(function (a) { return '@' + a; }).join(', ') : '';
     q('.live-aliases').hidden = !m.discovered.length;
     q('.live-bar').hidden = true;
+    var aged = E.agedLine(m.asOf, function () { if (!busy) scan(m.handle, m.platform, null, m.socials); });
+    q('.live-aged').textContent = '';
+    if (aged) q('.live-aged').appendChild(aged);
     var count = q('.live-count');
     count.textContent = n + ' ' + E.plural(n, 'link found', 'links found');
     count.className = 'chip live-count ' + (n ? 'chip-live' : 'chip-dead');
@@ -357,7 +360,8 @@
     if (t) t.focus({ preventScroll: true });
     bring();
   }
-  function scan(handle, platform, social) {
+  // again: the socials of a report's "Scan again" (a fresh scan of the same inputs, no reuse)
+  function scan(handle, platform, social, again) {
     var tok = ++token;
     asked = Date.now();
     mediaTok++;
@@ -369,7 +373,7 @@
     q('.live-status').textContent = 'Starting the scan…';
     grow(h0);
     bring();
-    E.runScan({ platform: platform, handle: handle, social: social,
+    E.runScan({ platform: platform, handle: handle, social: social, socials: again, fresh: !!again,
       onProgress: function (t) { if (tok === token) progress(t); },
       onResult: function (raw) {
         if (tok !== token) return;

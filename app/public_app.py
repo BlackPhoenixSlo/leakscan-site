@@ -1602,6 +1602,7 @@ def scan_row(slug):
 # whole-scan reuse: a repeat quick scan (same platform, handle, aliases, declared socials) inside SCAN_REUSE_TTL gets its
 # own new row + slug holding a fresh scan's result, no external call. Only a whole fresh result stores the key
 # (scan_reuse_value), a reused row never does, nor the leakshaven key: the TTL can't roll forward. Body fresh:true skips it.
+# `as_of` (SSE result, /api/scan-result): when the data was really scanned, the source's created_at on a reuse.
 SCAN_REUSE_TTL = int(os.environ.get("SCAN_REUSE_TTL", str(leakshaven.CACHE_TTL)))   # s; 0 = off
 SCAN_REUSE_FIELD = "scan_key"                                                       # scans.extra_json, never served
 
@@ -1646,7 +1647,7 @@ def scan_reuse_serve(h, key, handle, platform, ip, aliases, socials):
                "aliases": {**(ex.get("aliases") or {}), "declared": list(aliases)}, "mega": ex.get("mega") or []}
         slug = db.insert_scan(rows, handle=handle, level="low", platform=platform, status="complete",
                               client_ip_hash=_ip_hash(ip),
-                              extra={"profile": profile, "socials": socials, "reused_from": src["slug"], **pub})
+                              extra={"profile": profile, "socials": socials, "reused_from": src["slug"], "as_of": src["created_at"], **pub})
         if avatar and not _save_avatar(slug, avatar) and profile:
             profile["avatar"] = False
         media = {"status": media_gather.adopt(slug, src["slug"])}
@@ -1659,7 +1660,7 @@ def scan_reuse_serve(h, key, handle, platform, ip, aliases, socials):
     wc.sse(h, "result", json.dumps({
         "slug": slug, "handle": handle, "platform": platform, "level": "low",
         "status": "complete", "hit_count": len(rows), "domain_count": db.domain_count(rows),
-        "profile": profile, "media": media, "socials": socials, "hits": rows, **pub,
+        "profile": profile, "media": media, "socials": socials, "hits": rows, "as_of": src["created_at"], **pub,
     }, ensure_ascii=False))
     wc.sse(h, "done", "end")
     return True
@@ -1994,6 +1995,7 @@ class Handler(BaseHTTPRequestHandler):
         pub = {k: row[k] for k in ("slug", "level", "platform", "handle",
                                    "created_at", "status", "hit_count",
                                    "domain_count", "ownership_verified")}
+        pub["as_of"] = row["created_at"]  # one-project: scan reuse
         pub["hits"] = row["hits"]
         pub["images"] = row.get("images", [])
         pub["google_total"] = row.get("google_total")
@@ -2006,6 +2008,7 @@ class Handler(BaseHTTPRequestHandler):
         pub["mega"] = row.get("mega") or []  # one-project: mega[]
         if row["level"] == "low":
             ex = _scan_extra_all(slug) or {}
+            pub["as_of"] = ex.get("as_of") or row["created_at"]  # one-project: scan reuse
             pub["results"] = row.get("results") or []  # one-project: aggregator rule (scan_row filtered them)
             pub["profile"] = ex.get("profile")
             pub["socials"] = ex.get("socials") or {}
@@ -2246,6 +2249,7 @@ class Handler(BaseHTTPRequestHandler):
             "status": status, "hit_count": len(rows), "domain_count": db.domain_count(rows),  # one-project: domain_count
             "google_total": google_total, "images": images, "hits": rows,
             "results": shaped, "profile": profile, "media": media, "socials": socials,
+            "as_of": db._now(),  # one-project: scan reuse
             **pub,  # one-project: scan_end
         }, ensure_ascii=False))
         wc.sse(self, "done", "end")

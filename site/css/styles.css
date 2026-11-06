@@ -672,6 +672,8 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .report-card.is-live > :not(.live), .phone-free.is-live .m-illus { display: none; }
 .live-title:focus { outline: 0; }
 .live-socials, .live-aliases { margin: 2px 0 0; color: var(--muted); font-size: .88rem; }
+.aged { margin: 2px 0 0; color: var(--muted); font-size: .88rem; line-height: 1.4; }
+.aged-again { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .live-status { margin: 12px 0 0; color: var(--muted); font-size: .92rem; }
 .live-status:empty { display: none; }
 .live-bar { height: 6px; margin: 10px 0 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }

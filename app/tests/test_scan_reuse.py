@@ -144,9 +144,27 @@ class TestReuse(Base):
         self.assertEqual(self.calls(), n)                         # the media step too
         self.assertNotEqual(b["slug"], a["slug"])
         self.assertEqual(set(b), set(a))                          # same result shape
-        for k in set(a) - {"slug", "media"}:
+        for k in set(a) - {"slug", "media", "as_of"}:             # as_of: own test
             self.assertEqual(b[k], a[k], k)
         self.assertEqual(b["media"], {"status": "pending"})
+
+    def test_as_of_says_when_the_data_was_really_scanned(self):
+        a = self.scan()
+        then = "%sZ" % time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 7200))
+        with db._db() as c:
+            c.execute("UPDATE scans SET created_at=? WHERE slug=?", (then, a["slug"]))
+        result = lambda slug: json.loads(self.req("GET", f"/api/scan-result/{slug}")[1])
+        self.assertEqual(result(a["slug"])["as_of"], then)
+        b = self.scan()
+        self.assertHit(b, a)
+        self.assertEqual(b["as_of"], then)                        # the SSE result: the source's, not this row's
+        self.assertEqual(result(b["slug"])["as_of"], then)        # the report link too, on every later open
+        self.assertNotEqual(db.get_scan(b["slug"])["created_at"], then)
+        c = self.scan(fresh=True)
+        self.assertFresh(c)
+        self.assertGreater(c["as_of"], then)
+        self.assertLess(abs(time.time() - time.mktime(time.strptime(c["as_of"], "%Y-%m-%dT%H:%M:%SZ")) + time.timezone), 300)
+        self.assertEqual(result(c["slug"])["as_of"], db.get_scan(c["slug"])["created_at"])
 
     def test_own_row_and_own_per_slug_state(self):
         a = self.scan(headers={"X-Real-IP": "203.0.113.1"})
