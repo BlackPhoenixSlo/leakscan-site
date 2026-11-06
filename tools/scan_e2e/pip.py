@@ -269,7 +269,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     pg.wait_for_function("() => document.readyState === 'complete'", timeout=15000)
     check(f"{tag} still: pip.js never comes: nothing left on the page after load", not pg.query_selector(".pip-still"), pg.evaluate("window.__st.at"))
     ctx.close()
-    MOVED = "sessionStorage.setItem('leakscan.pip', JSON.stringify({p: [40, 300], w: 200, t: '', u: 1, c: 0}));"
+    MOVED = "try { sessionStorage.setItem('leakscan.pip', JSON.stringify({p: [40, 300], w: 200, t: '', u: 1, c: 0})); } catch (e) {}"
     for what, url, init in (("?pip=0", "?pip=0", ""), ("closed by its X", "", PIP_AWAY), ("moved + resized", "", MOVED), ("report page without ?r=", "scan/", "")) + ((("computer", "", ""),) if not phone else ()):
         ctx, pg, held, s = still_page(url, init)
         check(f"{tag} still: none: {what}", s is None, s)
