@@ -381,7 +381,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
             pg.evaluate("""async ([dy, n]) => { for (let i = 0; i < n; i++) { scrollBy({top: dy / n, behavior: 'instant'}); await new Promise(r => requestAnimationFrame(r)); } }""",
                         [dy, 3 if fast else max(1, int(abs(dy)) // 30)])
         else:
-            pg.mouse.move(200, 600)
+            pg.mouse.move(60, 600)   # the page gutter, as the touch path (x 60): over the demo site's iframe a wheel scrolls the demo, not the page
             n = 3 if fast else max(1, int(abs(dy)) // 60)
             for _ in range(n):
                 pg.mouse.wheel(0, dy / n); pg.wait_for_timeout(8 if fast else 40)
@@ -445,7 +445,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
                   ok and not inside(rs) and len({r[4] for r in rs}) > 1, [home, bad, sorted({r[4] for r in rs})])
         pg.evaluate("scrollTo({top: 0, behavior: 'instant'})"); pg.wait_for_timeout(400)
     # X → the tab at the top-right corner, scrolled, tap → back
-    b0 = st(pg)["box"]
+    s0 = st(pg); b0, m0 = s0["box"], s0["mode"]
     pg.click(".pip-x"); pg.wait_for_timeout(600); s = st(pg); shot(pg, "strip-5-after-x")
     tb = s["tab"]["box"] if s["tab"] else None
     check(f"{ft} X → tab at the top-right corner (right edge, under the header, at the home spot's top)",
@@ -457,8 +457,12 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     if tb:
         tap(pg, tb[0] + tb[2] / 2, tb[1] + tb[3] / 2); pg.wait_for_timeout(300)
     s = st(pg); shot(pg, "strip-6-tab-tapped")
-    check(f"{ft} tab tapped 2 screens down → back at the prior spot (±1 px)", s["on"] and not s["tab"] and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0])
+    if m0 == "dock":   # docked on the hero card (it fits the screen at the top here): 2 screens down the dock is off screen, so it floats; at the top it docks again
+        check(f"{ft} tab tapped 2 screens down (was docked) → back, floating fully on screen", s["on"] and not s["tab"] and s["mode"] != "dock"
+              and s["box"][0] >= 0 and s["box"][1] >= 0 and s["box"][0] + s["box"][2] <= vpw and s["box"][1] + s["box"][3] <= H, [s["box"], s["mode"]])
     pg.evaluate("scrollTo({top: 0, behavior: 'instant'})"); pg.wait_for_timeout(400)
+    s = st(pg) if m0 == "dock" else s
+    check(f"{ft} tab tapped 2 screens down → back at the prior spot (±1 px{'; docked: back at the top' if m0 == 'dock' else ''})", s["on"] and not s["tab"] and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0, m0])
     # dropped mid-screen: stays there while scrolling (and through the URL bar), X / tab → back there
     s = drop(pg, cdp, s, vpw / 2, H / 2); mid = s["box"]
     rec(pg); trip(pg, cdp, H, False); trip(pg, cdp, H, True)

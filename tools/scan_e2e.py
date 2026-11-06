@@ -49,8 +49,8 @@ motion, JS off. No request leaves loopback, the lazy showcase iframe included (s
 inline (js/inline-scan.js): the hero form scans in place; the card becomes the report: Links / Images / Sites tabs
 (counts from the fixture, switching never resizes the card), whole-row links, a film strip of what Google Images shows
 (blurred, ↗, links to its result or the full report) that drifts by itself after ~4 s idle, stops for good on a
-pointerdown and never moves under prefers-reduced-motion (no layout shift: card box + PerformanceObserver), the #free
-phone's Images tab with her tiles; errors, reload, reset; a shared ?r= link makes one /api/scan-result
+pointerdown and never moves under prefers-reduced-motion (no layout shift: card box + PerformanceObserver), the Before
+(#free) phone's Images tab with her tiles; errors, reload, reset; a shared ?r= link makes one /api/scan-result
 request and (phone) scrolls the card under the nav, not with #website. --break-drift serves strip-drift.js with the
 drift speed 0: only `drift:` checks may go red. --break-phones serves personalize.js without the phone links: only
 `phones:` checks may go red.
@@ -61,21 +61,21 @@ next image takes the slot, the label / tab / "+N more" / phone counts say what s
 thumbs seen on the wire); ?r=demoDeadTail1 (24 live thumbs, then 8 dead ones past the strip): sampled from load, no
 count ever says more than 24 and all settle at 24; every tile is painted, video stills only after the real images, result tiles first (judged on the page, never a
 re-derived list); the scan page's grid refills its slots; the scan page with > 80 results, a mostly-video report and
-thumbs failing late on the strip: every thumb in strip + Images tab, nothing on screen moves (E.gallery `still`); (2) #website copy → demo iframe → Before / After phones (in #showcase), their All / Images / Videos tabs switch
-on click and keys without moving anything, the demo pops out to a full-screen layer (Esc / button / backdrop close,
-focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the #free phone: same
+thumbs failing late on the strip: every thumb in strip + Images tab, nothing on screen moves (E.gallery `still`); (2) #website copy → demo iframe → the one Before / After block (#free, in #website; Before = the scan phone), Before /
+After then All / Images / Videos tabs switch without moving anything; phones show a still of the demo's top that opens the pop-out, the demo pops out to a full-screen layer (Esc / button / backdrop close,
+focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the Before (#free) phone: same
 tabs, the illustration without a scan, her "<handle> nude leaks" search / rows / tiles / videos + Reveal with ?r=, each tab
-scrolling inside the phone (no trap at its end) with "Show more" batches up to every item; (4) the Before / After phones,
-without a scan and with ?r=: both search "<name> nude leaks", equal height, each tab's first items overflow the screen and
-scroll inside it, "Show more" adds groups (kept, no repeat) until it goes, the page never moves; with ?r= the after phone's
-Removed rows = the before phone's 4 leak sites; no horizontal overflow.
+scrolling inside the phone (a wheel past its end scrolls the page: no trap) with "Show more" batches up to every item; (4) the After
+phone, without a scan and with ?r=: searches "<name> nude leaks", the Before phone's height, each tab's first items overflow the
+screen and scroll inside it, "Show more" adds groups (kept, no repeat) until it goes, the page never moves; with ?r= its
+Removed rows = her top 4 leak sites; no horizontal overflow.
 Screenshots: <vp>-t*.png. --break-thumbs serves scan-engine.js with the gallery drop disabled: only `thumbs:` checks may go red.
 --break-people serves scan-engine.js with E.isPhoto always true (logos kept): only `thumbs:` checks may go red.
 
 removals (js/removals.js, the #removals "Where I remove from" panels): section placed after #faq and directly before
-#contact; demo defaults (Orla Brennick), neutral mock copy (no onlyfans / leaked / leaks); leak-side images blurred by
-default (+ Reveal); idle, the handle covers nothing and no edge line shows; Remove flips all 4 panels (Mega / X / Reddit /
-leak site) to their removed state and Show again back, with zero layout shift; a sideways drag on the stage moves the
+#contact; demo defaults (Orla Brennick), neutral mock copy (no onlyfans / leaked / leaks; the Before phone's Google query aside); leak-side images blurred by
+default (+ Show demo images); idle, the handle covers nothing and no edge line shows; Preview removal flips all 4 panels (Mega / X / Reddit /
+leak site; phones: a swipe row) to their removed state and Show again back, with zero layout shift; a sideways drag on the stage moves the
 compare edge + clip, a tap does not; arrow keys on the handle; reduced motion = no transition; no horizontal overflow
 (390); ?r=demoRemove1 personalizes each panel all-or-nothing from the backend's top-level `mega` list + x.com /
 reddit.com / top other host hits (leak words skipped, no third-party title), thumbs via /api/thumb, still blurred, no URL
@@ -111,7 +111,7 @@ elementFromPoint at the inputs / Scan now / "Scanned" line = not the player, clo
 → tab at the top-right corner → tap = back, same box; X again + reload = the full player back on its home spot
 (first load's box; phone top-right, desktop docked), nothing with 'pip' in session / localStorage; scrolled to the form / down: same spot.
 follow (Jack: "it didn't follow, it got hidden"): a rAF sampler records the rect every frame while scrolling 3 screens
-down and back, slowly and with fast flicks (Chromium phone: CDP touch gestures, flicks with momentum; desktop: wheel;
+down and back, slowly and with fast flicks (Chromium phone: CDP touch gestures, flicks with momentum; desktop: wheel in the page gutter, x 60, never over the demo iframe;
 WebKit: script scrollBy per frame, declared): phone = the same rect ±1 px in every frame; desktop = fully on screen in
 every frame, the same rect whenever floating; URL-bar collapse / expand (viewport height -94 px and back, x2, at the top
 and 2 screens down: window + visualViewport resize) = no jump; dropped mid-screen, scrolled + URL bar = stays; X → tab at
