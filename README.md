@@ -12,7 +12,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
 - Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card: a ledger, removed rows
   struck through once on load) · `#free` the free offer, said once, beside one Google phone (All / Images / Videos
   tabs; after a scan her real results, `js/inline-scan.js`) · `#why` (letter + three rules + the record) · `#how`
-  (5 steps, 3 of them hers) · `#removals` · `#pricing` · `#website` · `#showcase` (demo iframe, 520 px tall on a phone,
+  (5 steps, 3 of them hers) · `#removals` · `#pricing` · `#website` · `#showcase` (demo iframe, 560 px tall,
   with a "Full screen" in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button; then the
   Before / After Google phones, real ARIA tabs, `js/main.js`; under 820 px one phone at a time behind a Before | After
   switch, two `aria-pressed` buttons + a label line; no horizontal scroll anywhere) · `#faq` · `#contact`.
