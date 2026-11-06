@@ -1,7 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="9" fill="#a8431c"/>
-  <g fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="translate(4 4)">
-    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
-    <path d="m9 12 2 2 4-4"/>
-  </g>
+  <!-- Abolita: the A of Young Serif (OFL) on mulberry -->
+  <rect width="32" height="32" rx="9" fill="#8c1d52"/>
+  <path fill="#fff" transform="matrix(0.02326 0 0 -0.02326 6.860 25.221)" d="M691 155Q707 114 722.0 87.0Q737 60 765 60Q775 60 777.5 56.5Q780 53 780 45V15Q780 0 765 0H458Q443 0 443 15V45Q443 53 445.5 56.5Q448 60 458 60Q485 60 510.5 80.0Q536 100 536 129Q536 136 534.5 142.0Q533 148 531 155L500 240H226L196 155Q194 148 193.0 141.5Q192 135 192 130Q192 98 218.0 79.0Q244 60 270 60Q281 60 283.0 56.5Q285 53 285 45V15Q285 0 270 0H21Q6 0 6 15V45Q6 53 8.5 56.5Q11 60 21 60Q51 60 66.5 88.0Q82 116 96 155L311 737Q315 750 328 750H449Q462 750 466 738ZM257 327H468L360 619Z"/>
 </svg>

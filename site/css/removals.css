@@ -57,6 +57,12 @@ html:not(.js) .rm-stage { cursor: auto; }
 }
 .rm-act { margin: 0; }
 .rm-btn { min-width: 9.5em; justify-content: center; }
+/* the Remove button sits on the title row (top right): a shorter card, the stage keeps its fixed height */
+.rm-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top act" "stage stage"; align-items: start; gap: 12px 12px; }
+.rm-top { grid-area: top; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
+.rm-stage { grid-area: stage; }
+.rm-act { grid-area: act; }
+@media (max-width: 519px) { .rm-btn { min-width: 7.6em; padding-inline: .8em; } }
 .rm-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { display: none; }
 

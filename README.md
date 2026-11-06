@@ -9,11 +9,16 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
 Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py --variants` rebuilds them from
 the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB copy and any full-size photo > 200 KB).
 
-- Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card) · `#free` one Google
-  phone (All / Images / Videos tabs; after a scan her real results, `js/inline-scan.js`) · `#why` · `#how` (7 steps) ·
-  `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop close, page
-  behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs, `js/main.js`) ·
-  `#pricing` · `#faq` · `#removals` · `#contact`. `tools/check.py` fails if a section id is missing here.
+- Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card: a ledger, removed rows
+  struck through once on load) · `#free` the free offer, said once, beside one Google phone (All / Images / Videos
+  tabs; after a scan her real results, `js/inline-scan.js`) · `#why` (letter + three rules + the record) · `#how`
+  (5 steps) · `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop
+  close, page behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs,
+  `js/main.js`; on phones the page's only swipe row, the second phone peeking) · `#pricing` · `#faq` · `#removals` ·
+  `#contact`. `tools/check.py` fails if a section id is missing here.
+- Type and colour: Young Serif (display, h1 / h2 / prices, >= 32 px) + Schibsted Grotesk (everything else),
+  self-hosted woff2 in `site/fonts/` (OFL, see CREDITS.md), metric-matched fallbacks; paper `#eceef0`, ink `#1c1b22`,
+  one accent (mulberry `#8c1d52`, dark `#ec8db9`); tokens at the top of `css/styles.css`.
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
@@ -58,8 +63,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   server with Range, which `<video>` seeking needs).
 - Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
   `?pip=0` off. Landing: docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report,
-  or the scan report card after a scan) at 55% of its width, never > 25% of the card, never over a link / button / pill
-  (else just below the card); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
+  or the scan report card after a scan) at 55% of its width, never > 25% of the card, never over a link / button / pill or the
+  card's text (its rows and Jaka's note; else just below the card, where the hero keeps room for it); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
   user dragged, resized, tucked or closed it. Created after load + first scroll / pointer / key or idle; same-origin
   iframe of `video/?r=&name=` made embed-only from the host (injected style; `<video>` driven directly: muted start, tap =
   unmute, then play / pause); icon-only 30 px bar under the picture. Drag drops it where released (kept on-screen, under

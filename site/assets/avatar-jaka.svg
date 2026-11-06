@@ -2,8 +2,8 @@
   <!-- Placeholder initials avatar. Replace with a real photo of Jaka: see README. -->
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f2c6a8"/>
-      <stop offset="1" stop-color="#b8582f"/>
+      <stop offset="0" stop-color="#ecbcd2"/>
+      <stop offset="1" stop-color="#8c1d52"/>
     </linearGradient>
   </defs>
   <circle cx="80" cy="80" r="80" fill="url(#g)"/>

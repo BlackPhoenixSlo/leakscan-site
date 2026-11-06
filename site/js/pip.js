@@ -64,6 +64,7 @@
       if (pip.contains(el) || tab.contains(el) || el.closest('.askai-launcher, .mobile-cta')) return false;   // fixed ones: they sit above the docked player (z)
       return !!vis(el);
     }).map(function (el) { return el.getBoundingClientRect(); });
+    [].forEach.call(card.querySelectorAll('p, li, h3, .chip'), function (el) { var b = vis(el); if (b) live.push(b); });   // never over the card's text / note: else just under it
     for (var i = 0; i < spots.length; i++) {
       var s = spots[i], ix = Math.max(0, Math.min(s.x + w, r.right) - Math.max(s.x, r.left)), iy = Math.max(0, Math.min(s.y + h, r.bottom) - Math.max(s.y, r.top));
       if (ix * iy > 0.25 * r.width * r.height) continue;
@@ -139,9 +140,9 @@
       pip.style.setProperty('--w', b.w + 'px');
       move(b.x, b.y);
     } else if (d) {
-      setMode('dock');
-      pip.style.setProperty('--w', d.w + 'px');
+      pip.style.setProperty('--w', d.w + 'px');   // size + spot first, then the mode: no frame at the old size / spot
       move(d.x + scrollX, d.y + scrollY);
+      setMode('dock');
     } else {
       setMode('float');
       if (S.w) pip.style.setProperty('--w', lim(S.w) + 'px'); else pip.style.removeProperty('--w');

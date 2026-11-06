@@ -3,7 +3,11 @@
 - **Icons**: [Lucide](https://lucide.dev) v0.546.0, ISC License. Copyright (c) for portions of Lucide are held by
   Cole Bemis 2013-2023 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2025.
   Used as an inline SVG sprite in `site/*.html`; the logo/favicon shield is Lucide `shield-check`.
-- **Fonts**: none shipped. System font stacks only (serif: Iowan Old Style / Palatino / Georgia; sans: system-ui) on the landing pages.
+- **Fonts** (self-hosted in `site/fonts/`, subset to Latin + punctuation with fontTools; no font CDN at runtime):
+  - Young Serif, by Jack Halten Fahnestock. SIL Open Font License 1.1. `young-serif.woff2` (23 KB).
+  - Schibsted Grotesk, by Schibsted Media Group with Bakken & Bæck. SIL Open Font License 1.1. `schibsted-grotesk.woff2`
+    (variable, weights 400 to 800, 39 KB).
+  License texts: `site/fonts/OFL-*.txt`. The demo site and video page keep their own stacks.
   The showcase demo uses system font stacks too (display: Georgia; body: system-ui), no web fonts.
 - **Photos**: the showcase demo (`site/showcase/imgs/`) uses Pexels photos (Pexels License), credited per file in
   `tools/showcase/CREDITS.md`. The landing page reuses small crops of those same photos (the fictional demo creator's
