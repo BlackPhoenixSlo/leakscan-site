@@ -238,8 +238,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 - `js/inline-scan.js`: with JS the form never leaves the page. The hero card turns into the live report (progress →
   first 5 links: domain + title, badge Live = `live: true`, Indexed = Google result, else Found; "N links found";
   Open full report `scan/?r=`; Send me the report; demo photo status; its image strip / Images tab / #free phone list the
-  real images first, then video results' stills, no badge; the #free grid skips stills its Videos tab shows), the #free phone shows her Google results
-  (`js/free-phone.js`), the `leakscan:result` event has personalize do the phones / showcase / demo (`socials` win the IG / X rows),
+  real images first, then video results' stills, no badge), the #free phone shows her Google results (`js/free-phone.js`:
+  search "<handle> nude leaks"; each tab scrolls inside the fixed screen, "Show more" adds the next batch), the `leakscan:result` event has personalize do the phones / showcase / demo (`socials` win the IG / X rows),
   URL becomes `?r=<slug>` (reload restores the card). Errors stay inline (busy / bad handle / failed + DM links); a
   new scan resets everything, "Reset page" too. Own elements only, never personalize's `data-p` slots.
 - Proof: `tools/scan_e2e.py OUT --only inline`; `tools/check_scan_form.py BASE OUT` (layout, no-JS GET).

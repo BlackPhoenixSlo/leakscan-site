@@ -4,7 +4,7 @@ import json
 import types
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from .common import (COUNTS, FX, MEASURED, TILES, band, bring, cfg, check, dead_thumb, digits, links, new_ctx, scan_images, served, settled_count, swipe,
+from .common import (COUNTS, FX, MEASURED, TILES, bring, cfg, check, dead_thumb, digits, links, new_ctx, scan_images, served, settled_count, swipe,
                      tiles_ok, video_stills)
 from .huge import IN_VIEW
 
@@ -118,7 +118,7 @@ def report_card(t):
     bring(page, "#free", "center")
     page.locator("#tab-free-videos").click()
     page.wait_for_timeout(1500)
-    BV = [r for r in broken["results"] if r.get("kind") == "video" and r.get("link")][:3]
+    BV = [r for r in broken["results"] if r.get("kind") == "video" and r.get("link")][:6]
     bv = page.evaluate("""() => [...document.querySelectorAll('[data-live=free-videos] a.m-link')].map(a => { const i = a.querySelector('.m-vthumb img');
         return [a.href, i ? (i.complete && i.naturalWidth >= 16) : null, !!a.querySelector('.m-vthumb .m-play')]; })""")
     check(f"{tag} videos: #free Videos rows: logo still dropped (grey box + play kept, row stays), the rest painted",
@@ -424,7 +424,8 @@ def free_phone(t):
           shown: [...ph.querySelectorAll('[role=tabpanel]')].filter(p => !p.hidden && p.offsetParent !== null).map(p => p.id),
           shifts: window.__ls.filter(x => x[1] > 0).length, focus: document.activeElement && document.activeElement.id}; }"""
     s0 = page.evaluate(PH, ".phone-free")
-    check(f"{tag} free: no scan → Images tab selected, illustration tiles", s0["shown"] == ["panel-free-images"] and s0["sel"][1] == ["Images", "true", 0], s0)
+    check(f"{tag} free: no scan → Images tab selected, illustration tiles, search 'yourhandle nude leaks'", s0["shown"] == ["panel-free-images"] and s0["sel"][1] == ["Images", "true", 0]
+          and page.inner_text(".phone-free [data-p=scan-handle]") == "yourhandle nude leaks", s0)
     boxes, seen, shifts = [s0["box"]], [], []
     for k, label in (("all", "All"), ("images", "Images"), ("videos", "Videos")):
         # per click, before shot() (its light/dark flip is not a tab switch); the fixed Ask-AI pill's own height
@@ -461,18 +462,18 @@ def free_phone(t):
     rows = links(d)
     VID = [r for r in d.get("results", []) if r.get("kind") == "video"]
     hero_n = digits(settled_count(page, "#tab-report-images .live-tab-n"))
-    strip9 = band(page.evaluate(TILES, ".report-card .live-strip a.gi-card"), d)
+    strip18 = page.evaluate(TILES, ".report-card .live-strip a.gi-card")[:18]
     lv = page.evaluate("""() => { const ph = document.querySelector('.phone-free'), q = s => [...ph.querySelectorAll(s)];
         return {search: ph.querySelector('[data-p=scan-handle]').textContent, label: ph.getAttribute('aria-label'),
           all: q('[data-live=free-all] a.m-link').map(a => [a.href, a.target, a.querySelector('.m-site').textContent]),
           tiles: q('[data-live=free-images] a.gi-card').map(a => [decodeURIComponent(a.querySelector('img').getAttribute('src').split('u=')[1]), a.href, a.target, true]),
           n: (ph.querySelector('[data-live=free-images] .m-n') || {}).textContent,
           vids: q('[data-live=free-videos] a.m-link').map(a => a.href), illus: q('.m-illus').filter(e => e.offsetParent !== null).length}; }""")
-    check(f"{tag} free: report → search = @handle, All = her first 4 rows (new tab), Images = first 9 that load + count, Videos = her video results",
-          lv["search"] == "@demo.creator" and lv["label"] == "Google results for @demo.creator" and [x[0] for x in lv["all"]] == [r[0] for r in rows[:4]]
-          and all(x[1] == "_blank" for x in lv["all"]) and [t[:3] for t in lv["tiles"]] == [t[:3] for t in strip9] and len(lv["tiles"]) == len(strip9)
+    check(f"{tag} free: report → search = 'handle nude leaks', All = her first 8 rows (new tab), Images = first 18 that load + count, Videos = her first 6",
+          lv["search"] == "demo.creator nude leaks" and lv["label"] == "Google results for @demo.creator" and [x[0] for x in lv["all"]] == [r[0] for r in rows[:8]]
+          and all(x[1] == "_blank" for x in lv["all"]) and [t[:3] for t in lv["tiles"]] == [t[:3] for t in strip18] and len(lv["tiles"]) == len(strip18)
           and not tiles_ok(lv["tiles"], d) and lv["n"] == f"{hero_n} images"
-          and lv["vids"] == [r["link"] for r in VID[:3]] and lv["illus"] == 0, lv)
+          and lv["vids"] == [r["link"] for r in VID[:6]] and lv["illus"] == 0, lv)
     for k in ("all", "images", "videos"):
         page.locator(f"#tab-free-{k}").click()
         page.wait_for_timeout(500 if k == "images" else 250)
@@ -486,6 +487,55 @@ def free_phone(t):
             page.wait_for_timeout(300)
             check(f"{tag} free: report → blurred by default, Reveal unblurs, Blur again", "blur" in b0 and b1 == ["none", "true"], (b0, b1))
         shot(page, f"3-free-{k}", "#free .free-phone")
+    # each tab scrolls inside the fixed screen (a wheel on it moves the list, not the page; at its end a new wheel still
+    # scrolls the page: no trap); "Show more" adds the next batch (8 / 18 / 6), no repeat, the page never moves; once all
+    # show it goes. All / Videos end at every served link / video; Images at what loads (judged by tiles_ok)
+    PANEL = """(k) => { const p = document.getElementById('panel-free-' + k), b = p.querySelector('.m-more'), ph = document.querySelector('.phone-free').getBoundingClientRect();
+        const ids = k === 'images' ? [...p.querySelectorAll('[data-live] .m-grid > a.gi-card')].map(a => decodeURIComponent(a.querySelector('img').getAttribute('src').split('u=')[1]))
+          : [...p.querySelectorAll('[data-live] a.m-link')].map(a => a.href);
+        return {ids, more: !!b && !b.hidden, scroll: [p.scrollTop, p.scrollHeight, p.clientHeight], y: scrollY,
+          phone: [ph.x, ph.y, ph.width, ph.height].map(Math.round)}; }"""
+    bring(page, ".phone-free", "center")
+    page.wait_for_timeout(300)
+    for k, step, want in (("all", 8, [r[0] for r in rows]), ("images", 18, None), ("videos", 6, [r["link"] for r in VID])):
+        page.locator(f"#tab-free-{k}").click()
+        page.wait_for_timeout(300)
+        p0 = page.evaluate(PANEL, k)
+        bx = page.locator(f"#panel-free-{k}").bounding_box()
+        page.mouse.move(bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2)
+        page.mouse.wheel(0, 200)
+        page.wait_for_timeout(500)
+        p1 = page.evaluate(PANEL, k)
+        check(f"{tag} free: report → {k}: the list scrolls inside the phone (same box), a wheel on it moves the list, not the page",
+              p0["scroll"][1] > p0["scroll"][2] and p1["scroll"][0] > p0["scroll"][0] and p1["y"] == p0["y"] and p1["phone"] == p0["phone"],
+              (p0["scroll"], p1["scroll"], p0["y"], p1["y"], p0["phone"], p1["phone"]))
+        page.evaluate("k => { const p = document.getElementById('panel-free-' + k); p.scrollTop = p.scrollHeight; }", k)
+        page.wait_for_timeout(300)
+        shot(page, f"3-free-{k}-more", "#free .free-phone")   # the trigger: the list's end, "Show more"
+        seen, last = [p0], p0
+        while last["more"] and len(seen) < 30:
+            page.locator(f"#panel-free-{k} .m-more").click()
+            page.wait_for_timeout(700 if k == "images" else 250)
+            last = page.evaluate(PANEL, k)
+            seen.append(last)
+        n = [len(x["ids"]) for x in seen]
+        grew = len(n) > 1 and all(0 < b - a <= step for a, b in zip(n, n[1:])) and n[0] == min(step, n[-1])
+        kept = all(x["ids"][:len(y["ids"])] == y["ids"] for y, x in zip(seen, seen[1:]))
+        ok_end = last["ids"] == want if want else (not tiles_ok([[u, "", "", True] for u in last["ids"]], d)
+                                                   and len(last["ids"]) == digits(page.inner_text("#panel-free-images .m-n")))
+        check(f"{tag} free: report → {k}: Show more adds up to {step} per click (no repeat, earlier ones kept in place), ends at every item (Images: its count), then goes; the page / phone never move",
+              grew and kept and ok_end and len(set(last["ids"])) == len(last["ids"]) and not last["more"]
+              and {x["y"] for x in seen} == {p0["y"]} and {tuple(x["phone"]) for x in seen} == {tuple(p0["phone"])},
+              (n, kept, ok_end, [x["y"] for x in seen], want and len(want)))
+        page.evaluate("k => { const p = document.getElementById('panel-free-' + k); p.scrollTop = p.scrollHeight; }", k)
+        page.wait_for_timeout(500)
+        shot(page, f"3-free-{k}-more-end", "#free .free-phone")   # settled: every item, no button
+        y0 = page.evaluate("scrollY")
+        page.mouse.wheel(0, 200)
+        page.wait_for_timeout(500)
+        check(f"{tag} free: report → {k}: at the list's end a new wheel on the phone scrolls the page (no trap)", page.evaluate("scrollY") > y0)
+        bring(page, ".phone-free", "center")
+        page.wait_for_timeout(200)
     m["overflow_report"] = overflow(page)
     ctx.close()
 

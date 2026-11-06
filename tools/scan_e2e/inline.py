@@ -7,7 +7,7 @@ import re
 import types
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
-from .common import (ALSO, BARE_HOVER, FX, band, PROFILE, TILES, bring, cfg, check, digits, hover, links, new_ctx, occurrences, served,
+from .common import (ALSO, BARE_HOVER, FX, PROFILE, TILES, bring, cfg, check, digits, hover, links, new_ctx, occurrences, served,
                      settled_count, stub_media, swipe, tiles_ok, top_ok)
 
 DEAD_THUMB = "DEMO0111"   # this fixture thumb (a Sites-tab icon, past the 24 tiles) answers 404: a fault at the wire
@@ -257,11 +257,11 @@ def hero_tiles(run):
     strip_t = page.evaluate(TILES, ".report-card .live-strip a.gi-card")
     tile_shape = lambda x: (x[1] == "_blank" and x[2] == "noopener noreferrer nofollow") or (x[0] == report_url(slug) and x[1] == "" and x[2] == "")
     free_t = [[unquote(t[3].split("u=")[1]), t[0], t[1]] for t in i["tiles"]]
-    b9 = [t[:3] for t in band(strip_t, d)]
-    check(f"{tag} thumbs: band: #free phone Images tab = the first 9 tiles of the report (as the hero strip, minus its Videos tab's stills), count = the hero's, link → result in a new tab, else the report",
-          i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] == "group" and len(i["tiles"]) == len(b9)
+    b18 = [t[:3] for t in strip_t[:18]]
+    check(f"{tag} thumbs: band: #free phone Images tab = the first 18 tiles of the report (as the hero strip), count = the hero's, link → result in a new tab, else the report",
+          i["live"] and i["pill"] == f"{NI} images" and i["visible_illus"] == 0 and i["role"] == "group" and len(i["tiles"]) == len(b18)
           and all(t[3].startswith(cfg.api + "/api/thumb?u=") for t in i["tiles"]) and all(tile_shape(t) for t in i["tiles"])
-          and free_t == b9 and not tiles_ok([x + [True] for x in free_t], d, (DEAD_THUMB,)), (NI, i["tiles"][:2], tiles_ok([x + [True] for x in free_t], d, (DEAD_THUMB,))))
+          and free_t == b18 and not tiles_ok([x + [True] for x in free_t], d, (DEAD_THUMB,)), (NI, i["tiles"][:2], tiles_ok([x + [True] for x in free_t], d, (DEAD_THUMB,))))
     check(f"{tag} band: same height before/after results (row reserved, no shift)", abs(i["h"] - band_h0) <= 1, [band_h0, i["h"]])
     check(f"{tag} band: 'Send me the report' = Telegram with the report link", (i["send"] or "").startswith("https://t.me/jakabasej?text=")
           and quote(report_url(slug), safe="") in i["send"], i["send"])

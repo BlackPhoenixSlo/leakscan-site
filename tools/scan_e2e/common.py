@@ -174,13 +174,6 @@ dead_thumb = lambda u, extra=(): "DEAD" in u or "BLANK" in u or "LOGO" in u or a
 video_stills = lambda d: {r["thumb"] for r in d.get("results", []) if r.get("kind") == "video" and r.get("thumb")}   # kind: set by the backend
 
 
-def band(tiles, d, k=9):
-    """The #free phone's Images grid out of the hero strip's tiles: the first k minus the stills its Videos tab shows
-    (the first 3 video results')."""
-    v3 = {r.get("thumb") for r in [r for r in d.get("results", []) if r.get("kind") == "video" and r.get("link")][:3]}
-    return [t for t in tiles if t[0] not in v3][:k]
-
-
 def scan_images(d):
     """Every distinct image of a served result: images[] + every result's thumb, video results' stills included (no cap:
     the 80-result page list does not limit them) = what the scan page's strip and Images tab show (the data, as a set)."""

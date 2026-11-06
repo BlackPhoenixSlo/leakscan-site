@@ -60,7 +60,8 @@ re-derived list); the scan page's grid refills its slots; the scan page with > 8
 thumbs failing late on the strip: every thumb in strip + Images tab, nothing on screen moves (E.gallery `still`); (2) #website copy → demo iframe → Before / After phones (in #showcase), their All / Images / Videos tabs switch
 on click and keys without moving anything, the demo pops out to a full-screen layer (Esc / button / backdrop close,
 focus back, page scroll locked, nothing behind it moves, "Open the demo site" link kept); (3) the #free phone: same
-tabs, the illustration without a scan, her handle / rows / tiles / videos + Reveal with ?r=; no horizontal overflow.
+tabs, the illustration without a scan, her "<handle> nude leaks" search / rows / tiles / videos + Reveal with ?r=, each tab
+scrolling inside the phone (no trap at its end) with "Show more" batches up to every item; no horizontal overflow.
 Screenshots: <vp>-t*.png. --break-thumbs serves scan-engine.js with the gallery drop disabled: only `thumbs:` checks may go red.
 --break-people serves scan-engine.js with E.isPhoto always true (logos kept): only `thumbs:` checks may go red.
 

@@ -586,7 +586,7 @@ def public_api(t):
     occ = occurrences(served("demoNoProf01")["hits"])
     check(f"{tag} event again with other data resets the slots first",
           b2["search"] == [H, H] and b2["url"] == "yourname.com" and b2["ig"] == 0 and b2["thumbs"] == 3
-          and b2["handles"] == ["@" + H, "@" + H] and b2["line"] == 1 and occ.get(b2["leak1"]) == max(occ.values()), b2)
+          and b2["handles"] == ["@" + H, H + " nude leaks"] and b2["line"] == 1 and occ.get(b2["leak1"]) == max(occ.values()), b2)
     ctx.close()
 
 

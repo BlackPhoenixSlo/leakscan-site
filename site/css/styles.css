@@ -351,6 +351,17 @@ strong { font-weight: 650; }
 /* #free: one phone, Google for her handle; js/inline-scan.js fills it with her results (links, Reveal) */
 .free-phone { margin: 0; display: grid; justify-items: center; min-width: 0; }
 .phone-free { width: 288px; aspect-ratio: 9 / 16; }
+/* its tabs scroll inside the fixed screen (the page never moves on a switch). No overscroll-behavior: contain: the phone
+   is most of a 390 px screen, and past a list's end a new swipe / wheel on it must still scroll the page */
+.phone-free .phone-screen { display: flex; flex-direction: column; }
+.phone-free .m-search { flex: none; }
+.phone-free .m-search span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-free .m-panel { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; margin: 0 -6px; padding: 0 6px; }
+.phone-free .m-head { position: sticky; top: 0; z-index: 3; margin-top: 0; background: #fff; }
+.m-more { display: block; width: 100%; min-height: 36px; margin: 8px 0 6px; border: 1px solid #dadce0; border-radius: 999px; background: #fff; color: #1a73e8; font: inherit; font-size: .78rem; cursor: pointer; }
+.m-more[hidden] { display: none; }
+.m-more:focus-visible { outline: 2px solid #1a73e8; outline-offset: 2px; }
+@media (hover: hover) { .m-more:hover { background: #f8fafe; } }
 .m-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; margin: 2px 0 6px; font-size: .74rem; color: #5f6368; }
 .phone .reveal-btn { min-height: 30px; padding: 0 10px; border-color: #dadce0; background: #fff; color: #202124; font-size: .72rem; }
 .phone .reveal-btn[aria-pressed="true"] { border-color: #1a73e8; color: #1a73e8; }
