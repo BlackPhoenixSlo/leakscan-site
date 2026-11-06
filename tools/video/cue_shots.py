@@ -137,7 +137,7 @@ Plus:
   only (pure draw: offset > 100 px at live + 0.02 → 0 by live + 0.45, scale 1 throughout; x still pops; reduced motion: no
   offset); "google timing": google's removed cue = G_REMOVED_OLD − 0.5 (12.36), the wipe's first frame (--p < 100, pure draw
   0.01 s steps) = removed + 0.25, inside his "they" .. "removed" and done by "removed"'s end + 0.4. With --base REF: "google
-  post": from google-images live + 0.45 to the end (pure draw, 0.05 s steps, 1920, both modes) every card's / descendant's
+  post": from google-images live + 0.5 to the end (pure draw, 0.05 s steps, 1920, both modes) every card's / descendant's
   style, every card's text but google / google-images, the captions == REF's files (index.html, video-overlays.js,
   video.css served from git, declared). --only google = this part.
 --break-gtime serves index.html with google's old removed cue (G_REMOVED_OLD): only the "google timing" checks go red.
@@ -1864,10 +1864,10 @@ def gsearch(b, base, out, cues, raw_file, base_ref):
                 ri = next(i for i, w in enumerate(WORDS) if w[1] > g[0] and w[0].lower().startswith("removed"))
                 they, rmw = WORDS[ri - 2], WORDS[ri]
                 check(f"google timing ({lbl}): removed cue {tx['cue']} = {G_REMOVED_OLD} − 0.5", abs(tx["cue"] - (G_REMOVED_OLD - 0.5)) < 0.005, tx["cue"])
-                check(f"google timing ({lbl}): the wipe starts at removed + 0.25 (measured {w0}), while he says {they[0]!r} ({they[1]}) .. {rmw[0]!r} ({rmw[1]}), done by {rmw[2] + 0.4:.2f}",
-                      w0 is not None and abs(w0 - (tx["cue"] + 0.25)) <= 0.011 and they[1] <= w0 <= rmw[1] and w0 + 0.95 <= rmw[2] + 0.4, (w0, they, rmw))
-            check(f"google ({lbl}): mode {('named' if mode == 'hers' else 'generic')!r}, no console errors, no requests outside the local server",
-                  tx["mode"] == ("named" if mode == "hers" else "generic") and not errs and not ext, (tx["mode"], errs[:2], ext[:2]))
+                check(f"google timing ({lbl}): the wipe starts at removed + 0.25 (measured {w0}, ease-in: <= + 0.05), while he says {they[0]!r} ({they[1]}) .. {rmw[0]!r} ({rmw[1]}), done by {rmw[2] + 0.4:.2f}",
+                      w0 is not None and abs(w0 - (tx["cue"] + 0.25)) <= 0.05 and they[1] <= w0 <= rmw[1] and w0 + 0.95 <= rmw[2] + 0.4, (w0, they, rmw))
+            check(f"google ({lbl}): mode {('named' if mode == 'hers' else 'generic')!r}, no console errors (hers: but the declared thumb / media 404s), no requests outside the local server",
+                  tx["mode"] == ("named" if mode == "hers" else "generic") and not ext and not [e for e in errs if not (mode == "hers" and "status of 404" in e)], (tx["mode"], errs[:2], ext[:2]))
             ctx.close()
     ctx, _ = context(dict(viewport={"width": 1440, "height": 900}), rm=True)
     pg = ctx.new_page()
@@ -1876,7 +1876,7 @@ def gsearch(b, base, out, cues, raw_file, base_ref):
     check("google slide (reduced motion): no offset, no scale at live + 0.1", s[1] == 0 and s[2] == 1, s)
     ctx.close()
     if base_ref:
-        a0, end = round(gi[0] + 0.45, 2), round(END - 0.05, 2)
+        a0, end = round(gi[0] + 0.5, 2), round(END - 0.05, 2)   # its entrance (0.45 s) done
         for mode, query, _ in modes:
             st = []
             for ref in (base_ref, None):
@@ -1890,7 +1890,7 @@ def gsearch(b, base, out, cues, raw_file, base_ref):
             diff = [(x[0], x, y) for x, y in zip(*st) if x != y]
             (out / f"google-post-{mode}.json").write_text(json.dumps({"base": base_ref, "n": len(st[1]), "diff": diff[:5]}, indent=1))
             check(f"google post ({mode}): {a0} .. {end} s every card's state + texts (but google / google-images) + captions == {base_ref} ({len(st[1])} frames)",
-                  len(st[0]) == len(st[1]) > 100 and not diff, diff[:1])
+                  len(st[0]) == len(st[1]) > 100 and not diff, [d[0] for d in diff][:20])
 
 
 def main():
