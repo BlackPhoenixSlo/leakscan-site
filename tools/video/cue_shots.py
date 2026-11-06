@@ -72,7 +72,7 @@ Plus:
 - full frame (1920x1080, 1280x800, phone 390x844, iPhone theater, desktop full screen): the <video> box == the stage box,
   the drawn picture (object-fit + videoWidth / Height) covers the whole stage (full screen: the centred 16:9 picture, the
   overlay = its right half); .vo-over / .vo-box = the stage's right half, transparent (no background, no shadow: the
-  cards are drawn straight on the video); at a card-free, still time (7.2 s) the screen's right half = the video frame's right half
+  cards are drawn straight on the video); at a card-free, still time (7.2 s; the intro fill hidden, declared) the screen's right half = the video frame's right half
   (screenshot, native controls + player UI off (declared), vs drawImage(video), 8x8 grid, mean |diff| < 3, every cell < 24) -> full-frame-<vp>.png
 --break-full serves css/video.css with the old split layout appended (the video in the left half, an opaque panel behind
   the cards): only the "full frame:" checks go red.
@@ -710,9 +710,9 @@ def cta_steps(pg, base, out, cta, name_q):
     play(pg, END - 0.1)
     pg.wait_for_function("() => document.querySelector('video').ended", timeout=8000)
     try:
-        pg.wait_for_function("() => { const s = document.querySelectorAll('.vo-step'); return s.length === 3 && +getComputedStyle(s[2]).opacity > .9"
-                             " && +getComputedStyle(document.querySelector('.vo-end')).opacity > .9"
-                             " && document.querySelector('.vo-steps').style.getPropertyValue('--fp') === '1.000'; }", timeout=12000)
+        pg.wait_for_function("() => { const c = document.querySelector('.vo-cta'), s = c.querySelectorAll('.vo-step'); return s.length === 3 && +getComputedStyle(s[2]).opacity > .9"
+                             " && +getComputedStyle(c.querySelector('.vo-end')).opacity > .9"
+                             " && c.querySelector('.vo-steps').style.getPropertyValue('--fp') === '1.000'; }", timeout=12000)   # scoped: the intro holds a clone
     except Exception:
         pass
     f = out / "frame-1920-generic-cta-flip-postroll.png"
@@ -1142,8 +1142,9 @@ def full_frame(b, base, out):
             pg.wait_for_timeout(500)
         shot = out / f"full-frame-{vp}.png"
         pg.screenshot(path=str(shot))
-        if how is None:   # declared: native controls + the player UI layer off for the pixel probe (bar gradient, top-right button; ui_full checks their geometry)
-            pg.evaluate("() => { document.querySelector('.vo-video').controls = false; document.querySelector('.vo-ui').style.visibility = 'hidden'; }")
+        if how is None:   # declared: native controls + the player UI layer + the intro fill (cued 0.3-9.8, fill() checks it) off for the pixel probe (bar gradient, top-right button; ui_full checks their geometry)
+            pg.evaluate("() => { document.querySelector('.vo-video').controls = false; document.querySelector('.vo-ui').style.visibility = 'hidden';"
+                        " const i = document.querySelector('.vo-intro'); if (i) i.style.visibility = 'hidden'; }")
             pg.wait_for_timeout(300)
             png = pg.screenshot()
         st, vb, pic, ov, pov, pbx, sr, orr, full = pg.evaluate(FULL)
@@ -1160,7 +1161,7 @@ def full_frame(b, base, out):
         if how is None:   # the theater is rotated on screen: its geometry above is enough
             a_, v_ = pg.evaluate(PIX, [base64.b64encode(png).decode(), [.56, .1, .96, .9]])
             d = [abs(x - y) for x, y in zip(a_, v_)]   # real footage: fine moving detail (the phone on his whiteboard) moves single cells
-            check(f"full frame: {vp}: the screen's right half (no card at 7.2 s) = the video frame's right half (mean |diff| < 3, max < 24)",
+            check(f"full frame: {vp}: the screen's right half (no card at 7.2 s, intro fill hidden) = the video frame's right half (mean |diff| < 3, max < 24)",
                   sum(d) / len(d) < 3 and max(d) < 24, (round(sum(d) / len(d), 2), max(d)))
         ctx.close()
 
