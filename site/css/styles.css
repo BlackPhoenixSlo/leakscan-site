@@ -94,12 +94,12 @@ img { height: auto; }
 a { color: var(--accent); text-underline-offset: .18em; text-decoration-thickness: 1px; }
 @media (hover: hover) { a:hover { color: var(--accent-hover); } }
 h1, h2 { font-family: var(--serif); font-weight: 400; font-synthesis: none; margin: 0 0 .45em; text-wrap: balance; }
-/* 390: h1 44/46, h2 32/36; 1440: h1 88/88, h2 48/52 (linear between); every section h2 on the one scale */
+/* 390: h1 44/46, h2 32/36; 1440: h1 88/88, h2 44/48 (linear between); every section h2 on the one scale */
 h1 { font-size: clamp(2.75rem, 4.19vw + 1.729rem, 5.5rem); line-height: 1.045; letter-spacing: -.01em; }
-h2 { font-size: clamp(2rem, 1.524vw + 1.629rem, 3rem); line-height: 1.11; letter-spacing: -.01em; max-width: 18ch; }
-.ba-copy .ba-h { font-size: clamp(1.75rem, 1.143vw + 1.471rem, 2.5rem); line-height: 1.1; }   /* an h3 under #showcase: one step below the h2s */
+h2 { font-size: clamp(2rem, 1.143vw + 1.721rem, 2.75rem); line-height: 1.11; letter-spacing: -.01em; max-width: 18ch; }
+.ba-copy .ba-h { font-size: clamp(1.75rem, .762vw + 1.564rem, 2.25rem); line-height: 1.1; }   /* an h3 under #showcase: one step below the h2s */
 h3 { font: 600 1.1875rem/1.37 var(--sans); letter-spacing: -.005em; margin: 0 0 .3em; text-wrap: balance; }
-@media (min-width: 1100px) { h1 { line-height: 1; letter-spacing: -.015em; } h2 { line-height: 1.077; } h3 { font-size: 1.3125rem; line-height: 1.333; } }
+@media (min-width: 1100px) { h1 { line-height: 1; letter-spacing: -.015em; } h2 { line-height: 1.09; } h3 { font-size: 1.3125rem; line-height: 1.333; } }
 p { margin: 0 0 1em; text-wrap: pretty; }
 strong { font-weight: 600; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
@@ -445,6 +445,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* ---------- Sections: one paper, separated by space; the fold band only under #how and the showcase ---------- */
 .section { padding: 36px 0; }
 @media (min-width: 720px) { .section { padding: 60px 0; } }
+@media (min-width: 1100px) { .section { padding: 80px 0; } }   /* desktop: 80 everywhere (the website band keeps its joined edge) */
 .how, .website, .showcase { background: var(--fold); }   /* #website + #showcase: one band, heading to the last phone */
 .website { padding-bottom: 0; }
 .showcase { padding-top: 24px; }
@@ -514,6 +515,9 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .free-copy > p:not(.free-actions) { color: var(--ink); max-width: 36em; }
 .free-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 20px 0 0; }
 .free-phone { margin: 0; display: grid; justify-items: center; min-width: 0; }
+.phone-free .m-ex { flex: none; align-self: flex-end; position: relative; z-index: 1; margin: -38px 0 16px; padding: 2px 8px; border-radius: 999px; background: #f1f3f4; color: #5f6368; font: 600 .75rem/1.4 Arial, Helvetica, sans-serif; pointer-events: none; }
+.phone-free.is-live .m-ex { display: none; }
+@media (prefers-color-scheme: dark) { .phone-free .m-ex { background: #303134; color: #bdc1c6; } }   /* her results replaced the example (js/free-phone.js) */
 #main .phone-free { width: 300px; aspect-ratio: auto; height: 442px; }   /* 3 whole image rows */
 @media (max-width: 559px) {
   .free-copy h2 { margin-bottom: .4em; }
@@ -525,19 +529,20 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 
 /* #why: a letter (portrait, serif heading, text), three rules beside it, the record as one line */
 .why-grid { display: grid; gap: 24px; }
-@media (min-width: 960px) { .why-grid { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 32px 80px; align-items: start; } .proof { grid-column: 1 / -1; } }
-.why-portrait { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; margin-bottom: 18px; }
-.why-letter h2 { max-width: 14ch; }
-.why-letter p { max-width: 36em; margin: 0; }
+@media (min-width: 960px) { .why-grid { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); grid-template-rows: auto 1fr; gap: 32px 80px; align-items: start; } .why-rules { grid-column: 2; grid-row: 1 / 3; } .proof { grid-column: 1; grid-row: 2; align-self: end; } }   /* the record closes the left column, level with the last rule */
+.why-portrait { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+.why-letter { display: grid; grid-template-columns: 72px minmax(0, 1fr); column-gap: 20px; align-items: center; }   /* the portrait inline with the h2 */
+.why-letter h2 { max-width: none; margin: 0; }
+@media (min-width: 960px) { .why-letter h2 { white-space: nowrap; } }
+.why-letter p { grid-column: 1 / -1; max-width: 36em; margin: 18px 0 0; }
 .why-rules { list-style: none; margin: 0; padding: 0; }
 .why-rules li { padding: 12px 0; border-top: 1px solid var(--line); }
 .why-rules li:last-child { border-bottom: 1px solid var(--line); }
 .why-rules h3 { margin-bottom: .15em; }
 @media (max-width: 959px) {   /* phone: the portrait beside the heading, the letter under both */
-  .why-letter { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 16px; align-items: center; }
-  .why-letter .why-portrait { width: 64px; height: 64px; margin: 0; }
-  .why-letter h2 { margin: 0; }
-  .why-letter p { grid-column: 1 / -1; margin-top: 14px; }
+  .why-letter { grid-template-columns: 64px minmax(0, 1fr); column-gap: 16px; }
+  .why-letter .why-portrait { width: 64px; height: 64px; }
+  .why-letter p { margin-top: 14px; }
   .why-rules li { padding: 10px 0; }
 }
 .why-rules p { margin: 0; color: var(--muted); }
@@ -548,7 +553,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 @media (min-width: 720px) { .proof { grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 20px; } .proof-t { font-size: 1.0625rem; line-height: 1.6; } }
 
 /* #how, on the fold: "You" (1-3, the 3rd optional) and "Me" (4-5) */
-.how h2 { max-width: 20ch; margin-bottom: 20px; }
+.how h2 { max-width: 900px; margin-bottom: 20px; }
 .parts { display: grid; gap: 20px; }
 .part-h { margin: 0 0 6px; font: 600 1.1875rem/1.37 var(--sans); color: var(--ink); }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; }
@@ -641,7 +646,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   .ba-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .js .ba-copy .ba-label { display: block; margin: 8px 0 0; color: var(--muted); font-size: .906rem; }
   .js .ba-item { grid-area: 1 / 1; position: relative; z-index: 1; }   /* both screens in one cell: the off one stays laid out and readable (innerText) */
-  .js .ba .ba-item:not(.is-on):is(*, .reveal) { z-index: 0; opacity: 0; pointer-events: none; }   /* main.js: inert + aria-hidden on it */
+  .js .ba .ba-item:not(.is-on):is(*, .reveal) { z-index: 0; opacity: 0; pointer-events: none; }   /* main.js: inert on it */
   .js .ba .ba-item.reveal.is-in { transition: opacity .15s; }   /* the switch: a quick cross-fade */
   .js .ba-item figcaption { display: none; }
   .ba-arrow { display: none; }
@@ -714,6 +719,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .site-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; align-content: start; }
 .site-footer a:not(.brand) { color: var(--ink); text-decoration: none; display: inline-block; padding: 8px 0; line-height: 1.3; }
 @media (max-width: 819px) { .site-footer ul { display: flex; flex-wrap: wrap; column-gap: 20px; } .site-footer a:not(.brand) { padding: 6px 0; min-height: 32px; } }
+@media (min-width: 820px) { .footer-grid:not(:has(.footer-contact)) { grid-template-columns: minmax(0, 1fr) auto; } .site-footer ul { display: flex; flex-wrap: wrap; column-gap: 28px; justify-content: flex-end; } }   /* desktop: the six links as one row */
 @media (hover: hover) { .site-footer a:not(.brand):hover { color: var(--accent); text-decoration: underline; } }
 .footer-base { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 24px; margin-top: 16px; }
 .footer-base p { margin: 0; color: var(--muted); }

@@ -27,7 +27,8 @@
    play mark and the two-line caption; no blur, no bars */
 .pip-poster { display: flex; overflow: hidden; }
 .pip-poster img { flex: none; height: 100%; width: auto; aspect-ratio: 4 / 5; object-fit: cover; object-position: 50% 20%; }
-.pip-poster p { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; margin: 0; padding: 12px; text-align: center; }
+.pip-poster p { flex: 1; min-width: 0; display: flex; flex-direction: column-reverse; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0; padding: 16px; text-align: left; }   /* the caption top-left, the play mark bottom-right: the panel composed, not a centred void */
+.pip-poster-go { align-self: flex-end; }
 .pip-poster-go { display: flex; align-items: center; justify-content: center; flex: none;
   width: 56px; height: 56px; border-radius: 50%; background: #f2b8d2; color: #2b0f20; box-shadow: 0 2px 12px rgb(0 0 0 / .35); }
 .pip-poster-go svg { width: 22px; height: 22px; margin-left: 3px; stroke: none; }
@@ -35,7 +36,8 @@
 .pip-poster strong { color: #fff; font-weight: 600; font-size: 1rem; }
 /* a small player (floating, 45vw on a phone) */
 @container (max-width: 259px) {
-  .pip-poster p { gap: 6px; padding: 6px; }
+  .pip-poster p { flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 6px; text-align: center; }
+  .pip-poster-go { align-self: center; }
   .pip-poster-go { width: 40px; height: 40px; }
   .pip-poster-go svg { width: 16px; height: 16px; margin-left: 2px; }
   .pip-poster-t { font-size: 0; }   /* the panel is ~65 px: the name + length only */

@@ -38,7 +38,7 @@
   var baMq = matchMedia('(max-width: 819px)'), baOn = 0;
   function baShow(i) {
     var phone = baMq.matches; baOn = i;
-    baItems.forEach(function (it, j) { var off = phone && j !== i; it.classList.toggle('is-on', j === i); it.inert = off; if (off) it.setAttribute('aria-hidden', 'true'); else it.removeAttribute('aria-hidden'); });
+    baItems.forEach(function (it, j) { it.classList.toggle('is-on', j === i); it.inert = phone && j !== i; });   // inert: out of Tab order and the AT tree
     sw.querySelectorAll('button').forEach(function (b, j) { b.setAttribute('aria-pressed', String(j === i)); });
     if (baLab) baLab.textContent = BA_LAB[i];
   }

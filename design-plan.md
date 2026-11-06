@@ -159,3 +159,11 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
   phone sub shorter; proof line one string. "I send the notices for one page free" (hero, how, pricing, FAQ, meta, scan/).
   "Two plans."; contact "not a bot" cut; footer contact column and FAQ Telegram button gone.
 - Showcase phone hero: object-position 0% 40% + a left scrim: the eyebrow clears her hair.
+
+## Round 9 notes
+- personalize "buried 5": BA off phone keeps opacity + `inert` only (no aria-hidden); Tab can't reach it, hidden/buried clean.
+- #free: primary "Find my leaks" → #scan, secondary "Already scanned? Send the link"; "Example results" tag in the phone.
+- Removals: Mega window footer (Download / Import) fills the window; dark panels plum; idle knob `--ki` inset (8 px, Mega 22 px), "Drag" tag; tabs min 44×44.
+- Copy: hero sub "…one page free. You sign one page. You pay nothing."; "one page free" and "live, cached, gone" ≤ 2 visible; pricing sub "Prices in EUR. Pay only after the free page."; why h2 "A person, not a bot." inline with portrait; step 4 "I file everywhere"; plan-for and Mega caption shortened.
+- Scale: h2 32 → 44 (390 → 1440), section padding 80 at ≥1100; footer links one row on desktop; pip poster caption top-left, play bottom-right.
+- Scan card already has "Send me the report" (prefilled Telegram/WhatsApp/email): no change.
