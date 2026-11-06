@@ -45,7 +45,7 @@ Plus:
   ends the post-roll clock keeps it looping to the flip (frame-1920-generic-cta-flip-postroll.png); phone portrait +
   iPhone theater: every phase shot (phone-{portrait,theater}-generic-cta-<n>-<phase>.png), typed handle on screen >= 11 px
   portrait / >= 20 px theater, the toast's letters >= 11 px portrait
-- named flow (?name=NAME, data-cue-cta): the same take with handle(DEMO) "jakabasej" typed, '@jakabasej' on the scan / report cards, the toast
+- named flow (?name=NAME, data-cue-cta): the same take with handle(NAME) typed (no scan result: the placeholder rows), '@<handle(NAME)>' on the scan / report cards, the toast
   = only the compact contact row (Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev), never NAME, no
   title / form / flip / pill; held to cta + 14.6 (named loop 15 s), looping after the take ends; 1920 + phone portrait + iPhone
   theater phases (frame-1920-named-cta-*.png, phone-{portrait,theater}-named-cta-*.png), contacts >= 8 px portrait
@@ -99,9 +99,17 @@ Plus:
   last scan (the landing's in-page scan → leakscan.last → /video/ with no query), 1920 + phone 390x844 + iPhone theater; pure draw(t)
   (declared) + shots at 5 / 12 / 16.5 / 19 / 23 / 26 / 31 / 40 / 47 s (hers-<r|last>-<view>-t<t>.png): every card 10-34.6 s shows >= 1
   field of her result (host / title / count / her thumb loaded), the wall = her top sites first, no SophieStar / Your name / Orla Brennick
-  on screen or in a slot, the "for <name>" pill at 1 s; the end card (40 / 47 s) = the jakabasej demo, no "ophierai" / her name /
-  "This is what I'd clear", the contact footer <= 20 % of the phone; the landing's mini player (?pip=1, iframe loaded before the scan)
-  turns hers in place on the storage event (hers-pip-1920-t12.png).
+  on screen or in a slot, the "for <name>" pill at 1 s; "hers handle": the intro (3 / 3.5 / 6 / 9.5 s) and the end card (36 / 37.85 /
+  40 s) type onlyfans.com/<her handle> + "@<her handle>"; "hers end" (47 s): her report: '@<handle>', Images = her kept people
+  photos, rows = her hosts + titles (no *.example, no URL), "+N more", 9 of her photos blurred >= 5px, the contact footer <= 20 %
+  of the phone, no "This is what I'd clear"; never "jakabasej" outside the contact footer (on screen or in the DOM text);
+  "hers counts": the end card's Links / Images / Sites == the landing report's for the same result (?r=: the landing ?r=;
+  last: the landing's own scan; pip: the landing around the mini player); the landing's mini player (?pip=1, iframe loaded before the scan)
+  turns hers in place on the storage event (hers-pip-<1920|phone>-t12.png), then its intro / end card shot in the iframe at
+  3 / 6 / 9.5 / 36 / 40 / 47 s (hers-pip-<view>-t<t>.png, + the whole landing at 47 s: hers-pip-<view>-t47-page.png).
+--break-herend serves video-overlays.js with the old demo end in personalized mode (rr = null, jakabasej typed): only the
+  "hers handle" / "hers end" / "hers counts" / "prod end card" / prod report checks (and the named flow's typed handle, unless
+  --name slugs to jakabasej) go red.
 --break-hers serves video-overlays.js with a loaded result never applied: the "hers" checks (and the stub's ?r= "personalized" ones) go red.
 --break-voice serves video-overlays.js with the old overvoice (speechSynthesis.speak(name) 0.5 s in): only the "no overvoice"
   / swap speak checks go red. --only voice = the speech + desktop swap part.
@@ -190,7 +198,7 @@ STEPS = """() => { const c = document.querySelector('.vo-cta'), s = c && c.query
           h1: sp(q('.vo-h1').textContent), logo: logo.complete && logo.naturalWidth > 0, typed: mi.textContent, px: +(fs(mi) * k * cz[0]).toFixed(1),
           btn: q('.vo-mbtn').textContent.trim(), press: +s.style.getPropertyValue('--press'), ms: q('.vo-ms').textContent, bar: +s.style.getPropertyValue('--bar'),
           at: q('.vo-sc-scan .vo-at').textContent, count: sp(q('.vo-mc').textContent), tabs: [...s.querySelectorAll('.vo-tabs2 > span')].map(e => sp(e.textContent)),
-          rows: [...s.querySelectorAll('.vo-dom')].map(e => e.textContent), more: q('.vo-more').textContent, end: sp(q('.vo-end-h').textContent),
+          rows: [...s.querySelectorAll('.vo-dom')].map(e => e.textContent), rowon: [...s.querySelectorAll('.vo-row')].map(e => e.style.display !== 'none'), more: q('.vo-more').textContent, end: sp(q('.vo-end-h').textContent),
           eo: +getComputedStyle(q('.vo-end')).opacity, endpx: +(Math.min(fs(q('.vo-end-h')), fs(q('.vo-end-f'))) * k).toFixed(1), mini: q('.vo-mini-n').textContent,
           shown: [...s.querySelectorAll('.vo-end > span')].filter(e => getComputedStyle(e).display !== 'none').map(e => sp(e.textContent)),
           contacts: [...s.querySelectorAll('.vo-end-c > span')].map(a => sp(a.textContent)),
@@ -356,13 +364,13 @@ VIDEO_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|
 GSTATIC = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
 REAL = """() => { const q = s => [...document.querySelectorAll(s)], im = i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter];
   return {g: q('.vo-pf[data-prefab="google"] .rm-live .rm-img').map(im), grows: q('.vo-pf[data-prefab="google"] .rm-live .m-site').map(e => e.textContent),
-          grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
+          grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-cta .vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
           own: q('.vo-own').map(im), count: (document.querySelector('[data-vo="g-count"]') || {}).textContent, photos: window.VideoOverlays.photos,
           cards: q('.vo-pf[data-prefab]').map(e => [e.dataset.prefab, [...e.querySelectorAll('.rm-img, .vo-real')].map(im)])}; }"""
 BLUR = lambda f: float(m[1]) if (m := re.search(r"blur\(([\d.]+)px\)", f or "")) else 0.0
 BLUR_MIN = 5   # px: the video cards' leak-image blur floor (= styles.css .live-ico, the site's lightest rule)
 # the landing report (?r=, js/inline-scan.js) once its probes settled: [Images tab count, every strip / grid tile src]
-LANDING = """() => { const n = document.querySelector('#lt-images .live-tab-n');
+LANDING = """() => { const n = document.querySelector('#tab-report-images .live-tab-n');
   return [n ? +n.textContent : null, [...document.querySelectorAll('.live-strip-track .gi-img, .live-grid .gi-img')].map(i => i.getAttribute('src'))]; }"""
 
 
@@ -518,13 +526,14 @@ def prod(b, base, out, cues, cta):
         thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and BLUR(x[2]) >= BLUR_MIN for x in xs)
         check(f"prod img ({label}): Google: 3 real thumbs on the first row, loaded, blurred", len(real["g"]) == 3 and thumb(real["g"], 3), real["g"])
         check(f"prod img ({label}): Google Images: 6 real thumbs, loaded, blurred", len(real["grid"]) == 6 and thumb(real["grid"], 6), real["grid"][:2])
-        check(f"prod img ({label}): cta-steps report = the jakabasej demo: none of her thumbs (no .vo-real)", not real["rep"], real["rep"][:2])
+        check(f"prod img ({label}): cta-steps report: 9 of her people photos (rows + strip), loaded, blurred, all kept ones", len(real["rep"]) == 9 and thumb(real["rep"], 9)
+              and all(x[0] in real["photos"]["kept"] for x in real["rep"]), real["rep"][:2])
         check(f"prod img ({label}): every .rm-img = a real /api/thumb one, loaded, blurred", thumb(real["all"], 13), [x for x in real["all"] if not x[0].startswith("/api/thumb")][:2])
         check(f"prod ({label}): Google rows = her real domains, count {want['count']!r}", real["grows"] == want["rows"][:4] and real["count"] == want["count"], (real["grows"], real["count"]))
         weak = [(c, x[0][-24:], x[2]) for c, xs in real["cards"] for x in xs if BLUR(x[2]) < BLUR_MIN]
         n_leak = sum(len(xs) for _, xs in real["cards"])
         check(f"prod blur ({label}): every leak image on every card ({n_leak} on {', '.join(c for c, xs in real['cards'] if xs)}) blurred >= {BLUR_MIN}px",
-              n_leak >= 13 and not weak, weak[:3] or sorted({x[2] for _, xs in real["cards"] for x in xs}))
+              n_leak >= 22 and not weak, weak[:3] or sorted({x[2] for _, xs in real["cards"] for x in xs}))
         kept, dropped = real["photos"]["kept"], real["photos"]["dropped"]
         print(f"prod ({label}): people photos kept {len(kept)}, dropped {len(dropped)} (logos / banners / icons / dead)")
         own = real["own"]
@@ -546,15 +555,16 @@ def prod(b, base, out, cues, cta):
             (pg if theater else pg.locator(".vo-stage")).screenshot(path=str(f))
             if name in ("cta-typed", "end"):
                 s2 = pg.evaluate(STEPS)
-                ok = s2["typed"] == handle(DEMO) and s2["at"] == "@" + handle(DEMO) if name == "cta-typed" else named_end(s2, st[4])
-                check(f"prod end card ({label}): " + (f"typed onlyfans.com/{handle(DEMO)} + '@{handle(DEMO)}' (not her {PROD_HANDLE!r})" if name == "cta-typed"
+                ok = s2["typed"] == PROD_HANDLE and s2["at"] == "@" + PROD_HANDLE if name == "cta-typed" else named_end(s2, st[4])
+                check(f"prod end card ({label}): " + (f"typed onlyfans.com/{PROD_HANDLE} + '@{PROD_HANDLE}' (her handle, not {handle(DEMO)!r})" if name == "cta-typed"
                       else f"ends on the contact row only (no {st[4]!r})") + f" -> {f.name}", ok, s2 and (s2["typed"], s2["at"], s2["shown"]))
             if name == "report":
                 s2 = pg.evaluate(STEPS)
-                tabs = [int(re.sub(r"\D", "", x)) for x in s2["tabs"]]
-                check(f"prod ({label}): report = the jakabasej demo (her result loaded): Links / Images / Sites {TABS}, '+ {LEAKS - 5} more', 5 *.example rows, '@{handle(DEMO)}' -> {f.name}",
-                      tabs == TABS and s2["at"] == "@" + handle(DEMO) and s2["more"] == f"+ {LEAKS - 5} more in the full report"
-                      and len(s2["rows"]) == 5 and all(r.endswith(".example") for r in s2["rows"]), (tabs, s2["more"], s2["rows"]))
+                tabs = rep_tabs = [int(re.sub(r"\D", "", x)) for x in s2["tabs"]]
+                rows = [r for r, v in zip(s2["rows"], s2["rowon"]) if v]
+                check(f"prod ({label}): report = hers: '@{PROD_HANDLE}', Images = her kept photos ({len(kept)}), Links / Sites {tabs[0]} / {tabs[2]}, her rows {rows[:3]}…, no *.example, "
+                      f"'+ {tabs[0] - len(rows)} more' -> {f.name}", s2["at"] == "@" + PROD_HANDLE and tabs[1] == len(kept) and 0 < len(rows) <= 5
+                      and not any(r.endswith(".example") for r in rows) and s2["more"] == f"+ {tabs[0] - len(rows)} more in the full report", (tabs, s2["at"], s2["more"], rows))
         text = pg.evaluate("() => document.body.innerText + ' ' + document.querySelector('.vo').textContent")
         bad = [x for x in paths if x in text][:3] + re.findall(r"https?://\S+", text)[:3]
         check(f"prod ({label}): no leak URL in the DOM text ({len(paths)} paths checked, no http(s)://)", not bad, bad)
@@ -566,12 +576,12 @@ def prod(b, base, out, cues, cta):
             lp = lctx.new_page()
             lp.goto(f"{base}?r={slug}")
             try:   # its probes settled: the Images tab says what is left
-                lp.wait_for_function("k => { const n = document.querySelector('#lt-images .live-tab-n'); return n && +n.textContent === k; }", arg=len(kept), timeout=20000)
+                lp.wait_for_function("k => { const n = document.querySelector('#tab-report-images .live-tab-n'); return n && +n.textContent === k; }", arg=len(kept), timeout=20000)
             except Exception:
                 pass
             lp.wait_for_timeout(1500)
             n_l, tiles = lp.evaluate(LANDING)
-            lp.locator("#lt-images").first.click()
+            lp.locator("#tab-report-images").first.click()
             lp.wait_for_timeout(1200)
             card = lp.locator(".live-card, .hero-card, #hero-card").first
             (card if card.count() else lp).screenshot(path=str(out / "prod-landing-report-images.png"))
@@ -579,6 +589,8 @@ def prod(b, base, out, cues, cta):
             check(f"prod logos: the video cards and the landing report (?r={slug}) drop the same thumbs: landing Images {n_l} == video kept {len(kept)}"
                   f" (of {len(kept) + len(dropped)}, {len(dropped)} dropped), all {len(tiles)} landing tiles in the video's kept set -> prod-landing-report-images.png",
                   n_l == len(kept) and tiles and all(t in ks for t in tiles) and not ks & set(dropped), (n_l, len(kept), [t[-30:] for t in tiles if t not in ks][:3]))
+            lt = landing_tabs(lp)
+            check(f"prod ({label}): end-card report counts == the landing report's (?r={slug}): video {rep_tabs} == landing {lt}", rep_tabs == lt, (rep_tabs, lt))
             (out / "prod-photos.json").write_text(json.dumps({"slug": slug, "kept": kept, "dropped": dropped, "landing_count": n_l, "landing_tiles": tiles}, indent=1))
             print(f"prod logos: landing page requests outside 127.0.0.1 aborted (declared, the landing's own, not the video's): {sorted(set(lext))}")
             lctx.close()
@@ -593,8 +605,10 @@ def prod(b, base, out, cues, cta):
     print(f"prod: proxied read-only GETs to production (memoized): " + ", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))))
 
 
-# ---------- hers: her result in every card 0-34.6 s, the end card = Jack's jakabasej demo (?r= and the last scan) ----------
-HERS_TS = (1, 5, 12, 16.5, 19, 23, 26, 31, 40, 47)   # 1 = the "for <name>" pill (no shot)
+# ---------- hers: her result in every card, the intro + end card type HER handle, the end card = her report (?r=, the last scan, the pip) ----------
+HERS_TS = (1, 3, 3.5, 6, 9.5, 12, 16.5, 19, 23, 26, 31, 36, 37.85, 40, 47)   # 1 = the "for <name>" pill (no shot); 3.5 / 37.85 = her handle typed in full
+HERS_END = (3, 3.5, 6, 9.5, 36, 37.85, 40, 47)
+PIP_TS = (3, 6, 9.5, 36, 40, 47)   # the pip iframe's shots   # her handle / her end-card report checks (chk_end)
 HERS_CARD = {12: "google", 16.5: "google-images", 19: "x", 23: "reddit", 26: "mega", 31: "sites"}
 PERSONA_RE = re.compile(r"SophieStar|sophiestar|Your name|Orla|Brennick|brennick")   # case-sensitive: the hero copy says "in your name"
 HERS_JS = """t => { const v = document.querySelector('video'); v.pause(); window.VideoOverlays.draw(t);
@@ -605,7 +619,27 @@ HERS_JS = """t => { const v = document.querySelector('video'); v.pause(); window
     imgs: on.flatMap(e => [...e.querySelectorAll('img.rm-img')].map(i => [i.getAttribute('src'), i.naturalWidth])),
     sites: [...document.querySelectorAll('.vo-sites-l b')].map(b => b.textContent), slots: [...document.querySelectorAll('[data-vo]')].map(e => e.textContent).join(' | '),
     cta: c.innerText, contacts: [...c.querySelectorAll('.vo-end-c > span')].map(x => x.textContent), eo: +getComputedStyle(c.querySelector('.vo-end')).opacity,
-    cov: +(ix / (s.width * s.height)).toFixed(3), mode: document.documentElement.dataset.voMode, search: location.search}; }"""
+    cov: +(ix / (s.width * s.height)).toFixed(3), mode: document.documentElement.dataset.voMode, search: location.search, ...(() => {
+      const p = on.find(e => e.querySelector('.vo-steps')), q = x => p && p.querySelector(x), im = i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter];
+      const rows = p ? [...p.querySelectorAll('.vo-row')].filter(r => r.style.display !== 'none') : [], all = document.getElementById('vo').cloneNode(true);
+      all.querySelectorAll('.vo-end-c').forEach(x => x.remove());   // the contact footer's Telegram @jakabasej is contact info
+      const n = x => (x.toLowerCase().match(/jakabasej/g) || []).length, foot = on.includes(c) ? c.querySelector('.vo-end-c').innerText : '';
+      return {typed: q('.vo-mi-t') ? q('.vo-mi-t').textContent : null, at: q('.vo-sc-scan .vo-at') ? q('.vo-sc-scan .vo-at').textContent : null,
+        tabs: p ? [...p.querySelectorAll('.vo-tabs2 b')].map(b => +b.textContent) : [], rows: rows.map(r => [r.querySelector('.vo-dom').textContent, r.querySelector('.vo-ttl').textContent]),
+        more: q('.vo-more') ? q('.vo-more').textContent : null, real: p ? [...p.querySelectorAll('.vo-rows .vo-real, .vo-strip .vo-real')].map(im) : [],
+        kept: window.VideoOverlays.photos.kept, jkOn: n(on.map(e => e.innerText).join(' ')) - n(foot), jkDom: n(all.textContent)}; })()}; }"""
+# the landing report's Links / Images / Sites tab counts once settled (E.gallery: "24+" / "…" until every image is checked)
+LANDING_TABS = """() => ['links', 'images', 'sites'].map(k => { const n = document.querySelector('#tab-report-' + k + ' .live-tab-n'); return n ? n.textContent.trim() : null; })"""
+
+
+def landing_tabs(pg, timeout=60000):
+    """the landing report's tab counts [Links, Images, Sites] once its image probes settled (None if never)"""
+    try:
+        pg.wait_for_function("() => ['links', 'images', 'sites'].every(k => /^\\d+$/.test((document.querySelector('#tab-report-' + k + ' .live-tab-n') || {}).textContent || ''))", timeout=timeout)
+    except Exception:
+        pass
+    pg.wait_for_timeout(1500)
+    return [int(x) if x and x.isdigit() else x for x in pg.evaluate(LANDING_TABS)]
 
 
 def hers_expect(raw):
@@ -694,6 +728,31 @@ def hers(b, base, out, raw_file, no_prod):
         th = [s for s, w in imgs if w > 0 and s.startswith("/api/thumb?u=") and urllib.parse.parse_qs(urllib.parse.urlsplit(s).query).get("u", [""])[0] in X["thumbs"]]
         return f + ([f"{len(th)} of her thumbs"] if th else [])
 
+    ends = {}
+
+    def chk_end(label, t, s, shot):   # her handle typed (intro + end card), her report at the settled end, no "jakabasej" outside the contact footer
+        hh, ok, msg = X["handle"], s["jkOn"] == 0 and s["jkDom"] == 0, f"hers handle ({label}) t={t:g}: "
+        card = "intro" if t < 10 else "cta-steps"
+        ok = ok and s["on"] == [card]
+        if t in (3, 36):
+            ok, msg = ok and hh.startswith(s["typed"] or "") and (t == 36 or 0 < len(s["typed"]) < len(hh)), msg + f"{card} typing a prefix of onlyfans.com/{hh} ({s['typed']!r})"
+        elif t in (3.5, 37.85):
+            ok, msg = ok and s["typed"] == hh, msg + f"{card} typed onlyfans.com/{hh} in full"
+        elif t in (6, 40):
+            ok, msg = ok and s["at"] == "@" + hh, msg + f"{card} scan card '@{hh}' ({s['at']!r})"
+        elif t == 9.5:
+            ok, msg = ok and "Building YOUR video" in s["text"], msg + "'Building YOUR video…' over her intro"
+        if t == 47:
+            hosts, rows = set(X["hosts"]), [d for d, _ in s["rows"]]
+            ok = (ok and s["at"] == "@" + hh and len(s["tabs"]) == 3 and s["tabs"][1] == len(s["kept"]) and 0 < len(rows) <= 5 and all(d in hosts for d in rows)
+                  and all(t2 and not re.search(r"https?://|www\.", t2) for _, t2 in s["rows"]) and s["more"] == f"+ {s['tabs'][0] - len(rows)} more in the full report"
+                  and len(s["real"]) == 9 and all(x[1] > 0 and x[0] in s["kept"] and BLUR(x[2]) >= BLUR_MIN for x in s["real"])
+                  and s["eo"] > .9 and s["contacts"] == CONTACTS and s["cov"] <= .20 and "clear for" not in s["cta"].lower())
+            msg = (f"hers end ({label}) t=47: her report '@{hh}' Links / Images / Sites {s['tabs']} (Images = her kept photos), her rows {rows[:3]}…, none *.example, "
+                   f"{s['more']!r}, {len(s['real'])} of her people photos blurred >= {BLUR_MIN}px, contact footer {s['cov']:.1%} of the phone (<= 20 %)")
+        check(msg + f", no 'jakabasej' outside the contact footer (on screen {s['jkOn']}, DOM {s['jkDom']}) -> {shot}", ok,
+              {k: s[k] for k in ("on", "typed", "at", "tabs", "rows", "more", "jkOn", "jkDom", "cov", "eo")} | {"real": s["real"][:2]})
+
     def sweep(pg, label, theater):
         for t in HERS_TS:
             s = pg.evaluate(HERS_JS, t)
@@ -706,9 +765,10 @@ def hers(b, base, out, raw_file, no_prod):
                   s["mode"] == "named" and not bad, (s["mode"], bad[:3]))
             if t == 1:
                 check(f"hers ({label}) t=1: the 'for {X['name']}' pill (her result's name)", "for" in s["text"] and X["name"] in s["text"], s["text"][:80])
-            if t == 5:
-                check(f"hers ({label}) t=5: the intro types onlyfans.com/jakabasej (not her handle) -> {f.name}", s["on"] == ["intro"] and "jakabasej" in s["text"]
-                      and X["handle"] not in s["text"], (s["on"], s["text"][-200:]))
+            hh = X["handle"]
+            if t in HERS_END:
+                ends[label] = s
+                chk_end(label, t, s, f.name)
             if t in HERS_CARD:
                 pid, got = HERS_CARD[t], mine(s["text"], s["imgs"])
                 check(f"hers ({label}) t={t:g}: {pid} shows her result ({', '.join(got[:4]) or 'nothing'}) -> {f.name}", s["on"] == [pid] and len(got) >= 1, (s["on"], s["text"][:200]))
@@ -716,14 +776,6 @@ def hers(b, base, out, raw_file, no_prod):
                 k = min(12, len(X["hosts"]))
                 check(f"hers ({label}) t=31: the 10,000+ wall = her {k} top sites first (most links), then his whiteboard names",
                       s["sites"][:k] == X["hosts"][:k] and len(s["sites"]) == 12, s["sites"])
-            if t in (40, 47):
-                low = s["cta"].lower()
-                ok = s["on"] == ["cta-steps"] and "jakabasej" in low and "ophierai" not in low and X["name"].lower() not in low and "clear for" not in low
-                msg = f"hers end ({label}) t={t:g}: the jakabasej demo, no 'ophierai' / {X['name']!r} / 'This is what I'd clear'"
-                if t == 47:
-                    ok = ok and s["eo"] > .9 and s["contacts"] == CONTACTS and s["cov"] <= .20
-                    msg += f", contact footer covers {s['cov']:.1%} of the phone (<= 20 %)"
-                check(msg + f" -> {f.name}", ok, (s["on"], s["cov"], s["eo"], s["cta"][-160:]))
         txt = pg.evaluate("() => document.body.innerText")
         check(f"hers ({label}): no URL in the page text", not re.findall(r"https?://\S+", txt), re.findall(r"https?://\S+", txt)[:2])
 
@@ -740,6 +792,12 @@ def hers(b, base, out, raw_file, no_prod):
             pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
         sweep(pg, f"r-{label}", theater)
         check(f"hers (r-{label}): every request to 127.0.0.1, no console error", not ext and not errs, (ext[:3], errs[:3]))
+        lpg = ctx.new_page()   # the landing report on the same result (?r=, same proxy; its own font requests aborted, declared)
+        lpg.goto(f"{base}?r={PROD_SLUG}&pip=0")
+        lt = landing_tabs(lpg)
+        lpg.locator(".live-card, #hero-card, .hero-card").first.screenshot(path=str(out / f"hers-r-{label}-landing-report.png")) if lpg.locator(".live-card, #hero-card, .hero-card").count() else lpg.screenshot(path=str(out / f"hers-r-{label}-landing-report.png"))
+        vt = ends.get(f"r-{label}", {}).get("tabs")
+        check(f"hers counts (r-{label}): end-card Links / Images / Sites {vt} == the landing report's {lt} (?r={PROD_SLUG}) -> hers-r-{label}-t47.png, hers-r-{label}-landing-report.png", vt == lt and bool(lt), (vt, lt))
         ctx.close()
         # b: the last scan: the landing's in-page scan (her saved result as the SSE), then /video/ opened directly, no query
         ctx, ext, seen = context(opts, theater)
@@ -753,6 +811,7 @@ def hers(b, base, out, raw_file, no_prod):
             pass
         last = lp.evaluate("() => [location.search, localStorage.getItem('leakscan.last')]")
         check(f"hers (last-{label}): the landing's scan stored leakscan.last = {PROD_SLUG}", PROD_SLUG in (last[1] or ""), last)
+        lt = landing_tabs(lp)
         lp.close()
         pg = ctx.new_page()
         errs = []
@@ -764,45 +823,66 @@ def hers(b, base, out, raw_file, no_prod):
             pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
         check(f"hers (last-{label}): /video/ with no query plays hers", pg.evaluate("() => location.search") == "" and pg.evaluate("() => document.documentElement.dataset.voMode") == "named")
         sweep(pg, f"last-{label}", theater)
+        vt = ends.get(f"last-{label}", {}).get("tabs")
+        check(f"hers counts (last-{label}): end-card Links / Images / Sites {vt} == the landing report's {lt} (the landing's own scan)", vt == lt and bool(lt), (vt, lt))
         check(f"hers (last-{label}): video requests all to 127.0.0.1 (landing fonts etc. aborted, declared), no console error on /video/",
               all(u.startswith(base) for u in seen if "/video/" in u or "/api/" in u) and not errs, errs[:3])
         ctx.close()
-    # c: the landing's mini player (?pip=1), its iframe loaded BEFORE her scan: the scan → storage event → hers, in place
-    ctx, ext, seen = context(dict(viewport={"width": 1920, "height": 1080}), False)
-    lp = ctx.new_page()
-    lp.goto(f"{base}?pip=1")
-    lp.mouse.wheel(0, 200)
-    lp.wait_for_timeout(300)
-    lp.mouse.wheel(0, -200)
-    fr = None
-    for _ in range(60):
-        fr = next((f for f in lp.frames if "/video/" in f.url), None)
+    # c: the landing's mini player (?pip=1), its iframe loaded BEFORE her scan: the scan → storage event → hers, in place; then her
+    # intro + end card inside the iframe, its report counts vs the landing's own report around it (1920 + phone 390x844)
+    for label, opts in (("1920", dict(viewport={"width": 1920, "height": 1080})), ("phone", VIEWPORTS["phone"])):
+        ctx, ext, seen = context(opts, False)
+        lp = ctx.new_page()
+        lp.goto(f"{base}?pip=1")
+        lp.mouse.wheel(0, 200)   # the first scroll mounts the player
+        lp.wait_for_timeout(300)
+        lp.mouse.wheel(0, -200)
+        fr = None
+        for i in range(60):
+            if label == "phone" and i % 8 == 4:   # phone: the docked player hangs off the hero card, below the fold: bring it near the screen
+                lp.evaluate("() => { const f = document.querySelector('.pip, [class*=pip]'); (f || document.querySelector('#scan')).scrollIntoView({block: 'center'}); }")
+            fr = next((f for f in lp.frames if "/video/" in f.url), None)
+            if fr:
+                break
+            lp.wait_for_timeout(250)
+        before = None
         if fr:
-            break
-        lp.wait_for_timeout(250)
-    before = None
-    if fr:
-        fr.wait_for_load_state()
-        fr.wait_for_function("() => window.VideoOverlays", timeout=10000)
-        before = fr.evaluate("() => document.documentElement.dataset.voMode")
-    check(f"hers (pip): the landing's mini player iframe loaded before the scan, generic ({fr and fr.url})", fr is not None and before == "generic", (fr and fr.url, before))
-    lp.fill("#scan .scan-handle", PROD_HANDLE)
-    lp.locator("#scan button[type=submit]").click()
-    s = None
-    if fr:
-        try:
-            fr.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=15000)
-        except Exception:
-            pass
-        lp.wait_for_timeout(800)
-        s = fr.evaluate(HERS_JS, 31)
-        fr.evaluate(HERS_JS, 12)
-        lp.wait_for_timeout(400)
-    lp.screenshot(path=str(out / "hers-pip-1920-t12.png"))
-    k = min(12, len(X["hosts"]))
-    check(f"hers (pip): after the landing scan the mini player turns hers in place (iframe {fr and urllib.parse.urlsplit(fr.url).query or 'no query'}): named, her sites wall -> hers-pip-1920-t12.png",
-          s is not None and s["mode"] == "named" and s["sites"][:k] == X["hosts"][:k], s and (s["mode"], s["sites"][:3]))
-    ctx.close()
+            fr.wait_for_load_state()
+            fr.wait_for_function("() => window.VideoOverlays", timeout=10000)
+            before = fr.evaluate("() => document.documentElement.dataset.voMode")
+        check(f"hers (pip-{label}): the landing's mini player iframe loaded before the scan, generic ({fr and fr.url})", fr is not None and before == "generic", (fr and fr.url, before))
+        lp.fill("#scan .scan-handle", PROD_HANDLE)
+        lp.locator("#scan button[type=submit]").click()
+        s = None
+        if fr:
+            try:
+                fr.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=15000)
+                if not no_prod:
+                    fr.wait_for_function("() => window.VideoOverlays.photos.kept.length > 0 && [...document.querySelectorAll('.rm-img')].every(i => i.complete)", timeout=30000)
+            except Exception:
+                pass
+            lp.wait_for_timeout(800)
+            s = fr.evaluate(HERS_JS, 31)
+            fr.evaluate(HERS_JS, 12)
+            lp.wait_for_timeout(400)
+        lp.screenshot(path=str(out / f"hers-pip-{label}-t12.png"))
+        k = min(12, len(X["hosts"]))
+        check(f"hers (pip-{label}): after the landing scan the mini player turns hers in place (iframe {fr and urllib.parse.urlsplit(fr.url).query or 'no query'}): named, her sites wall -> hers-pip-{label}-t12.png",
+              s is not None and s["mode"] == "named" and s["sites"][:k] == X["hosts"][:k], s and (s["mode"], s["sites"][:3]))
+        lt = landing_tabs(lp)
+        ifr = lp.locator("iframe[src*='video/']").first
+        for t in PIP_TS if fr else ():
+            s = fr.evaluate(HERS_JS, t)
+            lp.wait_for_timeout(350)
+            f = out / f"hers-pip-{label}-t{t:g}.png"
+            (ifr if ifr.count() else lp).screenshot(path=str(f))
+            if t == 47:
+                lp.screenshot(path=str(out / f"hers-pip-{label}-t47-page.png"))   # the mini player's end card over the landing's own report (Jack's view)
+                ends[f"pip-{label}"] = s
+            chk_end(f"pip-{label}", t, s, f.name)
+        vt = ends.get(f"pip-{label}", {}).get("tabs")
+        check(f"hers counts (pip-{label}): the mini player's end-card Links / Images / Sites {vt} == the landing report's around it {lt} -> hers-pip-{label}-t47-page.png", vt == lt and bool(lt), (vt, lt))
+        ctx.close()
     print(f"hers: production GETs (read-only, memoized): " + (", ".join(f"{k} x{proxied.count(k)}" for k in sorted(set(proxied))) or "none"))
 
 
@@ -962,13 +1042,13 @@ def named_flow(pg, base, out, cta, name_q):
         shot(name)
         s = pg.evaluate(STEPS)
         if name == "3-typed":
-            check(f"named flow: cta + 3.05 the field holds handle(DEMO) {handle(DEMO)!r} (not {handle(nm)!r}), camera zoomed -> frame-1920-named-cta-3-typed.png",
-                  s and s["typed"] == handle(DEMO) and s["cz"][0] >= 2.2, s and s["typed"])
+            check(f"named flow: cta + 3.05 the field holds her handle {handle(nm)!r}, camera zoomed -> frame-1920-named-cta-3-typed.png",
+                  s and s["typed"] == handle(nm) and s["cz"][0] >= 2.2, s and s["typed"])
         if name == "5-scanning":
-            check(f"named flow: cta + 5.6 the scan card for '@{handle(DEMO)}', 'Searching <place>, step N of 9…'", s and s["so"] == [0, 1, 0] and s["at"] == "@" + handle(DEMO)
+            check(f"named flow: cta + 5.6 the scan card for '@{handle(nm)}', 'Searching <place>, step N of 9…'", s and s["so"] == [0, 1, 0] and s["at"] == "@" + handle(nm)
                   and PROGRESS.fullmatch(s["ms"] or ""), s and (s["at"], s["ms"]))
         if name == "6-report":
-            check(f"named flow: cta + 8.3 the report '{LEAKS} links found' for '@{handle(DEMO)}'", s and s["so"][2] > .9 and s["count"] == f"{LEAKS} links found" and s["at"] == "@" + handle(DEMO), s and (s["count"], s["at"]))
+            check(f"named flow: cta + 8.3 the report '{LEAKS} links found' for '@{handle(nm)}' (?name=: no scan result, the placeholder rows)", s and s["so"][2] > .9 and s["count"] == f"{LEAKS} links found" and s["at"] == "@" + handle(nm), s and (s["count"], s["at"]))
         if name == "7-flip":
             check(f"named flow: cta + 9.65 the contact row Telegram / WhatsApp / email only (no {nm!r}), no 'Rewatch', no flip -> frame-1920-named-cta-7-flip.png",
                   s and s["eo"] > .9 and named_end(s, nm), s and (s["shown"], s["contacts"], s["chrome"]))
@@ -989,8 +1069,8 @@ def named_flow(pg, base, out, cta, name_q):
     pg.locator(".vo-stage").screenshot(path=str(f))
     s = pg.evaluate(STEPS)
     t1 = pg.evaluate("() => [document.documentElement.dataset.voT, document.querySelector('video').ended, document.querySelector('.vo-for').hasAttribute('data-off')]")
-    check(f"named flow: after the take ends it keeps playing (clock {t0} → {t1[0]}), cta-steps with '@{handle(DEMO)}', pill off -> {f.name}",
-          s and not s["off"] and t1[1] and t1[2] and float(t1[0]) > float(t0) + 1 and s["at"] == "@" + handle(DEMO), (t0, t1, s and s["at"]))
+    check(f"named flow: after the take ends it keeps playing (clock {t0} → {t1[0]}), cta-steps with '@{handle(nm)}', pill off -> {f.name}",
+          s and not s["off"] and t1[1] and t1[2] and float(t1[0]) > float(t0) + 1 and s["at"] == "@" + handle(nm), (t0, t1, s and s["at"]))
 
 
 def cta_phone(b, base, out, cta, full):
@@ -1036,8 +1116,8 @@ def named_phone(b, base, out, cta, name_q):
         pg.evaluate(DRAW, cta + 9.65)
         s = pg.evaluate(STEPS)
         lo = 11 if view == "portrait" else 20
-        check(f"named flow (phone {view}): typed {handle(DEMO)!r} >= {lo} px, the contact row (no {nm!r}) >= 8 px -> phone-{view}-named-cta-*.png",
-              s3 and s3["typed"] == handle(DEMO) and s3["px"] >= lo and named_end(s, nm) and s["nmpx"] >= 8, (s3 and (s3["typed"], s3["px"]), s and (s["shown"], s["nmpx"])))
+        check(f"named flow (phone {view}): typed her handle {handle(nm)!r} >= {lo} px, the contact row (no {nm!r}) >= 8 px -> phone-{view}-named-cta-*.png",
+              s3 and s3["typed"] == handle(nm) and s3["px"] >= lo and named_end(s, nm) and s["nmpx"] >= 8, (s3 and (s3["typed"], s3["px"]), s and (s["shown"], s["nmpx"])))
     ctx.close()
 
 
@@ -1546,7 +1626,6 @@ inter = lambda a, b: bool(a and b) and a[0] < b[2] and b[0] < a[2] and a[1] < b[
 
 def fill(b, base, out, name_q, nm, intro, sites, cta):
     """the intro (intro = (in, out)) + the sites gap card (sites = (in, out)): real seeks + shots, the 0.1 s timeline, the scan hold"""
-    want = handle(DEMO)
     for view, opts in (("1920", dict(viewport={"width": 1920, "height": 1080})), ("phone", VIEWPORTS["phone"]), ("theater", VIEWPORTS["phone"])):
         ctx = ctx_new(b, **opts)
         if view == "theater":
@@ -1557,6 +1636,7 @@ def fill(b, base, out, name_q, nm, intro, sites, cta):
         console(pg, errs)
         lim = 11   # px on screen: portrait (k = .305) and theater (bigger) alike
         for mode, query in (("generic", ""), ("named", name_q)):
+            want = handle(nm if mode == "named" else DEMO)   # named: her handle (= js herHandle(), no scan result: a slug of the name)
             goto(pg, base, query, 0.5)
             if view == "theater":
                 pg.locator(".vo-fs").tap()
@@ -1696,6 +1776,7 @@ def main():
     ap.add_argument("--break-voice", action="store_true")
     ap.add_argument("--break-intro", action="store_true")
     ap.add_argument("--break-hers", action="store_true")
+    ap.add_argument("--break-herend", action="store_true")
     ap.add_argument("--hers-raw", help="her saved scan result (JSON) instead of the read-only production GET")
     ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers"], help="run only this part (iteration)")
     a = ap.parse_args()
@@ -1757,6 +1838,11 @@ def main():
         broken, k = re.subn(r"if \(g === gen && \(who === null \|\| real\)\) useResult\(raw\);", "", js)
         assert k == 1, "break: load()'s useResult(raw) not found"
         BREAK["hers"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_herend:   # wire boundary: video-overlays.js with the old demo end in personalized mode (jakabasej typed, the placeholder report)
+        js = BREAK["hers"][1] if "hers" in BREAK else (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"rr = c\.named \? real : null, bs = box\.style, h = c\.named \? herHandle\(\) : handle\(demoName\(\)\)", "rr = null, bs = box.style, h = handle(c.named ? DEMO : demoName())", js)
+        assert k == 1, "break: steps()' rr / h not found"
+        BREAK["herend"] = ("**/js/video-overlays.js", broken, "application/javascript")
     fl = {k: tuple(map(float, re.search(r'data-prefab="%s" data-cue-in="([\d.]+)" data-cue-out="([\d.]+)"' % k, html).groups())) for k in ("intro", "sites")}
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
