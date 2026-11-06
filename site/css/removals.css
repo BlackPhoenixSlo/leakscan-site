@@ -1,17 +1,43 @@
-/* #removals "Where I remove from": four mock panels (Mega, X, Reddit, a leak site), live leak vs. removed.
-   Own file so it merges next to other work on styles.css; reuses its tokens (--surface, --line, --ink, --muted, ...). */
+/* #removals "Where I remove from": one stage, four platform tabs (Mega, X, Reddit, a leak site; E.tablist in
+   js/removals.js: every panel stays in the DOM, one shown), live leak vs. removed. Own file so it merges next to other
+   work on styles.css; reuses its tokens (--line, --ink, --muted, --accent, ...). The video page (site/video/) draws
+   the same stage outside .rm: the section's layout is scoped to .rm. */
 .rm { --rm-h: 372px; --rm-s: 1; }   /* one fixed stage height: no shift when a panel flips */
-/* phones: each panel is drawn at its 372 px layout and scaled down as a whole, like a screenshot (shorter page, same mock;
-   clip and handle are % of the box, so the compare edge stays put) */
-@media (max-width: 559px) { .rm { --rm-s: .73; } }
-.rm-tools { display: flex; justify-content: flex-end; margin: -12px 0 14px; }
-.rm-grid { display: grid; gap: 20px; }
-@media (min-width: 820px) { .rm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; } }
-.rm-card { min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--radius); box-shadow: var(--shadow); }
-.rm-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
-.rm-h { display: inline-flex; align-items: center; gap: 9px; margin: 0; font: 700 1.1rem/1.3 var(--sans); }
-.rm-out { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.4; }
+/* phones: the panel is drawn at its 372 px layout and scaled down as a whole, like a screenshot (shorter page, same mock;
+   clip and handle are % of the box, so the compare edge stays put); its layout width stays < 440 px (2-column leak site) */
+@media (max-width: 559px) { .rm { --rm-s: .8; } }
+.rm-wrap { display: grid; gap: 16px; }
+@media (min-width: 1000px) { .rm-wrap { grid-template-columns: minmax(0, 1fr) minmax(0, 704px); gap: 48px; align-items: start; } }
+.rm .section-head { margin-bottom: 18px; }
+@media (min-width: 1000px) { .rm .section-head { margin-bottom: 28px; } }
+.rm-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.rm-tabs { display: flex; gap: 0; }
+.rm-tabs [role="tab"] { position: relative; min-height: 44px; padding: 0 14px; margin: 0; border: 0; border-bottom: 2px solid var(--line); border-radius: 0;
+  background: none; color: var(--muted); font: 600 1rem/1 var(--sans); cursor: pointer; white-space: nowrap; transition: color .15s, border-color .15s; }
+.rm-tabs [role="tab"]:first-child { padding-left: 0; }
+.rm-tabs [aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+@media (hover: hover) { .rm-tabs [role="tab"]:hover { color: var(--ink); } }
+.rm-tabs [role="tab"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.rm-tools { margin: 0; }
+@media (max-width: 559px) { .rm-tabs [role="tab"] { padding: 0 10px; font-size: .95rem; } .rm-bar { gap: 4px 12px; } }
+/* desktop: platforms as a list in the left column, under the heading; the stage in the right column */
+@media (min-width: 1000px) {
+  .rm-bar { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .rm-tabs { flex-direction: column; width: 100%; max-width: 320px; border-top: 1px solid var(--line); }
+  .rm-tabs [role="tab"] { min-height: 52px; padding: 0 0 0 16px; text-align: left; font-size: 1.1875rem; border-bottom: 1px solid var(--line); }
+  .rm-tabs [role="tab"]:first-child { padding-left: 16px; }
+  .rm-tabs [aria-selected="true"]::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; background: var(--accent); }
+  .rm-tabs [aria-selected="true"] { border-bottom-color: var(--line); }
+}
+.rm-grid { display: grid; min-width: 0; }
+.rm-card { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "stage stage" "top act"; align-items: center; gap: 12px 16px; }
+.rm-card[hidden] { display: none; }
+.rm-top { grid-area: top; min-width: 0; }
+.rm .rm-h { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }   /* the tab names it */
+.rm-out { margin: 0; color: var(--muted); font-size: .906rem; line-height: 1.45; }
+.rm-act { grid-area: act; margin: 0; }
+.rm-btn { min-width: 9.5em; justify-content: center; }
+@media (max-width: 379px) { .rm-btn { min-width: 0; padding-inline: .9em; } }
 .rm-ico { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; font: 800 .8rem/1 var(--sans); }
 .rm-ico .icon { width: 16px; height: 16px; }
 .rm-ico-mega { background: #d90007; }
@@ -25,6 +51,8 @@
    past its right edge, so focusing it (Tab, a tap) slid both layers out of view */
 .rm-stage { position: relative; height: calc(var(--rm-h) * var(--rm-s)); overflow: hidden; overflow: clip; border-radius: 12px; border: 1px solid var(--line); touch-action: pan-y;
   user-select: none; -webkit-user-select: none; cursor: ew-resize; }
+.rm .rm-stage { grid-area: stage; border-radius: 14px; }
+@media (prefers-color-scheme: dark) { .rm .rm-stage { border: 8px solid #26222c; } }
 html:not(.js) .rm-stage { cursor: auto; }
 .rm-layer { position: absolute; left: 0; top: 0; width: calc(100% / var(--rm-s)); height: var(--rm-h); overflow: hidden; transform: scale(var(--rm-s)); transform-origin: 0 0; }
 .rm-gone { clip-path: inset(0 0 0 calc(var(--p) * 1%)); }
@@ -32,6 +60,10 @@ html:not(.js) .rm-stage { cursor: auto; }
    its left edge is the compare edge */
 .rm-handle { position: absolute; inset: 0; z-index: 3; transform: translateX(calc(var(--p) * 1%)); pointer-events: none; }
 .rm-handle::before { content: ""; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--accent); box-shadow: 0 0 0 1px rgb(0 0 0 / .12); }
+/* in the section the edge is the ink strike, upright: a 2 px pen line with the same wobble */
+.rm .rm-handle::before { left: -4px; width: 8px; box-shadow: none; background: var(--accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 100' preserveAspectRatio='none'%3E%3Cpath d='M4.2 0C3.4 14 5 26 3.8 40S5.1 66 4 80 3.6 94 4.4 100' fill='none' stroke='%23000' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 100' preserveAspectRatio='none'%3E%3Cpath d='M4.2 0C3.4 14 5 26 3.8 40S5.1 66 4 80 3.6 94 4.4 100' fill='none' stroke='%23000' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
 .rm-knob { position: absolute; top: 50%; left: 0; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; background: var(--accent);
   box-shadow: 0 2px 8px rgb(0 0 0 / .3); }
 /* keep the knob inside the stage at both ends; idle (all live) it is parked in the bottom corner and the edge line is
@@ -58,24 +90,30 @@ html:not(.js) .rm-stage { cursor: auto; }
   .rm-anim .rm-handle { transition: transform var(--rm-t, .7s) cubic-bezier(.6, 0, .25, 1); }
   .rm-knob { transition: transform .2s, opacity .2s; }
 }
-.rm-act { margin: 0; }
-.rm-btn { min-width: 9.5em; justify-content: center; }
-/* the Remove button sits on the title row (top right): a shorter card, the stage keeps its fixed height */
-.rm-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top act" "stage stage"; align-items: start; gap: 12px 12px; }
-.rm-top { grid-area: top; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
-.rm-stage { grid-area: stage; }
-.rm-act { grid-area: act; }
-@media (max-width: 519px) {
-  .rm-btn { min-width: 7.6em; padding-inline: .8em; }
-  /* phones: title + button on one row, the outcome line under both (one line, not two) */
-  .rm-card { grid-template-areas: "h act" "out out" "stage stage"; align-items: center; gap: 8px 12px; padding: 14px; }
-  .rm-top { display: contents; }
-  .rm-h { grid-area: h; }
-  .rm-out { grid-area: out; font-size: .85rem; }
-  .rm-grid { gap: 16px; }
-}
 .rm-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { display: none; }
+/* no JS: no tabs either; the four panels stacked, each named */
+html:not(.js) .rm-tabs { display: none; }
+html:not(.js) .rm-card[hidden] { display: grid; }
+html:not(.js) .rm-grid { gap: 28px; }
+html:not(.js) .rm .rm-h { position: static; width: auto; height: auto; clip: auto; grid-area: top; font: 600 1.1875rem/1.37 var(--sans); }
+/* the removed layer's message sits in the layer's right half and shows once the edge is left of the middle (.is-removed,
+   js/removals.js): an ambient stop never cuts its text at the seam */
+.rm .mg-gone { align-items: flex-end; text-align: right; padding-left: 52%; }
+.rm :is(.rd-off, .fp-pane, .xp-off) { justify-items: end; text-align: right; padding-left: 52%; }
+.rm .fp-pane { padding-right: 18px; }
+.rm .fp .fp-404 { font-size: 3.4rem; text-align: right; }
+.rm .fp .fp-gh { margin-right: 0; text-align: right; }
+.rm .mg-gone ul { text-align: right; }
+.rm :is(.mg-gone > *, .rd-note, .fp-pane > *) { opacity: 0; transition: opacity .2s; }
+.rm .xp-off { color: transparent; transition: color .2s; }
+.rm .rm-card.is-removed :is(.mg-gone > *, .rd-note, .fp-pane > *) { opacity: 1; transition: opacity .35s .45s; }
+.rm .rm-card.is-removed .xp-off { color: var(--xp-mut); transition: color .35s .45s; }
+/* while the edge glides (sweep / button), the message waits for the glide to end: the seam never crosses visible text */
+.rm .rm-card.is-removed .rm-anim :is(.mg-gone > *, .rd-note, .fp-pane > *) { transition: opacity .35s var(--rm-t, .7s); }
+.rm .rm-card.is-removed .rm-anim .xp-off { transition: color .35s var(--rm-t, .7s); }
+html:not(.js) .rm :is(.mg-gone > *, .rd-note, .fp-pane > *) { opacity: 1; }
+html:not(.js) .rm .xp-off { color: var(--xp-mut); }
 
 /* leak-side photos: blurred like the hero card's tiles until Reveal */
 .rm-img { display: block; width: 100%; height: 100%; object-fit: cover; filter: blur(var(--leak-blur)) saturate(.8); transform: scale(1.15); transition: filter .25s, transform .25s; }
@@ -210,12 +248,3 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .fp-pane { display: grid; align-content: center; height: 248px; margin: 10px 12px 0; padding: 0 16px; border-radius: 8px; background: #e5e7eb; }
 .fp .fp-404 { margin: 0; color: #6b7280; font: 900 4.5rem/1 var(--fp-sans); letter-spacing: .04em; text-align: center; }
 .fp .fp-gh { margin: 10px auto 0; max-width: 16em; color: #374151; font-size: 1rem; font-weight: 600; text-align: center; }
-
-/* desktop (>= 1100 px): each card is a row, name + outcome + Remove on the left, the stage on the right at 66% scale
-   (the layer keeps a >= 440 px layout width: same mock as before, 4-column leak-site grid) so the 2x2 grid stays short */
-@media (min-width: 1100px) {
-  .rm { --rm-s: .66; }
-  .rm-card { display: grid; grid-template-columns: 150px minmax(0, 1fr); grid-template-rows: 1fr auto; grid-template-areas: "top stage" "act stage"; gap: 12px 16px; }
-  .rm-top { grid-area: top; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 8px; }
-  .rm-stage { grid-area: stage; }
-}

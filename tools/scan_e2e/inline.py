@@ -48,7 +48,7 @@ STRIP = """() => {
 card = lambda page: page.evaluate(CARD)
 ill = lambda page: page.evaluate(ILL)
 strip = lambda page: page.evaluate(STRIP)
-lcol = lambda page: page.evaluate("() => ['.scan-alt', '.assurances'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return Math.round(r.top + scrollY); })")
+lcol = lambda page: page.evaluate("() => ['.assurances', '.report-card'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return Math.round(r.top + scrollY); })")
 msgs_ok = lambda m, *need: len(m) == 3 and m[0].startswith("https://t.me/jakabasej?text=") and m[1].startswith(
     "https://wa.me/38640703992?text=") and m[2].startswith("mailto:me@jackbase.dev?") and all(all(x in u for x in need) for u in m)
 report_url = lambda slug: cfg.base + "scan/?r=" + slug   # E.reportUrl(slug): absolute, from the page's own site root
@@ -171,7 +171,7 @@ def hero_card(run):
     settled(page)
     page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=5000)
     lc1 = lcol(page)
-    check(f"{tag} hero: the left column doesn't move when the result lands (scanned line takes the note's slot)", lc1 == lc0, (lc0, lc1))
+    check(f"{tag} hero: the note and the card top don't move when the result lands (scanned line takes the note's slot)", lc1 == lc0, (lc0, lc1))
     an = page.evaluate("window.__anim.map(a => [a[0].map(k => parseFloat(k.height)), a[1]])")
     hf = page.evaluate("document.querySelector('.report-card').offsetHeight")
     check(f"{tag} hero: the card eases twice, no snap: at Scan up to the skeleton (about the report's height), then to the result's exact height (~320 ms each)",

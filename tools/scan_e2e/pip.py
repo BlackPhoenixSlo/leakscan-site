@@ -16,6 +16,7 @@ PIP_J = """() => { const p = document.querySelector('.pip'), t = document.queryS
     bar: [...p.querySelectorAll('.pip-bar button')].map(b => { const r = b.getBoundingClientRect(); return [b.className, b.getAttribute('aria-label'), Math.round(r.width), Math.round(r.height)]; }),
     exp: x && [x.getAttribute('aria-label'), x.getAttribute('aria-expanded'), x.innerHTML.includes('m6 9') ? 'v' : 'expand'],
     grip: getComputedStyle(g).display === 'none' ? null : [gr.left - pic.left, gr.top - pic.top, gr.width, gr.height].map(Math.round), box: R(p), pic: R(p.querySelector('.pip-pic')), card: c ? R(c) : null,
+    slot: (q => q && q.getBoundingClientRect().width ? R(q) : null)(document.querySelector('.hero .pip-slot')),
     on: p.classList.contains('on') && !p.classList.contains('tucked'), tucked: p.classList.contains('tucked'),
     overPic: ctl.filter(b => b.right > pic.left && b.left < pic.right && b.bottom > pic.top && b.top < pic.bottom).length,
     tab: t && !t.hidden ? {box: R(t), side: t.dataset.side, chev: t.innerHTML.includes('m9 6') ? '>' : t.innerHTML.includes('m15 6') ? '<' : '?'} : null,
@@ -90,11 +91,11 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         pg.goto(cfg.base + url, wait_until="load")
         if wake:
             pg.keyboard.press("Shift")   # an interaction mounts it at once (else: idle)
-        if card:   # the docked player loads once it is near the screen: bring the card's bottom (its dock spot) into view
+        if card:   # the docked player loads once it is near the screen: bring the hero's .pip-slot (its dock spot) into view
             if "r=" in url:
                 pg.wait_for_selector(".hero .report-card.is-live", timeout=10000)
             pg.wait_for_timeout(800)
-            pg.evaluate("(() => { const r = document.querySelector('.hero .report-card').getBoundingClientRect(); scrollTo(0, Math.max(0, scrollY + r.bottom - innerHeight * 0.6)); })()")
+            pg.evaluate("(() => { const r = document.querySelector('.hero .pip-slot').getBoundingClientRect(); scrollTo(0, Math.max(0, scrollY + r.bottom - innerHeight * 0.8)); })()")
         pg.wait_for_function("() => { const p = document.querySelector('.pip'); return p && p.classList.contains('on'); }", timeout=12000)
         pg.wait_for_timeout(700)
         return st(pg)
@@ -167,10 +168,10 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         b = s["box"]
         ix = max(0, min(b[0] + b[2], c[0] + c[2]) - max(b[0], c[0])); iy = max(0, min(b[1] + b[3], c[1] + c[3]) - max(b[1], c[1]))
         cov = ix * iy / (c[2] * c[3])
-        MEASURED[f"{tag} dock {what}"] = {"pip": b, "card": c, "coverage": round(cov, 3)}
-        check(f"{tag} dock: {what}: docked, 55% of the card wide, in its bottom-right slot (live report: hanging off that corner)",
-              s["mode"] == "dock" and abs(b[2] - round(c[2] * 0.55)) <= 1 and (b[0] + b[2] >= c[0] + c[2] - 13 and b[1] + b[3] > c[1] + c[3]
-              or b[0] + b[2] >= c[0] + c[2] - 24 and b[1] + b[3] <= c[1] + c[3]) and b[1] > c[1] + c[3] * 0.5 and ratio_ok(s), [b, c])
+        sl = s["slot"]
+        MEASURED[f"{tag} dock {what}"] = {"pip": b, "card": c, "slot": sl, "coverage": round(cov, 3)}
+        check(f"{tag} dock: {what}: docked exactly on the hero's video slot (.pip-slot, the docket's video column)",
+              s["mode"] == "dock" and bool(sl) and all(abs(b[i] - sl[i]) <= 1 for i in range(3)) and abs(b[3] - sl[3]) <= 2 and ratio_ok(s), [b, sl])
         check(f"{tag} dock: {what}: covers <= 25% of the card", cov <= 0.25, round(cov, 3))
         under = pg.evaluate(PIP_UNDER)
         ok, d = clear(pg)
@@ -380,7 +381,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     shot(pg, "9-landing-floating")
     pg.evaluate("scrollTo(0, 0)"); pg.wait_for_timeout(300)
     if phone:
-        pg.evaluate("document.querySelector('.hero .report-card').scrollIntoView({block: 'center', behavior: 'instant'})")
+        pg.evaluate("document.querySelector('.hero .pip-slot').scrollIntoView({block: 'center', behavior: 'instant'})")
     pg.wait_for_timeout(1200); s = st(pg)
     check(f"{tag} dock: scrolled back up → docked again on the card", s["mode"] == "dock" and abs(s["box"][2] - docked[2]) <= 1, [s["box"], docked])
     mx, my = s["vw"] * 0.4, s["vh"] * 0.45

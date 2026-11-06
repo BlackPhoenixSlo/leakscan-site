@@ -96,9 +96,9 @@ personalize also proves the phone sticky bar (`tgcta:`): no slug = "Free scan: t
 bar. --break-tgcta serves personalize.js without the bar swap: only `tgcta:` checks may go red.
 
 pip (js/pip.js, the mini player of site/video/): ?pip=0 and scan/ without ?r= show none and load no /video/. Landing
-(default on): docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report, or the
-scan report card after an in-page / ?r= scan) at 55% of the card width, coverage <= 25%, no live element under it
-(elementFromPoint grid), start spot off the screen corner, else just below the card; hero out = floating bottom-right
+(default on): docked (absolute, scrolls with the page) exactly on the hero docket's video slot (.pip-slot, before and
+after an in-page / ?r= scan), coverage of the card <= 25%, no live element under it (elementFromPoint grid), start spot
+off the screen corner; hero out = floating bottom-right
 at normal size clear of Scan now / CTA bar / Ask-AI; scroll back re-docks unless dragged / resized / tucked. scan/?r=:
 floating bottom-right. Lazy (after load), 16:9, same-origin embed (no name bar / player UI), muted + playing, tap
 expands; bar under the picture = play / sound / expand / close, 40 px buttons, no link (resize = 28 px top-left corner).

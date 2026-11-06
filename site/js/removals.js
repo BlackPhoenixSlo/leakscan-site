@@ -1,5 +1,5 @@
-// #removals "Where I remove from": four mock panels (Mega, X, Reddit, a leak site), each a live leak vs. its removed
-// state. Remove / Show again animates the compare edge; the handle moves it (arrow keys on it; drag it, or drag sideways
+// #removals "Where I remove from": four mock panels (Mega, X, Reddit, a leak site) behind four tabs, each a live leak vs.
+// its removed state. Show removal / Show again animates the compare edge; the handle moves it (arrow keys on it; drag it, or drag sideways
 // anywhere on the stage: a tap or a vertical swipe never moves it): left of it = the live leak, right = removed. Idle
 // (all live) the handle is parked in the stage's bottom corner with no edge line, so nothing of the live leak is covered.
 // Personalized per panel from the page's scan result (E.currentSlug() → E.fetchResult, the one request shared with the
@@ -144,7 +144,7 @@
     h.setAttribute('aria-valuenow', p);
     h.setAttribute('aria-valuetext', p === LIVE ? 'Leak live' : p === GONE ? 'Removed' : p + '% leak, ' + (LIVE - p) + '% removed');
     b.setAttribute('aria-pressed', String(gone));
-    b.textContent = gone ? 'Show again' : 'Remove';
+    b.textContent = gone ? 'Show again' : 'Show removal';
   }
   var now = function (card) { return +card.querySelector('.rm-handle').getAttribute('aria-valuenow'); };
 
@@ -154,7 +154,7 @@
   var mq = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
   var still = !window.IntersectionObserver || !mq || mq.matches;
   var sweeps = [], io = null;
-  var rnd = function (a, b) { return a + Math.random() * (b - a); };
+  var rnd = function (a, b) { return a + Math.random() * (b - a); }, FIRST = 6000;
   function step(c) {
     c.t = 0;
     if (c.dead || !c.seen || document.hidden || mq.matches) return;
@@ -177,13 +177,18 @@
       en.forEach(function (e) {
         var c = sweeps.filter(function (x) { return x.card === e.target; })[0];
         c.seen = e.isIntersecting;
-        if (c.seen) wake(c, rnd(300, 1500)); else { clearTimeout(c.t); c.t = 0; }
+        // first time on screen: 6 s of the still leak before the first glide (time to read it); later visits sooner
+        if (c.seen) { wake(c, c.met ? rnd(300, 1500) : FIRST); c.met = true; } else { clearTimeout(c.t); c.t = 0; }
       });
     });
     document.addEventListener('visibilitychange', function () {
       sweeps.forEach(function (c) { if (document.hidden) { clearTimeout(c.t); c.t = 0; } else wake(c, rnd(300, 1500)); });
     });
   }
+
+  // one stage, four platform tabs (Mega / X / Reddit / Leak sites): every panel stays in the DOM, the others [hidden];
+  // a hidden panel is off screen for the IntersectionObserver, so its sweep waits until its tab is picked
+  E.tablist(root);
 
   each(root.querySelectorAll('.rm-card'), function (card, i) {
     var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), drag = null;

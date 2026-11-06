@@ -94,3 +94,19 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
 - Removed layers share the live layers' boxes (Reddit notice in the media slot, leak-site 404 in one pane).
 - Pip bar in the palette (deep mulberry, pink mute); no poster: the player autoplays its own intro, a poster would not show.
 - Dark mode dims the always-light mocks with filter: brightness(.93) (#fff -> ~#ededed); computed colours stay exact (e2e).
+## Round 4 notes (design-runs/direction-r4.md, "the docket")
+- Phone 390: 8,064 px (measured; r3 ~8,600, target ~7,400). 1440: 6,644. CLS 0 both; scrollWidth = width at 320 / 360 / 390.
+  Over target: hero 1,106 (the docket carries the 16:9 video slot + the player's 40 px bar, 3 assurance lines, the
+  honest "Example report" foot), why 807, showcase 1,123, pricing 994. The rest is within ~60 px of the doc.
+- Hero: the docket = form header row (one row at >= 720 px), note + assurances, example rows left, .pip-slot right.
+  pip.js docks the player exactly on .pip-slot; without a slot it keeps the old off-the-card spots.
+- The live report is a paper sheet laid in the docket (page tokens), so inline.py's placeholder checks hold.
+  Wide docket (>= 960 px): its Images grid is 2 x 8 (16 tiles, --live-grid-rows / --live-grid-cols read by
+  inline-scan.js), so the settled card fits 1440x800 with the Send buttons.
+- Shared ?r= link on a phone: brought up when the card sits below mid-screen (was: below the fold; the docket put it
+  above the fold at 844).
+- #removals: one stage, 4 tabs (E.tablist; the doc said radiogroup, tabs fit 4 panels in the DOM better). First glide
+  6 s after a panel is first visible. The removed message sits in the layer's right half, shows at p <= 50 and waits
+  for the glide to end: 0 seam cuts in 20 s samples of every panel (measured).
+- Lead wraps to 3 lines at 1440 (46ch), so the docket starts at y~444, not 412.
+- Ask-AI launcher text unchanged ("Ask AI before you DM me"): askai.py asserts it verbatim.

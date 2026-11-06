@@ -11,32 +11,33 @@ LAYOUT_SHIFTS = "window.__ls = []; try { new PerformanceObserver(l => l.getEntri
 
 # ---------- removals (js/removals.js, css/removals.css: the #removals "Where I remove from" panels) ----------
 RM_PANELS = ("mega", "x", "reddit", "site")
-RM_STATE = """() => { const y0 = scrollY, out = [...document.querySelectorAll('#removals .rm-card')].map(c => {
-  const s = c.querySelector('.rm-stage'), b = c.querySelector('.rm-btn');
+RM_TAB = "const tab0 = document.querySelector('#removals [role=tab][aria-selected=true]'), pick = c => document.getElementById('rm-tab-' + c.dataset.rm).click();"
+RM_STATE = """() => { """ + RM_TAB + """ const y0 = scrollY, out = [...document.querySelectorAll('#removals .rm-card')].map(c => {
+  pick(c); const s = c.querySelector('.rm-stage'), b = c.querySelector('.rm-btn');
   s.scrollIntoView({block: 'center', behavior: 'instant'});
   const r = s.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width * .75, r.top + r.height / 2), cb = c.getBoundingClientRect();
   return {k: c.dataset.rm, p: c.querySelector('.rm-handle').getAttribute('aria-valuenow'), pressed: b.getAttribute('aria-pressed'),
     label: b.textContent, clip: getComputedStyle(c.querySelector('.rm-gone')).clipPath,
     shown: top && top.closest('.rm-gone') ? 'gone' : top && top.closest('.rm-live') ? 'live' : String(top && top.className),
     box: [r.x, r.y + scrollY, r.width, r.height].map(Math.round), card: [cb.x, cb.y + scrollY, cb.width, cb.height].map(Math.round)}; });
-  scrollTo({top: y0, behavior: 'instant'}); return out; }"""
-RM_TEXT = """() => Object.fromEntries([...document.querySelectorAll('#removals .rm-live [data-rm-k]')].filter(e => !e.closest('[hidden]')).map(e => [e.dataset.rmK, e.textContent]))"""
+  tab0.click(); scrollTo({top: y0, behavior: 'instant'}); return out; }"""
+RM_TEXT = """() => Object.fromEntries([...document.querySelectorAll('#removals .rm-live [data-rm-k]')].filter(e => !e.closest('[hidden]:not(.rm-card)')).map(e => [e.dataset.rmK, e.textContent]))"""
 # per panel, what its live layer shows: {key: text} of the visible keyed slots + the srcs of the visible photos
 RM_PANEL = """() => [...document.querySelectorAll('#removals .rm-card')].map(c => ({k: c.dataset.rm,
-  t: Object.fromEntries([...c.querySelectorAll('.rm-live [data-rm-k]')].filter(e => !e.closest('[hidden]')).map(e => [e.dataset.rmK, e.textContent])),
-  img: [...c.querySelectorAll('.rm-live .rm-img')].filter(i => !i.closest('[hidden]')).map(i => i.getAttribute('src'))}))"""
+  t: Object.fromEntries([...c.querySelectorAll('.rm-live [data-rm-k]')].filter(e => !e.closest('[hidden]:not(.rm-card)')).map(e => [e.dataset.rmK, e.textContent])),
+  img: [...c.querySelectorAll('.rm-live .rm-img')].filter(i => !i.closest('[hidden]:not(.rm-card)')).map(i => i.getAttribute('src'))}))"""
 # idle (all live): the knob's box vs every visible text / photo box of the live layer, and the edge line's opacity. The
 # leak-site panel's photo grid is not counted: a full-bleed wall of blurred tiles cropped by the stage like a screenshot
 # (#75's fapello page), so the parked knob sits on a tile corner at every width (text and every other photo still are)
-RM_IDLE = """() => [...document.querySelectorAll('#removals .rm-card')].map(c => {
-  const k = c.querySelector('.rm-knob').getBoundingClientRect(), hit = [];
+RM_IDLE = """() => { """ + RM_TAB + """ const out = [...document.querySelectorAll('#removals .rm-card')].map(c => {
+  pick(c); const k = c.querySelector('.rm-knob').getBoundingClientRect(), hit = [];
   for (const e of c.querySelectorAll('.rm-live *')) {
-    if (e.closest('[hidden]') || !(e.matches('.rm-th, .agg-th, .rd-media') || [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))) continue;
+    if (e.closest('[hidden]:not(.rm-card)') || !(e.matches('.rm-th, .agg-th, .rd-media') || [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))) continue;
     const r = e.getBoundingClientRect();
     if (e.matches('.fp-grid .rm-th')) continue;
     if (r.width && r.right > k.left && r.left < k.right && r.bottom > k.top && r.top < k.bottom) hit.push(e.className || e.tagName);
   }
-  return [c.dataset.rm, hit, getComputedStyle(c.querySelector('.rm-handle'), '::before').opacity]; })"""
+  return [c.dataset.rm, hit, getComputedStyle(c.querySelector('.rm-handle'), '::before').opacity]; }); tab0.click(); return out; }"""
 # the whole DOM, every same-origin frame included (walked in the page: a lazy iframe that never loaded can't stall it)
 DOM_ALL = """() => { const out = [], walk = d => { if (!d || !d.documentElement) return; out.push(d.documentElement.outerHTML);
   for (const f of d.querySelectorAll('iframe')) { try { walk(f.contentDocument); } catch (e) { out.push('<cross-origin frame>'); } } };
@@ -57,7 +58,7 @@ SW_REC = """() => { window.__sw = []; document.querySelectorAll('#removals .rm-h
   window.__sw.push([Math.round(performance.now()), i, +h.getAttribute('aria-valuenow')])).observe(h, {attributes: true, attributeFilter: ['aria-valuenow']})); }"""
 SW_SEEN = """() => [...document.querySelectorAll('#removals .rm-card')].map(c => { const r = c.querySelector('.rm-stage').getBoundingClientRect();
   return r.bottom > 0 && r.top < innerHeight; })"""
-FP_STATE = """() => { const c = document.querySelector('#removals .rm-card[data-rm="site"]'), q = s => c.querySelector(s), cs = e => getComputedStyle(e);
+FP_STATE = """() => { document.getElementById('rm-tab-site').click(); const c = document.querySelector('#removals .rm-card[data-rm="site"]'), q = s => c.querySelector(s), cs = e => getComputedStyle(e);
   const live = q('.rm-live'), st = q('.rm-stage').getBoundingClientRect();
   return {ring: cs(q('.fp-ring')).backgroundImage, av: [cs(q('.fp-av')).borderTopWidth, cs(q('.fp-av')).borderTopColor, cs(q('.fp-av')).borderTopLeftRadius],
     name: q('.rm-live .fp-name').textContent, aka: q('.fp-aka').textContent, hosts: [...c.querySelectorAll('.fp-logo')].map(e => e.textContent),
@@ -73,6 +74,12 @@ FP_STATE = """() => { const c = document.querySelector('#removals .rm-card[data-
     row1: (() => { const ts = [...c.querySelectorAll('.fp-grid .rm-th')], y = Math.round(ts[0].getBoundingClientRect().top);
       return ts.filter(t => Math.round(t.getBoundingClientRect().top) === y).map(t => { const r = t.getBoundingClientRect(); return [Math.round(r.top - st.top), Math.round(st.bottom - r.bottom)]; }); })(),
     sexual: /live sex|undress|brazzers|porn/i.test(c.textContent)}; }"""
+
+
+def tab(page, k):
+    """#removals is one stage with 4 platform tabs: pick k's tab (its panel shown, the others [hidden])."""
+    page.click(f"#rm-tab-{k}")
+    page.wait_for_timeout(50)
 
 
 def fp_row(tag, w, fp):
@@ -120,6 +127,9 @@ def sweep_flow(ctx_, vp_name, tag):
     tnow = lambda: page.evaluate("Math.round(performance.now())")
     page.evaluate("() => document.querySelector('#removals .rm-card').scrollIntoView({block: 'start', behavior: 'instant'})")
     seen = page.evaluate(SW_SEEN)
+    tv = tnow()
+    page.wait_for_timeout(5500)   # first visit: the panel holds still ~6 s before its first glide
+    early = since(tv)
     page.evaluate("() => { window.__ls.length = 0; window.__box = [...document.querySelectorAll('#removals .rm-card')].map(c => JSON.stringify(c.getBoundingClientRect())); }")
     t0 = tnow()
     page.wait_for_timeout(2600)
@@ -133,12 +143,11 @@ def sweep_flow(ctx_, vp_name, tag):
     rec = since(t0)
     vis = [i for i in range(4) if seen[i]]
     per = {i: [e[2] for e in rec if e[1] == i] for i in vis}
-    check(f"{tag} sweep: on-screen edges glide by themselves, no input (9 s: 2+ stops each, all in 15-85)", len(vis) >= 2 and all(
+    check(f"{tag} sweep: first visit: the shown panel holds still 5.5 s before its first glide", not early and len(vis) == 1, [early, vis])
+    check(f"{tag} sweep: on-screen edges glide by themselves, no input (9 s: 2+ stops each, all in 15-85)", len(vis) >= 1 and all(
         len(per[i]) >= 2 and all(15 <= v <= 85 for v in per[i]) for i in vis), {"visible": vis, "per": per})
-    times = {i: [e[0] for e in rec if e[1] == i] for i in vis}
-    synced = [(i, j) for i in vis for j in vis if i < j and len(times[i]) == len(times[j]) and all(abs(x - y) < 50 for x, y in zip(times[i], times[j]))]
-    check(f"{tag} sweep: cards not in lockstep (each its own stops and times)", len(vis) >= 2 and len({tuple(per[i]) for i in vis}) == len(vis)
-          and not synced, {"times": times, "per": per, "synced": synced})
+    hid = [e for e in rec if e[1] not in vis]
+    check(f"{tag} sweep: the hidden panels (other tabs) never move", not hid, hid)
     secs = float(dur[:-1]) if dur.endswith("s") and dur[:-1].replace(".", "", 1).isdigit() else 0
     ls = page.evaluate("() => [window.__ls.filter(e => !e[2] && e[3]).reduce((a, e) => a + e[1], 0), [...document.querySelectorAll('#removals .rm-card')].every((c, i) => JSON.stringify(c.getBoundingClientRect()) === window.__box[i])]")
     check(f"{tag} sweep: glide = CSS transition 1-2 s, CLS 0 in #removals, card boxes unchanged", 1 <= secs <= 2 and ls == [0, True], [dur, ls])
@@ -155,9 +164,10 @@ def sweep_flow(ctx_, vp_name, tag):
     page.mouse.up()
     check(f"{tag} sweep: pressing Remove (held 5.5 s) already stops that card, before the click", not held, held)
     a0, t1 = val(0), tnow()
-    page.wait_for_timeout(6000)
+    tab(page, "x")   # the next panel: first visit, its glide starts ~6 s in
+    page.wait_for_timeout(7500)
     rec = since(t1)
-    check(f"{tag} sweep: toggle: Remove tap stops that card for good (6 s still), the next card keeps gliding",
+    check(f"{tag} sweep: toggle: Remove tap stops that card for good (7.5 s still), the next card keeps gliding",
           a0 in (0, 100) and not [e for e in rec if e[1] == 0] and any(e[1] == 1 for e in rec), [a0, rec])
     page.screenshot(path=str(cfg.out / f"removals-{vp_name}-sweep-3-stopped.png"))
     # a tap on card 1's stage: stops its sweep; the edge stays where it was (a tap never moves it: L9)
@@ -170,9 +180,10 @@ def sweep_flow(ctx_, vp_name, tag):
     rec = [e for e in since(t1) if e[1] == 1]
     check(f"{tag} sweep: a tap on the stage stops it where it was (no edge move, 5.5 s still)", a1 == a_pre and not rec and val(1) == a1, [a_pre, a1, rec])
     # handle keys on card 2, once it is gliding
+    tab(page, "reddit")
     bring(page, '#removals .rm-card[data-rm="reddit"]', "center")
     try:
-        page.wait_for_function("() => document.querySelectorAll('#removals .rm-handle')[2].getAttribute('aria-valuenow') !== '100'", timeout=4500)
+        page.wait_for_function("() => document.querySelectorAll('#removals .rm-handle')[2].getAttribute('aria-valuenow') !== '100'", timeout=8000)
     except Exception:
         pass
     moving = val(2) != 100
@@ -184,9 +195,10 @@ def sweep_flow(ctx_, vp_name, tag):
     rec = [e for e in since(t1) if e[1] == 2]
     check(f"{tag} sweep: ArrowLeft on a gliding card's handle steps 10 and stops it (5.5 s still)", moving and not rec and val(2) == a2, [moving, a2, rec])
     # document hidden: card 3 pauses, resumes when visible again
+    tab(page, "site")
     bring(page, '#removals .rm-card[data-rm="site"]', "center")
     try:
-        page.wait_for_function("() => document.querySelectorAll('#removals .rm-handle')[3].getAttribute('aria-valuenow') !== '100'", timeout=4500)
+        page.wait_for_function("() => document.querySelectorAll('#removals .rm-handle')[3].getAttribute('aria-valuenow') !== '100'", timeout=8000)
     except Exception:
         pass
     vis_flip = "h => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => h}); Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => h ? 'hidden' : 'visible'}); document.dispatchEvent(new Event('visibilitychange')); }"
@@ -240,10 +252,12 @@ def removals_flow(browser, vp_name, vp):
         bring(page, "#removals .rm-grid", "center")
         page.wait_for_timeout(700)
         if settle:   # the ambient sweep stops on input: End on each handle = real input, edge back at 100
-            for hd in page.locator("#removals .rm-handle").all():
+            for k, hd in zip(RM_PANELS, page.locator("#removals .rm-handle").all()):
+                tab(page, k)
                 hd.focus()
                 page.keyboard.press("End")
             page.evaluate("document.activeElement.blur()")
+            tab(page, "mega")
             page.wait_for_timeout(300)
         return page
 
@@ -281,37 +295,42 @@ def removals_flow(browser, vp_name, vp):
             "blur(" in b[1] and b[0].startswith("img/removals/") and b[2] > 0 for b in blur), blur)
         sw = page.evaluate("() => [document.documentElement.scrollWidth, innerWidth, Math.max(...[...document.querySelectorAll('#removals *')].map(e => e.parentElement.closest('.rm-stage') ? 0 : e.getBoundingClientRect().right))]")
         check(f"{tag} {scheme}: no horizontal overflow", sw[0] <= sw[1] and sw[2] <= sw[1] + 0.5, sw)
-        cols = page.evaluate("() => new Set([...document.querySelectorAll('#removals .rm-card')].map(c => Math.round(c.getBoundingClientRect().x))).size")
-        check(f"{tag} {scheme}: layout {'stacked' if vp_name == 'phone' else '2x2'}", cols == (1 if vp_name == "phone" else 2), cols)
+        cols = page.evaluate("() => [[...document.querySelectorAll('#removals [role=tab]')].map(t => t.textContent), [...document.querySelectorAll('#removals .rm-card')].filter(c => c.getBoundingClientRect().height > 0).map(c => c.dataset.rm)]")
+        check(f"{tag} {scheme}: layout: one stage, 4 platform tabs, exactly one panel shown", cols == [["Mega", "X", "Reddit", "Leak sites"], ["mega"]], cols)
         if scheme == "light":
             fp_checks(tag, vp_name, page.evaluate(FP_STATE), "Orla Brennick", "brennickclay, orlabrennick", vp["width"])
         before = page.evaluate(RM_STATE)
         check(f"{tag} {scheme}: starts live (edge at 100, removed layer clipped away)", all(
-            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Remove" and s["shown"] == "live" for s in first["state"] + before), [first["state"], before])
+            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Show removal" and s["shown"] == "live" for s in first["state"] + before), [first["state"], before])
         idle = page.evaluate(RM_IDLE)
         check(f"{tag} {scheme}: L10: idle, the handle covers no text / photo of the live leak and no edge line shows (leak-site photo grid aside)",
               all(not x[1] and x[2] == "0" for x in idle), idle)
         for k, card in zip(RM_PANELS, page.locator("#removals .rm-card").all()):
+            tab(page, k)
             card.screenshot(path=str(cfg.out / f"removals-{vp_name}-{scheme}-{k}-1-live.png"))
         page.evaluate("() => { window.__ls.length = 0; }")
-        for b in page.locator("#removals .rm-btn").all():
+        for k, b in zip(RM_PANELS, page.locator("#removals .rm-btn").all()):
+            tab(page, k)
             b.click()
         page.wait_for_timeout(1000)
         after = page.evaluate(RM_STATE)
-        check(f"{tag} {scheme}: toggle: Remove flips all 4 panels to removed (edge 0, removed layer on top, 'Show again')",
+        check(f"{tag} {scheme}: toggle: Show removal flips all 4 panels to removed (edge 0, removed layer on top, 'Show again')",
               [s["k"] for s in after] == list(RM_PANELS) and all(s["p"] == "0" and s["pressed"] == "true" and s["label"] == "Show again"
                                                                and s["shown"] == "gone" and s["clip"] == "inset(0px 0px 0px 0%)" for s in after), after)
         ls = page.evaluate("() => window.__ls.filter(e => !e[2]).reduce((a, e) => a + e[1], 0)")
         check(f"{tag} {scheme}: CLS 0 on toggle, stage + card boxes unchanged", ls == 0 and [s["box"] + s["card"] for s in before] == [s["box"] + s["card"] for s in after],
               f"cls={ls}")
         for k, card in zip(RM_PANELS, page.locator("#removals .rm-card").all()):
+            tab(page, k)
             card.screenshot(path=str(cfg.out / f"removals-{vp_name}-{scheme}-{k}-2-removed.png"))
+        tab(page, "mega")
         page.locator("#removals .rm-btn").first.click()
         page.wait_for_timeout(1000)
         back = page.evaluate(RM_STATE)[0]
-        check(f"{tag} {scheme}: toggle: Show again puts the leak back", back["p"] == "100" and back["shown"] == "live" and back["label"] == "Remove", back)
+        check(f"{tag} {scheme}: toggle: Show again puts the leak back", back["p"] == "100" and back["shown"] == "live" and back["label"] == "Show removal", back)
         if scheme == "light":
             # drag: grab the stage near its right edge, pull to 30 %
+            tab(page, "x")
             st = page.locator('#removals .rm-card[data-rm="x"] .rm-stage')
             bring(page, '#removals .rm-card[data-rm="x"] .rm-stage', "center")
             r = st.bounding_box()
@@ -327,6 +346,7 @@ def removals_flow(browser, vp_name, vp):
             st.screenshot(path=str(cfg.out / f"removals-{vp_name}-drag-x-30.png"))
             page.locator('#removals .rm-card[data-rm="x"] .rm-handle').focus()
             page.keyboard.press("End")
+            tab(page, "reddit")
             sr = page.locator('#removals .rm-card[data-rm="reddit"] .rm-stage')
             bring(page, '#removals .rm-card[data-rm="reddit"] .rm-stage', "center")
             b = sr.bounding_box()
@@ -338,6 +358,7 @@ def removals_flow(browser, vp_name, vp):
             page.wait_for_timeout(200)
             tp = page.evaluate(RM_STATE)[2]["p"]
             check(f"{tag} L9: a {'tap' if vp_name == 'phone' else 'click'} on the stage (no sideways drag) leaves the edge where it was", tp == tp0, [tp0, tp])
+            tab(page, "x")
             page.locator('#removals .rm-card[data-rm="x"] .rm-handle').focus()
             page.keyboard.press("End")
             k1 = page.evaluate(RM_STATE)[1]
@@ -373,6 +394,7 @@ def removals_flow(browser, vp_name, vp):
             nctx = new_ctx(browser, f"phone{w}", {"width": w, "height": hgt}, net, device_scale_factor=2, has_touch=True)[0]
             pg = nctx.new_page()
             pg.goto(cfg.base, wait_until="load")
+            tab(pg, "site")
             bring(pg, '#removals .rm-card[data-rm="site"]', "center")
             pg.wait_for_timeout(400)
             sw = pg.evaluate("""() => [document.documentElement.scrollWidth, innerWidth, Math.max(...[...document.querySelectorAll('#removals *')].map(e => e.parentElement.closest('.rm-stage') ? 0 : e.getBoundingClientRect().right)),
@@ -431,13 +453,15 @@ def removals_flow(browser, vp_name, vp):
                   and "reddit.com/" not in html and page.locator("#removals a").count() == 0
                   and not UNSAFE_RE.search(" ".join(v for k, v in t.items() if k not in ("name",))), t)
             check(f"{tag} ?r=: one /api/scan-result request (shared with the hero card)", len(net["results"]) == 1, net["results"])
-        th = page.eval_on_selector_all("#removals .rm-img", "es => es.filter(e => !e.closest('[hidden]')).map(e => [e.getAttribute('src'), getComputedStyle(e).filter, e.naturalWidth])")
+        th = page.eval_on_selector_all("#removals .rm-img", "es => es.filter(e => !e.closest('[hidden]:not(.rm-card)')).map(e => [e.getAttribute('src'), getComputedStyle(e).filter, e.naturalWidth])")
         check(f"{tag} ?r= {scheme}: real thumbs via <API>/api/thumb, still blurred", all(
             s[0].startswith(cfg.api + "/api/thumb?u=") and "blur(" in s[1] and s[2] > 0 for s in th), th[:2])
         site = page.locator('#removals .rm-card[data-rm="site"]')
         page.locator("#removals .rm-grid").screenshot(path=str(cfg.out / f"removals-{vp_name}-{scheme}-personalized-1-live.png"))
+        tab(page, "site")
         site.screenshot(path=str(cfg.out / f"removals-{vp_name}-{scheme}-site-personalized-1-live.png"))
-        for b in page.locator("#removals .rm-btn").all():
+        for k, b in zip(RM_PANELS, page.locator("#removals .rm-btn").all()):
+            tab(page, k)
             b.click()
         page.wait_for_timeout(1000)
         page.locator("#removals .rm-grid").screenshot(path=str(cfg.out / f"removals-{vp_name}-{scheme}-personalized-2-removed.png"))

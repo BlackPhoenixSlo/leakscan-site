@@ -8,9 +8,9 @@
 // min(960px, 70vw) centred, fixed right under the sticky header; the page keeps scrolling under it (no lock, nothing over
 // the rest). There a tap on the picture = play / pause; drag it down (follows the finger: translate + scale toward the mini
 // spot; released past 30% or flung down = mini, else snaps back), the chevron button or Esc = back to the mini player.
-// Docked: absolute (scrolls with the page), 55% of the card's width, in the card's .pip-slot (bottom-right, the note wraps
-// left of it; the live report card has none: hanging off its bottom-right corner) (<= 25% of the card, never over a link /
-// button / input: else just outside that corner, else floating); re-placed when the card
+// Docked: absolute (scrolls with the page), exactly over the hero's .pip-slot (the docket's video column, beside the
+// report card; under it on a phone), the slot's width; no slot shown: 55% of the card, off its bottom-right corner
+// (<= 25% of the card, never over a link / button / input: else just under it, else floating); re-placed when the card
 // changes (in-page scan → report card). Floating: fixed, by default bottom-right at min(320px, 45vw), under the sticky header
 // / report nav and off the hero Scan now button, phone CTA bar, Ask-AI launcher, report Reveal pill. Drag (pointer events,
 // touch too): it stays where it is dropped (kept on-screen, under the header); fling / drag past the left, right or bottom
@@ -55,15 +55,15 @@
   function vis(el) { var r = el.getBoundingClientRect(); return r.width && r.height && getComputedStyle(el).visibility !== 'hidden' ? r : null; }
   function vw() { return document.documentElement.clientWidth; }
 
-  // ---------- docked: in the hero card's .pip-slot (bottom-right, the note left of it); a card without one (the live
-  // report): off its bottom-right corner, else just under it ----------
+  // ---------- docked: over the hero's .pip-slot, its width (16:9 + the bar = the slot's height); no slot: off the card's
+  // bottom-right corner, else just under it ----------
   function dockAt() {   // → viewport rect {x, y, w} or null (no safe spot)
     var r = card && card.getBoundingClientRect();
     if (!r || !r.width) return null;
-    var w = Math.round(r.width * DOCK), h = Math.round(w * 9 / 16) + BAR, W = vw();
+    var slot = hero && hero.querySelector('.pip-slot'), sb = slot && vis(slot);
+    var w = Math.round(sb ? sb.width : r.width * DOCK), h = Math.round(w * 9 / 16) + BAR, W = vw();
     var fit = function (x) { return Math.max(12, Math.min(x, W - w - 12)); };
-    var slot = card.querySelector('.pip-slot'), sb = slot && vis(slot);
-    var spots = (sb ? [{ x: sb.right - w, y: sb.top }] : []).concat([{ x: fit(r.right - w * 0.7), y: r.bottom - h * 0.7 }, { x: fit(r.right - w), y: r.bottom + 10 }]);
+    var spots = sb ? [{ x: sb.left, y: sb.top }] : [{ x: fit(r.right - w * 0.7), y: r.bottom - h * 0.7 }, { x: fit(r.right - w), y: r.bottom + 10 }];
     var live = [].filter.call(document.querySelectorAll(LIVE), function (el) {
       if (pip.contains(el) || tab.contains(el) || el.closest('.askai-launcher, .mobile-cta')) return false;   // fixed ones: they sit above the docked player (z)
       return !!vis(el);
@@ -77,7 +77,7 @@
     }
     return null;
   }
-  var DOCK = 0.55, BAR = 40, MIN = 168;   // docked width = 55% of the card; bar = 4 x 40 px buttons (+ 8 px padding = MIN)
+  var DOCK = 0.55, BAR = 40, MIN = 168;   // docked width without a slot = 55% of the card; bar = 4 x 40 px buttons (+ 8 px padding = MIN)
   function lim(w) {   // 16:9 + bar, MIN .. 60% (phone 90%) of the width, and it fits the screen's height
     var W = vw(), max = Math.min(W * (innerWidth < 720 ? 0.9 : 0.6), (innerHeight - topInset() - 8 - BAR) * 16 / 9);
     return Math.round(Math.max(MIN, Math.min(w, max)));

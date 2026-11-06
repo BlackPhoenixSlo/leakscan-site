@@ -184,8 +184,8 @@
         strip = heroStrip(m, pics, links);
         links.appendChild(strip.box);
         // Images: a grid of the first ones
-        // GRID_ROWS rows of the grid's columns (CSS --live-grid-cols: 3 on phones, else 4): fills the Links panel's height
-        var GRID = GRID_ROWS * (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--live-grid-cols'), 10) || 4);
+        // rows x columns from CSS (--live-grid-rows / --live-grid-cols: phone 4 x 3, 4 x 4, the wide docket 2 x 8): fills the Links panel's height
+        var cs = getComputedStyle(document.documentElement), GRID = (parseInt(cs.getPropertyValue('--live-grid-rows'), 10) || GRID_ROWS) * (parseInt(cs.getPropertyValue('--live-grid-cols'), 10) || 4);
         var imgsN = make('p'), imgsMore = make('a', 'live-more live-more-a', [], { href: E.reportUrl(m.slug) }), grid = make('div', 'live-panel', [
           make('div', 'live-imgs-head', [imgsN, E.revealButton(live)]), pics.view(make('div', 'live-grid'), GRID, pics.tile()), imgsMore]);
         tabs.push(['images', 'Images', pics.count().text, grid]);
@@ -404,9 +404,10 @@
       heroOpen(m.handle, m.platform).setAttribute('data-handle', m.handle);
       heroResult(m);
       if (F) F.render(m);
-      // A shared report link (?r=, no #section) opened where the card sits below the fold (phones: under the hero
-      // text): bring it up, unless she already scrolled / typed. A restored scroll position or a #link is left alone.
-      if (shared && !location.hash && card.getBoundingClientRect().top >= window.innerHeight) bring();
+      // A shared report link (?r=, no #section) opened where the card sits below the fold (phones: below mid-screen,
+      // under the hero text and the form): bring it up, unless she already scrolled / typed. A restored scroll position
+      // or a #link is left alone.
+      if (shared && !location.hash && card.getBoundingClientRect().top >= window.innerHeight * (window.innerWidth < 720 ? 0.5 : 1)) bring();
     }, function () { /* unknown / unreachable: the page keeps its illustration */ });
   }
 })();
