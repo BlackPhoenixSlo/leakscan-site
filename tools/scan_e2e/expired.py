@@ -1,6 +1,6 @@
 """Scenario parts `expired` (see tools/scan_e2e.py): reports retention trimmed, what a visitor reads at each tier."""
 from .again import asked_fresh, scan_log, slug_of
-from .common import FX, PIP_AWAY, PROFILE, cfg, check, digits, new_ctx, served
+from .common import FX, PIP_AWAY, PROFILE, cfg, check, digits, new_ctx, served, top_ok
 
 TRIMMED, SUMMARY = "demoTrimmed1", "demoSummary1"
 LINES = {TRIMMED: "Scanned 5 days ago, images expired · Scan again", SUMMARY: "Scanned 2 months ago, details expired · Scan again"}
@@ -107,9 +107,12 @@ def personal_flow(browser, vp_name, vp):
     r = served(SUMMARY)
     page.goto(f"{cfg.base}?r={SUMMARY}")
     page.wait_for_selector(".report-card .aged-again", timeout=15000)
-    page.wait_for_function("h => document.body.innerText.includes(h)", arg="@" + FX["handle"], timeout=15000)
-    hosts = [t["domain"] for t in r["top_domains"]]
-    check("personal: landing summary: her hosts fill the page", any(h in page.locator("#removals").inner_text() for h in hosts) if page.locator("#removals").count() else True)
+    occ = {t["domain"]: t["n"] for t in r["top_domains"]}
+    page.wait_for_function("() => document.querySelector('.ba [data-p=\"gone-1\"] .m-site').textContent !== 'leak-mirror.example'", timeout=15000)
+    gone = page.eval_on_selector_all('.ba [data-p^="gone-"] .m-site', "els => els.map(e => e.textContent)")
+    check("personal: landing summary: Removed rows = her top 4 kept hosts", top_ok(gone, occ, 4), (gone, occ))
+    search = page.eval_on_selector_all("[data-p=search]", "els => els.map(e => e.textContent)")
+    check("personal: landing summary: her name in the search", search and all(x == name + " nude leaks" for x in search), search)
     page.close()
     ctx.close()
     check("personal: no page / console errors", not (net["errors"] or net["console"]), {k: net[k][:3] for k in ("errors", "console")})

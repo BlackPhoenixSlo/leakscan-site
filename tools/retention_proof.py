@@ -288,6 +288,11 @@ def main():
     visitors = subprocess.Popen([sys.executable, os.path.abspath(__file__), "--load", str(port), sample_file, stop, req_log, "--readers", str(args.readers),
                                  "--scanners", str(args.scanners), "--handle", stub.HANDLE], stdout=log, stderr=log)
     time.sleep(10)
+    # the worst VACUUM: nothing trimmed yet, every byte live, visitors on. Scans overlapping it must wait it out, not fail.
+    vac_full = {"bytes": public_app._db_bytes(), "t0": time.time()}
+    db.vacuum()
+    vac_full.update(t1=time.time(), after=public_app._db_bytes())
+    time.sleep(3)
     vac = {}
     real_vacuum = db.vacuum
 
@@ -410,6 +415,10 @@ def main():
     if vac:
         vac_scans = [r for r in reqs if r["k"] == "scan" and r["t0"] < vac["t1"] and r["t1"] > vac["t0"]]
         check("load: a scan insert overlapping VACUUM is stored (a VACUUM under 1 s may overlap none)", all(r["s"] == 200 for r in vac_scans) and (vac_scans or vac["t1"] - vac["t0"] < 1), len(vac_scans))
+    vac_full_scans = [r for r in reqs if r["k"] == "scan" and r["t0"] < vac_full["t1"] and r["t1"] > vac_full["t0"]]
+    check("load: scans overlapping the worst VACUUM are stored", (vac_full_scans or vac_full["t1"] - vac_full["t0"] < 1) and all(r["s"] == 200 and r["slug"] in inserted for r in vac_full_scans), len(vac_full_scans))
+    bytes_settled = public_app._db_bytes()
+    check("bytes: retention shrinks the DB and the WAL is gone", args.rows < 500 or bytes_settled < bytes_seeded / 2 and not os.path.getsize(db.DB_PATH + "-wal"), (bytes_seeded, bytes_settled))
     check("idempotent: a second run touches 0 rows", (n2["trimmed"], n2["summary"], n2["corrupt"], n2["errors"], n3["trimmed"], n3["summary"]) == (0, 0, 0, 0, 0, 0), (n2, n3))
     check("idempotent: the table is identical", d1 == d2)
     check("run: no row raised", n1 and not n1["errors"], n1 and n1["errors"])
@@ -420,7 +429,9 @@ def main():
     first = min(r["t0"] for r in reqs) if reqs else 0
     report = {"rows": args.rows, "kinds": sizes, "tiers": tiers, "inserts": len(inserted), "requests": len(reqs), "seed_s": round(seed_s, 1),
               "retention_s": round(run_t1 - run_t0, 2), "vacuum_s": round(vac["t1"] - vac["t0"], 2) if vac else None,
-              "db_bytes": {"seeded": bytes_seeded, "after": bytes_after}, "first_run": {k: v for k, v in (n1 or {}).items() if k != "slugs"},
+              "db_bytes": {"seeded": bytes_seeded, "right_after_run": bytes_after, "settled": bytes_settled},
+              "worst_vacuum": {"secs": round(vac_full["t1"] - vac_full["t0"], 2), "bytes_before": vac_full["bytes"], "bytes_after": vac_full["after"], "scans_overlapping": len(vac_full_scans),
+                               "their_max_s": round(max((r["t1"] - r["t0"] for r in vac_full_scans), default=0), 2)}, "first_run": {k: v for k, v in (n1 or {}).items() if k != "slugs"},
               "files_slugs": len((n1 or {}).get("slugs") or []), "second_run": {k: v for k, v in n2.items() if k != "slugs"},
               "second_run_s": events[-2].split("secs=")[-1] if len(events) > 1 else None, "p95_s": {
                   k: {"before": pct(k, first, run_t0), "during": pct(k, run_t0, run_t1), "after": pct(k, run_t1, 1e12)} for k in ("result", "profile", "media", "avatar", "scan")},
@@ -428,7 +439,7 @@ def main():
               "events": events, "checks": checks, "bypasses": "CSE, DeepSeek, leakshaven: app/tests wire stubs; profile pages: fake urlopen; media gathering off; limiters widened"}
     with open(os.path.join(args.out, "report.json"), "w") as fh:
         json.dump(report, fh, indent=1, default=dict)
-    print(json.dumps({k: report[k] for k in ("rows", "tiers", "inserts", "requests", "retention_s", "vacuum_s", "db_bytes", "p95_s", "max_s_during", "statuses")}, default=dict), flush=True)
+    print(json.dumps({k: report[k] for k in ("rows", "tiers", "inserts", "requests", "retention_s", "vacuum_s", "worst_vacuum", "db_bytes", "p95_s", "max_s_during", "statuses")}, default=dict), flush=True)
     srv.shutdown()
     up.shutdown()
     lsv.shutdown()

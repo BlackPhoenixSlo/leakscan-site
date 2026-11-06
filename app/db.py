@@ -248,7 +248,10 @@ def vacuum(path=None):
     conn = sqlite3.connect(path or DB_PATH, timeout=30, isolation_level=None)
     try:
         conn.execute("VACUUM")
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        for _ in range(10):   # busy while a reader sits on the old pages: VACUUM wrote the whole DB to the WAL
+            if not conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0]:
+                break
+            time.sleep(0.5)
     finally:
         conn.close()
 
