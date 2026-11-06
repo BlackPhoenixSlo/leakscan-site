@@ -125,6 +125,7 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 .vo-phone { width: 300px; aspect-ratio: 9 / 16; }   /* 300x533: the card stays ~600 of the 720 box */
 .vo-phone .phone-screen { display: flex; flex-direction: column; }
 .vo-phone .m-search { flex: none; }
+.vo-q { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }   /* the query: "<name> nude leaks" */
 .vo-tabs span { padding: 0 2px 6px; border-bottom: 3px solid transparent; }
 .vo-tabs .on { color: #1a73e8; border-bottom-color: #1a73e8; }
 .vo-phone .vo-rs { flex: 1; height: auto; }

@@ -35,7 +35,7 @@ removal is his "they get removed", so the removed cue = "removed". He ends at 52
 |---|---|---|---|---|---|---|
 | start | "Hey, it's me Jack…" (0.58) | named: "for <name>" pill (nothing spoken) | 0 | – | – | pill 2 s |
 | 1-2 | "Hey, it's me Jack, a real face, not a bot. I remove leaks, check, fuck leaks." | `intro` fill (`data-cue-in` / `-out`): the landing in a phone types `jakabasej` (named: her handle), "Scan now", the scan card, "Building YOUR video…" | 0.3 | – | – | 9.8 |
-| 3 | "I remove from the **Google** (10.30), you see links, they get **removed** (12.86)." | `google` | 10 | – | 12.86 | 14.81 |
+| 3 | "I remove from the **Google** (10.30), you see links, **they** (12.44) get **removed** (12.86)." | `google` (removed: "removed" − 0.5, the wipe on "they get removed") | 10 | – | 12.36 | 14.81 |
 | 4 | "You see **images** (14.16) on the Google, they get **removed** (16.00)." | `google-images` (tap: end of "images", clamped) | 14.81 | 15.26 | 16.01 | 17.96 |
 | 5 | "You see stuff on the **X** (18.08), they get **removed** (19.52)." | `x` | 17.96 | – | 19.52 | 21.47 |
 | 6 | "You see stuff on the **Reddit** (21.60), they get **removed** (22.88)." | `reddit` | 21.47 | – | 22.88 | 24.88 |
