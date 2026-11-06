@@ -175,3 +175,4 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
 - Copy: "one leaked URL free" (hero, FAQ + JSON-LD, meta, scan page h2); "free URL" in pricing/steps; website h2 "A website in your name, included."; footnote drops "and your website"; video caption "Why I check every link: 57 s"; 16,000+ = "links filed in takedown notices so far. A count of notices, not of removals."
 - Hero lead: 820 px desktop (2 lines), 17/26 px on phone (3 lines at 390, button bottom 499).
 - Skipped: "570 of 633" in the poster panel (the panel is inside the pip player/slot box; pip.js markup = pip logic).
+- r10 fix: #free phone 476 px (gi-box 94) → #free 636 at 1440 (≤ 640); removals captions share one grid cell (visibility, not display) → card box identical live/removed (390: 351.6 both).

@@ -510,7 +510,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 @media (min-width: 860px) { .free-band { grid-template-columns: minmax(0, 1fr) 320px; gap: 64px; } }
 @media (min-width: 1100px) {   /* wide: the copy ~610 px (h2 in 3 lines), the mock 460 px on the grid's right edge, 3 whole rows of ~138 x 100 thumbs */
   .free-band { grid-template-columns: minmax(0, 1fr) 460px; gap: 48px; } #free .free-phone { justify-items: end; }
-  #main .free-phone .phone-free { width: 460px; height: 494px; } #main .free-phone .phone-free .m-grid .gi-box { height: 100px; }
+  #main .free-phone .phone-free { width: 460px; height: 476px; } #main .free-phone .phone-free .m-grid .gi-box { height: 94px; }   /* #free <= 640 at 1440 (80 + 476 + 80) */
 }
 .free-copy h2 { max-width: 15ch; }
 @media (min-width: 1100px) { .free-copy h2 { max-width: none; } }

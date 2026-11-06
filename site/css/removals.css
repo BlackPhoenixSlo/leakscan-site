@@ -44,7 +44,9 @@
 .rm .rm-h { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }   /* the tab names it */
 .rm-cap { margin: 0; color: var(--muted); font-size: .906rem; line-height: 1.45; }
 /* the caption says what the stage shows: live until the edge passes half way, then the outcome (js/removals.js: .is-removed) */
-.rm-card:not(.is-removed) .rm-out, .rm-card.is-removed .rm-now { display: none; }
+.rm-cap { display: grid; }
+.rm-cap > span { grid-area: 1 / 1; }   /* both captions in one cell: the box = the taller one in either state (no shift on toggle / sweep) */
+.rm-card:not(.is-removed) .rm-out, .rm-card.is-removed .rm-now { visibility: hidden; }
 .rm-act { grid-area: act; margin: 0; }
 .rm-btn { min-width: 9.5em; justify-content: center; }
 @media (max-width: 379px) { .rm-btn { min-width: 0; padding-inline: .9em; } }
