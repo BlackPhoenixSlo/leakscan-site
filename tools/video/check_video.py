@@ -13,9 +13,9 @@
 - after state (the .rm-gone layer) = the landing after-phone: google lists her site (data-vo=site) + instagram.com, no
   leak host (*.example, data-vo=host); google-images shows >= 4 of her own photos (<img>, not the blurred .rm-img) and no
   "No results" / copyright notice
-- both modes: .vo-stage has numeric data-cue-say (named: the name at the end, after the last prefab's out),
-  data-cue-say-start (named: the name in the take's 1.5 s silent opening, its 2 s pill out before the first prefab); the
-  generic end card (.vo-cta) exists with the exact ask + a form (input name=name) and its cue (data-cue-cta, default
+- both modes: .vo-stage has numeric data-cue-say (named: the "for <name>" pill from there, after the last prefab's out;
+  its first 2 s pill at the take's start ends before the first prefab); the page never speaks (no speechSynthesis /
+  SpeechSynthesisUtterance / data-cue-say-start in the page, js or css: Jack talks from the first second); the generic end card (.vo-cta) exists with the exact ask + a form (input name=name) and its cue (data-cue-cta, default
   data-cue-say) is after the last out; the "for <name>" pill (.vo-for) exists; js/video-overlays.js keeps the generic name
   "SophieStar" (generic persona), the ?sfx=0 switch and the production images (the landing's runScan / fetchResult + /api/media/)
 - one take: the <video> plays jack.webm (an mp4 <source> only next to an existing file); no second take (jack-named), no
@@ -51,8 +51,10 @@ MIN_LIVE = {"google-images": 1.2}   # seconds from live to removed (default: the
 IN = 0.45
 CTA_TEXT = "Type your name in the link → this video rebuilds with YOUR leaks"
 MIN_HOLD = 1.95                     # seconds from removed to out: wipe + stamp + slide-out
+EPS = 1e-6                          # cues are 2-decimal seconds: 17.96 - 16.01 is 1.9499.. in floats
 CUES = ("data-cue-live", "data-cue-removed", "data-cue-out")
 VIDEO_BUDGET = 60_000_000   # the real recording replaces the ~0.2 MB placeholder; keep the repo sane
+PILL = 2.0   # js/video-overlays.js: the named "for <name>" pill shows 0 .. 2 s, then from data-cue-say
 
 
 class P(HTMLParser):
@@ -107,16 +109,17 @@ def stage_cue(p, k):
 def modes(html, p, last_out):
     """the two modes: named (say start / end, shift, pill) and generic (the end card + form at data-cue-cta / -say)"""
     bad = []
-    say, start = stage_cue(p, "data-cue-say"), stage_cue(p, "data-cue-say-start")
+    say = stage_cue(p, "data-cue-say")
     first_live = float(p.prefabs[0]["data-cue-live"]) if p.prefabs and "data-cue-live" in p.prefabs[0] and p.prefabs[0].get("data-cue-live", "").replace(".", "", 1).isdigit() else None
     if say is None:
         bad.append(f"video/index.html: .vo-stage needs a numeric data-cue-say (got {p.stage.get('data-cue-say')!r})")
     elif last_out is not None and say < last_out:
         bad.append(f"video/index.html: data-cue-say {say} before the last prefab is out at {last_out}")
-    if start is None:
-        bad.append(f"video/index.html: .vo-stage needs a numeric data-cue-say-start (got {p.stage.get('data-cue-say-start')!r})")
-    elif first_live is not None and start + 2 > first_live:
-        bad.append(f"video/index.html: data-cue-say-start {start} + 2 s pill overlaps the first prefab at {first_live}")
+    if first_live is not None and PILL > first_live:
+        bad.append(f"video/index.html: the {PILL} s start pill overlaps the first prefab at {first_live}")
+    for f in (PAGE, SITE / "js" / "video-overlays.js", SITE / "css" / "video.css"):
+        for k in sorted(set(re.findall(r"speechSynthesis|SpeechSynthesisUtterance|data-cue-say-start", f.read_text(encoding="utf-8")))):
+            bad.append(f"{f.relative_to(SITE)}: {k!r}: no spoken name (no AI overvoice), Jack's take only")
     cta = stage_cue(p, "data-cue-cta") if "data-cue-cta" in p.stage else say
     if cta is None:
         bad.append(f"video/index.html: data-cue-cta {p.stage.get('data-cue-cta')!r} not numeric")
@@ -227,16 +230,16 @@ def main():
             continue
         if not 0 <= live < rem < out:
             bad.append(f"video/index.html: prefab {pid} cues not ascending: live {live} < removed {rem} < out {out}")
-        if rem - live < MIN_LIVE.get(pid, IN):
+        if rem - live < MIN_LIVE.get(pid, IN) - EPS:
             bad.append(f"video/index.html: prefab {pid}: removed {rem} - live {live} < {MIN_LIVE.get(pid, IN)} s")
         if a.get("data-cue-tap") is not None:
             try:
                 tap = float(a["data-cue-tap"])
-                if not live + IN <= tap <= rem - 0.7:
+                if not live + IN - EPS <= tap <= rem - 0.7 + EPS:
                     bad.append(f"video/index.html: prefab {pid}: data-cue-tap {tap} outside live + {IN} .. removed - 0.7")
             except ValueError:
                 bad.append(f"video/index.html: prefab {pid}: data-cue-tap {a['data-cue-tap']!r} not numeric")
-        if out - rem < MIN_HOLD:
+        if out - rem < MIN_HOLD - EPS:
             bad.append(f"video/index.html: prefab {pid}: out {out} - removed {rem} < {MIN_HOLD} s")
         if prev_out is not None and live < prev_out:
             bad.append(f"video/index.html: prefab {pid} comes in at {live} before {prev_id} is out at {prev_out}")
