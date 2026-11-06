@@ -1,13 +1,16 @@
 /* js/pip.js: mini player of site/video/. Picture (16:9, the iframe, nothing drawn over it) + a thin control bar under it.
    Docked (.docked, landing): absolute, hanging off the bottom-right corner of the hero card, scrolls with the page.
-   Floating: fixed in a corner, min(320px, 45vw). Drag anywhere but the buttons → nearest corner; fling / drag past the left
-   or right edge → tucked off-screen, .pip-tab (chevron) at that edge brings it back. z 44: under the header (50) and the
-   Ask-AI launcher (45). Never in the flow: CLS 0. */
-.pip { --bar: 30px; position: fixed; left: 0; top: 0; z-index: 44; width: var(--w, min(320px, 45vw)); border-radius: 12px; overflow: hidden;
+   Floating: fixed, min(320px, 45vw), dropped anywhere; fling / drag past a side or the bottom → tucked off-screen,
+   .pip-tab (chevron) brings it back. Expanded (.big): fixed under the header, full width (phone) / min(960px, 70vw); the page
+   scrolls under it. Size changes animate as transform only (--s scale, origin top-left). z 44: under the header (50) and
+   the Ask-AI launcher (45). Never in the flow: CLS 0. */
+.pip { --bar: 40px; position: fixed; left: 0; top: 0; z-index: 44; width: var(--w, min(320px, 45vw)); border-radius: 12px; overflow: hidden;
   background: #0b0c0e; box-shadow: 0 10px 30px rgb(0 0 0 / .35), 0 0 0 1px rgb(255 255 255 / .1); opacity: 0; visibility: hidden;
-  transform: translate3d(var(--x, 0px), var(--y, 0px), 0); transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease, visibility 0s linear .3s;
+  transform: translate3d(var(--x, 0px), var(--y, 0px), 0) scale(var(--s, 1)); transform-origin: 0 0; transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease, visibility 0s linear .3s;
   touch-action: none; -webkit-user-select: none; user-select: none; cursor: grab; }
 .pip.docked { position: absolute; }
+.pip.big { box-shadow: 0 14px 40px rgb(0 0 0 / .5), 0 0 0 1px rgb(255 255 255 / .1); }
+@media (max-width: 719px) { .pip.big { border-radius: 0; } }
 .pip.on { opacity: 1; visibility: visible; transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease, visibility 0s; }
 .pip.on.tucked { visibility: hidden; transition: transform .3s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .3s; }
 .pip.drag, .pip.swap { transition: none; }
@@ -17,15 +20,15 @@
 .pip-pic { position: relative; aspect-ratio: 16 / 9; background: #000; }
 .pip iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
 .pip-hit { position: absolute; inset: 0; }
-.pip-bar { display: flex; align-items: center; gap: 2px; height: var(--bar); padding: 0 4px; background: #16181c; }
+.pip-bar { display: flex; align-items: center; height: var(--bar); padding: 0 4px; background: #16181c; }
 .pip-bar i { flex: 1; }
-.pip-bar button, .pip-bar a { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 26px; padding: 0; border: 0; border-radius: 7px;
+.pip-bar button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 9px;
   background: transparent; color: #d8dadf; cursor: pointer; }
 .pip.muted .pip-snd { background: #ffd400; color: #000; }
-.pip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.pip svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .pip-pp .pip-i-pause, .pip.paused .pip-pp .pip-i-play { display: block; }
 .pip-pp .pip-i-play, .pip.paused .pip-pp .pip-i-pause { display: none; }
-@media (hover: hover) { .pip-bar button:hover, .pip-bar a:hover { background: rgb(255 255 255 / .12); color: #fff; } .pip.muted .pip-snd:hover { background: #ffe14d; color: #000; } }
+@media (hover: hover) { .pip-bar button:hover { background: rgb(255 255 255 / .12); color: #fff; } .pip.muted .pip-snd:hover { background: #ffe14d; color: #000; } }
 .pip :focus-visible, .pip-tab:focus-visible { outline: 3px solid #2f80ff; outline-offset: -3px; }
 .pip-tab { position: fixed; top: 0; z-index: 44; display: flex; align-items: center; justify-content: center; width: 30px; height: 64px; padding: 0; border: 0;
   background: #0b0c0e; color: #fff; box-shadow: 0 6px 18px rgb(0 0 0 / .3); cursor: pointer; touch-action: none; transform: translateY(var(--ty, 0px)); }
@@ -34,4 +37,7 @@
 .pip-tab[data-side="r"] { right: 0; border-radius: 10px 0 0 10px; }
 .pip-tab svg { width: 20px; height: 20px; fill: none; stroke: #ffd400; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 @media (prefers-reduced-motion: reduce) { .pip, .pip.on, .pip.on.tucked { transition: none; } .pip.pop { animation: none; } }
-.pip-bar .pip-rs { cursor: nwse-resize; touch-action: none; }
+.pip-rs { position: absolute; left: 0; top: 0; width: 28px; height: 28px; display: flex; color: #fff; cursor: nwse-resize; touch-action: none; }
+.pip-rs svg { width: 16px; height: 16px; margin: 5px; stroke-width: 2.6; filter: drop-shadow(0 0 2px rgb(0 0 0 / .8)); opacity: .85; }
+@media (hover: hover) and (pointer: fine) { .pip-rs svg { opacity: 0; transition: opacity .15s; } .pip:hover .pip-rs svg, .pip-rs:focus-visible svg { opacity: .9; } }
+.pip.big .pip-rs { display: none; }
