@@ -110,6 +110,8 @@ Plus:
 --break-herend serves video-overlays.js with the old demo end in personalized mode (rr = null, jakabasej typed): only the
   "hers handle" / "hers end" / "hers counts" / "prod end card" / prod report checks (and the named flow's typed handle, unless
   --name slugs to jakabasej) go red.
+--break-burst serves video-overlays.js with photoOnly probing every thumb at once (the pre-pacing burst): the "hers paced"
+  checks go red.
 --break-hers serves video-overlays.js with a loaded result never applied: the "hers" checks (and the stub's ?r= "personalized" ones) go red.
 --break-voice serves video-overlays.js with the old overvoice (speechSynthesis.speak(name) 0.5 s in): only the "no overvoice"
   / swap speak checks go red. --only voice = the speech + desktop swap part.
@@ -320,6 +322,7 @@ def personalized(b, out, break_thumbs):
         try:
             pg.wait_for_function("() => document.querySelector('[data-vo=name]').textContent === 'Mira Example'", timeout=8000)
             pg.wait_for_function("() => [...document.querySelectorAll('.rm-img')].every(i => i.complete && i.src.includes('/api/thumb'))", timeout=12000)
+            pg.wait_for_function("() => window.VideoOverlays.photos.settled", timeout=60000)   # paced probes done: no late draw(currentTime) over the draw(t) shots
         except Exception:
             pass
         pg.wait_for_timeout(500)
@@ -362,10 +365,11 @@ PROD_SLUG, PROD_HANDLE = "MT4kpWQI3QXp", "sophieraiin"
 PROD_SLUG2 = "2_YPj7TbK4rm"   # an older scan of the same handle: other counts than the placeholder's (the ?r= / theater run)
 VIDEO_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|embed|clips?|vod)(?:[/?#.-]|$)", re.I)
 GSTATIC = re.compile(r"^https://[a-z0-9-]+\.gstatic\.com/[^\s\"'<>\\]*$")
+# REAL count = the g-count slot's value (__src), not its roll frame (the read happens mid-play)
 REAL = """() => { const q = s => [...document.querySelectorAll(s)], im = i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter];
   return {g: q('.vo-pf[data-prefab="google"] .rm-live .rm-img').map(im), grows: q('.vo-pf[data-prefab="google"] .rm-live .m-site').map(e => e.textContent),
           grid: q('.vo-gi .rm-live .vo-grid .rm-img').map(im), rep: q('.vo-cta .vo-steps .vo-real').map(im), all: q('.rm-img').map(im),
-          own: q('.vo-own').map(im), count: (document.querySelector('[data-vo="g-count"]') || {}).textContent, photos: window.VideoOverlays.photos,
+          own: q('.vo-own').map(im), count: (e => e && (e.__src || e.textContent))(document.querySelector('[data-vo="g-count"]')), photos: window.VideoOverlays.photos,
           cards: q('.vo-pf[data-prefab]').map(e => [e.dataset.prefab, [...e.querySelectorAll('.rm-img, .vo-real')].map(im)])}; }"""
 BLUR = lambda f: float(m[1]) if (m := re.search(r"blur\(([\d.]+)px\)", f or "")) else 0.0
 BLUR_MIN = 5   # px: the video cards' leak-image blur floor (= styles.css .live-ico, the site's lightest rule)
@@ -511,7 +515,7 @@ def prod(b, base, out, cues, cta):
                 r.fulfill(status=200, content_type="text/event-stream", body=sse)
         try:
             pg.wait_for_function("s => location.search === '?r=' + s || document.documentElement.dataset.voMode === 'named'", arg=slug, timeout=15000)
-            pg.wait_for_function("""() => window.VideoOverlays.photos.kept.length > 0 && [...document.querySelectorAll('.rm-img, .vo-real')].every(i => i.complete)
+            pg.wait_for_function("""() => window.VideoOverlays.photos.kept.length > 0 && window.VideoOverlays.photos.settled && [...document.querySelectorAll('.rm-img, .vo-real')].every(i => i.complete)
                 && [...document.querySelectorAll('.vo-own')].every(i => i.src.includes('/api/media/') && i.complete)""", timeout=30000)
         except Exception:
             pass
@@ -718,7 +722,7 @@ def hers(b, base, out, raw_file, no_prod):
         try:
             pg.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=10000)
             if not no_prod:
-                pg.wait_for_function("() => window.VideoOverlays.photos.kept.length > 0 && [...document.querySelectorAll('.rm-img')].every(i => i.complete)", timeout=30000)
+                pg.wait_for_function("() => window.VideoOverlays.photos.kept.length > 0 && window.VideoOverlays.photos.settled && [...document.querySelectorAll('.rm-img')].every(i => i.complete)", timeout=90000)
         except Exception:
             pass
         pg.wait_for_timeout(500)
@@ -783,10 +787,18 @@ def hers(b, base, out, raw_file, no_prod):
         # a: the shared link ?r=<slug>
         ctx, ext, seen = context(opts, theater)
         pg = ctx.new_page()
-        errs = []
+        errs, tq = [], []
         console(pg, errs)
+        pg.on("request", lambda r: "/api/thumb?" in r.url and tq.append(time.monotonic()))
+        t0 = time.monotonic()
         pg.goto(f"{base}video/?r={PROD_SLUG}")
+        pg.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=10000)
+        pg.wait_for_timeout(max(0, (t0 + 5.5 - time.monotonic()) * 1000))
+        early = [x for x in tq if x - t0 < 5.5]   # the probes before PROBE_MAX (6 s: then the kept ones show, local routing = no HTTP cache)
+        burst = max((sum(1 for y in early if 0 <= y - x < 1) for x in early), default=0)
         settle(pg)
+        check(f"hers paced (r-{label}): the video's /api/thumb probes <= 3 per 1 s window before 5.5 s ({burst}, {len(early)} in all; /api/thumb refills 2/s: a burst = 429s = photos dropped)",
+              0 < burst <= 3, (burst, len(early)))
         if theater:
             pg.locator(".vo-fs").tap()
             pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
@@ -858,7 +870,7 @@ def hers(b, base, out, raw_file, no_prod):
             try:
                 fr.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=15000)
                 if not no_prod:
-                    fr.wait_for_function("() => window.VideoOverlays.photos.kept.length > 0 && [...document.querySelectorAll('.rm-img')].every(i => i.complete)", timeout=30000)
+                    fr.wait_for_function("() => window.VideoOverlays.photos.kept.length > 0 && window.VideoOverlays.photos.settled && [...document.querySelectorAll('.rm-img')].every(i => i.complete)", timeout=90000)
             except Exception:
                 pass
             lp.wait_for_timeout(800)
@@ -1777,6 +1789,7 @@ def main():
     ap.add_argument("--break-intro", action="store_true")
     ap.add_argument("--break-hers", action="store_true")
     ap.add_argument("--break-herend", action="store_true")
+    ap.add_argument("--break-burst", action="store_true")
     ap.add_argument("--hers-raw", help="her saved scan result (JSON) instead of the read-only production GET")
     ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers"], help="run only this part (iteration)")
     a = ap.parse_args()
@@ -1807,13 +1820,14 @@ def main():
         BREAK["named"] = ("**/js/video-overlays.js", broken, "application/javascript")
     if a.break_img:   # wire boundary: video-overlays.js with report()'s image field wrong (it.title for it.src)
         js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
-        broken, k = re.subn(r"E\.thumb\(it\.src\)", "E.thumb(it.title)", js)
-        assert k == 1, "break: E.thumb(it.src) not found"
+        broken, k = re.subn(r"return it\.src; \}\)\.filter", "return it.title; }).filter", js)
+        assert k == 1, "break: report()'s it.src not found"
         BREAK["img"] = ("**/js/video-overlays.js", broken, "application/javascript")
     if a.break_logos:   # wire boundary: video-overlays.js with the people-photo test off (every loaded thumb kept)
         js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
-        broken, k = re.subn(r"&& E\.isPhoto\(im\) \?", "?", js)
-        assert k == 1, "break: E.isPhoto(im) not found"
+        broken, k = re.subn(r"E\.photo\(u, ", "(function (s, f) { var im = new Image(); im.onload = function () { f(im.naturalWidth >= 16 && im.naturalHeight >= 16); }; "
+                            "im.onerror = function () { f(false); }; im.src = E.thumb(s); })(u, ", js)   # E.photo minus its E.isPhoto
+        assert k == 1, "break: photoOnly's E.photo(u, …) not found"
         BREAK["logos"] = ("**/js/video-overlays.js", broken, "application/javascript")
     if a.break_persona:   # wire boundary: video-overlays.js with the old generic placeholder
         js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
@@ -1843,6 +1857,11 @@ def main():
         broken, k = re.subn(r"rr = c\.named \? real : null, bs = box\.style, h = c\.named \? herHandle\(\) : handle\(demoName\(\)\)", "rr = null, bs = box.style, h = handle(c.named ? DEMO : demoName())", js)
         assert k == 1, "break: steps()' rr / h not found"
         BREAK["herend"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_burst:   # wire boundary: video-overlays.js's photoOnly unpaced (every probe at once)
+        js = (ROOT / "site/js/video-overlays.js").read_text(encoding="utf-8")
+        broken, k = re.subn(r"for \(var k = 0; k < LANES; k\+\+\) lane\(\);", "for (var k = 0; k < list.length; k++) lane();", js)
+        assert k == 1, "break: photoOnly's lanes not found"
+        BREAK["burst"] = ("**/js/video-overlays.js", broken, "application/javascript")
     fl = {k: tuple(map(float, re.search(r'data-prefab="%s" data-cue-in="([\d.]+)" data-cue-out="([\d.]+)"' % k, html).groups())) for k in ("intro", "sites")}
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
