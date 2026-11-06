@@ -3,31 +3,28 @@
 <head>
 <meta charset="utf-8">
 <title>og image source</title>
-<!-- Source for site/assets/og.png (1200x630). Render: python3 tools/make_icons.py -->
+<!-- Source for site/assets/og-jack.jpg (1200x630). Render: python3 tools/make_icons.py
+     Photo: tools/og-jack-src.jpg = frame 44 (1.47 s, "it's me") of the original take, crop x0-846 y51-859. -->
 <style>
 * { box-sizing: border-box; margin: 0; }
 html, body { width: 1200px; height: 630px; }
-body { background: #fbf8f3; color: #1f1a15; font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; padding: 72px 80px; position: relative; overflow: hidden; }
-body::before { content: ""; position: absolute; right: -180px; top: -200px; width: 760px; height: 760px; background: radial-gradient(closest-side, rgb(168 67 28 / .18), transparent 70%); }
+body { background: #fbf8f3; color: #1f1a15; font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; position: relative; overflow: hidden; }
+body::before { content: ""; position: absolute; right: -220px; top: -240px; width: 760px; height: 760px; background: radial-gradient(closest-side, rgb(168 67 28 / .16), transparent 70%); }
+.photo { position: absolute; left: 0; top: 0; width: 660px; height: 630px; object-fit: cover;
+  -webkit-mask-image: linear-gradient(to right, #000 70%, transparent 88%); mask-image: linear-gradient(to right, #000 70%, transparent 88%); }
+.copy { position: absolute; left: 626px; right: 48px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; }
 .brand { display: flex; align-items: center; gap: 14px; font: 700 34px/1 "Iowan Old Style", Palatino, Georgia, serif; }
-h1 { font: 600 76px/1.06 "Iowan Old Style", Palatino, Georgia, serif; letter-spacing: -.02em; margin-top: 56px; max-width: 760px; }
+h1 { font: 600 66px/1.06 "Iowan Old Style", Palatino, Georgia, serif; letter-spacing: -.02em; margin-top: 40px; text-wrap: balance; }
 h1 em { color: #a8431c; }
-p { margin-top: 30px; font-size: 30px; color: #5c5248; }
-.card { position: absolute; right: 72px; bottom: 72px; width: 380px; white-space: nowrap; background: #fff; border: 1px solid #e6ddd0; border-radius: 22px; padding: 18px 20px; box-shadow: 0 24px 60px rgb(60 40 20 / .14); }
-.row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed #e6ddd0; font: 500 17px/1 Menlo, monospace; }
-.row:last-child { border: 0; }
-.chip { font: 700 15px/1 system-ui, sans-serif; padding: 6px 12px; border-radius: 99px; }
-.dead { background: #dff1e7; color: #23704f; } .live { background: #fbe2dd; color: #b02a1d; } .cached { background: #fbefd4; color: #8a5a00; }
+p { margin-top: 30px; font-size: 26px; white-space: nowrap; font-weight: 500; color: #5c5248; }
 </style>
 </head>
 <body>
-  <div class="brand"><img src="../site/assets/logo.svg" width="52" height="52" alt="">Abolita</div>
-  <h1>Leaked content, taken down by a real person. <em>Me.</em></h1>
-  <p>Free Google scan first · No forms, no card</p>
-  <div class="card">
-    <div class="row">leak-mirror.example<span class="chip dead">Dead</span></div>
-    <div class="row">free-galleries.example<span class="chip cached">Cached</span></div>
-    <div class="row">pirate-tube.example<span class="chip live">Live</span></div>
+  <img class="photo" src="og-jack-src.jpg" alt="">
+  <div class="copy">
+    <div class="brand"><img src="../site/assets/logo.svg" width="52" height="52" alt="">Abolita</div>
+    <h1>Leaked content, taken down by a real person. <em>Me.</em></h1>
+    <p>Free Google scan first · No forms, no card</p>
   </div>
 </body>
 </html>

@@ -159,7 +159,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `showcase-index`), so one run never overwrites itself. Needs Playwright with Chromium; system `python3` works here,
   fallback: `cd ~/leakhunt && uv run python ~/leakscan-site/tools/shots.py OUT_DIR URL...`.
   Evidence goes outside the repo: `~/.leakscan-site/evidence/<branch>/<UTC>-<sha7>/`.
-- Raster assets: `python3 tools/make_icons.py` renders `site/assets/og.png` (from `tools/og.html`),
+- Raster assets: `python3 tools/make_icons.py` renders `site/assets/og-jack.jpg` (from `tools/og.html`),
   `apple-touch-icon.png` and `favicon-32.png` (from `site/assets/favicon.svg`).
 - Deploy: VPS = `deploy/push.sh` (see "One project, one origin" below). Push to `main` →
   `.github/workflows/pages.yml` runs the gate and deploys `site/` to GitHub Pages
