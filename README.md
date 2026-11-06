@@ -205,6 +205,9 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   that passed, else the neutral letter (never another site's photo);
   pixels read via a CORS load of `/api/thumb`; refused → once more on `E.fresh`'s URL (`?c=1&u=`: a copy cached before
   the API sent ACAO / Vary would refuse forever), then plain (unreadable = kept). Thresholds + measured confusion: comment there.
+  Landing (`inline-scan.js`, API cross-origin): tiles, row icons, video stills show the exact URL + mode the probe passed
+  with (`g.put`): its cached copy, one request per image (a plain load would be a 2nd cache entry: ~2x requests, past the
+  `/api/thumb` burst → 429, photos dropped).
 - `js/inline-scan.js`: with JS the form never leaves the page. The hero card turns into the live report (progress →
   first 5 links: domain + title, badge Live = `live: true`, Indexed = Google result, else Found; "N links found";
   Open full report `scan/?r=`; Send me the report; demo photo status; its image strip / Images tab / #free phone list the
