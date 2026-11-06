@@ -85,7 +85,7 @@ probed like the landing report's gallery(): >= 16 px + `E.isPhoto`, so the same 
 `VideoOverlays.photos` = {kept, dropped}), always blurred (video cards: `blur(2px) saturate(.95)` on `.rm-img` /
 `.vo-real`, lighter than styles.css `.live-ico`); the Images count = the kept ones; the cta-steps report = her real counts (Links = hits + results by URL, Images, Sites, "+ N more")
 + 5 titled rows + thumbs. After state: her own SFW photos (`GET <API>/api/media/<slug>` → `<API>/api/media/<slug>/<n>.jpg`,
-unblurred `.vo-own`), else the default photos. Leak URLs are read for their host only, never rendered. A failed scan /
+unblurred `.vo-own`; asked for from 5 s of the take), else the default photos. Leak URLs are read for their host only, never rendered. A failed scan /
 read = text only. While the name bar's scan runs: a yellow status pill ("Searching Google, step N of 9…"); the take plays
 its intro and holds just before the first card (at most 45 s) until the result lands, then the URL becomes `?r=<slug>`.
 

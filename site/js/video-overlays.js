@@ -19,7 +19,7 @@
 // report's gallery() (js/inline-scan.js), kept if it loads >= 16 px and E.isPhoto (js/scan-engine.js) passes, so the
 // cards drop the same logos / banners / icons as the report (VideoOverlays.photos = {kept, dropped}); the cta-steps report = hers (above);
 // the gap card's wall = her result's sites (hosts, most links first) then his whiteboard names;
-// the Mega caption = her folder's size; the after photos = her own SFW photos (GET <API>/api/media/<slug> → /<n>.jpg, unblurred .vo-own),
+// the Mega caption = her folder's size; the after photos = her own SFW photos (GET <API>/api/media/<slug> → /<n>.jpg, unblurred .vo-own; asked for from 5 s of the take),
 // else the defaults. A failed scan / read = text only. Leak URLs are read for their host, never rendered.
 // While the name bar's scan runs: the .vo-wait status pill ("Searching Google, step N of 9…"); the take plays its intro and
 // holds (paused) on the intro's "Building YOUR video…" beat (no intro: just before the first card) until the result lands
@@ -453,6 +453,20 @@
       });
     }, noop);
   }
+  // They wait for PHOTOS_AT s of the take: 600+ KB of them before the first frame compete with it, and they only show from the Images
+  // card's after state (~16 s), taking ~8 s next to the video on Slow 4G (measured). Once per result; a ?t= past it or a late result starts them at once.
+  var PHOTOS_AT = 5, photosAt = null;
+  function photosLater(slug, g) {
+    if (photosAt) video.removeEventListener('timeupdate', photosAt);
+    var at = photosAt = function () {
+      if (g === gen && video.currentTime < PHOTOS_AT) return;
+      video.removeEventListener('timeupdate', at);
+      if (photosAt === at) photosAt = null;
+      if (g === gen) photos(slug, g);
+    };
+    video.addEventListener('timeupdate', at);
+    at();
+  }
   // people photos only: each raw thumb's verdict from the engine's E.photo (the landing report's own rule and probe:
   // >= 16 px, E.isPhoto, a 429 retried after RETRY_MS), LANES at a time, GAP s apart (= the engine's paced prober: under
   // /api/thumb's 2/s; a burst got 429s = photos dropped, the Images count below the landing's on iPhone). done(kept) at
@@ -492,7 +506,7 @@
     m.gcount = r.gtotal;
     apply(values(m));
     personal(m.name);
-    photos(raw.slug, gen);
+    photosLater(raw.slug, gen);
     var g = gen, all = r.imgs;
     r.imgs = [];
     real = r;

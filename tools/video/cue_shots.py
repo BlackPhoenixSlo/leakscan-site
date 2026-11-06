@@ -505,6 +505,7 @@ def prod(b, base, out, cues, cta):
             pg.wait_for_function("() => document.querySelector('video').readyState >= 3", timeout=15000)
             pg.locator(".vo-fs").tap()
             pg.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+            pg.evaluate("() => { document.querySelector('video').currentTime = 6; }")   # never played here: her photos wait for 5 s of the take
         else:   # the name bar: the landing's scan, the loading state, then her result
             pg.goto(f"{base}video/")
             pg.wait_for_function("() => document.querySelector('video').readyState >= 3", timeout=15000)

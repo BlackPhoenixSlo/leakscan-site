@@ -7,7 +7,7 @@ import time
 from . import reach, reuse
 from .common import MEASURED, VIEWPORTS, cfg, check, configure, fails, start_stub
 
-BEFORE_VP = {"thumb_paint": lambda pw, browser: (pw,), "pip_flow": lambda pw, browser: (pw, browser), "sheet_flow": lambda pw, browser: (pw, browser)}   # first args of a part; default (browser,)
+BEFORE_VP = {"thumb_paint": lambda pw, browser: (pw,), "pip_flow": lambda pw, browser: (pw, browser), "photos_flow": lambda pw, browser: (pw, browser), "sheet_flow": lambda pw, browser: (pw, browser)}   # first args of a part; default (browser,)
 
 
 def flow(fn, vp_name, *args):
@@ -31,7 +31,8 @@ def scenario(s, parts, pw, browser, state):
             for fn in parts:
                 flow(fn, vp_name, *BEFORE_VP.get(fn.__name__, lambda _pw, b: (b,))(pw, browser), vp_name, vp)
         if s in ("pip", "sheet"):
-            flow(parts[0], "phone-webkit", pw, browser, "phone", None, "webkit")   # iPhone 13 (Playwright device), WebKit
+            for fn in parts:
+                flow(fn, "phone-webkit", pw, browser, "phone", None, "webkit")   # iPhone 13 (Playwright device), WebKit
     finally:
         reach.record(None)
         stub.terminate()
