@@ -8,15 +8,17 @@
 // viewer's typed name in its form) as a handle, "Scan now" → "Searching Google, step N of 9…" → the report "87 links found" + tabs + rows →
 // "Rewatch this video with YOUR content" + SophieStar flipping to the typed name (else stays), looping after the video ends) and "named" (?name=, ?r=, the
 // last scan or the name bar: her texts, the "for <name>" pill 0 .. 2 s and from data-cue-say (after his last word); nothing is ever spoken (Jack's
-// voice only, no speech synthesis); at data-cue-cta the same take = Jack's own demo in every mode: typing handle(DEMO) "jakabasej" (@jakabasej),
-// the placeholder report (never her counts / rows / thumbs / name), ending on a compact contact row (no name), held 5 s per loop).
+// voice only, no speech synthesis); at data-cue-cta the same take typing HER handle (herHandle(): her result's, else a slug of her name),
+// "@<her handle>", the report = her result (Links / Sites = the landing's E.reportModel counts, Images = her kept people photos, her top
+// titled rows: host + title, her photos blurred, "+N more"; ?name= without a result: her handle on the placeholder rows), ending on a compact
+// contact row (no name), held 5 s per loop).
 // Production images (named): a scan result (js/scan-engine.js: ?r= → fetchResult(slug) = GET <API>/api/scan-result/<slug>; the
 // name bar → runScan = the landing's POST <API>/api/public-scan, onlyfans.com/<handle>) fills the cards like the landing
 // hero card (js/inline-scan.js model): Google rows = her real result domains + titles, Google Images grid + every .rm-img
 // = her real Google thumbs via <API>/api/thumb (blurred, .rm-img), people photos only: each probed like the landing
 // report's gallery() (js/inline-scan.js), kept if it loads >= 16 px and E.isPhoto (js/scan-engine.js) passes, so the
-// cards drop the same logos / banners / icons as the report (VideoOverlays.photos = {kept, dropped}); the cta-steps report (links / images /
-// sites) stay the demo's (jakabasej); the gap card's wall = her result's sites (hosts, most links first) then his whiteboard names;
+// cards drop the same logos / banners / icons as the report (VideoOverlays.photos = {kept, dropped}); the cta-steps report = hers (above);
+// the gap card's wall = her result's sites (hosts, most links first) then his whiteboard names;
 // the Mega caption = her folder's size; the after photos = her own SFW photos (GET <API>/api/media/<slug> → /<n>.jpg, unblurred .vo-own),
 // else the defaults. A failed scan / read = text only. Leak URLs are read for their host, never rendered.
 // While the name bar's scan runs: the .vo-wait status pill ("Searching Google, step N of 9…"); the take plays its intro and
@@ -40,7 +42,7 @@
 // (.vo-ccb, on by default, localStorage leakscan.cc = '0' off). Never personalized.
 // Intro (both modes, the .vo-intro's data-cue-in .. -out, 0.3-9.8 s, before the first card): a compact cta-steps take, the
 // SAME engine (steps()) on a runtime clone of the end card's .vo-steps phone, time-warped (no loop): the hero types
-// onlyfans.com/jakabasej (named too; generic: the viewer's typed name, as the end card), "Scan now", the scan card, then
+// onlyfans.com/jakabasej (generic; the viewer's typed name once typed, as the end card; named: her handle, as the end card), "Scan now", the scan card, then
 // the "Building YOUR video…" beat (build()); slides out before the google card. While the name bar's scan runs the take
 // holds on that beat (holdAt()). Gap card (.vo-sites, its data-cue-in .. -out, 28.2-34.6 s, "any of these websites…
 // like 10,000 of them"): site names from his whiteboard (text only, no logos / URLs) struck "Removed" in turn, the
@@ -56,7 +58,7 @@
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
   var GENERIC = 'SophieStar', WAIT_MAX = 45, HOLD_LEAD = 0.4;   // the scan hold: at most 45 s, 0.4 s before the first card
   // cta-steps: one 10 s take (s into its loop) in a phone replica of the landing: the hero, the camera zooms onto the
-  // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form; named: DEMO), "Scan now"; the scan card
+  // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form; named: herHandle()), "Scan now"; the scan card
   // ("Searching <place>, step N of 9…", js/scan-engine.js progressInfo); the report card (LEAKS links rolling, tabs, rows)
   // + "Rewatch this video with YOUR content" with the name flip. SCENES = [in, out] per scene (0.2 s fades; the hero fades
   // back in over the loop's last 0.2 s)
@@ -114,7 +116,8 @@
     var inp = ctaEl && ctaEl.querySelector('input'), v = inp ? inp.value.replace(/\s+/g, ' ').trim() : '';
     return v && NAME_RE.test(v) ? v : '';
   }
-  function demoName() { return typedName() || DEMO; }   // what the hero types
+  function demoName() { return typedName() || DEMO; }   // what the hero types (generic)
+  function herHandle() { return handle(real && real.handle || who || DEMO); }   // named: her result's handle, else a slug of her name
   var handle = function (n) { return n.toLowerCase().replace(/[^\p{L}\p{N}._]/gu, '') || 'creator'; };   // "Jaka Basej" → jakabasej
   var RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
   function lay(el, pg) {   // el's layout box in its page's px (offsets up to the .vo-pg, untransformed)
@@ -139,7 +142,7 @@
   }
   function steps(c, t) {   // cta-steps at t: u = seconds into its loop (from the card's live cue, = the clip's 0 s)
     var v = c.intro ? Math.min(Math.max(0, t - c.live), INTRO_U) : Math.max(0, t - c.live) % (c.named ? CYCLE + HOLD : CYCLE), u = c.named && !c.intro && v >= SETTLED ? Math.max(SETTLED, v - HOLD) : v;
-    var box = c.steps, bs = box.style, h = handle(c.named ? DEMO : demoName()), q1 = function (s) { return box.querySelector(s); };   // h typed / @ / the titles: jakabasej in named mode too
+    var box = c.steps, rr = c.named ? real : null, bs = box.style, h = c.named ? herHandle() : handle(demoName()), q1 = function (s) { return box.querySelector(s); };   // h typed / @ / titles: hers in named mode
     var sc = box.querySelectorAll('.vo-step'), pgs = box.querySelectorAll('.vo-pg'), W = q1('.vo-scr').clientWidth, T0 = W / 390;
     Array.prototype.forEach.call(sc, function (el, i) {
       var a = u - SCENES[i][0], d = SCENES[i][1] - SCENES[i][0], o = i === 0 && u >= SCENES[2][1] ? clamp((u - SCENES[2][1]) / 0.2) : a >= 0 && a < d + 0.2 ? Math.min(i ? clamp(a / 0.2) : 1, clamp((d + 0.2 - a) / 0.2)) : 0;
@@ -163,7 +166,7 @@
     bs.setProperty('--bar', p.toFixed(3));
     bs.setProperty('--shim', (1 - (u * 0.8) % 1).toFixed(3));
     // 3 the report card: zoom onto "N links found" while it rolls to LEAKS, pull back over the tabs + rows; the end toast + flip
-    var tabs = TABS, L = tabs[0];   // the demo's counts, every mode (never the viewer's)
+    var tabs = rr ? [rr.links, rr.nimg, rr.sites] : TABS, L = tabs[0], nr = rr ? Math.min(5, rr.rows.length) : 5;   // her counts (= the landing report's), else the demo's
     var chip = lay(q1('.vo-mc'), pgs[2]), m = Math.round(L * (1 - Math.pow(1 - clamp((u - 7.2) / 0.75), 3))), f = clamp((u - 9.05) / 0.25);
     camera(pgs[2], [[7, top(1.42)], [7.5, [chip.x + chip.w / 2, chip.y + chip.h / 2 - 16, 2.4]], [8.1, [chip.x + chip.w / 2, chip.y + chip.h / 2 - 16, 2.4]], [8.6, top(0.8)]], u);
     setText(q1('.vo-mc-n'), String(m));
@@ -171,9 +174,13 @@
     bs.setProperty('--cp', (1 + 0.2 * bump((u - 7.95) / 0.3)).toFixed(3));
     var ttl = [' full set', ' PPV pack', '', ' video bundle', ' photo set'];
     Array.prototype.forEach.call(box.querySelectorAll('.vo-tabs2 b'), function (el, i) { setText(el, String(tabs[i])); });
-    setText(q1('.vo-more'), '+ ' + Math.max(0, L - 5) + ' more in the full report');
+    setText(q1('.vo-more'), '+ ' + Math.max(0, L - nr) + ' more in the full report');
     Array.prototype.forEach.call(box.querySelectorAll('.vo-row'), function (el, i) {
-      setText(el.querySelector('.vo-ttl'), i === 2 ? 'Search results for ' + h : h + ttl[i]);
+      var r = rr && rr.rows[i], d = el.querySelector('.vo-dom');   // her top titled rows: host + title (never a URL)
+      if (d.__def == null) d.__def = d.textContent;
+      setText(d, r ? r.dom : d.__def);
+      setText(el.querySelector('.vo-ttl'), r ? r.title : i === 2 ? 'Search results for ' + h : h + ttl[i]);
+      el.style.display = rr && !r ? 'none' : '';
       el.style.setProperty('--ro', (u < 7 ? 1 : clamp((u - 8.15 - i * 0.08) / 0.2)).toFixed(3));
     });
     var eo = u < SCENES[2][1] ? clamp((u - 8.75) / 0.3) : clamp((SCENES[2][1] + 0.2 - u) / 0.2);
@@ -380,7 +387,8 @@
     items = items.filter(function (it) { return it.link; }).concat(items.filter(function (it) { return !it.link; }),
       E.imageItems(gi, res, okThumb, Infinity, true).filter(function (it) { return it.video && !had[it.src]; })).slice(0, 60);
     var g = typeof raw.google_total === 'number' && raw.google_total > 0 && raw.google_total < 1e9 ? Math.round(raw.google_total) : null;
-    return { slug: raw.slug, handle: R && R.model(raw).handle, links: rows.length, sites: sites, nimg: items.length,
+    var lm = E.reportModel && E.reportModel(raw, { handle: null, platform: 'onlyfans.com' });   // the landing report's own model: its Links / Sites counts
+    return { slug: raw.slug, handle: R && R.model(raw).handle, links: lm ? lm.rows.length : rows.length, sites: lm ? lm.sites.length : sites, nimg: items.length,
       hosts: hosts.sort(function (a, b) { return by[b] - by[a]; }),   // most links first (stable: first seen on a tie)
       rows: rows.filter(function (r) { return r.title; }), imgs: items.map(function (it) { return E.thumb(it.src); }).filter(Boolean),
       gtotal: g && 'About ' + g.toLocaleString('en-US') + ' results' };
@@ -420,6 +428,7 @@
         var x = r.rows[i % Math.max(1, r.rows.length)], d = x ? x.dom : r.handle + '.com';
         return el('span', 'vo-gc', [el('span', 'vo-gt', [pic(at(i), 'rm-img')]), el('span', 'gi-cap', [letter(d, 'gi-fav'), el('span', 'gi-cap-t', [d])])]);
       }));
+      Array.prototype.forEach.call(root.querySelectorAll('.vo-rows .vo-th, .vo-strip i'), function (b, i) { put(b, [pic(at(i), 'vo-real')]); });   // the end card's report: her people photos, blurred
     }
   }
   // her own SFW photos (the scan's /api/media/<slug>: Instagram etc.) into the Google Images after grid, unblurred; none = defaults
