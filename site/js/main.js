@@ -25,6 +25,20 @@
   var E = window.LeakScanEngine;
   if (E) document.querySelectorAll('.phone').forEach(function (phone) { E.tablist(phone); });
 
+  // Before / After (phone, < 820 px): one phone at a time behind a two-button switch (aria-pressed); the label line
+  // under it says what the shown phone means. Desktop shows both (CSS hides the switch). Same height both ways: no shift.
+  var sw = document.querySelector('.ba-switch'), baItems = document.querySelectorAll('.ba .ba-item'), baLab = document.querySelector('.ba-label');
+  var BA_LAB = ['Leak sites first', 'Your pages first'];
+  function baShow(i) {
+    baItems.forEach(function (it, j) { it.classList.toggle('is-on', j === i); });
+    sw.querySelectorAll('button').forEach(function (b, j) { b.setAttribute('aria-pressed', String(j === i)); });
+    if (baLab) baLab.textContent = BA_LAB[i];
+  }
+  if (sw && baItems.length === 2) {
+    sw.addEventListener('click', function (e) { var b = e.target.closest('button[data-ba]'); if (b) baShow(+b.getAttribute('data-ba')); });
+    baShow(0);
+  }
+
   // Demo site: "Full screen" pops the frame out to a layer over the page (same iframe, no reload: it keeps its scroll).
   // Its slot keeps its height and the scrollbar gutter stays, so nothing behind it moves. Esc / the button / the
   // backdrop close it; focus goes back to the button; the rest of the page is inert meanwhile.

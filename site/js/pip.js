@@ -1,5 +1,5 @@
 // Mini player of site/video/ (picture-in-picture style). The script tag says where it is on by default:
-//   data-pip-auto="dock" (landing): docked on the hero card (below), floating once the hero is out of view;
+//   data-pip-auto="dock" (landing): docked in the hero card (below), floating once the hero is out of view;
 //   data-pip-auto="r" (scan report): floating, when the URL has ?r=<slug> (the video personalizes itself with that scan).
 // ?pip=1 forces it on, ?pip=0 off. Same-origin iframe of ../video/ (?r= / ?name= passed through) in embed form: this script
 // injects a style into it (no name bar, no player UI: the stage fills the picture) and drives its <video> (starts muted).
@@ -8,8 +8,9 @@
 // min(960px, 70vw) centred, fixed right under the sticky header; the page keeps scrolling under it (no lock, nothing over
 // the rest). There a tap on the picture = play / pause; drag it down (follows the finger: translate + scale toward the mini
 // spot; released past 30% or flung down = mini, else snaps back), the chevron button or Esc = back to the mini player.
-// Docked: absolute (scrolls with the page), ~44% of the card's width, hanging off its bottom-right corner (<= 25% of the
-// card, never over a link / button / input: else just outside that corner, else floating); re-placed when the card
+// Docked: absolute (scrolls with the page), 55% of the card's width, in the card's .pip-slot (bottom-right, the note wraps
+// left of it; the live report card has none: hanging off its bottom-right corner) (<= 25% of the card, never over a link /
+// button / input: else just outside that corner, else floating); re-placed when the card
 // changes (in-page scan → report card). Floating: fixed, by default bottom-right at min(320px, 45vw), under the sticky header
 // / report nav and off the hero Scan now button, phone CTA bar, Ask-AI launcher, report Reveal pill. Drag (pointer events,
 // touch too): it stays where it is dropped (kept on-screen, under the header); fling / drag past the left, right or bottom
@@ -21,7 +22,8 @@
 (function () {
   'use strict';
   var me = document.currentScript, q = new URLSearchParams(location.search), KEY = 'leakscan.pip';
-  if (!me || q.get('pip') === '0' || !('PointerEvent' in window) || !('IntersectionObserver' in window)) return;
+  var noPip = function () { document.documentElement.classList.add('pip-x'); };   // the hero card drops its empty .pip-slot
+  if (!me || q.get('pip') === '0' || !('PointerEvent' in window) || !('IntersectionObserver' in window)) return noPip();
   var auto = me.getAttribute('data-pip-auto') || '', forced = q.get('pip') === '1';
   if (!forced && !auto) return;
   var VIDEO = new URL('../video/', me.src);
@@ -38,7 +40,7 @@
     var s0 = JSON.parse(sessionStorage.getItem(KEY) || 'null');
     if (s0) S = { p: Array.isArray(s0.p) ? [num(s0.p[0]), num(s0.p[1])] : null, w: num(s0.w), t: /^[lr]$/.test(s0.t) ? s0.t : '', u: s0.u ? 1 : 0, x: s0.x ? 1 : 0 };
   } catch (e) { /* defaults */ }
-  if (S.x) return;
+  if (S.x) return noPip();
   var save = function () { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } };
   var pip, pic, tab, frame, snd, pp, exp, xb, grip, video = null, wasPlaying = true, offPaused = false, mounted = false, pos = { x: 0, y: 0 };
   var card = null, hero = null, heroIn = false, mode = '', big = false;
@@ -53,13 +55,15 @@
   function vis(el) { var r = el.getBoundingClientRect(); return r.width && r.height && getComputedStyle(el).visibility !== 'hidden' ? r : null; }
   function vw() { return document.documentElement.clientWidth; }
 
-  // ---------- docked: off the hero card's bottom-right corner ----------
+  // ---------- docked: in the hero card's .pip-slot (bottom-right, the note left of it); a card without one (the live
+  // report): off its bottom-right corner, else just under it ----------
   function dockAt() {   // → viewport rect {x, y, w} or null (no safe spot)
     var r = card && card.getBoundingClientRect();
     if (!r || !r.width) return null;
     var w = Math.round(r.width * DOCK), h = Math.round(w * 9 / 16) + BAR, W = vw();
     var fit = function (x) { return Math.max(12, Math.min(x, W - w - 12)); };
-    var spots = [{ x: fit(r.right - w * 0.7), y: r.bottom - h * 0.7 }, { x: fit(r.right - w), y: r.bottom + 10 }];
+    var slot = card.querySelector('.pip-slot'), sb = slot && vis(slot);
+    var spots = (sb ? [{ x: sb.right - w, y: sb.top }] : []).concat([{ x: fit(r.right - w * 0.7), y: r.bottom - h * 0.7 }, { x: fit(r.right - w), y: r.bottom + 10 }]);
     var live = [].filter.call(document.querySelectorAll(LIVE), function (el) {
       if (pip.contains(el) || tab.contains(el) || el.closest('.askai-launcher, .mobile-cta')) return false;   // fixed ones: they sit above the docked player (z)
       return !!vis(el);
@@ -216,7 +220,7 @@
     sync();
   }
   function close() {
-    S.x = 1; save();
+    S.x = 1; save(); noPip();
     if (video) video.pause();
     pip.remove(); tab.remove();
     removeEventListener('scroll', soon); removeEventListener('resize', soon);

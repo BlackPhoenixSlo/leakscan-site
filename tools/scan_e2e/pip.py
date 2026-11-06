@@ -168,8 +168,9 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         ix = max(0, min(b[0] + b[2], c[0] + c[2]) - max(b[0], c[0])); iy = max(0, min(b[1] + b[3], c[1] + c[3]) - max(b[1], c[1]))
         cov = ix * iy / (c[2] * c[3])
         MEASURED[f"{tag} dock {what}"] = {"pip": b, "card": c, "coverage": round(cov, 3)}
-        check(f"{tag} dock: {what}: docked, 55% of the card wide, hanging off its bottom-right corner",
-              s["mode"] == "dock" and abs(b[2] - round(c[2] * 0.55)) <= 1 and b[0] + b[2] >= c[0] + c[2] - 13 and b[1] + b[3] > c[1] + c[3] and b[1] > c[1] + c[3] * 0.5 and ratio_ok(s), [b, c])
+        check(f"{tag} dock: {what}: docked, 55% of the card wide, in its bottom-right slot (live report: hanging off that corner)",
+              s["mode"] == "dock" and abs(b[2] - round(c[2] * 0.55)) <= 1 and (b[0] + b[2] >= c[0] + c[2] - 13 and b[1] + b[3] > c[1] + c[3]
+              or b[0] + b[2] >= c[0] + c[2] - 24 and b[1] + b[3] <= c[1] + c[3]) and b[1] > c[1] + c[3] * 0.5 and ratio_ok(s), [b, c])
         check(f"{tag} dock: {what}: covers <= 25% of the card", cov <= 0.25, round(cov, 3))
         under = pg.evaluate(PIP_UNDER)
         ok, d = clear(pg)

@@ -258,7 +258,7 @@ def removals_flow(browser, vp_name, vp):
         page = open_(ctx)
         order = page.evaluate("() => { const r = document.getElementById('removals'); return [r && r.previousElementSibling && r.previousElementSibling.id, r && r.nextElementSibling && r.nextElementSibling.id, r && r.closest('main') && r.closest('main').id]; }")
         if scheme == "light":
-            check(f"{tag} section sits after #how, directly before #website, inside <main>", order == ["how", "website", "main"], order)
+            check(f"{tag} section sits after #how, directly before #pricing, inside <main>", order == ["how", "pricing", "main"], order)
             t = page.evaluate(RM_TEXT)
             check(f"{tag} defaults: demo creator (Orla Brennick / brennickclay) in every panel",
                   t.get("name") == "Orla Brennick" and t.get("mega-title") == "brennickclay – pack" and t.get("x-l1") == "Orla Brennick full set"
@@ -271,8 +271,8 @@ def removals_flow(browser, vp_name, vp):
             check(f"{tag} removed layers carry the live post's chrome (copied once from the live layer)",
                   gone == [["mega", 0, 0], ["x", 3, 0], ["reddit", 3, 0], ["site", 2, 0]], gone)
             outs = page.eval_on_selector_all("#removals .rm-out", "es => es.map(e => e.textContent)")
-            check(f"{tag} one outcome line per panel", outs == ["Mega: folders behind aggregator packs disabled", "X: media disabled after copyright report",
-                                                             "Reddit: removed on copyright notice", "Leak sites: profile 404 after a DMCA notice"], outs)
+            check(f"{tag} one outcome line per panel", outs == ["Folders behind aggregator packs disabled", "Media disabled after copyright report",
+                                                             "Removed on copyright notice", "Profile 404 after a DMCA notice"], outs)
             DEMO = page.evaluate(RM_PANEL)
             check(f"{tag} no links in the section (mock-ups only)", page.locator("#removals a").count() == 0)
         settled_imgs(page)

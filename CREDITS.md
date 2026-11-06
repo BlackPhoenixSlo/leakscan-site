@@ -13,7 +13,7 @@
   `tools/showcase/CREDITS.md`. The landing page reuses small crops of those same photos (the fictional demo creator's
   "own" pictures) in two places: `site/assets/phone/` (After phone, Images / Videos tabs) and `site/img/removals/`
   (blurred thumbnails in the `#removals` mock-ups). The `/video/` demo reuses those same crops in its cards.
-  Everything else on the landing pages is CSS/SVG drawn for this site (device mockups, gradient thumbnails, initials
-  avatar). Google's name and colours appear only inside illustrative mockups.
+  `site/assets/` holds one photo: `jaka.webp` (Jaka's avatar), a frame of his own take (`site/video/jack.mp4` at 45.0 s, cropped with
+  ffmpeg). Everything else on the landing pages is CSS/SVG drawn for this site (device mockups, gradient thumbnails). Google's name and colours appear only inside illustrative mockups.
 - **Video**: `site/video/` ships Jack's own recording (one 56.9 s take, his face and voice, no stock footage):
   `jack.webm` (VP9) + `jack.mp4` (H.264), and `transcript.json` (his words, transcribed locally; see `site/video/CUES.md`).

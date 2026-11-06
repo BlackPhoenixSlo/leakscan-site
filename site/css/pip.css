@@ -1,5 +1,5 @@
 /* js/pip.js: mini player of site/video/. Picture (16:9, the iframe, nothing drawn over it) + a thin control bar under it.
-   Docked (.docked, landing): absolute, hanging off the bottom-right corner of the hero card, scrolls with the page.
+   Docked (.docked, landing): absolute, in the hero card's .pip-slot (live report card: off its corner), scrolls with the page.
    Floating: fixed, min(320px, 45vw), dropped anywhere; fling / drag past a side or the bottom → tucked off-screen,
    .pip-tab (chevron) brings it back. Expanded (.big): fixed under the header, full width (phone) / min(960px, 70vw); the page
    scrolls under it. Size changes animate as transform only (--s scale, origin top-left). z 44: under the header (50) and

@@ -210,3 +210,12 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .fp-pane { display: grid; align-content: center; height: 248px; margin: 10px 12px 0; padding: 0 16px; border-radius: 8px; background: #e5e7eb; }
 .fp .fp-404 { margin: 0; color: #6b7280; font: 900 4.5rem/1 var(--fp-sans); letter-spacing: .04em; text-align: center; }
 .fp .fp-gh { margin: 10px auto 0; max-width: 16em; color: #374151; font-size: 1rem; font-weight: 600; text-align: center; }
+
+/* desktop (>= 1100 px): each card is a row, name + outcome + Remove on the left, the stage on the right at 66% scale
+   (the layer keeps a >= 440 px layout width: same mock as before, 4-column leak-site grid) so the 2x2 grid stays short */
+@media (min-width: 1100px) {
+  .rm { --rm-s: .66; }
+  .rm-card { display: grid; grid-template-columns: 150px minmax(0, 1fr); grid-template-rows: 1fr auto; grid-template-areas: "top stage" "act stage"; gap: 12px 16px; }
+  .rm-top { grid-area: top; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 8px; }
+  .rm-stage { grid-area: stage; }
+}

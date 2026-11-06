@@ -273,7 +273,7 @@ strong { font-weight: 650; }
   width: 300px; max-width: 100%; aspect-ratio: 9 / 17.5; border-radius: 42px; padding: 11px;
   background: linear-gradient(145deg, #2c2833, #121016); box-shadow: var(--shadow-lg), inset 0 0 0 1.5px #4a4452;
 }
-.phone-screen { position: relative; height: 100%; border-radius: 32px; overflow: hidden; background: #fff; color: #202124; padding: 40px 14px 14px; font-family: Arial, Helvetica, sans-serif; }
+.phone-screen { position: relative; height: 100%; border-radius: 32px; overflow: hidden; background: var(--mock); color: #202124; padding: 40px 14px 14px; font-family: Arial, Helvetica, sans-serif; }
 .phone-screen::before { content: ""; position: absolute; top: 10px; left: 50%; width: 86px; height: 22px; transform: translateX(-50%); border-radius: 999px; background: #121016; }
 .m-search { padding: 8px 14px; font-size: .85rem; }
 .m-tabs { gap: 14px; margin: 10px 0 6px; font-size: .74rem; }
@@ -337,7 +337,7 @@ strong { font-weight: 650; }
 .free-phone { margin: 0; display: grid; justify-items: center; min-width: 0; }
 .phone-free { width: 288px; aspect-ratio: 9 / 16; }
 .m-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; margin: 2px 0 6px; font-size: .74rem; color: #5f6368; }
-.phone .reveal-btn { min-height: 30px; padding: 0 10px; border-color: #dadce0; background: #fff; color: #202124; font-size: .72rem; }
+.phone .reveal-btn { min-height: 30px; padding: 0 10px; border-color: #dadce0; background: var(--mock); color: #202124; font-size: .72rem; }
 .phone .reveal-btn[aria-pressed="true"] { border-color: #1a73e8; color: #1a73e8; }
 .phone a.gi-card:focus-visible { outline-color: #1a73e8; }
 .m-video.is-link { padding: 0; }
@@ -361,15 +361,15 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 
 /* ---------- Sections. Paper and sheet alternate; one container; each section gets its own device ---------- */
 .section { padding: 34px 0; }
-@media (min-width: 720px) { .section { padding: clamp(72px, 7vw, 104px) 0; } }
-.free-sec, .why, .website, .showcase, .faq-sec { background: var(--surface); }
+@media (min-width: 720px) { .section { padding: clamp(80px, 6.5vw, 96px) 0; } }
+.free-sec, .why, .pricing, .faq-sec { background: var(--surface); }   /* paper and white alternate in the page order */
 .website { padding-bottom: 0; }
 .showcase { padding-top: 28px; }
 @media (min-width: 720px) { .showcase { padding-top: 40px; } }
 .section-head { margin-bottom: 28px; }
 .section-head p { color: var(--muted); max-width: 36em; margin: 0; }
 @media (min-width: 960px) {
-  .section-head.split { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 64px; align-items: end; margin-bottom: 44px; }
+  .section-head.split { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 64px; align-items: end; margin-bottom: 36px; }
   .section-head.split h2 { margin: 0; max-width: 15em; }
   .section-head.split p { font-size: 1.06rem; }
 }
@@ -378,7 +378,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* #free: the offer, once; the phone beside it shows her results after a scan (js/inline-scan.js) */
 .free-sec { padding-block: 34px; }
 .free-band { display: grid; gap: 32px; align-items: center; }
-@media (min-width: 860px) { .free-sec { padding-block: 56px; } .free-band { grid-template-columns: minmax(0, 1fr) 320px; gap: 64px; } }
+@media (min-width: 860px) { .free-sec { padding-block: 80px; } .free-band { grid-template-columns: minmax(0, 1fr) 320px; gap: 64px; } }
 @media (min-width: 1100px) { .free-band { grid-template-columns: minmax(0, 620px) 1fr; } }
 .free-copy h2 { max-width: 13em; }
 .free-copy > p:not(.free-actions) { color: var(--muted); max-width: 33em; }
@@ -425,29 +425,32 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   .showcase-head { gap: 4px 40px; }
 }
 .browser { margin-top: 20px; }
-.browser-demo iframe { width: 100%; height: 300px; border: 0; background: var(--surface-2); }
+.browser-demo iframe { width: 100%; height: 520px; border: 0; background: var(--surface-2); }   /* phone: the demo hero whole (name, city, photo) */
 @media (min-width: 720px) { .browser-demo iframe { height: clamp(480px, 70vh, 720px); } }
 .ba-wrap { display: grid; gap: 12px; margin-top: 32px; }
 .ba-wrap .ba-under { margin-top: 0; }
 .ba-copy h3 { font-size: 1.2rem; margin-bottom: .3em; }
 .ba-copy p { color: var(--muted); margin: 0; max-width: 34em; }
-.ba-swipe { display: none; }
 @media (min-width: 1000px) {
-  .ba-wrap { grid-template-columns: 300px minmax(0, 1fr); gap: 56px; align-items: center; margin-top: 72px; }
+  .ba-wrap { grid-template-columns: 300px minmax(0, 1fr); gap: 56px; align-items: start; margin-top: 56px; }   /* heading top = the phone labels */
   .ba-copy h3 { font: 400 2rem/1.1 var(--serif); font-synthesis: none; letter-spacing: -.01em; }
 }
-/* phone: the only swipe row. Two phones side by side, the second one peeks; a hint says so */
+/* phone (< 820 px): one phone at a time behind the Before | After switch (js/main.js); no JS = both, stacked */
+.ba-switch, .ba-label { display: none; }
 @media (max-width: 819px) {
-  .ba-swipe { display: flex; align-items: center; gap: 8px; margin-top: 8px !important; color: var(--ink) !important; font-weight: 600; font-size: .95rem; }
-  .ba-swipe .icon { color: var(--accent); }
-  .ba { display: grid; grid-auto-flow: column; grid-auto-columns: min(66%, 250px); justify-items: center; justify-content: start; gap: 16px;
-    overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none;
-    margin-inline: calc(-1 * var(--gut)); padding: 4px var(--gut) 12px; scroll-padding-inline: var(--gut); }
-  .ba::-webkit-scrollbar { display: none; }
-  .ba-item { scroll-snap-align: start; width: 100%; }
-  .ba-item .phone { width: 100%; }
-  .ba-item { gap: 10px; }
+  .js .ba-switch { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; width: min(100%, 280px); padding: 4px; margin-top: 4px;
+    border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+  .ba-switch button { min-height: 40px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: 600 .95rem/1 var(--sans); cursor: pointer; }
+  .ba-switch button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .ba-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .js .ba-copy .ba-label { display: block; margin: 8px 0 0; color: var(--ink); font-weight: 600; }
+  .js .ba-item:not(.is-on), .js .ba-item figcaption { display: none; }
+  .ba-wrap { justify-items: center; }
+  .ba-copy { display: grid; justify-items: center; text-align: center; }
+  .ba-copy p { margin-inline: auto; }
   .ba-arrow { display: none; }
+  .ba { gap: 16px; }
+  .ba-item .phone { width: min(260px, 72vw); }
 }
 
 /* #pricing: the monthly plan is the deep sheet, the one-time plan the outlined one; same inclusions said once above */
@@ -537,9 +540,10 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .footer-base { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 24px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .footer-base p { margin: 0; color: var(--muted); }
 
-/* hero: room under the report card for the docked mini player (js/pip.js docks just under it, never over its text) */
-@media (max-width: 1099px) { .hero { padding-bottom: calc(min(100vw - 40px, 460px) * .55 * 9 / 16 + 68px); } }
-@media (min-width: 1100px) { .hero { padding-bottom: 72px; } .report-card { margin-bottom: calc(460px * .55 * 9 / 16 + 56px); } }
+/* hero: the docked mini player sits in the card's .pip-slot (below). The live report card has no slot: there it
+   hangs off the card's corner or just under it (js/pip.js), so only then the hero keeps room under the card. */
+@media (max-width: 1099px) { .hero:has(.report-card.is-live) { padding-bottom: calc(min(100vw - 40px, 460px) * .55 * 9 / 16 + 68px); } }
+@media (min-width: 1100px) { .hero { padding-bottom: 72px; } .report-card.is-live { margin-bottom: calc(460px * .55 * 9 / 16 + 56px); } }
 /* Legal pages */
 .legal { padding: clamp(40px, 7vw, 80px) 0 clamp(64px, 9vw, 112px); }
 .legal .container { max-width: 780px; }
@@ -781,7 +785,9 @@ a.gi-card:focus-visible .gi-go { opacity: 1; transform: none; }
 /* round 2: phones get shorter mocks; dark mode dims the always-light device screens (filter: the mock colours stay exact) */
 @media (max-width: 559px) { .showcase-head { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
 @media (max-width: 519px) { .phone-free { width: 248px; } }
-@media (prefers-color-scheme: dark) { .phone-screen, .rm-stage .fp { filter: brightness(.93); } }
+/* dark: the light mocks (Google phones, the leak-site page) on a dimmed paper, not bright white */
+:root { --mock: #fff; }
+@media (prefers-color-scheme: dark) { :root { --mock: #e9e9ee; } .rm-stage .fp { filter: brightness(.915); } }
 
 /* round 2, phones: the same content, tighter */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -800,14 +806,12 @@ a.gi-card:focus-visible .gi-go { opacity: 1; transform: none; }
   .report-foot img { width: 28px; height: 28px; }
   .step { padding: 10px 0; }
   .ba-copy p { display: none; }
-  .browser-demo iframe { height: 260px; }
   .pricing .section-head p { font-size: .95rem; }
   .fineprint { font-size: .88rem; margin-top: 16px; }
 }
 @media (max-width: 519px) {
   .free-actions .text-link { display: none; }
   .phone-free { width: 216px; }
-  .ba { grid-auto-columns: min(56%, 212px); }
   h2 { font-size: 1.85rem; }
 }
 @media (max-width: 1099px) {
@@ -832,3 +836,47 @@ a.gi-card:focus-visible .gi-go { opacity: 1; transform: none; }
 .step { align-content: start; }   /* titles start on one line across the five columns */
 .site-footer ul { align-content: start; }
 .footer-base { border-top: 0; background: linear-gradient(var(--line), var(--line)) var(--gut) 0 / calc(100% - 2 * var(--gut)) 1px no-repeat; }
+
+/* ---- round 3 ---- */
+/* hero card: the mini player's slot, bottom-right, 55% of the card wide, 16:9 + its 40 px bar (js/pip.js docks exactly
+   here); the note wraps left of it, so the player never covers text. No JS / player closed: no slot. */
+.report-card { --cp: 22px; padding: var(--cp) var(--cp) 18px; }
+.report-foot { display: grid; grid-template-columns: minmax(0, 1fr) calc((100% + 2 * var(--cp)) * .55); gap: 12px; align-items: stretch;
+  margin-top: 4px; padding: 14px 0 0; background: none; border-radius: 0; border-top: 1px solid var(--line); }
+.foot-note { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.report-foot .pip-cap img { flex: none; width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.report-foot p { font-size: .86rem; line-height: 1.35; }
+.report-foot .pip-cap { display: flex; align-items: center; gap: 8px; margin-top: auto; color: var(--muted); font-size: .8rem; line-height: 1.3; }
+.report-foot .pip-cap span { color: var(--muted); }
+.pip-cap strong { color: var(--ink); }
+.pip-cap strong::after { content: " \2192"; color: var(--accent); }
+.pip-slot { align-self: end; border-radius: 12px; background: var(--bg); }
+.pip-slot::before { content: ""; display: block; padding-top: calc(56.25% + 40px); }
+html:not(.js) .report-foot, .pip-x .report-foot { grid-template-columns: minmax(0, 1fr); }
+html:not(.js) .pip-slot, html:not(.js) .pip-cap, .pip-x .pip-slot, .pip-x .pip-cap { display: none; }
+@media (max-width: 519px) { .report-card { --cp: 16px; } .report-rows li:nth-child(4) { display: none; } .report-rows .lav { width: 32px; height: 32px; font-size: .9rem; } .report-rows li { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; } }
+@media (max-width: 419px) { .row-path { display: none; } }
+
+/* hero facts: one compact line under the form (wraps on a phone), then "Or message me" */
+.assurances { display: block; margin-top: 12px; padding: 0; border: 0; font-size: .84rem; line-height: 1.5; }
+.assurances li { display: inline; margin-right: 12px; }
+.assurances .icon { display: inline-block; margin: 0 4px 0 0; vertical-align: -.15em; }
+.assurances + .scan-alt { margin-top: 14px; }
+.scan-note + .assurances, .scanned:not([hidden]) + .scan-note + .assurances { margin-top: 0; }
+@media (max-width: 719px) { .hero { padding-bottom: 40px; } }
+@media (prefers-color-scheme: dark) { .m-result.bad, .m-video.bad { background: #f0dedb; } }
+@media (max-width: 519px) {
+  .hero-grid { gap: 20px; }
+  .hero { padding-bottom: 28px; }
+  .foot-note > p:first-child span { display: none; }   /* the chips say it; the note column is narrow here */
+  .report-foot .pip-cap { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .assurances { font-size: .8rem; }
+  .assurances li { white-space: normal; margin: 0; }
+  .assurances .icon { display: none; }
+  .assurances li + li::before { content: " · "; }
+  .hero { padding-top: 24px; }
+  .hero .scan-form { margin-top: 16px; }
+}
+@media (min-width: 520px) { .assurances li { white-space: nowrap; } }
+.row-url { font-variant-numeric: normal; }
+@media (min-width: 720px) { .how h2 { margin-bottom: 36px; } }

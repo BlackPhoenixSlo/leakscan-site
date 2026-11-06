@@ -507,6 +507,10 @@ def order_popout(t):
     page.wait_for_timeout(900)
     ok, shifts = [], []
     for side in ("before", "after"):
+        sw = page.locator(f".ba-switch [data-ba='{0 if side == 'before' else 1}']")
+        if sw.is_visible():   # phone: one phone at a time behind the Before | After switch
+            sw.click()
+            page.wait_for_timeout(200)
         for k in ("images", "videos", "all"):
             t0 = page.evaluate("performance.now()")
             page.locator(f"#tab-{side}-{k}").click()

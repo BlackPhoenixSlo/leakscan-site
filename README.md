@@ -12,9 +12,10 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
 - Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card: a ledger, removed rows
   struck through once on load) · `#free` the free offer, said once, beside one Google phone (All / Images / Videos
   tabs; after a scan her real results, `js/inline-scan.js`) · `#why` (letter + three rules + the record) · `#how`
-  (5 steps) · `#removals` · `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop
-  close, page behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs,
-  `js/main.js`; on phones the page's only swipe row, the second phone peeking) · `#pricing` · `#faq` · `#contact`.
+  (5 steps, 3 of them hers) · `#removals` · `#pricing` · `#website` · `#showcase` (demo iframe, 520 px tall on a phone,
+  with a "Full screen" in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button; then the
+  Before / After Google phones, real ARIA tabs, `js/main.js`; under 820 px one phone at a time behind a Before | After
+  switch, two `aria-pressed` buttons + a label line; no horizontal scroll anywhere) · `#faq` · `#contact`.
   Phone sticky "Free scan" pill (`js/main.js`): shown once the hero form is above the screen, hidden (visibility, not just
   moved off) while the report card, the plan buttons, #contact's channels or the footer pass its bottom band, or the demo
   preview sits in the lower half. `tools/check.py` fails if a section id is missing here.
@@ -25,7 +26,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404 in one pane), each a live leak vs. its removed state (the
   removed layer's chrome is cloned from the live one, `data-rm-copy`, in the same boxes, so the seam never splits a word
-  out of line). Under 560 px each panel is drawn at its 372 px layout and scaled to .73 (`--rm-s`), like a screenshot. On screen each edge glides by itself (1-2 s CSS
+  out of line). Under 560 px each panel is drawn at its 372 px layout and scaled to .73 (`--rm-s`), like a screenshot; from
+  1100 px each card is a row (name, outcome, Remove left; stage right at .66, its layout still >= 440 px wide). On screen each edge glides by itself (1-2 s CSS
   transition) to a random 15-85 % and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
   reduced motion; a card's first input (Remove press, stage tap, handle key) stops its sweep for good. Remove / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
@@ -65,9 +67,11 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).
 - Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
-  `?pip=0` off. Landing: docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report,
-  or the scan report card after a scan) at 55% of its width, never > 25% of the card, never over a link / button / pill or the
-  card's text (its rows and Jaka's note; else just below the card, where the hero keeps room for it); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
+  `?pip=0` off. Landing: docked (absolute, scrolls with the page) in the Weekly report card's `.pip-slot` (bottom-right,
+  reserved by CSS: 55% of the card wide, 16:9 + the 40 px bar; Jaka's note and the "Meet Jaka, 57 s, sound off" caption
+  wrap left of it; no JS / closed = no slot), never > 25% of the card, never over a link / button / pill or the card's
+  text. The scan report card (after a scan) has no slot: there it hangs off its bottom-right corner, else just below
+  the card, where the hero then keeps room for it; once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
   user dragged, resized, tucked or closed it. Created after load + first scroll / pointer / key or idle; same-origin
   iframe of `video/?r=&name=` made embed-only from the host (injected style; `<video>` driven directly: muted start, tap =
   unmute, then play / pause); icon-only 30 px bar under the picture. Drag drops it where released (kept on-screen, under
@@ -279,10 +283,9 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 
 ## Replace before launch
 
-- **Jaka's photo**: `site/assets/avatar-jaka.svg` is an initials placeholder (used 3x in `site/index.html`). Add a square
-  photo, e.g. `site/assets/jaka.webp` (at least 176x176), then
-  `sed -i '' 's#assets/avatar-jaka.svg#assets/jaka.webp#g' site/index.html && rm site/assets/avatar-jaka.svg`
-  and run the gate.
+- **Jaka's photo**: `site/assets/jaka.webp` (192x192, 8 KB) is a frame from his take (`site/video/jack.mp4` at 45.0 s,
+  cropped square around the face with ffmpeg); used 3x (hero report card + contact on `site/index.html`, contact on
+  `site/scan/index.html`). Swap in a studio photo under the same name if you have one.
 - **Imprint**: add registration number (matična številka) and tax number (davčna številka) to `site/imprint.html`
   if you want them shown.
 
