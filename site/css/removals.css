@@ -22,24 +22,29 @@
 /* what a notice is, who gets it, what she gets back (desktop: fills the column under the heading) */
 .rm-facts { display: none; }
 @media (min-width: 1200px) {
-  .rm-facts { display: grid; gap: 14px; list-style: none; margin: 28px 0 0; padding: 20px 0 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 1rem; line-height: 1.5; }
+  .rm-facts { display: grid; gap: 14px; list-style: none; margin: 0; padding: 20px 0 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 1rem; line-height: 1.5; }
   .rm-facts strong { display: block; color: var(--ink); font-weight: 600; }
 }
 @media (max-width: 559px) { .rm-tabs [role="tab"] { padding: 0 10px; font-size: .95rem; } .rm-bar { gap: 4px 12px; } }
 /* desktop: the heading in the left column; the right column = the toolbar row (tabs, Reveal at its end) over the stage */
+/* desktop: the h2 across the top on one line; under it the line + facts on the left, the toolbar row (tabs, Reveal) over the stage on the right */
 @media (min-width: 1000px) {
-  .rm-wrap { grid-template-rows: auto 1fr; row-gap: 16px; }
-  .rm-side { display: contents; }
-  .rm-side .section-head { grid-column: 1; grid-row: 1 / span 2; margin: 0; }
-  .rm-bar { grid-column: 2; grid-row: 1; }
-  .rm-grid { grid-column: 2; grid-row: 2; }
+  .rm-wrap { grid-template-rows: auto auto 1fr; row-gap: 16px; }
+  .rm-side, .rm-side .section-head { display: contents; }
+  .rm-side .section-head h2 { grid-column: 1 / -1; grid-row: 1; max-width: none; margin: 0 0 8px; }
+  .rm-side .section-head > p { grid-column: 1; grid-row: 2; align-self: center; margin: 0; }
+  .rm-facts { grid-column: 1; grid-row: 3; align-self: start; }
+  .rm-bar { grid-column: 2; grid-row: 2; }
+  .rm-grid { grid-column: 2; grid-row: 3; }
 }
 .rm-grid { display: grid; min-width: 0; }
 .rm-card { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "stage stage" "top act"; align-items: center; gap: 12px 16px; }
 .rm-card[hidden] { display: none; }
 .rm-top { grid-area: top; min-width: 0; }
 .rm .rm-h { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }   /* the tab names it */
-.rm-out { margin: 0; color: var(--muted); font-size: .906rem; line-height: 1.45; }
+.rm-cap { margin: 0; color: var(--muted); font-size: .906rem; line-height: 1.45; }
+/* the caption says what the stage shows: live until the edge passes half way, then the outcome (js/removals.js: .is-removed) */
+.rm-card:not(.is-removed) .rm-out, .rm-card.is-removed .rm-now { display: none; }
 .rm-act { grid-area: act; margin: 0; }
 .rm-btn { min-width: 9.5em; justify-content: center; }
 @media (max-width: 379px) { .rm-btn { min-width: 0; padding-inline: .9em; } }
@@ -134,7 +139,9 @@ html:not(.js) .rm .xp-off { color: var(--xp-mut); }
 .agg { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 4px 12px; align-items: center; padding: 10px; border-radius: 12px; background: #16181d; color: #f1f2f4; }
 .agg-th { grid-row: span 2; width: 56px; height: 56px; overflow: hidden; border-radius: 10px; background: #2b2e35; }
 .agg-b { display: grid; min-width: 0; }
-.rm .agg-th { grid-row: auto; }   /* the section's card: name + meta only (no pill, no button) */
+.rm .agg-th { grid-row: auto; }
+.rm .mg.rm-live { display: flex; flex-direction: column; }
+.rm .mg.rm-live .mg-win { flex: 1; }   /* the file window runs to the stage foot: no dead band under the list */   /* the section's card: name + meta only (no pill, no button) */
 .agg-pill { justify-self: start; padding: 1px 8px; border-radius: 999px; background: #ff3d6e; color: #fff; font: 800 .62rem/1.6 var(--sans); letter-spacing: .08em; text-transform: uppercase; }
 .agg-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agg-meta { color: #a9adb6; font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

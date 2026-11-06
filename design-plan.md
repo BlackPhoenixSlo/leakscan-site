@@ -147,3 +147,15 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
   contact h2 breaks after "scan?"; hero labels 14 px, label + value centred on one left edge; dark frame inside the column;
   stage tooltip; #how without the caps tier, step 3 "(optional)"; dark --muted #c8c1d2, --deep-muted #dcc6d3, docket field
   edge #8f6a80 (3.7:1); Mega mock without "Trending" / "Open link" (removals.py asserts neither).
+
+## Round 8 notes
+- personalize (phone, 3 FAILs): visibility:hidden made innerText '' on the off phone. Now opacity 0 + pointer-events none +
+  z-index under the on phone, inert + aria-hidden from main.js (phone only; cleared ≥ 820). Site fix; no check edited.
+- Pip poster: 4:5 still from the take (t = 45 s, no whiteboard) flush left, docket panel right (play + "Jaka, 57 s" / "Tap to
+  watch"); small player: name only. assets/jaka-poster.webp, preloaded (check.py wants an HTML reference).
+- Removals: h2 "Where I take it down." across the top on one line (desktop); Mega window fills the stage; caption follows the
+  state (.rm-now live / .rm-out removed: the e2e outcome strings unchanged).
+- All section h2s on one scale: 32 → 48 px. BA copy centred vs the phones. Hero sub 760 px, "(Search, Images, Videos)" once,
+  phone sub shorter; proof line one string. "I send the notices for one page free" (hero, how, pricing, FAQ, meta, scan/).
+  "Two plans."; contact "not a bot" cut; footer contact column and FAQ Telegram button gone.
+- Showcase phone hero: object-position 0% 40% + a left scrim: the eyebrow clears her hair.

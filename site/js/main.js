@@ -35,14 +35,17 @@
   // under it says what the shown phone means. Desktop shows both (CSS hides the switch). Same height both ways: no shift.
   var sw = document.querySelector('.ba-switch'), baItems = document.querySelectorAll('.ba .ba-item'), baLab = document.querySelector('.ba-label');
   var BA_LAB = ['Leak sites first', 'Your pages first'];
+  var baMq = matchMedia('(max-width: 819px)'), baOn = 0;
   function baShow(i) {
-    baItems.forEach(function (it, j) { it.classList.toggle('is-on', j === i); });
+    var phone = baMq.matches; baOn = i;
+    baItems.forEach(function (it, j) { var off = phone && j !== i; it.classList.toggle('is-on', j === i); it.inert = off; if (off) it.setAttribute('aria-hidden', 'true'); else it.removeAttribute('aria-hidden'); });
     sw.querySelectorAll('button').forEach(function (b, j) { b.setAttribute('aria-pressed', String(j === i)); });
     if (baLab) baLab.textContent = BA_LAB[i];
   }
   if (sw && baItems.length === 2) {
     sw.addEventListener('click', function (e) { var b = e.target.closest('button[data-ba]'); if (b) baShow(+b.getAttribute('data-ba')); });
     baShow(0);
+    if (baMq.addEventListener) baMq.addEventListener('change', function () { baShow(baOn); });   /* desktop: both live */
   }
 
   // Demo site: "Full screen" pops the frame out to a layer over the page (same iframe, no reload: it keeps its scroll).

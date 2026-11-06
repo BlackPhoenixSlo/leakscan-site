@@ -17,14 +17,17 @@
      frame and sits directly under the copy. Weight the scrim harder for legibility. */
   /* Showcase: the portrait is hands and a bowl, not a face; keep the bowl in frame
      and the scrim on the lower half only. */
-  .hero__bg { filter: brightness(0.66); object-position: 30% 40%; }
+  /* the head pushed right (out from under the eyebrow), and the copy column darkened from the left */
+  .hero__bg { filter: brightness(0.66); object-position: 0% 40%; }
   .hero__overlay {
-    background: linear-gradient(
-      to top,
-      color-mix(in srgb, var(--bg) 96%, transparent) 0%,
-      color-mix(in srgb, var(--bg) 70%, transparent) 40%,
-      color-mix(in srgb, var(--bg) 10%, transparent) 75%
-    );
+    background:
+      linear-gradient(to right, color-mix(in srgb, var(--bg) 55%, transparent) 0%, transparent 80%),
+      linear-gradient(
+        to top,
+        color-mix(in srgb, var(--bg) 96%, transparent) 0%,
+        color-mix(in srgb, var(--bg) 70%, transparent) 40%,
+        color-mix(in srgb, var(--bg) 10%, transparent) 75%
+      );
   }
 }
 

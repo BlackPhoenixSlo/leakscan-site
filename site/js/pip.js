@@ -368,7 +368,7 @@
       '</div></div><div class="pip-bar"><button class="pip-pp" type="button">' + I.pp +
       '</button><button class="pip-snd" type="button"></button><i></i><button class="pip-exp" type="button"></button><button class="pip-x" type="button" aria-label="Close video">' + I.x + '</button></div>';
     pic = pip.querySelector('.pip-pic');
-    // landing: until the first play, only a still poster over the whole player (his portrait, one play mark, one caption);
+    // landing: until the first play, only a still poster over the whole player (his photo at the left, the play mark + caption on the docket panel);
     // the bar and the resize corner are hidden (visibility: the 40 px stay, the box = the slot) while the muted take autoplays
     // underneath. A tap on it (a picture tap: expanded, sound on) or Enter / Space = play: it goes, the take restarts from 0.
     if (auto === 'dock') {
@@ -377,8 +377,8 @@
       poster.setAttribute('role', 'button');
       poster.setAttribute('tabindex', '0');
       poster.setAttribute('aria-label', "Play Jaka's video (57 s)");
-      poster.innerHTML = '<img src="' + new URL('../assets/jaka.webp', me.src).href + '" alt="" width="192" height="192" decoding="async"><p><span class="pip-poster-go">' +
-        SVG('<path d="M8 5v14l11-7z" fill="currentColor"/>') + '</span><span class="pip-poster-t"><strong>Jaka, 57 s</strong> · Tap to watch</span></p>';
+      poster.innerHTML = '<img src="' + new URL('../assets/jaka-poster.webp', me.src).href + '" alt="" width="400" height="500" decoding="async"><p><span class="pip-poster-go">' +
+        SVG('<path d="M8 5v14l11-7z" fill="currentColor"/>') + '</span><span class="pip-poster-t"><strong>Jaka, 57 s</strong> Tap to watch</span></p>';
       pip.appendChild(poster);
       pip.classList.add('posted');
       poster.addEventListener('keydown', function (e) {

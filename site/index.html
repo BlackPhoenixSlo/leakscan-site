@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Abolita: leaked content removed by a real person, not a bot</title>
-<meta name="description" content="Leaked content removed by a real person, not a bot. Free leak scan and one page removed free, then €250/month or €500 one-time. No account, no card.">
+<meta name="description" content="Leaked content removed by a real person, not a bot. Free leak scan; I send the notices for one page free. Then €250/month or €500 one-time. No account, no card.">
 <link rel="canonical" href="https://blackphoenixslo.github.io/leakscan-site/">
 <meta name="theme-color" content="#ECEEF0" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#17151C" media="(prefers-color-scheme: dark)">
@@ -27,6 +27,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" href="fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/young-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/jaka-poster.webp" as="image" fetchpriority="low"><!-- the hero player's poster (js/pip.js) -->
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/removals.css">
 <link rel="stylesheet" href="css/chat.css">
@@ -138,7 +139,7 @@
       "name": "What do I have to send you?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "For the free scan: just your OnlyFans username, typed into the box at the top of this page, plus your Instagram or X if you like. To get one page removed free, message me the report link and sign the authorization. Before I file anything I need the signed one‑page Copyright Enforcement Authorization, and now and then a link to your original post so I can show it’s yours. I never need your passwords or logins."
+        "text": "For the free scan: just your OnlyFans username, typed into the box at the top of this page, plus your Instagram or X if you like. To have me send the notices for one page free, message me the report link and sign the authorization. Before I file anything I need the signed one‑page Copyright Enforcement Authorization, and now and then a link to your original post so I can show it’s yours. I never need your passwords or logins."
       }
     },
     {
@@ -239,7 +240,7 @@
 <section class="hero" id="top" aria-labelledby="hero-title">
   <div class="container">
     <h1 id="hero-title"><span>Find your leaks.</span> <span>I’ll file the takedowns.</span></h1>
-    <p class="lead">A free scan of public Google results<span class="lead-x"> (Search, Images, Videos)</span> for your username. I check every match by hand and take one page down free. You sign a one-page authorization first; no payment.</p>
+    <p class="lead">Find public Google results for your username. I check every match by hand and send the notices for one page free.<span class="lead-x"> You sign a one-page authorization first; no payment.</span></p>
     <div class="docket hero-grid">
       <form id="scan" class="scan-form" method="get" action="scan/">
         <label class="scan-field scan-prefix"><span class="scan-lab" aria-hidden="true">OnlyFans username</span><span class="scan-pre" aria-hidden="true">onlyfans.com/</span><input class="scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="username" aria-label="OnlyFans username"></label>
@@ -269,7 +270,7 @@
       </ul>
           <p class="report-foot" aria-hidden="true">Example report. Your scan replaces these rows.</p>
         </figure>
-        <p class="docket-proof"><strong>570 of 633</strong> links I reported<span class="pf-site"> on fapello.com</span> are gone.</p>
+        <p class="docket-proof"><strong>570 of 633</strong> links I reported on fapello.com are gone.</p>
         <div class="docket-side">
           <div class="pip-slot"></div>
           <p class="pip-cap">Every row checked by me.</p>
@@ -282,7 +283,7 @@
 <section class="section free-sec" id="free" aria-labelledby="free-title">
   <div class="container free-band">
     <div class="free-copy">
-      <h2 id="free-title">See what’s out there. Then watch me take one page down.</h2>
+      <h2 id="free-title">See what’s out there.</h2>
       <p>This is what Google shows for a leaked name today. After your scan it shows yours.</p>
       <p class="free-actions">
         <a class="btn btn-primary" href="#contact" data-free-send><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Send me the report</a>
@@ -327,7 +328,7 @@
         <p class="part-h">You</p>
         <ol class="steps">
           <li class="step"><span class="step-n" aria-hidden="true">1</span><div><h3>Scan and send</h3><p>Run the free scan, send me the report link.</p></div></li>
-          <li class="step"><span class="step-n" aria-hidden="true">2</span><div><h3>Sign the authorization</h3><p>One page to sign. Then I take one page down, free.</p></div></li>
+          <li class="step"><span class="step-n" aria-hidden="true">2</span><div><h3>Sign the authorization</h3><p>One page to sign. Then I send the notices for one page free.</p></div></li>
           <li class="step"><span class="step-n" aria-hidden="true">3</span><div><h3>Pick a plan <span class="step-opt">(optional)</span></h3><p>Monthly or one‑time plans. Payment starts only here.</p></div></li>
         </ol>
       </div>
@@ -346,8 +347,8 @@
   <div class="container rm-wrap">
     <div class="rm-side">
       <div class="section-head">
-        <h2 id="removals-title">Where I remove from.</h2>
-        <p>Mega, X, Reddit, leak sites, their hosts, Google. Pick a platform, then press Show removal.</p>
+        <h2 id="removals-title">Where I take it down.</h2>
+        <p>Mega, X, Reddit, leak sites, their hosts, Google.</p>
         <ul class="rm-facts">
           <li><strong>The notice:</strong> a DMCA copyright notice (or its EU equivalent), filed on your behalf.</li>
           <li><strong>Who gets it:</strong> the site, its host and registrar, then Google for de‑indexing.</li>
@@ -358,7 +359,7 @@
     </div>
     <div class="rm-grid">
       <article class="rm-card" data-rm="mega" id="rm-panel-mega" role="tabpanel" aria-labelledby="rm-tab-mega">
-        <div class="rm-top"><h3 class="rm-h" id="rm-h-mega">Mega</h3><p class="rm-out">Mega folders behind the pack: taken down</p></div>
+        <div class="rm-top"><h3 class="rm-h" id="rm-h-mega">Mega</h3><p class="rm-cap"><span class="rm-now">Live: the folder behind the pack</span><span class="rm-out">Mega folders behind the pack: taken down</span></p></div>
         <div class="rm-stage" style="--p:100" data-end="idle" title="Drag to compare: the leak (left), removed (right)">
           <div class="rm-layer rm-live mg" aria-hidden="true">
             <div class="agg">
@@ -385,7 +386,7 @@
         <p class="rm-act"><button class="btn btn-outline btn-sm rm-btn" type="button" aria-pressed="false">Show removal</button></p>
       </article>
       <article class="rm-card" data-rm="x" id="rm-panel-x" role="tabpanel" aria-labelledby="rm-tab-x" hidden>
-        <div class="rm-top"><h3 class="rm-h" id="rm-h-x">X</h3><p class="rm-out">Media disabled after copyright report</p></div>
+        <div class="rm-top"><h3 class="rm-h" id="rm-h-x">X</h3><p class="rm-cap"><span class="rm-now">Live: the post and its media</span><span class="rm-out">Media disabled after copyright report</span></p></div>
         <div class="rm-stage" style="--p:100" data-end="idle" title="Drag to compare: the leak (left), removed (right)">
           <div class="rm-layer rm-live xp" aria-hidden="true">
             <div class="xp-head"><span class="xp-av" data-rm-k="x-av">L</span><span class="xp-who"><b data-rm-k="x-name">Leak Mirror</b><span><span data-rm-k="x-at">@leak.mirror</span><span data-rm-k="x-age"> · 2h</span></span></span><span class="xp-logo">X</span></div>
@@ -403,7 +404,7 @@
         <p class="rm-act"><button class="btn btn-outline btn-sm rm-btn" type="button" aria-pressed="false">Show removal</button></p>
       </article>
       <article class="rm-card" data-rm="reddit" id="rm-panel-reddit" role="tabpanel" aria-labelledby="rm-tab-reddit" hidden>
-        <div class="rm-top"><h3 class="rm-h" id="rm-h-reddit">Reddit</h3><p class="rm-out">Removed on copyright notice</p></div>
+        <div class="rm-top"><h3 class="rm-h" id="rm-h-reddit">Reddit</h3><p class="rm-cap"><span class="rm-now">Live: the post in the subreddit</span><span class="rm-out">Removed on copyright notice</span></p></div>
         <div class="rm-stage" style="--p:100" data-end="idle" title="Drag to compare: the leak (left), removed (right)">
           <div class="rm-layer rm-live rd" aria-hidden="true">
             <p class="rd-head"><span class="rd-ic">r/</span><b data-rm-k="sub">r/brennickclay_pics</b><span data-rm-k="rd-age">· 5h</span></p>
@@ -421,7 +422,7 @@
         <p class="rm-act"><button class="btn btn-outline btn-sm rm-btn" type="button" aria-pressed="false">Show removal</button></p>
       </article>
       <article class="rm-card" data-rm="site" id="rm-panel-site" role="tabpanel" aria-labelledby="rm-tab-site" hidden>
-        <div class="rm-top"><h3 class="rm-h" id="rm-h-site">Leak sites</h3><p class="rm-out">Profile 404 after a DMCA notice</p></div>
+        <div class="rm-top"><h3 class="rm-h" id="rm-h-site">Leak sites</h3><p class="rm-cap"><span class="rm-now">Live: the profile page</span><span class="rm-out">Profile 404 after a DMCA notice</span></p></div>
         <div class="rm-stage" style="--p:100" data-end="idle" title="Drag to compare: the leak (left), removed (right)">
           <div class="rm-layer rm-live fp" aria-hidden="true">
             <div class="fp-bar"><svg class="icon fp-menu"><use href="#i-menu"/></svg><span class="fp-logo" data-rm-k="host">leak-mirror</span><span class="fp-pill fp-p1">Trending</span><span class="fp-pill fp-p2">Random</span><span class="fp-pill fp-p3">New</span></div>
@@ -458,7 +459,7 @@
 <section class="section pricing" id="pricing" aria-labelledby="pricing-title">
   <div class="container">
     <div class="section-head split">
-      <h2 id="pricing-title">Two plans. The same person does the work.</h2>
+      <h2 id="pricing-title">Two plans.</h2>
       <p>Both include notices to sites, hosts and registrars, Google de‑indexing and your website.</p>
     </div>
     <div class="plans">
@@ -487,7 +488,7 @@
         <a class="btn btn-outline btn-block" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20one-time%20clean%20%28%E2%82%AC500%29.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Ask about the clean‑up</a>
       </article>
     </div>
-    <p class="fineprint">Every removal, the free one too, starts with a signed one‑page Copyright Enforcement Authorization. Signing is free. Prices in EUR.</p>
+    <p class="fineprint">First I send the notices for one page free. Every removal, that one too, starts with a signed one‑page Copyright Enforcement Authorization. Signing is free. Prices in EUR.</p>
   </div>
 </section>
 
@@ -567,7 +568,6 @@
       <div class="faq-me">
         <img src="assets/jaka.webp" alt="" width="56" height="56" loading="lazy">
         <p><strong>Jaka</strong>I answer every message myself.</p>
-        <a class="btn btn-primary btn-sm" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%20have%20a%20question%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Telegram @jakabasej</a>
       </div>
     </div>
     <div class="faq">
@@ -585,7 +585,7 @@
       </details>
       <details>
         <summary>What do I have to send you?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
-        <p>For the free scan: just your OnlyFans username, typed into the box at the top of this page, plus your Instagram or X if you like. To get one page removed free, message me the report link and sign the authorization. Before I file anything I need the signed one‑page Copyright Enforcement Authorization, and now and then a link to your original post so I can show it’s yours. I never need your passwords or logins.</p>
+        <p>For the free scan: just your OnlyFans username, typed into the box at the top of this page, plus your Instagram or X if you like. To have me send the notices for one page free, message me the report link and sign the authorization. Before I file anything I need the signed one‑page Copyright Enforcement Authorization, and now and then a link to your original post so I can show it’s yours. I never need your passwords or logins.</p>
       </details>
       <details>
         <summary>Why not a big agency or an automated service?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
@@ -615,7 +615,7 @@
   <div class="container contact-grid">
     <div class="contact-copy">
       <h2 id="contact-title">Ran the scan? <span>Send me the report link.</span></h2>
-      <p>Paste the report link and your handle. You’ll be talking to me, not a bot.</p>
+      <p>Paste the report link and your handle.</p>
       <p class="hint">Not sure what to write? <q>Hi Jaka, I ran the free scan. My report link and handle: …</q></p>
     </div>
     <div class="channels">
@@ -660,11 +660,6 @@
         <li><a href="privacy.html">Privacy</a></li>
       </ul>
     </nav>
-    <ul class="footer-contact">
-      <li><a href="https://t.me/jakabasej">Telegram @jakabasej</a></li>
-      <li><a href="https://wa.me/38640703992">WhatsApp <span class="nowrap">+386 40 703 992</span></a></li>
-      <li><a href="mailto:me@jackbase.dev">me@jackbase.dev</a></li>
-    </ul>
   </div>
   <div class="container footer-base">
     <p>© 2026 Ognjeni Feniks, Jaka Basej, s.p.</p>
