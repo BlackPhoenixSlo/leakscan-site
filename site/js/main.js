@@ -32,6 +32,38 @@
       function (n) { return n <= bs.length; }).el);
   });
 
+  // Before / after: one phone at a time, picked by real tabs (click, ←/→, Home / End). Not E.tablist: that sets
+  // [hidden], and without JS both phones show. .ba[data-show] picks the one in view (CSS).
+  var baTabs = document.querySelector('.ba-tabs'), ba = document.querySelector('.ba[data-show]');
+  if (baTabs && ba) {
+    var bt = [].slice.call(baTabs.querySelectorAll('[role="tab"]'));
+    var pick = function (t, focus) {
+      bt.forEach(function (b) { var on = b === t; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+      ba.setAttribute('data-show', t.id.replace('ba-tab-', ''));
+      if (focus) t.focus();
+    };
+    baTabs.addEventListener('click', function (e) { var t = e.target.closest('[role="tab"]'); if (t) pick(t); });
+    baTabs.addEventListener('keydown', function (e) {
+      var i = bt.indexOf(document.activeElement), n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: bt.length - 1 }[e.key];
+      if (i < 0 || n === undefined) return;
+      e.preventDefault(); pick(bt[(n + bt.length) % bt.length], true);
+    });
+  }
+
+  // Demo frame: data-src until the page has loaded and the frame is near the screen. Chrome's own lazy-frame distance
+  // (~3000 px) started it during load on desktop: with a stored scan its photos held the load event and the video player
+  // behind it (first frame 6 s vs 1.8 s on Fast 4G, measured). personalize.js writes her ?r= to data-src until then.
+  var lazyDemo = document.querySelector('iframe[data-p="demo"][data-src]');
+  if (lazyDemo) {
+    var demoGo = function () { if (!lazyDemo.getAttribute('src')) lazyDemo.setAttribute('src', lazyDemo.getAttribute('data-src')); };
+    var demoWatch = function () {
+      if (!('IntersectionObserver' in window)) return demoGo();
+      var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); demoGo(); } }, { rootMargin: '800px 0px' });
+      io.observe(lazyDemo);
+    };
+    if (document.readyState === 'complete') demoWatch(); else addEventListener('load', demoWatch, { once: true });
+  }
+
   // Demo site: "Full screen" pops the frame out to a layer over the page (same iframe, no reload: it keeps its scroll).
   // Its slot keeps its height and the scrollbar gutter stays, so nothing behind it moves. Esc / the button / the
   // backdrop close it; focus goes back to the button; the rest of the page is inert meanwhile.
@@ -85,6 +117,8 @@
     popBtn.hidden = false;
     popBtn.setAttribute('aria-expanded', 'false');
     popBtn.addEventListener('click', function () { setPop(!popOpen()); });
+    var shot = demoFig.querySelector('.demo-shot');   // phone: the still of the demo's top opens the same full screen
+    if (shot) shot.addEventListener('click', function (e) { e.preventDefault(); setPop(true); });
     document.addEventListener('keydown', onKey);
     frame.addEventListener('load', function () {   // a popped frame that navigates keeps Esc
       if (popOpen()) try { frame.contentWindow.addEventListener('keydown', onKey); } catch (e) { /* ignore */ }

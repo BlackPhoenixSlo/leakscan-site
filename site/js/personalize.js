@@ -17,8 +17,6 @@
     patreon: ['Patreon', 'patreon.com'], onlyfans: ['OnlyFans', 'onlyfans.com'], fansly: ['Fansly', 'fansly.com'],
     x: ['X', 'x.com', 'twitter.com'], threads: ['Threads', 'threads.net'], twitch: ['Twitch', 'twitch.tv']
   };
-  // Before-phone rows: same phrasing as the static mockup, name swapped in. Never the leak pages' own titles.
-  var LEAK_TITLES = ['{n}: full gallery', '{n}: all photos and videos', '{n} videos (new)', '{n} forum thread'];
 
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
   var $$ = function (sel, root) { return (root || document).querySelectorAll(sel); };
@@ -67,15 +65,13 @@
     o.first = o.first_name || o.name.split(' ')[0];
     return o;
   }
-  // r: an API result → {slug, handle, platform, leaks: top 4 leak hosts (E.rankHosts), urls: {host:
-  // its most-seen page}, images: 3 Google thumbs, profile, socials, found} or null
+  // r: an API result → {slug, handle, platform, leaks: top 4 leak hosts (E.rankHosts), profile,
+  // socials, found} or null
   function clean(r, slug) {
     if (!r || typeof r !== 'object') return null;
     var h = C.handle(r.handle);
     if (!h) return null;
-    var ranked = E.rankHosts(r).slice(0, 4), top = {};
-    ranked.forEach(function (x) { if (x.url) top[x.domain] = x.url; }); // the phone's row for this site opens its most-seen page
-    var images = (Array.isArray(r.images) ? r.images : []).filter(C.thumbOk);
+    var ranked = E.rankHosts(r).slice(0, 4);
     // socials: the Instagram / X names she typed next to the scan (echoed by the API); they win over profile guesses
     var so = r.socials && typeof r.socials === 'object' ? r.socials : {}, socials = {};
     if (C.handle(so.instagram)) socials.instagram = C.handle(so.instagram);
@@ -88,8 +84,8 @@
       fseen[k] = 1;
       found.push({ key: k, handle: fh, url: accountUrl(a.url, k) });
     });
-    return { slug: slug, handle: h, platform: platKey(r.platform), leaks: ranked.map(function (x) { return x.domain; }), urls: top,
-      images: images.slice(0, 3), profile: cleanProfile(r.profile), socials: socials, found: found };
+    return { slug: slug, handle: h, platform: platKey(r.platform), leaks: ranked.map(function (x) { return x.domain; }),
+      profile: cleanProfile(r.profile), socials: socials, found: found };
   }
 
   // ---------- data ----------
@@ -219,9 +215,9 @@
     if (!SNAP) { SNAP = tops.map(function (el) { return [el, el.cloneNode(true)]; }); return; }
     SNAP.forEach(function (p) {
       var el = p[0], s = p[1], i;
-      for (i = el.attributes.length - 1; i >= 0; i--) if (!s.hasAttribute(el.attributes[i].name)) el.removeAttribute(el.attributes[i].name);
+      for (i = el.attributes.length - 1; i >= 0; i--) if (!s.hasAttribute(el.attributes[i].name) && !(el.getAttribute('data-p') === 'demo' && el.attributes[i].name === 'src')) el.removeAttribute(el.attributes[i].name);   // the demo frame's src: main.js set it, keep it loaded
       for (i = 0; i < s.attributes.length; i++) {
-        if (el.getAttribute('data-p') === 'demo' && /^(src|href)$/.test(s.attributes[i].name)) continue; // set below; no double load
+        if (el.getAttribute('data-p') === 'demo' && /^(src|data-src|href)$/.test(s.attributes[i].name)) continue; // set below; no double load
         if (el.getAttribute(s.attributes[i].name) !== s.attributes[i].value) el.setAttribute(s.attributes[i].name, s.attributes[i].value);
       }
       el.textContent = '';
@@ -236,8 +232,8 @@
         if (site == null) return hide(r);
         if (site) text(r.querySelector('.m-site'), site);
         if (title) text(r.querySelector('.m-title'), title);
-        var f = site && /^(leak|gone)-\d$/.test(k) && r.querySelector('.fav');
-        if (f) { // a letter avatar per leak site, like the hero card's rows
+        var f = site && /^gone-\d$/.test(k) && r.querySelector('.fav');
+        if (f) { // a letter avatar per removed leak site, like the hero card's rows
           f.textContent = site.charAt(0).toUpperCase();
           f.classList.add('fav-l');
           f.style.background = E.favColor(site);
@@ -247,18 +243,8 @@
     each($$('[data-p="name"]'), function (el) { text(el, name); });
     each($$('[data-p="search"]'), function (el) { text(el, name + ' nude leaks'); });   // both phones' Google query
     each($$('[data-p="site"]'), function (el) { text(el, d.site); });
-    if (m.leaks.length) LEAK_TITLES.forEach(function (t, i) {   // the after phone's Removed rows: the same leak sites
-      row('leak-' + (i + 1), m.leaks[i] || null, t.replace('{n}', name));
-      row('gone-' + (i + 1), m.leaks[i] || null);
-    }); // no leak domains: the leak rows stay the generic illustration
-    each($$('[data-p="thumbs"] .thumb'), function (span, i) {
-      var u = m.images[i];
-      if (!u) return;
-      var img = make('img', 'p-img', [], { src: E.thumb(u), alt: '', width: '60', height: '60',
-        loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
-      E.watchThumb(img, function () { img.remove(); });   // dead / blank: the illustration's gradient stays
-      span.appendChild(img);
-    });
+    if (m.leaks.length) [1, 2, 3, 4].forEach(function (i) { row('gone-' + i, m.leaks[i - 1] || null); });   // the After phone's Removed rows: her top leak sites
+    // no leak domains: the Removed rows stay the generic illustration
     row('ig', d.ig ? '' : null, d.ig ? name + ' (@' + d.ig + ')' : '');
     row('tt', d.tiktok ? '' : null, d.tiktok ? '@' + d.tiktok : '');
     row('own', d.site, name + ': Official site');
@@ -266,7 +252,7 @@
     phones(m, d);
     if (m.profile) {
       text(q('site-url'), d.site);
-      text(q('demo-intro'), 'A preview built from your scan: your name and links, your photos as they arrive. Scroll around inside it. The real one we make together.');
+      text(q('demo-intro'), 'A preview built from your scan: your name and links, your photos as they arrive. The real one we make together.');
     }
     // Hero "Weekly report" card + "Free scan report" illustration: only the handle for now. Their rows / "N links
     // found" pill are marked (report-row-*, scan-row-*, scan-count) but stay the illustration: no invented statuses.
@@ -274,9 +260,9 @@
     each($$('[data-p="scan-handle"]'), function (el) { text(el, m.handle + ' nude leaks'); });   // the #free phone's Google query
     var demo = 'showcase/?r=' + encodeURIComponent(m.slug);
     each($$('[data-p="demo"]'), function (el) {
-      var k = el.tagName === 'IFRAME' ? 'src' : 'href';
+      var k = el.tagName === 'IFRAME' ? (el.getAttribute('src') ? 'src' : 'data-src') : 'href';   // frame not started yet: main.js loads data-src
       if (el.getAttribute(k) !== demo) el.setAttribute(k, demo);
-      if (k === 'src') keepSlug(el);
+      if (el.tagName === 'IFRAME') { if (k === 'src') el.setAttribute('data-src', demo); keepSlug(el); }
     });
 
     // phone sticky bar: "Free scan" → "DM me on Telegram", prefilled like #contact's Telegram channel with her report link
@@ -305,23 +291,22 @@
     }
   }
 
-  // Before / after phones: after a scan every marked row of their All tab is a real link (leak rows → her leak pages,
-  // Instagram / TikTok → her accounts, her site / blog → the demo site above, Removed → pricing) and the label drops
-  // "Illustration:". The phones are labelled groups either way (their All / Images / Videos tabs are real buttons).
+  // After phone: after a scan every row of its All tab is a real link (Instagram / TikTok → her accounts, her site /
+  // blog → the demo site above, Removed rows → pricing) and the label drops "Illustration:". The Before phone (.phone-free)
+  // is js/free-phone.js's: her real results. Both are labelled groups (their All / Images / Videos tabs are real buttons).
   var PHONES = null;
   function phones(m, d) {
     var ba = document.querySelector('.ba');
     if (!ba) return;
-    if (!PHONES) PHONES = Array.prototype.map.call($$('.phone', ba), function (ph) { return [ph, ph.getAttribute('aria-label')]; });
+    if (!PHONES) PHONES = Array.prototype.map.call($$('.phone:not(.phone-free)', ba), function (ph) { return [ph, ph.getAttribute('aria-label')]; });
     PHONES.forEach(function (p) { p[0].setAttribute('aria-label', p[1]); }); // back to the illustration first (apply() can run again)
     ba.classList.remove('is-live');
     var hint = document.querySelector('.ba-hint');
     if (hint) hint.remove();
-    var urls = m.urls || {}, acc = function (k) { return d.acc[k] && d.acc[k].url; };
+    var acc = function (k) { return d.acc[k] && d.acc[k].url; };
     var to = {
       own: '#showcase', blog: '#showcase', 'gone-1': '#pricing', 'gone-2': '#pricing', 'gone-3': '#pricing', 'gone-4': '#pricing',
-      ig: acc('instagram'), tt: acc('tiktok'),
-      'leak-1': urls[m.leaks[0]], 'leak-2': urls[m.leaks[1]], 'leak-3': urls[m.leaks[2]], 'leak-4': urls[m.leaks[3]]
+      ig: acc('instagram'), tt: acc('tiktok')
     };
     var n = 0;
     each($$('[data-p]', ba), function (r) {
@@ -510,6 +495,7 @@
     if (f.keepSlug) return;
     f.keepSlug = true;
     var onLoad = function () {
+      if (!f.getAttribute('src')) return;   // not started yet (main.js)
       try {
         if (/[?&]r=/.test(f.contentWindow.location.search)) f.removeEventListener('load', onLoad);
         else f.contentWindow.location.replace(new URL(f.getAttribute('src'), location.href).href);
