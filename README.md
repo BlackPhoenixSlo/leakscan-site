@@ -211,6 +211,10 @@ uv run python <worktree>/tools/scan_e2e.py OUT --no-reuse           # run anyway
 - Limits: a new file shadowing an imported module is not seen (the import system's own listdir isn't recorded). A hit needs the same
   env: `uv run` from `~/leakhunt` and the system `python3` have different Playwrights, so they don't share entries. A file the
   scenario only sometimes loads (a lazy image) is a dep only of the runs that loaded it.
+- What to expect (measured 2026-11-06): the saving is same-content reruns (another worktree, a retry, a docs or test-only commit), not
+  typical edits. `index.html` loads all landing JS and the player mounts everywhere, so every `site/js/*.js` reaches 6 or 7 of the 7
+  scenarios, and every `app/*.py` the stub imports reaches all 7. Narrow: `site/showcase/` sub-pages (`personalize` only). Skips one:
+  `index.html`, `main.js`, `chat.js`, `inline-scan.js` (`scan`), `scan.js`, `scan.css` (`askai`). A red scenario reruns every time.
 - Proof: `tools/scan_e2e/reuse_proof.py EVIDENCE_DIR [--only s ...] [--break-key]` (temp worktrees + temp cache, the real CLI).
 
 ## One project, one origin (VPS)
