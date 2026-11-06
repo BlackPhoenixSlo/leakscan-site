@@ -18,7 +18,7 @@ Routes (public surface — no admin routes here):
   GET  /api/avatar/<slug>      quick-scan profile avatar image (404 if none)
   GET  /api/media/<slug>       quick-scan SFW photos {status: pending|ready|none, images[]}
   GET  /api/media/<slug>/<n>.jpg  one gathered photo (404 if none)
-  POST /api/public-scan        live scan (SSE, rate-limited)
+  POST /api/public-scan        live scan (SSE, rate-limited)  # one-project: scan reuse (body {"fresh": true} skips reuse)
   POST /api/chat               (M5) DeepSeek chat proxy; body {"kb":"landing"} -> landing
                                FAQ mode (kb_landing.md + LANDING_SYSTEM_PROMPT)
   GET  /api/chat-kb?kb=landing landing KB monitor {kb, ok, bytes, updated} (no content)
@@ -1440,18 +1440,20 @@ ALIAS_BUDGET = float(os.environ.get("ALIAS_BUDGET", "12"))          # s: page re
 ALIAS_SKIP_AFTER = float(os.environ.get("ALIAS_SKIP_AFTER", "45"))  # s into the scan: past this, skip the step
 
 
-def _alias_cse(alias, deadline):
+def _alias_cse(alias, deadline, errors=None):
     """One discovered alias -> CSE items tagged alias=<alias> (<= CSE_QUICK_CALLS calls). Never raises."""
     seeds = [alias] + [f"{p} {alias}" for p in CSE_PREFIXES]
     try:
         items, _ = cse_scanner.cse_search_wide(seeds, max_calls=CSE_QUICK_CALLS, tags=[alias] * len(seeds),
-                                               deadline=deadline)
+                                               deadline=deadline, errors=errors)
         return items
-    except Exception:
+    except Exception as e:
+        if errors is not None:
+            errors.append(type(e).__name__)
         return []
 
 
-def enrich_aliases(declared, rows, results, prog, started):
+def enrich_aliases(declared, rows, results, prog, started, errors=None):
     """First-pass rows/results -> (extra CSE items, discovered aliases scanned, leak-page socials, names).
     Bounded: skipped with 0 hits or when the scan already ran ALIAS_SKIP_AFTER s; <= ALIAS_BUDGET s."""
     none = ([], [], [], [])
@@ -1459,6 +1461,8 @@ def enrich_aliases(declared, rows, results, prog, started):
         return none
     if time.monotonic() - started > ALIAS_SKIP_AFTER:
         _event("alias_enrich skipped: budget")
+        if errors is not None:
+            errors.append("alias_budget")
         return none
     t0 = time.monotonic()
     deadline = t0 + ALIAS_BUDGET
@@ -1471,7 +1475,7 @@ def enrich_aliases(declared, rows, results, prog, started):
     if new and deadline - time.monotonic() > 2:
         prog("Also searching Google for " + ", ".join("@" + a for a in new) + "…")
         with _cf.ThreadPoolExecutor(max_workers=len(new)) as ex:
-            for items in ex.map(lambda a: _alias_cse(a, deadline), new):
+            for items in ex.map(lambda a: _alias_cse(a, deadline, errors), new):
                 extra += items
     else:
         new = []
@@ -1480,17 +1484,17 @@ def enrich_aliases(declared, rows, results, prog, started):
     return extra, new, d["socials"], d["names"]
 
 
-def leakshaven_start(handle, platform, socials, aliases, names, prog):
+def leakshaven_start(handle, platform, socials, aliases, names, prog, fresh=False):
     """Starts the leakshaven.com step (it runs next to the profile step) -> join() returning (mega items, cache
     key to store or None). Cache: a scan of this handle from the last 6 h whose lookup had the same inputs
-    (leakshaven.cache_key: platform, search term, aliases, names); else one suggest + one pack-list request in a
-    worker thread (<= leakshaven.TIMEOUT s). Never raises; one log line."""
+    (leakshaven.cache_key: platform, search term, aliases, names), unless `fresh`; else one suggest + one pack-list
+    request in a worker thread (<= leakshaven.TIMEOUT s). Never raises; one log line."""
     if not leakshaven.ENABLED:
         return lambda: ([], None)
     term = socials.get("instagram") or handle
     key = leakshaven.cache_key(platform, term, aliases, names)
     try:
-        ex = db.recent_extra(handle, leakshaven.CACHE_FIELD, key, leakshaven.CACHE_TTL)
+        ex = None if fresh else db.recent_extra(handle, leakshaven.CACHE_FIELD, key, leakshaven.CACHE_TTL)
     except Exception:
         ex = None
     if ex is not None:
@@ -1520,10 +1524,10 @@ def merge_items(results, extra):
     return out
 
 
-def scan_begin(handle, platform, aliases, socials, rows, results, prog, started):
+def scan_begin(handle, platform, aliases, socials, rows, results, prog, started, fresh=False, errors=None):
     """_scan_cse after its first CSE pass: alias enrichment (its items merged into results / rows), then the
     leakshaven step starts (it runs next to the profile step) -> (op, rows, results); op feeds the other hooks."""
-    extra, found, found_socials, names = enrich_aliases(aliases, rows, results, prog, started)
+    extra, found, found_socials, names = enrich_aliases(aliases, rows, results, prog, started, errors)
     if extra:
         results = merge_items(results, extra)
         rows = cse_scanner.summarize_cse(results)
@@ -1531,7 +1535,7 @@ def scan_begin(handle, platform, aliases, socials, rows, results, prog, started)
     info = {"declared": list(aliases), "discovered": found,
             "socials": [s for s in found_socials if s["handle"].lower() not in mine]}
     join = leakshaven_start(handle, platform, socials, list(aliases) + found + [s["handle"] for s in info["socials"]],
-                            names, prog)
+                            names, prog, fresh)
     return {"aliases": info, "hints": {"names": names, "aliases": found}, "join": join}, rows, results
 
 
@@ -1593,6 +1597,72 @@ def off_row(row):
 def scan_row(slug):
     """db.get_scan + the aggregator rule (off_row)."""
     return off_row(db.get_scan(slug))
+
+
+# whole-scan reuse: a repeat quick scan (same platform, handle, aliases, declared socials) inside SCAN_REUSE_TTL gets its
+# own new row + slug holding a fresh scan's result, no external call. Only a whole fresh result stores the key
+# (scan_reuse_value), a reused row never does, nor the leakshaven key: the TTL can't roll forward. Body fresh:true skips it.
+SCAN_REUSE_TTL = int(os.environ.get("SCAN_REUSE_TTL", str(leakshaven.CACHE_TTL)))   # s; 0 = off
+SCAN_REUSE_FIELD = "scan_key"                                                       # scans.extra_json, never served
+
+
+def scan_reuse_key(platform, handle, aliases, socials):
+    """Everything a quick scan's result depends on -> opaque key (instagram=y and x=y are different scans)."""
+    return leakshaven.cache_key(platform, handle, aliases, [f"{k}={socials[k]}" for k in sorted(socials)])
+
+
+def scan_reuse_value(key, status, errors, mega_key, profile):
+    """What a fresh row stores under SCAN_REUSE_FIELD: the key for a whole result, else None. Not whole: no rows; any
+    Google call failed or the alias step was skipped (few rows would pass for few leaks, `errors`); the aggregator lookup
+    failed or came from its own cache (a TTL on top of its TTL; mega_key None); the profile is the LLM-less fallback."""
+    whole = (status == "complete" and not errors and (mega_key or not leakshaven.ENABLED)
+             and (not PROFILE_ENABLED or (profile or {}).get("generated_by") == "deepseek"))
+    return key if whole and SCAN_REUSE_TTL > 0 else None
+
+
+def _read_avatar(slug):
+    """A saved avatar as _save_avatar takes it -> (bytes, ext) | None."""
+    p = _avatar_path(slug)
+    try:
+        with open(p or "", "rb") as fh:
+            return fh.read(), p.rsplit(".", 1)[1]
+    except OSError:
+        return None
+
+
+def scan_reuse_serve(h, key, handle, platform, ip, aliases, socials):
+    """A recent whole scan under `key` -> its result as this visitor's own new row and the SSE a fresh scan ends with;
+    no external call -> True. None (or any failure) -> False: the caller scans. The visitor's own typing of her handle,
+    aliases and socials stands; nothing of the source's row but its result (never its ip hash, verify fields or key)."""
+    try:
+        src = db.recent_scan(handle, SCAN_REUSE_FIELD, key, SCAN_REUSE_TTL)
+        if not src:
+            return False
+        ex, rows, avatar = src["extra"], src["hits"], _read_avatar(src["slug"])
+        profile = ex.get("profile")
+        if isinstance(profile, dict):
+            profile = {**profile, "avatar": bool(avatar)}
+        pub = {"images": ex.get("images") or [], "results": ex.get("results") or [], "google_total": ex.get("google_total"),
+               "aliases": {**(ex.get("aliases") or {}), "declared": list(aliases)}, "mega": ex.get("mega") or []}
+        slug = db.insert_scan(rows, handle=handle, level="low", platform=platform, status="complete",
+                              client_ip_hash=_ip_hash(ip),
+                              extra={"profile": profile, "socials": socials, "reused_from": src["slug"], **pub})
+        if avatar and not _save_avatar(slug, avatar) and profile:
+            profile["avatar"] = False
+        media = {"status": media_gather.adopt(slug, src["slug"])}
+    except Exception as e:
+        _event(f"scan reuse failed: {type(e).__name__}")
+        return False
+    _event(f"scan reuse hit level=low platform={platform} aliases={len(aliases)} hits={len(rows)} "
+           f"age={src['age_s']}s media={media['status']}")
+    wc.sse(h, "progress", "Loading a recent scan…")
+    wc.sse(h, "result", json.dumps({
+        "slug": slug, "handle": handle, "platform": platform, "level": "low",
+        "status": "complete", "hit_count": len(rows), "domain_count": db.domain_count(rows),
+        "profile": profile, "media": media, "socials": socials, "hits": rows, **pub,
+    }, ensure_ascii=False))
+    wc.sse(h, "done", "end")
+    return True
 
 
 # 3) the one video rule (replaces upstream's): the landing / scan page read `kind` only (no client-side URL sniffing)
@@ -2104,16 +2174,19 @@ class Handler(BaseHTTPRequestHandler):
             if not aliases:
                 return wc.sse_fail(self, "Enter a valid handle (letters, digits, . _ - only).")
             self._scan_cse(aliases[0], platform, ip, aliases=quick_aliases(aliases, socials),
-                           socials=socials)
+                           socials=socials, fresh=body.get("fresh") is True)  # one-project: scan reuse
         finally:
             SCAN_LIMITER.release(ip)
 
-    def _scan_cse(self, handle, platform, ip, aliases=None, socials=None):
+    def _scan_cse(self, handle, platform, ip, aliases=None, socials=None, fresh=False):  # one-project: scan reuse
         """Level 1: Google Custom Search — fast, no scraping, anyone. Runs a 6–8
         call exclude-reset widening (CSE_QUICK_CALLS) across a few phrasings so the
         quick scan surfaces many more distinct leak hosts than the old 2-pass, with
         a shallow depth fallback when too few sites turn up."""
         aliases, socials = aliases or [handle], socials or {}
+        reuse_key, errors = scan_reuse_key(platform, handle, aliases, socials), []  # one-project: scan reuse
+        if not fresh and scan_reuse_serve(self, reuse_key, handle, platform, ip, aliases, socials):  # one-project: scan reuse
+            return  # one-project: scan reuse
         started = time.monotonic()  # one-project: scan_begin
         _event(f"scan start level=low platform={platform} aliases={len(aliases)}")
         if not cse_scanner.cse_available():
@@ -2124,18 +2197,18 @@ class Handler(BaseHTTPRequestHandler):
             seeds = [(a, a) for a in aliases] + [(f"{p} {a}", a) for a in aliases for p in CSE_PREFIXES]
             results, raw_total = cse_scanner.cse_search_wide(
                 [q for q, _ in seeds], max_calls=CSE_QUICK_CALLS + len(aliases) - 1, on_progress=prog,
-                tags=[a for _, a in seeds])
+                tags=[a for _, a in seeds], errors=errors)  # one-project: scan reuse
             rows = cse_scanner.summarize_cse(results)
             if len(rows) < MIN_SITES_FOR_FALLBACK and FALLBACK_EXTRA_PAGES > 0:
                 try:
                     results = results + cse_scanner.cse_paginate(
-                        handle, pages=FALLBACK_EXTRA_PAGES, on_progress=prog)
+                        handle, pages=FALLBACK_EXTRA_PAGES, on_progress=prog, errors=errors)  # one-project: scan reuse
                     rows = cse_scanner.summarize_cse(results)
                 except Exception:
                     pass
         except Exception:
             return wc.sse_fail(self, "Quick search is temporarily unavailable. Please try again.")
-        op, rows, results = scan_begin(handle, platform, aliases, socials, rows, results, prog, started)  # one-project: scan_begin
+        op, rows, results = scan_begin(handle, platform, aliases, socials, rows, results, prog, started, fresh, errors)  # one-project: scan_begin
         # images / status / shaped below: upstream's, dead here (scan_end's pub replaces them, pack hosts dropped)  # one-project: scan_end
         images = cse_scanner.good_images(results, handle, CSE_IMAGES)
         # Replace Google's inflated raw totalResults with a grounded estimate.
@@ -2159,7 +2232,8 @@ class Handler(BaseHTTPRequestHandler):
         slug = db.insert_scan(rows, handle=handle, level="low", platform=platform,
                               status=status, client_ip_hash=_ip_hash(ip),
                               extra={"images": images, "google_total": google_total,
-                                     "results": shaped, "profile": profile, "socials": socials, **pub, leakshaven.CACHE_FIELD: mega_key})  # one-project: scan_end
+                                     "results": shaped, "profile": profile, "socials": socials, **pub, leakshaven.CACHE_FIELD: mega_key,  # one-project: scan_end
+                                     SCAN_REUSE_FIELD: scan_reuse_value(reuse_key, status, errors, mega_key, profile)})  # one-project: scan reuse
         if avatar and not _save_avatar(slug, avatar) and profile:
             profile["avatar"] = False
         media = {"status": media_gather.start(slug, platform, handle, profile, results,

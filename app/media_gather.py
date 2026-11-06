@@ -1195,4 +1195,63 @@ def google_web_retry(st, raw, page, handle, profile, ig, leak, deadline):
     except Exception as e:
         st["ok"] = False
         log(f"media google web retry failed: {type(e).__name__}")
+
+
+# A reused quick scan (public_app.scan_reuse_serve): its photos and refined profile are the source scan's, no external call.
+ADOPT_POLL = 1.0
+ADOPT_NO_INDEX = 5.0          # s: src's row is written just before its index; none by then = no gather is coming
+
+
+def _settled_index(src):
+    """src's index.json once its gather is over; what is there after the gather's longest run otherwise (a restart orphaned it)."""
+    t0, idx = time.monotonic(), None
+    while time.monotonic() - t0 < MEDIA_BUDGET + 60:
+        idx = _read_index(src)
+        if (idx and idx.get("status") != "pending") or (not idx and time.monotonic() - t0 > ADOPT_NO_INDEX):
+            break
+        time.sleep(ADOPT_POLL)
+    return idx or {}
+
+
+def _adopt_run(slug, src):
+    g = _Gallery(slug)
+    try:
+        idx = _settled_index(src)
+        os.makedirs(g.dir, exist_ok=True)
+        for i in idx.get("images") or []:
+            s, d = os.path.join(media_dir(src), f"{i['n']}.jpg"), os.path.join(g.dir, f"{i['n']}.jpg")
+            try:
+                os.link(s, d)
+            except OSError:
+                shutil.copyfile(s, d)
+            g.images.append(i)
+        if idx.get("profile_updated_at") and db.update_extra(slug, {"profile": db.scan_extra(src).get("profile")}):
+            g.profile_updated_at = idx["profile_updated_at"]
+    except Exception as e:
+        log(f"media adopt failed: {type(e).__name__}")
+    finally:
+        try:
+            g.finish()
+        except OSError as e:
+            log(f"media index write failed: {type(e).__name__}")
+        with _LOCK:
+            _RUNNING.discard(slug)
+
+
+def adopt(slug, src):
+    """Give a reused scan src's media in the background (waits out src's gather, if it still runs) -> 'pending' | 'none'.
+    Never raises."""
+    if not MEDIA_ENABLED or not SLUG_RE.match(slug or "") or not SLUG_RE.match(src or ""):
+        return "none"
+    try:
+        _write_index(slug, "pending", [])
+        with _LOCK:
+            _RUNNING.add(slug)
+        threading.Thread(target=_adopt_run, args=(slug, src), daemon=True).start()
+        return "pending"
+    except Exception as e:
+        with _LOCK:
+            _RUNNING.discard(slug)
+        log(f"media adopt failed: {type(e).__name__}")
+        return "none"
 # <<< one-project patch <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
