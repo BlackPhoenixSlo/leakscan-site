@@ -348,8 +348,8 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
                 pg.click(".pip-x"); pg.wait_for_timeout(600); s = st(pg)
                 check(f"{vt} reload: X again → the tab", s["tucked"] and bool(s["tab"]), s["tab"])
                 pg.reload(wait_until="domcontentloaded"); pg.wait_for_timeout(1500); s = st(pg)
-                check(f"{vt} reload: after X + reload the full player is back on its home spot ({'top-right under the header' if phone else 'docked on the hero card'}), first load's box, no tab",
-                      s["on"] and not s["tucked"] and not s["tab"] and on_screen(s) and s["mode"] == m0 == ("float" if phone else "dock") and (top_right(s) or not phone)
+                check(f"{vt} reload: after X + reload the full player is back on its home spot ({'top-right under the header' if phone else 'as on the first load: docked while that spot fits, else top-right'}), first load's box + mode, no tab",
+                      s["on"] and not s["tucked"] and not s["tab"] and on_screen(s) and s["mode"] == m0 and (top_right(s) if phone or m0 == "float" else m0 == "dock")
                       and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0, s["mode"], m0, s["tab"]])
                 check(f"{vt} reload: nothing about the player in sessionStorage / localStorage", s["store"] == [], s["store"])
                 shot(pg, f"{name}-reload-home")
@@ -548,10 +548,10 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
 
     # resize: the grip (pointer) + pinch (Chromium phone); 16:9, 160 px .. 60% / 90% of the width, kept
     s = ready(pg, "scan/?r=demoR3port01")
-    w0 = s["box"][2]
+    w0, r0 = s["box"][2], s["box"][0] + s["box"][2]
     s = grip(pg, cdp, s, -90, -40)
     check(f"{tag} resize: grip dragged out → bigger, 16:9 kept, bottom-right edge anchored", s["on"] and s["box"][2] >= w0 + 80 and ratio_ok(s)
-          and s["box"][0] + s["box"][2] == s["vw"] - 8, [w0, s["box"], s["pic"]])
+          and s["box"][0] + s["box"][2] == r0, [w0, r0, s["box"], s["pic"]])
     shot(pg, "6-resized")
     s = grip(pg, cdp, s, 900, 600)
     check(f"{tag} resize: min 168 px wide", s["box"][2] == 168 and ratio_ok(s), s["box"])
@@ -561,7 +561,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     check(f"{tag} resize: max {'90' if phone else '60'}% of the width (or the screen height)", abs(s["box"][2] - mx_w) <= 2 and ratio_ok(s) and s["box"][1] >= s["hdr"], [s["box"], round(mx_w)])
     big = s["box"][2]
     s = ready(pg, "scan/?r=demoR3port01")
-    check(f"{tag} resize: size kept across a reload", abs(s["box"][2] - big) <= 1, [s["box"][2], big])
+    check(f"{tag} reload: resized + reload = default size again, home spot", s["on"] and abs(s["box"][2] - w0) <= 1 and top_right(s), [s["box"], w0, big])
     if cdp:   # two real touch points spreading over the picture
         s = grip(pg, cdp, s, 700, 500)   # back to the min
         s = drop(pg, cdp, s, s["vw"] / 2, s["vh"] / 2)
@@ -576,10 +576,11 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     s = ready(pg, "scan/?r=demoR3port01")
     pg.focus(".pip-snd"); pg.keyboard.press("Escape"); pg.wait_for_timeout(500); s = st(pg)
     check(f"{tag} tuck: Esc inside the player tucks it, focus on the tab", s["tucked"] and bool(s["tab"]) and s["focus"] == "pip-tab", [s["cls"], s["focus"]])
-    s = ready(pg, "scan/?r=demoR3port01")
-    check(f"{tag} tuck: tucked state kept across a reload", bool(s) and s["tucked"], s and s["cls"])
     pg.focus(".pip-tab"); pg.keyboard.press("Enter"); pg.wait_for_timeout(500); s = st(pg)
     check(f"{tag} tuck: Enter on the tab brings it back, focus inside the player", s["on"] and not s["tab"] and (s["focus"] or "").startswith("pip-"), [s["cls"], s["focus"]])
+    pg.focus(".pip-snd"); pg.keyboard.press("Escape"); pg.wait_for_timeout(500)
+    s = ready(pg, "scan/?r=demoR3port01")
+    check(f"{tag} reload: tucked + reload = the full player on its home spot, no tab", bool(s) and s["on"] and not s["tucked"] and not s["tab"] and top_right(s), s and [s["cls"], s["box"]])
     ls = pg.evaluate("() => window.__ls.filter(e => e[0] >= (window.__pipAt || 0) && e[2]).reduce((a, e) => a + e[1], 0)")   # shifts of the player (sources)
     check(f"{tag} cls: 0 from the player after it mounts (report)", ls == 0, ls)
 
