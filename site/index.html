@@ -39,6 +39,7 @@
 <script src="js/chat.js" defer></script>
 <script src="js/removals.js" defer></script>
 <script src="js/pip.js" data-pip-auto="dock" defer></script>
+<script src="js/analytics.js" defer></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -168,7 +169,7 @@
       "name": "Is my information safe?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site has no cookies and no tracking."
+        "text": "Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site sets ad cookies only if you accept them."
       }
     },
     {
@@ -184,6 +185,22 @@
 </script>
 </head>
 <body>
+<script>
+// Jack's still in the first paint, on a phone's home spot (360+: under that the landing overflows and the box's width isn't known yet), pip.js's on / off rules;
+// a tucked / moved / resized player waits for js/pip.js (which takes the still over when it mounts). Styled in css/pip.css (.pip-still).
+(function () {
+  var q = new URLSearchParams(location.search), W = innerWidth, s, w, e;
+  if (W < 360 || W >= 720 || q.get('pip') === '0' || !('PointerEvent' in window) || !('IntersectionObserver' in window)) return;
+  try { s = JSON.parse(sessionStorage.getItem('leakscan.pip')); } catch (x) { /* private mode */ }
+  if (s && (s.t || s.p || s.w)) return;
+  w = Math.round(Math.min(320, W * 0.45));
+  e = document.createElement('div');
+  e.className = 'pip-still';
+  e.style.cssText = 'width:' + w + 'px;height:' + (w * 9 / 16 + 40) + 'px;background-image:url(data:image/webp;base64,UklGRsQAAABXRUJQVlA4ILgAAABwBQCdASowABsAP1mEtE6qpKKhMBVdUVgrCecAvdAJ9VBVGjA6TxquZ+EfwzjfUei7rNrAAMlGJD0T5HASGOHTqXO0YgFtsJBpdeJsnpOfKpSZm2jv9o2dI+JR+HvQjegbFtgJQLlEFnt/snjCU/OT5GouNQ95sLsg59eafpHdXKuDIq/DVT0US1sVgNsvLyeZApPR4mnuUA7+0p0panzGh5i1glUvuCJ0di0/tMZiICe72OqOiAAA)';
+  document.body.appendChild(e);
+  addEventListener('load', function () { e.remove(); });   // pip.js never came
+})();
+</script>
 <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><symbol id="i-shield-check" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
 <symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol>
 <symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
@@ -528,7 +545,7 @@
       </details>
       <details class="reveal">
         <summary>Is my information safe?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
-        <p>Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site has no cookies and no tracking.</p>
+        <p>Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site sets ad cookies only if you accept them.</p>
       </details>
       <details class="reveal">
         <summary>Do I need to register or create an account?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
@@ -691,8 +708,12 @@
         <li><a href="./#free">Free scan</a></li>
         <li><a href="./#pricing">Pricing</a></li>
         <li><a href="./#faq">FAQ</a></li>
+        <li><a href="faq/">Takedown FAQ</a></li>
+        <li><a href="removals/">Removal guides</a></li>
+        <li><a href="compare/">Compare services</a></li>
         <li><a href="imprint.html">Imprint</a></li>
         <li><a href="privacy.html">Privacy</a></li>
+        <li data-cookie-settings hidden><a href="privacy.html#cookies">Cookie settings</a></li>
       </ul>
     </nav>
     <div>
@@ -704,7 +725,7 @@
     </div>
   </div>
   <div class="container footer-base">
-    <p>© 2026 Ognjeni Feniks, Jaka Basej, s.p. · No cookies, no tracking.</p>
+    <p>© 2026 Ognjeni Feniks, Jaka Basej, s.p. · Ad cookies only if you accept.</p>
   </div>
 </footer>
 

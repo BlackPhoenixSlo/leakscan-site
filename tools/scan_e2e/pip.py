@@ -1,7 +1,11 @@
 """Scenario `pip` (see tools/scan_e2e.py for what it proves)."""
+import base64
+import os
 from urllib.parse import parse_qs, urlsplit
 
-from .common import LOOP, MEASURED, break_routes, cfg, check
+from .common import LOOP, MEASURED, PIP_AWAY, break_routes, cfg, check
+
+os.environ["PW_TEST_SCREENSHOT_NO_FONTS_READY"] = "1"   # WebKit's document.fonts.ready waits for the page's parse, so a screenshot while pip.js is held would hang (still:)
 
 
 PIP_J = """() => { const p = document.querySelector('.pip'), t = document.querySelector('.pip-tab'), c = document.querySelector('.hero .report-card'),
@@ -50,6 +54,23 @@ PIP_TAKE = """async (t) => { const v = document.querySelector('video'); v.pause(
     card: !g.hasAttribute('data-off'), cardIn: gr.left >= sr.left + sr.width * .45 && gr.right <= sr.right + 1 && gr.top >= sr.top - 1 && gr.bottom <= sr.bottom + 1,
     capOn: !cap.hasAttribute('data-off'), capShown: getComputedStyle(cap).display !== 'none', capText: cap.textContent.trim().toLowerCase()}; }"""
 
+# the first-paint still: when it entered the page (a mutation with neither it nor the box = a gap), LCP elements
+STILL_INIT = """window.__st = {gap: false, lcp: []}; new MutationObserver(() => { const s = document.querySelector('.pip-still');
+    if (s && window.__st.at == null) window.__st.at = performance.now();
+    if (window.__st.at != null && !s && !document.querySelector('.pip.on') && document.readyState !== 'complete') window.__st.gap = true; }).observe(document, {childList: true, subtree: true});
+  try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__st.lcp.push(e.element ? e.element.className || e.element.tagName : e.url))).observe({type: 'largest-contentful-paint', buffered: true}); } catch (e) {}
+  """
+STILL_J = """() => { const e = document.querySelector('.pip-still'); if (!e) return null; const r = e.getBoundingClientRect(), c = getComputedStyle(e), f = performance.getEntriesByName('first-contentful-paint')[0];
+  return {box: [r.left, r.top, r.width, r.height], shown: c.display !== 'none' && c.visibility === 'visible' && r.width > 0, at: window.__st.at, fcp: f && f.startTime, vw: document.documentElement.clientWidth,
+    hdr: document.querySelector('.site-header').getBoundingClientRect().bottom}; }"""
+# a PNG of the spot vs the still's own image, both at 64 x 36: mean absolute difference (0-255), luminance SD
+STILL_PX = """async (png) => { const load = u => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('image')); i.src = u; });
+  const px = i => { const c = document.createElement('canvas'); c.width = 64; c.height = 36; const x = c.getContext('2d'); x.drawImage(i, 0, 0, 64, 36); return x.getImageData(0, 0, 64, 36).data; };
+  const a = px(await load('data:image/png;base64,' + png)), b = px(await load(document.querySelector('.pip-still').style.backgroundImage.slice(5, -2)));
+  let d = 0; const L = []; for (let i = 0; i < a.length; i += 4) { d += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]); L.push(.299 * a[i] + .587 * a[i + 1] + .114 * a[i + 2]); }
+  const m = L.reduce((s, y) => s + y, 0) / L.length;
+  return {diff: +(d / (L.length * 3)).toFixed(1), lum: +m.toFixed(1), sd: +Math.sqrt(L.reduce((s, y) => s + (y - m) ** 2, 0) / L.length).toFixed(1)}; }"""
+
 
 def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     """js/pip.js: the mini player of site/video/ (landing: docked on the hero card, then floating; scan report with ?r=: floating)."""
@@ -82,7 +103,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
               requestAnimationFrame(f); }; requestAnimationFrame(f); }""")
 
         def route(r, _req):
-            if urlsplit(r.request.url).hostname in LOOP:
+            if urlsplit(r.request.url).hostname in LOOP or r.request.url.startswith(("data:", "blob:")):   # WebKit routes those too
                 if "/video/" in r.request.url:
                     net["video"].append(r.request.url)
                 r.continue_()
@@ -207,6 +228,58 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         ok, d = clear(pg)
         check(f"{tag} dock: {what}: scan inputs / Scan now / Scanned line not under it (it may cover the card's rows), header / Ask-AI still clickable", fok and ok, [fr, d, round(cov, 3)])
         check(f"{tag} dock: {what}: start spot off the screen corner (up / left of it)", not (0 <= s["vw"] - (b[0] + b[2]) <= 24 and 0 <= s["vh"] - (b[1] + b[3]) <= 24), b)
+
+    # still: Jack's face in a phone's first paint, from the HTML alone: js/pip.js held at the wire (or served empty), so
+    # what shows is what the page paints by itself; a screenshot of the spot = the still's own image (pixels, not the DOM).
+    # Released: the box on the same rect, no frame with neither, the still under the poster. Off where pip.js is off / moved.
+    def still_page(url, init="", pip="hold"):
+        ctx, pg, _ = new_ctx(init=STILL_INIT + init)
+        held = []
+        ctx.route("**/js/pip.js", lambda r, _q=None: held.append(r) if pip == "hold" else r.fulfill(body="", content_type="application/javascript"))
+        pg.goto(cfg.base + url, wait_until="commit")
+        pg.wait_for_function("() => performance.getEntriesByName('first-contentful-paint').length > 0", timeout=15000)
+        return ctx, pg, held, pg.evaluate(STILL_J)
+
+    for what, url in ((("landing", ""), ("report", "scan/?r=demoR3port01")) if phone else ()):
+        vt = f"{tag} still: {what}:"
+        ctx, pg, held, s = still_page(url)
+        check(f"{vt} in the page before its first contentful paint (pip.js held), top-right under the header", bool(s) and s["shown"] and s["at"] is not None and s["at"] <= s["fcp"]
+              and abs(s["box"][0] + s["box"][2] + M - s["vw"]) <= 1 and abs(s["box"][1] - s["hdr"] - 8) <= 1, s)
+        px = None
+        if s and s["shown"]:
+            x, y, w = s["box"][:3]
+            png = pg.screenshot(clip={"x": x, "y": y, "width": w, "height": w * 9 / 16})
+            px = pg.evaluate(STILL_PX, base64.b64encode(png).decode())
+        check(f"{vt} first paint shows his face: the spot's pixels = the still's image", bool(px) and px["diff"] < 25 and px["sd"] > 15, px)
+        shot(pg, f"still-{what}-first-paint")
+        for r in held:
+            r.fallback()
+        pg.wait_for_function("() => document.querySelector('.pip.on')", timeout=15000)
+        a = st(pg)
+        check(f"{vt} pip.js mounted: the box on the same rect (±1 px)", bool(s) and s["shown"] and all(abs(u - v) <= 1 for u, v in zip(a["box"], s["box"])), [a["box"], s and s["box"]])
+        e = pg.evaluate("() => [window.__st.gap, !!document.querySelector('.pip-still'), getComputedStyle(document.querySelector('.pip-pic')).backgroundImage.slice(0, 10)]")
+        check(f"{vt} replaced in one task: no moment with neither, the still gone, its image in the picture", not e[0] and not e[1] and (not s or not s["shown"] or e[2].startswith(('url("data:', 'url("blob:'))), e)
+        pg.wait_for_function("() => /blob:.*data:/.test(getComputedStyle(document.querySelector('.pip-pic')).backgroundImage)", timeout=10000) if s and s["shown"] else None
+        lcp = pg.evaluate("window.__st.lcp")
+        check(f"{vt} never the LCP element", not any("pip-still" in x for x in lcp), lcp)
+        pg.wait_for_function("() => document.querySelector('.pip.live')", timeout=15000)
+        shot(pg, f"still-{what}-settled")
+        ctx.close()
+    ctx, pg, held, s = still_page("", pip="empty")
+    pg.wait_for_function("() => document.readyState === 'complete'", timeout=15000)
+    check(f"{tag} still: pip.js never comes: nothing left on the page after load", not pg.query_selector(".pip-still"), pg.evaluate("window.__st.at"))
+    ctx.close()
+    MOVED = "try { sessionStorage.setItem('leakscan.pip', JSON.stringify({p: [40, 300], w: 200, t: '', u: 1, c: 0})); } catch (e) {}"
+    for what, url, init in (("?pip=0", "?pip=0", ""), ("closed by its X", "", PIP_AWAY), ("moved + resized", "", MOVED), ("report page without ?r=", "scan/", "")) + ((("computer", "", ""),) if not phone else ()):
+        ctx, pg, held, s = still_page(url, init)
+        check(f"{tag} still: none: {what}", s is None, s)
+        if what == "computer":
+            shot(pg, "still-computer-first-paint")
+            for r in held:
+                r.fallback()
+            pg.wait_for_function("() => document.querySelector('.pip.live')", timeout=15000)
+            shot(pg, "still-computer-settled")
+        ctx.close()
 
     # vis: Jack's iPhone report (no player after a scan): landing, no interaction, dark + light; fresh / after a stored scan
     # of sophieraiin (localStorage leakscan.last → the stub's demoR3port01) / with an old "closed" flag in sessionStorage.

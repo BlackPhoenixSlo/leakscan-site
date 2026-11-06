@@ -1,7 +1,7 @@
 # leakscan-site
 
 Google Ads landing site for Abolita: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
-cookies, no third-party requests on the landing pages. `site/` is what ships. `site/showcase/` is the demo of
+cookies or third-party requests on the landing pages except `js/analytics.js` (Google Ads, see below). `site/` is what ships. `site/showcase/` is the demo of
 the official site each client gets (fictional creator, built from the tessa template); the landing page links and
 iframes it as `showcase/`. The demo uses system fonts too (no Google Fonts); `tools/check.py` fails if it loads any
 third-party host that `privacy.html` does not disclose. Its own
@@ -57,6 +57,10 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   (whisper / faster-whisper word timestamps → `data-cue-*` diff, untested on a real take):
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).
+- Search landing pages (indexed, in the sitemap; plain static HTML + `css/guides.css`, no JS of their own, edit the HTML directly): hubs
+  `faq/`, `removals/` and `compare/`, and their child pages. Each ends in the same free-scan + DM CTA. Legal and process claims link the
+  primary source they were checked against; facts about Abolita come only from `index.html`. Comparisons are dated: re-check them against
+  the other service's own pages before changing them. Linked from the homepage footer.
 - Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
   `?pip=0` off. Landing: docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report,
   or the scan report card after a scan) at 55% of its width, never > 25% of the card, never over a link / button / pill
@@ -67,8 +71,10 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   the sticky header / report nav); a fling / drag past the left or right edge tucks it (paused) with a `>` / `<` tab
   (tap / drag inward = back; Esc tucks, Enter on the tab returns); corner grip / pinch resizes (min 160 px, max 60% of
   the width, 90% on phones); expand = `video/?r=&t=`; x closes for the session; spot / size / tucked / closed in
-  sessionStorage `leakscan.pip`. E2E: `scan_e2e.py OUT --only pip` (phone, desktop, WebKit iPhone 13; `--break-tuck`,
-  `--break-dock`).
+  sessionStorage `leakscan.pip`. A phone's first paint already has Jack's still on the player's spot (`.pip-still`, an
+  inline script + data URI after `<body>` in `index.html` and `scan/index.html`, keep the two the same; `pip.js` replaces
+  it when it mounts; not on a computer, where the dock spot needs the card). E2E: `scan_e2e.py OUT --only pip` (phone,
+  desktop, WebKit iPhone 13; `--break-tuck`, `--break-dock`, `--break-still`).
 - Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
   `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API
@@ -150,6 +156,13 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   links are live only for existing `#ids` and `https://` t.me, wa.me, blackphoenixslo.github.io, abolita.com, jackbase.me,
   the scan server, plus `mailto:me@jackbase.dev`. Chat lives in sessionStorage only. Stub: `/api/chat` with magic words
   `stub-fail` / `stub-429`. E2E: `scan_e2e.py OUT_DIR --only askai` (`--break-allowlist` for the break-it run).
+- Google Ads + consent banner: `js/analytics.js` only (one `defer` script per page, `data-cookie-settings` = reopen link,
+  shipped `hidden`; `showcase/` and `404.html` have neither: a client's demo, and no relative paths). Paste `ADS_ID`, `LABEL_SCAN`, `LABEL_CONTACT` at
+  its top; while `ADS_ID` is empty it does nothing, in a frame too. gtag.js directly, no GTM; Consent Mode v2, denied by default everywhere
+  (US auto-grant: the marked commented line, off). Scan conversion = the `leakscan:result` event, contact = delegated click on
+  Jaka's t.me / wa.me / mailto links, once per page load. gtag.js copies `document.title` into conversion hits whatever `page_title` says
+  (measured), so no page that loads it may put a handle or name in its title. Proof (sub-path, real gtag.js, beacons recorded + aborted):
+  `tools/analytics_e2e.py OUT` (`--break-order`).
 - Preview: `python3 -m http.server 8920 --directory site` → http://127.0.0.1:8920/
 - Gate: `python3 tools/check.py` (silent + exit 0 when green; prints each problem + exit 1). Runs in CI on every push/PR.
   `.github/workflows/ci.yml` also runs `python3 -m pytest -q app/tests`.
@@ -166,6 +179,43 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `.github/workflows/pages.yml` runs the gate and deploys `site/` to GitHub Pages
   (https://blackphoenixslo.github.io/leakscan-site/), the fallback during the DNS transition. `netlify.toml` publishes `site/` if connected to Netlify.
 - Improvement loop: `LOOP.md`.
+
+## E2E result reuse
+
+`tools/scan_e2e.py` doesn't rerun a scenario whose inputs are unchanged since a green run, in any worktree:
+
+```
+cd ~/leakhunt
+uv run python <worktree>/tools/scan_e2e.py OUT                      # every scenario, reusing what it can
+uv run python <worktree>/tools/scan_e2e.py OUT --only pip --only askai
+uv run python <worktree>/tools/scan_e2e.py OUT --changed [REF]      # only what the diff reaches; REF default: merge-base with origin/main
+uv run python <worktree>/tools/scan_e2e.py OUT --no-reuse           # run anyway; a green run still fills
+```
+
+- A hit prints `<scenario>: reused green from <run folder>`, starts no stub and no browser, and takes no machine slot. Misses
+  wait for the machine gate on their own (`~/.slop/gate.py`, re-exec at nice 10); invoking through the gate as before still works.
+  Unselected: `skip <scenario>: diff doesn't reach it`. Selected scenarios still go through reuse.
+- **Before a deploy: a full `--no-reuse` run.** CI runs only `check.py`, `check_video.py` and `app/tests`, so nothing else
+  catches a stale hit.
+- Key (`tools/scan_e2e/reuse.py`) = env (Playwright's `browsers.json`, its version, Python major.minor, platform) + code (entry,
+  `common` / `main` / `reuse` / `reach`, the scenario's modules + their imports, the stub, `tools/fixtures/**`; Python by its ast: no
+  comments, no module docstring, no `BREAKS` in `common.py`) + reach: `{path: sha or null}` of everything the scenario read,
+  measured by an audit hook in the stub and the harness (`tools/scan_e2e/reach.py`), 404s and listed dirs included. No hand-kept
+  map: with every recorded file unchanged a deterministic scenario reads the same things.
+- Never reused or filled: a red run (it also evicts the green it would have hit), a `--break-*` / `--omit-*` run (these never read
+  the cache either), a run during which a reached file changed, an entry whose run folder is gone or now says something else.
+- Cache: `~/.leakscan-site/e2e-reuse/` (`E2E_REUSE_DIR` overrides): `<scenario>/<code_key>/<reach_key>.json`, `map/<scenario>.json` =
+  union of the paths over all complete runs on any branch, red ones too (`--changed` reads it; no map = selected). Safe to delete.
+- `NOT_CACHEABLE` in `reuse.py` is empty, audited: no check moves with the calendar and no request leaves loopback. Timing
+  budgets are load-sensitive, not calendar-sensitive, so they stay cacheable: a green under load stays green.
+- Limits: a new file shadowing an imported module is not seen (the import system's own listdir isn't recorded). A hit needs the same
+  env: `uv run` from `~/leakhunt` and the system `python3` have different Playwrights, so they don't share entries. A file the
+  scenario only sometimes loads (a lazy image) is a dep only of the runs that loaded it.
+- What to expect (measured 2026-11-06): the saving is same-content reruns (another worktree, a retry, a docs or test-only commit), not
+  typical edits. `index.html` loads all landing JS and the player mounts everywhere, so every `site/js/*.js` reaches 6 or 7 of the 7
+  scenarios, and every `app/*.py` the stub imports reaches all 7. Narrow: `site/showcase/` sub-pages (`personalize` only). Skips one:
+  `index.html`, `main.js`, `chat.js`, `inline-scan.js` (`scan`), `scan.js`, `scan.css` (`askai`). A red scenario reruns every time.
+- Proof: `tools/scan_e2e/reuse_proof.py EVIDENCE_DIR [--only s ...] [--break-key]` (temp worktrees + temp cache, the real CLI).
 
 ## One project, one origin (VPS)
 

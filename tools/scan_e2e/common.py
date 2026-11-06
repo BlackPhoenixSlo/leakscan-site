@@ -2,6 +2,7 @@
 break-it registry, new_ctx(), check() and the tile helpers. Importing it has no side effects."""
 import argparse
 import json
+import os
 import pathlib
 import re
 import socket
@@ -9,11 +10,15 @@ import subprocess
 import sys
 import types
 import urllib.request
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
+
+from . import reach
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 FX = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())   # the stub's fixture: expected profile / copy
-SCENARIOS = ("scan", "personalize", "askai", "inline", "tabs", "removals", "pip", "sheet")
+FLOWS = {"scan": ("scan.scan_flow", "huge.huge_flow"), "personalize": ("personalize.personalize_flow",), "askai": ("askai.askai",),   # scenario → its parts (module.function), in order
+         "inline": ("inline.inline_flow", "inline.thumb_paint"), "tabs": ("tabs.tabs_flow",), "removals": ("removals.removals_flow",), "pip": ("pip.pip_flow",), "sheet": ("sheet.sheet_flow",)}
+SCENARIOS = tuple(FLOWS)
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 LOOP = ("127.0.0.1", "localhost")
 PROD_HOSTS = ("scan.srv1395798.hstgr.cloud", "72.62.92.114", "jackbase.me")
@@ -37,6 +42,7 @@ BREAKS = {
     "pull": ("pip.js", "    if (drag.big) { pull(e, my); return; }\n", "    if (drag.big) return;\n"),   # expanded: no drag-down
     "dock": ("pip.js", "card = auto === 'dock' ? document.querySelector('.hero .report-card') : null;", "card = null;"),   # no dock anchor
     "pipload": ("pip.js", "if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });", "go();"),   # the iframe at once: holds the load event
+    "still": ("pip.css", ".pip-still { position: fixed;", ".pip-still { display: none; position: fixed;"),   # no still in the first paint
     "pipfollow": ("pip.js", "    if (home && home.k === k) return home; var sy = scrollY;\n", "    var sy = 0;\n"),   # #79's floating spot: re-placed off the form at every scroll
     "pipvis": ("pip.js", "&& !S.t && innerWidth >= 720; }\n  function inView(d) {   // a dock spot is used only on a wide screen and while all of it is on screen under the header\n"
                "    return innerWidth >= 720 && d.y >= topInset() && d.y + Math.round(d.w * 9 / 16) + BAR <= vh() - 8;\n",
@@ -47,7 +53,7 @@ BREAKS = {
 }
 
 # the run: set once by configure(); scenarios read cfg.out / cfg.base / cfg.api / cfg.broken
-cfg = types.SimpleNamespace(out=None, port=0, base="", api="", omit=False, omit_profile=False, scenarios=SCENARIOS, broken=set())
+cfg = types.SimpleNamespace(out=None, port=0, base="", api="", omit=False, omit_profile=False, scenarios=SCENARIOS, broken=set(), no_reuse=False, changed=None)
 fails = []
 MEASURED = {}
 
@@ -55,7 +61,9 @@ MEASURED = {}
 def configure(argv):
     ap = argparse.ArgumentParser(prog="scan_e2e.py")
     ap.add_argument("out")
-    ap.add_argument("--only", choices=SCENARIOS)
+    ap.add_argument("--only", choices=SCENARIOS, action="append")   # repeatable
+    ap.add_argument("--no-reuse", action="store_true")   # run even on a hit; a green run still fills (reuse.py)
+    ap.add_argument("--changed", nargs="?", const="", metavar="REF")   # only the scenarios the diff reaches; REF default: merge-base with origin/main
     ap.add_argument("--omit-results", action="store_true")
     ap.add_argument("--omit-profile", action="store_true")
     for k in BREAKS:
@@ -69,15 +77,19 @@ def configure(argv):
     cfg.base = f"http://127.0.0.1:{cfg.port}/"
     cfg.api = f"http://localhost:{cfg.port}"   # the stub injects the other loopback name as data-api
     cfg.omit, cfg.omit_profile = a.omit_results, a.omit_profile
-    cfg.scenarios = [a.only] if a.only else list(SCENARIOS)
+    cfg.scenarios = [s for s in SCENARIOS if not a.only or s in a.only]
     cfg.broken = {k for k in BREAKS if getattr(a, "break_" + k)}
+    cfg.no_reuse, cfg.changed = a.no_reuse, a.changed
+    if a.changed is not None and (cfg.broken or cfg.omit or cfg.omit_profile):
+        ap.error("--changed reads the cache: a break run never does")
     return cfg
 
 
-def start_stub():
+def start_stub(reach_log=None):
+    env = {**os.environ, reach.ENV: str(reach_log)} if reach_log else None
     stub = subprocess.Popen([sys.executable, str(ROOT / "tools" / "scan_stub.py"), "--port", str(cfg.port), "--delay", "0.25"]
-                            + (["--omit-results"] if cfg.omit else []) + (["--omit-profile"] if cfg.omit_profile else []),
-                            stderr=open(cfg.out / "stub.err", "w"), stdout=subprocess.PIPE)   # its tracebacks kept with the run
+                            + (["--omit-results"] if cfg.omit else []) + (["--omit-profile"] if cfg.omit_profile else []), env=env,
+                            stderr=open(cfg.out / "stub.err", "a"), stdout=subprocess.PIPE)   # its tracebacks kept with the run (one stub per scenario: appended)
     stub.stdout.readline()
     return stub
 
@@ -151,6 +163,8 @@ def new_ctx(browser, vp_name, vp, net=None, *, route=None, console_ok=None, init
     def _route(r, _req):
         u = r.request.url
         if urlsplit(u).hostname in LOOP or u.startswith(("file:", "blob:")):   # WebKit routes blob: URLs too
+            if u.startswith("file:"):
+                reach.note(unquote(urlsplit(u).path))   # askai opens site/index.html from disk: no stub saw it
             if not (route and route(r)):
                 r.continue_()
         else:

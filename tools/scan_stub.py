@@ -60,7 +60,12 @@ page reads instead of the production API host. The origin is the *other* loopbac
 so the page → API calls are cross-origin and exercise CORS like production. --omit-results drops `results` from the
 result (break-it run); --omit-profile sets `profile` to null everywhere (break-it run for the personalization checks).
 """
-import argparse, hashlib, json, pathlib, random, re, string, struct, sys, time, zlib
+import os, sys
+REACH = None
+if os.environ.get("E2E_REACH_LOG"):   # the e2e harness measures what this process reads (scan_e2e/reach.py), so before any import
+    from scan_e2e import reach as REACH
+    REACH.to_log(os.environ["E2E_REACH_LOG"])
+import argparse, hashlib, json, pathlib, random, re, string, struct, time, zlib
 from http.server import ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
@@ -424,6 +429,8 @@ class Handler(RangeHandler):
         path = pathlib.Path(self.translate_path(u.path))
         if path.is_dir():
             path = path / "index.html"
+        if REACH and not path.exists():
+            REACH.note(path)   # a 404 now: adding that file is a different page
         if path.suffix == ".html" and path.is_file():
             host = (self.headers.get("Host") or "").split(":")[0]
             port = self.server.server_address[1]

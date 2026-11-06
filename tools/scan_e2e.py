@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet]... [--changed [REF]] [--no-reuse]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
-        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-sheet500]
+        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-sheet500]
 
-Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
+Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
+`reused green from <run folder>` and skips the browser; --no-reuse forces a run; --changed runs only what the diff reaches; break runs never touch it.
+
+Starts tools/scan_stub.py on a free port, one per scenario (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs the scenarios below. Expected values come from what the stub serves
 (GET /api/scan-result/<slug>) or the fixture's profile, never from a client rule re-derived here.
 
@@ -143,6 +146,7 @@ drag-down on the expanded player: only `pull:` checks may go red; --break-pipvis
 card whatever the screen: off-screen on a phone): only `vis:` / `follow:` / phone dock-spot checks may go red; --break-pipfollow
 serves it with #79's floating spot (re-computed off the form at the current scroll, every scroll): only `follow:` checks may go red.
 --break-pipload serves it with the iframe started at once (before the load event): only the `vis:` load-event checks may go red.
+--break-still serves pip.css with the first-paint still hidden: only `still:` checks may go red.
 Declared bypass: the tabs and huge flows start with the player put away, as after its X (common.PIP_AWAY): floating it
 stays top-right while scrolling (by design) and covers what sits there, e.g. the demo's full-screen button.
 
