@@ -167,3 +167,11 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
 - Copy: hero sub "…one page free. You sign one page. You pay nothing."; "one page free" and "live, cached, gone" ≤ 2 visible; pricing sub "Prices in EUR. Pay only after the free page."; why h2 "A person, not a bot." inline with portrait; step 4 "I file everywhere"; plan-for and Mega caption shortened.
 - Scale: h2 32 → 44 (390 → 1440), section padding 80 at ≥1100; footer links one row on desktop; pip poster caption top-left, play bottom-right.
 - Scan card already has "Send me the report" (prefilled Telegram/WhatsApp/email): no change.
+
+## Round 10 notes (final build round)
+- Removals: "Drag" tag hidden < 480 px; dark stage = one 1 px plum border; Mega fake buttons → plain "3 items · 4 GB" status line, knob centred in it (--ki 17 px).
+- #free desktop align-items:start; why record 24 px under the letter; pricing note 16 px under "Two plans.", left.
+- Before/after desktop: heading + line full width on top, phone pair centred (auto columns, 56 px gaps).
+- Copy: "one leaked URL free" (hero, FAQ + JSON-LD, meta, scan page h2); "free URL" in pricing/steps; website h2 "A website in your name, included."; footnote drops "and your website"; video caption "Why I check every link: 57 s"; 16,000+ = "links filed in takedown notices so far. A count of notices, not of removals."
+- Hero lead: 820 px desktop (2 lines), 17/26 px on phone (3 lines at 390, button bottom 499).
+- Skipped: "570 of 633" in the poster panel (the panel is inside the pip player/slot box; pip.js markup = pip logic).
