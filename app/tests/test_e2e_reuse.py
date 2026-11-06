@@ -123,3 +123,13 @@ def test_tree_hash_and_map(tmp_path, monkeypatch):
     assert reuse.reaches("scan", {"site/a.js"}) and reuse.reaches("scan", {"site/imgs/c.webp"}) and reuse.reaches("scan", {"tools/x.py"})
     assert reuse.reaches("scan", {"tools/fixtures/new.json"})
     assert not reuse.reaches("scan", {"README.md", "site/b.js"})
+
+
+def test_summary_keeps_the_evidence_a_hit_reads():
+    ran = {"status": "ran", "key": "k", "fails": []}
+    reused, skip = {"status": "reused", "from_run": "/x"}, {"status": "skip"}
+    assert reuse.summary_rows({"a": ran}, {"a": reused}) == {"a": ran}   # reused into its own folder
+    assert reuse.summary_rows({"a": ran}, {"a": skip, "b": reused}) == {"a": ran, "b": reused}   # a later --changed / --only
+    red = {"status": "ran", "key": "k", "fails": ["x"]}
+    assert reuse.summary_rows({"a": ran}, {"a": red}) == {"a": red}   # a new run replaces it
+    assert reuse.summary_rows({"a": reused}, {}) == {}   # only a real run is evidence

@@ -47,11 +47,15 @@ def run(argv=None):
     configure(sys.argv[1:] if argv is None else argv)
     state, t0 = reuse.git_state(), time.time()
     todo, per = reuse.plan()
+    try:
+        old = json.loads((cfg.out / "e2e-summary.json").read_text()).get("per_scenario", {})
+    except (OSError, ValueError):
+        old = {}
 
     def save():
         (cfg.out / "e2e-summary.json").write_text(json.dumps({"fails": fails, "omit_results": cfg.omit, "omit_profile": cfg.omit_profile,
                                                               "scenarios": cfg.scenarios, "breaks": sorted(cfg.broken), "measured": MEASURED,
-                                                              "sha": state[0], "dirty": state[1], "secs": round(time.time() - t0, 1), "per_scenario": per}, indent=1))
+                                                              "sha": state[0], "dirty": state[1], "secs": round(time.time() - t0, 1), "per_scenario": reuse.summary_rows(old, per)}, indent=1))
     if todo:
         reuse.enter_gate()
         from playwright.sync_api import sync_playwright   # lazily: a full hit needs no browser

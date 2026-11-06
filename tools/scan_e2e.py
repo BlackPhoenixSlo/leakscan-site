@@ -6,7 +6,7 @@
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
         [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still]
 
-Result reuse (scan_e2e/reuse.py, README "Result reuse"): a scenario whose code and everything it read last time are unchanged prints
+Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
 `reused green from <run folder>` and skips the browser; --no-reuse forces a run; --changed runs only what the diff reaches; break runs never touch it.
 
 Starts tools/scan_stub.py on a free port, one per scenario (--omit-results / --omit-profile are passed through: break-it runs), then

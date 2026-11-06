@@ -38,9 +38,9 @@ class Proof:
     def __init__(self, base, evid):
         self.a, self.b, self.cache, self.evid, self.times = base / "a", base / "b", base / "cache", evid, {}
 
-    def cli(self, name, wt, *args, gated=True, during=None):
-        """The real CLI in worktree wt into EVID/name → run: .rc .out .secs .ran .red .reused .skip .folder. gated=False: as a fresh shell (no SLOP_GATED)."""
-        out = self.evid / name
+    def cli(self, name, wt, *args, gated=True, during=None, into=None):
+        """The real CLI in worktree wt into EVID/name → run: .rc .out .secs .ran .red .reused .skip .folder. gated=False: as a fresh shell (no SLOP_GATED); into: another run's folder."""
+        out = self.evid / (into or name)
         env = {**os.environ, "E2E_REUSE_DIR": str(self.cache)}
         if not gated:
             env.pop("SLOP_GATED", None), env.pop("SLOP_GATE_PID", None)
@@ -127,6 +127,8 @@ def main():
         r = p.cli("a-same-sha", p.a, *only, gated=False)
         check("a: same SHA twice: every green scenario reused, no stub, < 5 s, no gate", set(r.reused) == set(green) and not r.ran and not (r.folder / "stub.err").exists()
               and r.secs < 5 and "gate" not in r.out.lower() and r.rc == 0, f"{r.secs} s")
+        r2 = [p.cli(f"a2-own-folder-{i}", p.a, *only, gated=False, into="0-cold") for i in (1, 2)]
+        check("a2: reused twice into the run's own folder: still hits", all(set(x.reused) == set(green) and not x.ran for x in r2), [x.secs for x in r2])
         r = p.cli("b-other-worktree", p.b, *only, gated=False)
         check("b: a second worktree, same content: hit", set(r.reused) == set(green) and not r.ran and all(v == str(cold.folder) for v in r.reused.values()), set(r.reused.values()))
 

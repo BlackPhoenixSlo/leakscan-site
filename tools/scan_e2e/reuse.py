@@ -23,7 +23,7 @@ from .common import FLOWS, ROOT, cfg
 
 CACHE = pathlib.Path(os.environ.get("E2E_REUSE_DIR") or "~/.leakscan-site/e2e-reuse").expanduser()
 BASE = ("tools/scan_e2e.py", "tools/scan_stub.py", *(f"tools/scan_e2e/{m}.py" for m in ("__init__", "common", "main", "reuse", "reach")))
-NOT_CACHEABLE = {}   # scenario → reason; audited 2026-11-06: none (README, "Result reuse")
+NOT_CACHEABLE = {}   # scenario → reason; audited 2026-11-06: none (README, "E2E result reuse")
 
 
 def sha(b):
@@ -173,6 +173,12 @@ def enter_gate():
     if not os.environ.get("SLOP_GATED") and gate.exists():
         sys.stdout.flush()
         os.execv(sys.executable, [sys.executable, str(gate), "run", "--", "nice", "-n", "10", sys.executable, os.path.abspath(sys.argv[0]), *sys.argv[1:]])
+
+
+def summary_rows(old, per):
+    """A run folder's rows: this run's + an earlier `ran` row it didn't replace. A later --only, or a reuse of that run, into the
+    same OUT must not wipe the evidence run_ok() reads."""
+    return {**per, **{s: r for s, r in old.items() if r.get("status") == "ran" and per.get(s, {}).get("status") != "ran"}}
 
 
 def git_state():
