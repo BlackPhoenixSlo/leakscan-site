@@ -34,13 +34,13 @@ removal is his "they get removed", so the removed cue = "removed". He ends at 52
 | # (script) | what he says | prefab | live | tap | removed | out |
 |---|---|---|---|---|---|---|
 | start | "Hey, it's me Jack…" (0.58) | named: "for <name>" pill (nothing spoken) | 0 | – | – | pill 2 s |
-| 1-2 | "Hey, it's me Jack, a real face, not a bot. I remove leaks, check, fuck leaks." | none (his whiteboard) | – | – | – | – |
+| 1-2 | "Hey, it's me Jack, a real face, not a bot. I remove leaks, check, fuck leaks." | `intro` fill (`data-cue-in` / `-out`): the landing in a phone types `jakabasej`, "Scan now", the scan card, "Building YOUR video…" | 0.3 | – | – | 9.8 |
 | 3 | "I remove from the **Google** (10.30), you see links, they get **removed** (12.86)." | `google` | 10 | – | 12.86 | 14.81 |
 | 4 | "You see **images** (14.16) on the Google, they get **removed** (16.00)." | `google-images` (tap: end of "images", clamped) | 14.81 | 15.26 | 16.01 | 17.96 |
 | 5 | "You see stuff on the **X** (18.08), they get **removed** (19.52)." | `x` | 17.96 | – | 19.52 | 21.47 |
 | 6 | "You see stuff on the **Reddit** (21.60), they get **removed** (22.88)." | `reddit` | 21.47 | – | 22.88 | 24.88 |
 | 7 | "You see stuff on the **mega** (25.08), they get **removed** (26.06)." | `mega` | 24.88 | – | 26.06 | 28.01 |
-| 8 | "If you see stuff of any of these websites and a lot more, like 10,000 of them, they get removed." (27.1-34.3) | none (he points at the whiteboard's site list) | – | – | – | – |
+| 8 | "If you see stuff of any of these websites and a lot more, like 10,000 of them, they get removed." (27.1-34.3) | `sites` fill: his whiteboard's site names struck "Removed" in turn, the counter rolling to 10,000+ | 28.2 | – | – | 34.6 |
 | 9 | "**You can put your name on the website** (35.01) and you will see all of the links that I can get in eight seconds. I usually spend three or four hours per week on you. And the whole website is gonna change to be personalized directly for you." | `cta-steps` (`data-cue-cta` = the end of line 8 + 0.5): the landing in a phone, one 10 s take (types the name, scans, the report), looping to the end and past it | 34.77 | – | – | stays |
 | end | "Wubba lubba dub dub." (50.9-52.3), then the hold | named: "for <name>" pill (= the named flow), `data-cue-say` (last word + 0.3) | 52.98 | – | – | – |
 

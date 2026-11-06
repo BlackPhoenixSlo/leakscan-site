@@ -19,7 +19,8 @@
 // sites) + rows + thumbs; the after photos = her own SFW photos (GET <API>/api/media/<slug> → /<n>.jpg, unblurred .vo-own),
 // else the defaults. A failed scan / read = text only. Leak URLs are read for their host, never rendered.
 // While the name bar's scan runs: the .vo-wait status pill ("Searching Google, step N of 9…"); the take plays its intro and
-// holds (paused) just before the first card until the result lands (at most WAIT_MAX s), then plays on.
+// holds (paused) on the intro's "Building YOUR video…" beat (no intro: just before the first card) until the result lands
+// (at most WAIT_MAX s), then plays on.
 // Name bar (.vo-nb, under the stage; full screen / theater: the .vo-nb-pill opens it) + the end card's form = rebuild(): in
 // place, no reload: named mode + texts, ?name= (then ?r=<slug> once the scan lands) via history.replaceState, the take
 // restarts from 0, playing (the submit is the gesture). Reset = generic again.
@@ -36,6 +37,13 @@
 // draw(t): 1-3 words at a time (its chunks), the current word yellow + a small pop, on his left half's lower third or its top
 // band while his face is down there (the chunk's band); reduced motion = plain lines (its lines), no pop / highlight; CC toggle
 // (.vo-ccb, on by default, localStorage leakscan.cc = '0' off). Never personalized.
+// Intro (both modes, the .vo-intro's data-cue-in .. -out, 0.3-9.8 s, before the first card): a compact cta-steps take, the
+// SAME engine (steps()) on a runtime clone of the end card's .vo-steps phone, time-warped (no loop): the hero types
+// onlyfans.com/jakabasej (named too; generic: the viewer's typed name, as the end card), "Scan now", the scan card, then
+// the "Building YOUR video…" beat (build()); slides out before the google card. While the name bar's scan runs the take
+// holds on that beat (holdAt()). Gap card (.vo-sites, its data-cue-in .. -out, 28.2-34.6 s, "any of these websites…
+// like 10,000 of them"): site names from his whiteboard (text only, no logos / URLs) struck "Removed" in turn, the
+// counter rolling to 10,000+ (sites()). Neither is a cued prefab (pfs): no cue rules, no sounds, no confetti.
 // Keys: space = play / pause, Esc closes the theater. textContent only; requests: transcript.json + the scan API above (js/scan-engine.js host) only.
 (function () {
   'use strict';
@@ -51,10 +59,15 @@
   // back in over the loop's last 0.2 s)
   var CYCLE = 10, DEMO = 'Jaka Basej', LEAKS = 87, NSTEP = 9, SCENES = [[0, 4.1], [4.1, 6.8], [6.8, 9.8]];
   var HOLD = 5, SETTLED = 9.65;   // named: the loop holds its settled end (toast + contacts) 5 s, then loops (15 s)
+  var INTRO_U = 6.7, BUILD = 6.5, BUILD_BAR = 2.3;   // intro: steps() runs its first 6.7 s (hero + scan card), the beat from 6.5 s in, its bar 2.3 s
+  var SITES_STRIKE = 0.7, SITES_STEP = 0.33, SITES_N = 10000, SITES_ROLL = [0.4, 4.6];   // gap card: strike i at 0.7 + i x 0.33 s; the counter 0.4 .. 5 s
   var WHERE = ['Google', 'Google Images', 'X', 'Reddit', 'Mega'], TABS = [LEAKS, 12, 31];   // the placeholder report's tabs
   var q = new URLSearchParams(location.search);
   var video = root.querySelector('.vo-video'), over = root.querySelector('.vo-over'), stage = root.querySelector('.vo-stage');
   var forEl = root.querySelector('.vo-for'), ctaEl = root.querySelector('.vo-cta'), forc = null, ctac = null, who = null, endT = Infinity;
+  var introEl = root.querySelector('.vo-intro'), sitesEl = root.querySelector('.vo-sites'), introc = null, sitesc = null;
+  if (introEl && ctaEl && ctaEl.querySelector('.vo-steps')) introEl.insertBefore(ctaEl.querySelector('.vo-steps').cloneNode(true), introEl.querySelector('.vo-build'));
+  else introEl = null;   // one phone markup: the end card's, cloned (index.html has it once)
   var real = null;   // named + a scan result: report(raw) (her real rows, counts, thumbs); null = the placeholders
   var num = function (el, k) { var v = el.getAttribute(k); return v === null ? NaN : parseFloat(v); };
   var pfs = Array.prototype.map.call(root.querySelectorAll('.vo-pf[data-prefab][data-cue-live]'), function (el) {
@@ -122,7 +135,7 @@
     pg.style.setProperty('--cz', T.toFixed(4));
   }
   function steps(c, t) {   // cta-steps at t: u = seconds into its loop (from the card's live cue, = the clip's 0 s)
-    var v = Math.max(0, t - c.live) % (c.named ? CYCLE + HOLD : CYCLE), u = c.named && v >= SETTLED ? Math.max(SETTLED, v - HOLD) : v;
+    var v = c.intro ? Math.min(Math.max(0, t - c.live), INTRO_U) : Math.max(0, t - c.live) % (c.named ? CYCLE + HOLD : CYCLE), u = c.named && !c.intro && v >= SETTLED ? Math.max(SETTLED, v - HOLD) : v;
     var box = c.steps, name = c.named ? who : demoName(), rr = c.named ? real : null, bs = box.style,
       h = handle(c.named ? DEMO : name), vh = rr ? rr.handle : handle(name), q1 = function (s) { return box.querySelector(s); };   // h typed / @: jakabasej in named mode too; vh: placeholder titles
     var sc = box.querySelectorAll('.vo-step'), pgs = box.querySelectorAll('.vo-pg'), W = q1('.vo-scr').clientWidth, T0 = W / 390;
@@ -172,6 +185,21 @@
     setText(q1('.vo-end-who'), name);
     bs.setProperty('--fp', (1 + 0.3 * bump((u - 9.3) / 0.3)).toFixed(3));
   }
+  function build(c, t) {   // the intro's "Building YOUR video…" beat: pops in over the phone, its bar fills
+    var s = t - c.live - BUILD, st = c.el.style;
+    st.setProperty('--io', clamp(s / 0.25).toFixed(3));
+    st.setProperty('--is', (0.85 + 0.15 * back(clamp(s / 0.35))).toFixed(4));
+    st.setProperty('--ib', clamp(s / BUILD_BAR).toFixed(3));
+  }
+  var thousands = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+  function sites(c, t) {   // the gap card: each site struck + "Removed" in turn (--k 0..1), the counter rolling to 10,000+
+    var s = t - c.live, r = clamp((s - SITES_ROLL[0]) / (SITES_ROLL[1] - SITES_ROLL[0])), n = Math.round(SITES_N * (1 - Math.pow(1 - r, 3)));
+    setText(c.n, thousands(n) + (r >= 1 ? '+' : ''));
+    Array.prototype.forEach.call(c.items, function (el, i) {
+      el.style.setProperty('--k', clamp((s - SITES_STRIKE - i * SITES_STEP) / 0.2).toFixed(3));
+      el.style.setProperty('--ti', clamp((s - 0.1 - i * 0.04) / 0.15).toFixed(3));
+    });
+  }
   var cueAt = function (k) { return num(stage, k); };
   var sayEnd = function () { return Math.min(cueAt('data-cue-say'), endT); };   // or when the video ends, if that comes first
   var ctaAt = function () { var c = cueAt('data-cue-cta'); return Math.min(isFinite(c) ? c : cueAt('data-cue-say'), endT); };
@@ -182,6 +210,8 @@
       forc.live = early ? 0 : s1; forc.out = early ? PILL : ctac ? ctaAt() : Infinity; cards = cards.concat([forc]);
     }
     if (ctac) { ctac.live = ctaAt(); cards = cards.concat([ctac]); }
+    if (introc) cards = cards.concat([introc]);
+    if (sitesc) cards = cards.concat([sitesc]);
     cards.forEach(function (c) {
       var a = clamp((t - c.live) / IN), b = clamp((t - (c.out - OUT)) / OUT), o = Math.min(clamp(a * 1.5), 1 - b);
       var k = (t - c.removed) / SHAKE, sh = k >= 0 && k < 1 ? 1 - k : 0, r = t - c.removed - SHAKE;
@@ -213,6 +243,8 @@
       st.setProperty('--kgs', kg[0].toFixed(3));
       st.setProperty('--kgo', kg[1].toFixed(3));
       if (c.steps) steps(c, t);
+      if (c.intro) build(c, t);
+      if (c.items) sites(c, t);
     });
     captions(t);
     document.documentElement.setAttribute('data-vo-t', t.toFixed(2));
@@ -461,10 +493,18 @@
   function mode(m) { document.documentElement.setAttribute('data-vo-mode', m); }
   var nb = root.querySelector('.vo-nb');
   var cta = function (nm) { return ctaEl ? { el: ctaEl, id: 'cta-steps', out: Infinity, removed: Infinity, tap: Infinity, steps: ctaEl.querySelector('.vo-steps'), named: nm } : null; };
+  var timed = function (el, o) {   // the intro / gap card: own data-cue-in .. -out, no snap
+    if (!el) return null;
+    o.el = el; o.id = el.getAttribute('data-prefab'); o.live = num(el, 'data-cue-in'); o.out = num(el, 'data-cue-out'); o.removed = Infinity; o.tap = Infinity;
+    return isFinite(o.live) && isFinite(o.out) ? o : null;
+  };
+  var intro = function (nm) { return timed(introEl, { steps: introEl && introEl.querySelector('.vo-steps'), named: nm, intro: true }); };
+  sitesc = timed(sitesEl, { items: sitesEl && sitesEl.querySelectorAll('.vo-sites-l li'), n: sitesEl && sitesEl.querySelector('.vo-sites-n') });
   function personal(n) {
     who = n;
     mode('named');
     ctac = cta(true);   // cta-steps with her name, ending on the contact row
+    introc = intro(true);
     if (forEl) forc = { el: forEl, removed: Infinity, tap: Infinity };
     if (nb) { nb.removeAttribute('data-edit'); setText(nb.querySelector('.vo-nb-n'), n); }
   }
@@ -474,6 +514,7 @@
     forc = null;
     if (forEl) forEl.setAttribute('data-off', '');
     ctac = cta(false);
+    introc = intro(false);
     if (nb) nb.removeAttribute('data-edit');
   }
   // the page's own texts / photos, so a rebuild or Reset starts from them (not from a scan's)
@@ -658,7 +699,7 @@
   // the name bar's scan = the landing's free scan (js/scan-engine.js runScan, as js/inline-scan.js): onlyfans.com/<handle(n)>;
   // .vo-wait shows its progress, the take holds just before the first card until it lands (<= WAIT_MAX s); fail = text only
   var waitEl = root.querySelector('.vo-wait'), scanning = 0, held = false, waitT = null;
-  var holdAt = function () { return pfs.length ? pfs[0].live - HOLD_LEAD : Infinity; };
+  var holdAt = function () { return introc ? introc.out - OUT - 0.1 : pfs.length ? pfs[0].live - HOLD_LEAD : Infinity; };   // on the intro's "Building YOUR video…" beat
   function waiting(on, text) {
     clearTimeout(waitT);
     if (on) { html.setAttribute('data-vo-wait', ''); setText(waitEl, text); return; }

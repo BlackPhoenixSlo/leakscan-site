@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Gate for site/video/ (Jack's video page). Silent + exit 0 when green; prints each problem + exit 1.
 
-- exactly 6 prefabs: the 5 cued ones google, google-images, x, reddit, mega (in script order) + cta-steps (the generic
+- the fills (not cued prefabs: own data-cue-in < data-cue-out): intro (.vo-intro, first) ends before the first cued prefab
+  comes in, has no phone markup of its own (js clones the end card's .vo-steps: one markup, one steps() engine) + the
+  "Building YOUR video…" beat; sites (.vo-sites, after mega) starts after mega is out and ends before data-cue-cta, >= 8
+  site names, text only (no URL / domain, no <img>), his whiteboard's Telegram / Fapello / Nudogram / Erome / Leakheaven /
+  Pornhub / YouPorn / JustTheGays among them
+- exactly 8 prefabs: intro, the 5 cued ones google, google-images, x, reddit, mega (in script order) + cta-steps (the generic
   end card .vo-cta, no cues of its own: data-cue-cta; a phone replica of the landing: 3 .vo-step scenes (hero with the
   site's h1 + the onlyfans.com/ field + "Scan now", scan card, report card with tabs + *.example placeholder rows only) +
   the "Rewatch this video with YOUR content" toast with the name flip + the real form inside it; named mode: the same take
@@ -54,6 +59,7 @@ MIN_HOLD = 1.95                     # seconds from removed to out: wipe + stamp 
 EPS = 1e-6                          # cues are 2-decimal seconds: 17.96 - 16.01 is 1.9499.. in floats
 CUES = ("data-cue-live", "data-cue-removed", "data-cue-out")
 VIDEO_BUDGET = 60_000_000   # the real recording replaces the ~0.2 MB placeholder; keep the repo sane
+WHITEBOARD = ("Telegram", "Fapello", "Nudogram", "Erome", "Leakheaven", "Pornhub", "YouPorn", "JustTheGays")   # his whiteboard's site list
 PILL = 2.0   # js/video-overlays.js: the named "for <name>" pill shows 0 .. 2 s, then from data-cue-say
 
 
@@ -110,7 +116,8 @@ def modes(html, p, last_out):
     """the two modes: named (say start / end, shift, pill) and generic (the end card + form at data-cue-cta / -say)"""
     bad = []
     say = stage_cue(p, "data-cue-say")
-    first_live = float(p.prefabs[0]["data-cue-live"]) if p.prefabs and "data-cue-live" in p.prefabs[0] and p.prefabs[0].get("data-cue-live", "").replace(".", "", 1).isdigit() else None
+    c0 = next((a for a in p.prefabs if "data-cue-live" in a), {})   # the first cued prefab (the intro shares 0-2 s with the pill: above it, cue_shots.py)
+    first_live = float(c0["data-cue-live"]) if c0.get("data-cue-live", "").replace(".", "", 1).isdigit() else None
     if say is None:
         bad.append(f"video/index.html: .vo-stage needs a numeric data-cue-say (got {p.stage.get('data-cue-say')!r})")
     elif last_out is not None and say < last_out:
@@ -150,8 +157,8 @@ def steps_and_player(html, p):
     """cta-steps (6th prefab; named too, with her name), the render list, no stacking, full screen + theater"""
     bad = []
     ids = [a.get("data-prefab") for a in p.prefabs]
-    if ids != ORDER + [CTA_STEPS]:
-        bad.append(f"video/index.html: prefabs {ids}, want {ORDER + [CTA_STEPS]} (6)")
+    if ids != ["intro"] + ORDER + ["sites", CTA_STEPS]:
+        bad.append(f"video/index.html: prefabs {ids}, want {['intro'] + ORDER + ['sites', CTA_STEPS]} (8)")
     m = re.search(r'<div class="vo-pf vo-cta" data-prefab="cta-steps"[^>]*>(.*?)</form>', html, re.S)
     if not m:
         bad.append("video/index.html: cta-steps must be the generic end card (.vo-cta data-prefab=cta-steps) with the form inside")
@@ -183,6 +190,35 @@ def steps_and_player(html, p):
         bad.append("css/video.css: theater (fixed + rotate(90deg) stage, body scroll lock) / .vo-stage:fullscreen CSS missing")
     if 'class="vo-fs"' not in html or "requestFullscreen" not in js:
         bad.append("video/index.html / js: the .vo-fs full screen button (stage.requestFullscreen, else theater) missing")
+    return bad
+
+
+def fills(html, p, first_live, last_out, cta):
+    """the intro (before the first card) and the sites gap card (after mega, before the end card): own data-cue-in / -out"""
+    bad, got = [], {}
+    for pid in ("intro", "sites"):
+        a = next((x for x in p.prefabs if x.get("data-prefab") == pid), None)
+        try:
+            got[pid] = (float(a["data-cue-in"]), float(a["data-cue-out"]))
+        except (TypeError, KeyError, ValueError):
+            bad.append(f"video/index.html: {pid} needs numeric data-cue-in / data-cue-out")
+            continue
+        if not 0 <= got[pid][0] < got[pid][1] or got[pid][1] - got[pid][0] < 2 * IN:
+            bad.append(f"video/index.html: {pid} cues {got[pid]} not in < out (>= {2 * IN} s)")
+        if any(k in a for k in ("data-cue-live", "data-cue-removed")):
+            bad.append(f"video/index.html: {pid} is a fill (data-cue-in / -out), not a cued prefab (no data-cue-live / -removed)")
+    if "intro" in got and first_live is not None and got["intro"][1] > first_live:
+        bad.append(f"video/index.html: intro out {got['intro'][1]} after the first card's live {first_live}")
+    if "sites" in got and (last_out is not None and got["sites"][0] < last_out or cta is not None and got["sites"][1] > cta):
+        bad.append(f"video/index.html: sites {got['sites']} must sit between the last prefab's out {last_out} and the end card {cta}")
+    m = re.search(r'<div class="vo-pf vo-intro"[^>]*>(.*?)\n      </div>', html, re.S)
+    js = (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8")
+    if not m or "vo-steps" in m[1] or "Building <em>YOUR</em> video…" not in m[1] or "querySelector('.vo-steps').cloneNode(true)" not in js:
+        bad.append("video/index.html: the intro = the end card's .vo-steps cloned by js (no phone markup of its own) + \"Building YOUR video…\"")
+    m = re.search(r'<div class="vo-pf vo-sites"[^>]*>(.*?)\n      </div>', html, re.S)
+    names = re.findall(r"<li><b>([^<]+)</b><span>Removed</span></li>", m[1]) if m else []
+    if len(names) < 8 or not all(w in names for w in WHITEBOARD) or any(re.search(r"\.|https?:|/", n) for n in names) or (m and "<img" in m[1]):
+        bad.append(f"video/index.html: sites needs >= 8 text-only names (no URL / domain / img) incl. {WHITEBOARD}, got {names}")
     return bad
 
 
@@ -245,6 +281,8 @@ def main():
             bad.append(f"video/index.html: prefab {pid} comes in at {live} before {prev_id} is out at {prev_out}")
         prev_out, prev_id = out, pid
     bad += modes(html, p, prev_out)
+    first = next((float(a["data-cue-live"]) for a in cued if re.fullmatch(r"[\d.]+", a.get("data-cue-live") or "")), None)
+    bad += fills(html, p, first, prev_out, stage_cue(p, "data-cue-cta") if "data-cue-cta" in p.stage else None)
     if "noindex" not in p.robots:
         bad.append("video/index.html: no <meta name=robots content=noindex>")
     if "video/" in (SITE / "sitemap.xml").read_text(encoding="utf-8"):
