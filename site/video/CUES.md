@@ -26,6 +26,8 @@ Where: his left half (x 2-48 %), the lower third (bottom 16 %, above the touch p
 for the chunks where his face is down there (the tool's face track: 5-8 s, 27-33 s). Reduced motion: plain lines
 (<= 30 letters, two rows max), no pop / highlight. CC button (under the full screen button, on by default, `localStorage`
 `leakscan.cc` = `0` off). The "Rotate for full size" hint sits on the right half (the lower third is the captions').
+Small stages (the landing's mini player, `js/pip.js`): the 14 px floor shrinks with the stage so a chunk stays in the left
+half; under 260 px wide (`data-vo-tiny`) no captions.
 
 ## What a prefab does (`js/video-overlays.js`)
 

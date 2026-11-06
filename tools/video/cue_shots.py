@@ -147,6 +147,10 @@ FX = """pid => { const e = document.querySelector(`.vo-pf[data-prefab="${pid}"]`
           [+g.opacity, g.clipPath], e.offsetWidth, e.offsetHeight]; }"""
 LEAK_HOSTS = re.compile(r"\.example\b|leak|pirate|forum-dump|free-galleries", re.I)
 IMGS = "() => [...document.querySelectorAll('.rm-img')].map(i => [i.getAttribute('src'), i.naturalWidth, getComputedStyle(i).filter])"
+PIP_EMBED = re.search(r"var EMBED = '([^']+)'", (ROOT / "site/js/pip.js").read_text(encoding="utf-8"))[1]   # the mini player's embed style
+PIP_CAPT = """() => { const s = document.querySelector('.vo-stage').getBoundingClientRect(), c = document.querySelector('.vo-capt');
+  const r = getComputedStyle(c).display === 'none' ? [] : [...c.querySelectorAll('span')].map(e => e.getBoundingClientRect()).filter(x => x.width);
+  return r.length ? (Math.max(...r.map(x => x.right)) - s.left) / s.width : null; }"""
 SAY_STUB = """window.__said = []; window.__utt = 0; if ('speechSynthesis' in window) speechSynthesis.speak = u => {
   __said.push([u && u.text, document.querySelector('video')?.currentTime]); };   /* the page must never call it (no AI overvoice) */
   if (window.SpeechSynthesisUtterance) { const U = window.SpeechSynthesisUtterance; window.SpeechSynthesisUtterance = class extends U {
@@ -1260,6 +1264,27 @@ def captions(b, base, out, name_q):
     pg.screenshot(path=str(out / "capt-1920-reduced.png"))
     check(f"captions reduced motion: each of the {len(lines)} lines plain (no highlight / pop), its words, left half -> capt-1920-reduced.png", not bad, bad[:3])
     ctx.close()
+    # the landing's mini player (js/pip.js: an iframe of ../video/, min(320px, 45vw), its embed style): the stage = the frame
+    for w in (320, 260, 175):
+        ctx = ctx_new(b, viewport={"width": w, "height": round(w * 9 / 16)})
+        pg = ctx.new_page()
+        goto(pg, base, "", 0)
+        pg.add_style_tag(content=PIP_EMBED)
+        pg.wait_for_timeout(300)
+        edge, shown = 0.0, 0
+        for x in WORDS:
+            pg.evaluate(DRAW, (x[1] + x[2]) / 2)
+            g = pg.evaluate(PIP_CAPT)
+            if g is not None:
+                shown, edge = shown + 1, max(edge, g)
+        pg.evaluate(DRAW, 13.1)
+        pg.screenshot(path=str(out / f"capt-pip-{w}.png"))
+        if w >= 260:
+            check(f"captions mini player {w}px: every word shown, each chunk inside the left half (right edge {edge:.3f} <= .5) -> capt-pip-{w}.png",
+                  shown == len(WORDS) and edge <= 0.5, (shown, edge))
+        else:
+            check(f"captions mini player {w}px (< 260): no captions (unreadable) -> capt-pip-{w}.png", shown == 0, shown)
+        ctx.close()
 
 
 def sources(p, b, base, out):
