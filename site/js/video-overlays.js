@@ -30,7 +30,8 @@
 // Player UI (.vo-ui): full screen = the stage (Fullscreen API, + landscape lock on Android), else (iPhone) a CSS "theater":
 // the stage fixed + rotated 90deg (Esc / X / back closes); touch devices: no native controls, own play bar, a tap on the
 // stage plays / pauses, "Rotate for full size" hint after the first tap.
-// Each prefab: live cue = pops in from the right (0.45 s, scale .6 → 1.08 → 1) + kinetic word card; removed cue = the
+// Each prefab: live cue = pops in from the right (0.45 s, scale .6 → 1.08 → 1; google / google-images: SLID_IN, the slide
+// only, no pop: the #44 entrance) + kinetic word card; removed cue = the
 // snap: 0.25 s shake + flash + "GONE." word card, then the compare wipe (0.95 s; .vo-roll counters roll down meanwhile),
 // "Removed" stamp slams in (scale 2 → 1, 0.2 s) + a 12-piece confetti burst; slides out (0.4 s, gone at the out cue).
 // google-images taps "Images" at data-cue-tap (default live + 0.6) and shows the image grid 0.3 s later.
@@ -56,6 +57,8 @@
   if (!root) return;
   var IN = 0.45, OUT = 0.4, SHAKE = 0.25, WIPE = 0.95, STAMP = 0.2, BURST = 0.6, KW = 0.6, SLIDE = 160, PILL = 2;   // seconds; px
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
+  var SLID_IN = ['google', 'google-images'];   // these slide in from the right (no scale pop)
+  var OVERT = [' OnlyFans leaks', ' nude photos', ' leaked videos', ' nudes: full leak'];   // Google rows' titles: <name> + these (= index.html's)
   var GENERIC = 'SophieStar', WAIT_MAX = 45, HOLD_LEAD = 0.4;   // the scan hold: at most 45 s, 0.4 s before the first card
   // cta-steps: one 10 s take (s into its loop) in a phone replica of the landing: the hero, the camera zooms onto the
   // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form; named: herHandle()), "Scan now"; the scan card
@@ -77,7 +80,7 @@
   var num = function (el, k) { var v = el.getAttribute(k); return v === null ? NaN : parseFloat(v); };
   var pfs = Array.prototype.map.call(root.querySelectorAll('.vo-pf[data-prefab][data-cue-live]'), function (el) {
     var c = { el: el, id: el.getAttribute('data-prefab'), live: num(el, 'data-cue-live'), removed: num(el, 'data-cue-removed'), out: num(el, 'data-cue-out'),
-      tap: num(el, 'data-cue-tap'), rolls: el.querySelectorAll('.vo-roll') };
+      tap: num(el, 'data-cue-tap'), rolls: el.querySelectorAll('.vo-roll'), slide: SLID_IN.indexOf(el.getAttribute('data-prefab')) >= 0 };
     if (!isFinite(c.tap)) c.tap = c.live + TAP;
     var burst = document.createElement('span');   // 12 confetti pieces, deterministic spread over the stamp
     burst.className = 'vo-burst';
@@ -235,7 +238,7 @@
       st.setProperty('--x', ((1 - back(a)) * SLIDE + b * b * 70 + (sh && sh * 13 * Math.sin(k * 29))).toFixed(2));   // + the snap shake
       st.setProperty('--y', (b * b * 110 + (sh && sh * 8 * Math.cos(k * 37))).toFixed(2));
       st.setProperty('--rot', (sh && sh * 1.6 * Math.sin(k * 23)).toFixed(3));
-      st.setProperty('--sc', pop(a).toFixed(4));
+      st.setProperty('--sc', (c.slide ? 1 : pop(a)).toFixed(4));
       st.setProperty('--f', (sh * sh * 0.85).toFixed(3));
       st.setProperty('--tap', clamp((t - c.tap) / 0.4).toFixed(3));
       st.setProperty('--g', ease(clamp((t - c.tap - SWAP) / 0.3)).toFixed(3));
@@ -408,16 +411,16 @@
     box.replaceChildren.apply(box, kids);
   }
   function unput() { swapped.forEach(function (b) { b.replaceChildren.apply(b, b.__kids); }); }
-  // her real rows + thumbs into the Google / Google Images live layers and the cta-steps report (rows' thumbs, the strip)
+  // her real hosts + thumbs into the Google / Google Images live layers (titles: <her name> + OVERT) and the cta-steps report (rows' thumbs, the strip)
   function realize() {
     var r = real, im = r.imgs || [], at = function (i) { return im.length ? im[i % im.length] : null; }, q1 = function (s) { return root.querySelector(s); };
-    var row = function (x, th) {
-      return el('div', 'm-result bad', [letter(x.dom, 'fav fav-l'), el('div', '', [el('span', 'm-site', [x.dom]), el('span', 'm-title', [x.title]),
+    var row = function (x, th, i) {
+      return el('div', 'm-result bad', [letter(x.dom, 'fav fav-l'), el('div', '', [el('span', 'm-site', [x.dom]), el('span', 'm-title', [who + OVERT[i]]),
         th.length ? el('span', 'm-thumbs', th.map(function (s, i) { return el('span', 'thumb t' + (i + 1), [pic(s, 'rm-img')]); })) : el('span', 'm-lines', [el('i'), el('i')])])]);
     };
     if (r.rows.length) {
-      put(q1('.vo-pf[data-prefab="google"] .rm-live'), r.rows.slice(0, 4).map(function (x, i) { return row(x, i || !im.length ? [] : [at(0), at(1), at(2)]); }));
-      put(q1('.vo-gi .vo-serp'), r.rows.slice(0, 2).map(function (x) { return row(x, []); }));
+      put(q1('.vo-pf[data-prefab="google"] .rm-live'), r.rows.slice(0, 4).map(function (x, i) { return row(x, i || !im.length ? [] : [at(0), at(1), at(2)], i); }));
+      put(q1('.vo-gi .vo-serp'), r.rows.slice(0, 2).map(function (x, i) { return row(x, [], i); }));
       Array.prototype.forEach.call(root.querySelectorAll('.vo-gi .rm-live .gi-cap'), function (b, i) {   // no images yet / none kept: her hosts under the defaults
         var d = r.rows[(i + 2) % r.rows.length].dom;
         put(b, [letter(d, 'gi-fav'), el('span', 'gi-cap-t', [d])]);

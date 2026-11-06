@@ -129,7 +129,19 @@ Plus:
   fills fade, no pop (transform none). Checks are prefixed "intro:" / "sites:" / "fills:".
 --break-intro serves index.html with the intro's data-cue-in / -out removed (the intro never shows): only the "intro:"
   checks go red. --only fill = this part.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--break-intro] [--skip-prod] [--only prod|captions|voice|fill]
+- google anim (gsearch(), checks "google …"; 1920x1080 + phone 390x844, generic + ?r=PROD_SLUG = her saved result, declared:
+  served locally, thumb / media 404, no production): real seeks + shots at 10.1 / 10.2 / 11 / 12 / 12.36 / 12.9 / 13.6 / 14.9 /
+  15.4 s (ganim-<vp>-<mode>-t<t>.png). "google query": both search boxes read "<name> nude leaks" (SophieStar / her display
+  name); "google titles": the 4 Google rows (+ the 2 Google Images ones) = "<name> OnlyFans leaks / nude photos / leaked videos /
+  nudes: full leak", hosts only (?r=: her top hosts, no URL); "google slide": google + google-images enter by translateX
+  only (pure draw: offset > 100 px at live + 0.02 → 0 by live + 0.45, scale 1 throughout; x still pops; reduced motion: no
+  offset); "google timing": google's removed cue = G_REMOVED_OLD − 0.5 (12.36), the wipe's first frame (--p < 100, pure draw
+  0.01 s steps) = removed + 0.25, inside his "they" .. "removed" and done by "removed"'s end + 0.4. With --base REF: "google
+  post": from google-images live + 0.45 to the end (pure draw, 0.05 s steps, 1920, both modes) every card's / descendant's
+  style, every card's text but google / google-images, the captions == REF's files (index.html, video-overlays.js,
+  video.css served from git, declared). --only google = this part.
+--break-gtime serves index.html with google's old removed cue (G_REMOVED_OLD): only the "google timing" checks go red.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--base REF] [--break-gtime] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--break-intro] [--skip-prod] [--only prod|captions|voice|fill|hers|google]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, json, pathlib, re, socket, subprocess, sys, time, urllib.parse, urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -1770,6 +1782,117 @@ def sources(p, b, base, out):
     wk.close()
 
 
+G_REMOVED_OLD = 12.86   # google's removed cue before Jack's ask (PR #81: on "removed"); now 0.5 s sooner, while he says it
+OVERT = ("OnlyFans leaks", "nude photos", "leaked videos", "nudes: full leak")   # = js OVERT
+GSLIDE = """([pid, t]) => { if (t != null) window.VideoOverlays.draw(t); const e = document.querySelector(`.vo-pf[data-prefab="${pid}"]`), m = new DOMMatrix(getComputedStyle(e).transform);
+  return [e.hasAttribute('data-off'), +(m.e + e.offsetWidth / 2).toFixed(2), +m.a.toFixed(4), +m.d.toFixed(4), +getComputedStyle(e).opacity]; }"""
+GTEXT = """() => { const q = (c, s) => [...document.querySelectorAll(`.vo-pf[data-prefab="${c}"] ${s}`)].map(e => e.textContent.replace(/\\s+/g, ' ').trim());
+  return {q: [q('google', '.vo-q')[0], q('google-images', '.vo-q')[0]], g: q('google', '.rm-live .m-title'), gh: q('google', '.rm-live .m-site'),
+          gi: q('google-images', '.vo-serp .m-title'), gih: q('google-images', '.vo-serp .m-site'), mode: document.documentElement.dataset.voMode,
+          cue: +document.querySelector('.vo-pf[data-prefab="google"]').getAttribute('data-cue-removed')}; }"""
+GWIPE = """([a, b]) => { const e = document.querySelector('.vo-pf[data-prefab="google"]'); document.querySelector('video').pause();
+  for (let i = Math.round(a * 100); i <= Math.round(b * 100); i++) { window.VideoOverlays.draw(i / 100); if (+e.style.getPropertyValue('--p') < 100) return i / 100; } return null; }"""
+GSTATE = """([a, b, dt]) => { const out = [], txt = e => e.textContent.replace(/\\s+/g, ' '); document.querySelector('video').pause();
+  for (let i = Math.round(a / dt); i * dt <= b + 1e-9; i++) { const t = +(i * dt).toFixed(2); window.VideoOverlays.draw(t);
+    out.push([t, [...document.querySelectorAll('.vo-pf')].filter(e => !e.hasAttribute('data-off')).map(e => [e.dataset.prefab || e.className, e.getAttribute('style'),
+      [...e.querySelectorAll('[style]')].map(x => x.getAttribute('style')).join('|'), /^google/.test(e.dataset.prefab || '') ? '' : txt(e)]),
+      txt(document.querySelector('.vo-capt'))]); }
+  return out; }"""
+
+
+def gsearch(b, base, out, cues, raw_file, base_ref):
+    """the Google + Google Images cards up to the images' removal: query, overt titles, slide-in entrance, the earlier clear"""
+    raw = json.loads(pathlib.Path(raw_file).read_text(encoding="utf-8")) if raw_file else None
+    X = hers_expect(raw) if raw else None
+    body = json.dumps(raw).encode() if raw else b"{}"
+
+    def api(r):   # declared bypass, wire boundary: scan-result = her saved result (no production), thumb / media 404
+        u = urllib.parse.urlsplit(r.request.url)
+        if u.path.startswith("/api/scan-result/") and raw and u.path.endswith("/" + PROD_SLUG):
+            return r.fulfill(body=body, content_type="application/json")
+        return r.fulfill(status=404, body="{}")
+
+    def context(opts, rm=False, ref=None):
+        ctx = ctx_new(b, **opts, **({"reduced_motion": "reduce"} if rm else {}))
+        if ref:   # declared: REF's page / js / css (git show), the rest from the worktree
+            for path, pat, ct in (("site/video/index.html", lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), "text/html"),
+                                  ("site/js/video-overlays.js", "**/js/video-overlays.js", "application/javascript"), ("site/css/video.css", "**/css/video.css", "text/css")):
+                src = subprocess.run(["git", "-C", str(ROOT), "show", f"{ref}:{path}"], capture_output=True, text=True, check=True).stdout
+                ctx.route(pat, (lambda src, ct: lambda r: r.fulfill(body=src, content_type=ct))(src, ct))
+        for pat in ("**/api/scan-result/**", "**/api/thumb?**", "**/api/media/**"):
+            ctx.route(pat, api)
+        return ctx, guard(ctx, (base,))
+
+    def named(pg):
+        try:
+            pg.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=10000)
+        except Exception:
+            pass
+        pg.wait_for_timeout(300)
+
+    g, gi = cues["google"], cues["google-images"]
+    modes = [("generic", "", GENERIC)] + ([("hers", f"r={PROD_SLUG}", X["name"])] if X else [])
+    for vp, opts in (("1920", dict(viewport={"width": 1920, "height": 1080})), ("phone", VIEWPORTS["phone"])):
+        for mode, query, nm in modes:
+            ctx, ext = context(opts)
+            pg = ctx.new_page()
+            errs = []
+            console(pg, errs)
+            for t in (10.1, 10.2, 11, 12, g[1], 12.9, 13.6, 14.9, 15.4):
+                goto(pg, base, query, t)
+                if mode == "hers":
+                    named(pg)
+                f = out / f"ganim-{vp}-{mode}-t{t:05.2f}.png"
+                (pg if vp == "1920" else pg.locator(".vo-stage")).screenshot(path=str(f))
+                print(f"google anim {vp} {mode} t={t:g}: {[s[0] for s in pg.evaluate(VISIBLE)]} | said: {said(t)!r} -> {f.name}")
+            tx = pg.evaluate(GTEXT)
+            lbl = f"{vp} {mode}"
+            check(f"google query ({lbl}): both search boxes read {nm + ' nude leaks'!r}", tx["q"] == [nm + " nude leaks"] * 2, tx["q"])
+            hosts = prod_expect(raw)["rows"][:4] if mode == "hers" else None
+            want = [f"{nm} {o}" for o in OVERT]
+            check(f"google titles ({lbl}): Google rows {want}, Google Images rows the first 2" + (f", her hosts {hosts}" if hosts else ""),
+                  tx["g"] == want and tx["gi"] == want[:2] and (not hosts or tx["gh"] == hosts and tx["gih"] == hosts[:2])
+                  and not any(re.search(r"https?:|www\.|/", x) for x in tx["g"] + tx["gh"] + tx["gi"] + tx["gih"]), tx)
+            if vp == "1920":
+                pg.evaluate(DRAW, g[0])
+                sl = {pid: [pg.evaluate(GSLIDE, [pid, cues[pid][0] + d]) for d in (0.02, 0.1, 0.2, 0.3, 0.45, 0.6)] for pid in ("google", "google-images", "x")}
+                ok = all(s[0][1] > 100 and s[-2][1] == 0 and s[-1][1] == 0 and all(x[2] == 1 and x[3] == 1 and not x[0] for x in s) for s in (sl["google"], sl["google-images"]))
+                check(f"google slide ({lbl}): google + google-images slide in from the right (translateX > 100 px at live + 0.02 → 0 by + 0.45), no scale pop",
+                      ok, {k: [(x[1], x[2]) for x in v] for k, v in sl.items()})
+                check(f"google slide ({lbl}): x still pops (scale != 1 at live + 0.1: scope = google / google-images only)", sl["x"][1][2] != 1, [x[2] for x in sl["x"]])
+                w0 = pg.evaluate(GWIPE, [g[0], g[1] + 1.5])
+                ri = next(i for i, w in enumerate(WORDS) if w[1] > g[0] and w[0].lower().startswith("removed"))
+                they, rmw = WORDS[ri - 2], WORDS[ri]
+                check(f"google timing ({lbl}): removed cue {tx['cue']} = {G_REMOVED_OLD} − 0.5", abs(tx["cue"] - (G_REMOVED_OLD - 0.5)) < 0.005, tx["cue"])
+                check(f"google timing ({lbl}): the wipe starts at removed + 0.25 (measured {w0}), while he says {they[0]!r} ({they[1]}) .. {rmw[0]!r} ({rmw[1]}), done by {rmw[2] + 0.4:.2f}",
+                      w0 is not None and abs(w0 - (tx["cue"] + 0.25)) <= 0.011 and they[1] <= w0 <= rmw[1] and w0 + 0.95 <= rmw[2] + 0.4, (w0, they, rmw))
+            check(f"google ({lbl}): mode {('named' if mode == 'hers' else 'generic')!r}, no console errors, no requests outside the local server",
+                  tx["mode"] == ("named" if mode == "hers" else "generic") and not errs and not ext, (tx["mode"], errs[:2], ext[:2]))
+            ctx.close()
+    ctx, _ = context(dict(viewport={"width": 1440, "height": 900}), rm=True)
+    pg = ctx.new_page()
+    goto(pg, base, "", round(g[0] + 0.1, 2))
+    s = pg.evaluate(GSLIDE, ["google", None])
+    check("google slide (reduced motion): no offset, no scale at live + 0.1", s[1] == 0 and s[2] == 1, s)
+    ctx.close()
+    if base_ref:
+        a0, end = round(gi[0] + 0.45, 2), round(END - 0.05, 2)
+        for mode, query, _ in modes:
+            st = []
+            for ref in (base_ref, None):
+                ctx, _ = context(dict(viewport={"width": 1920, "height": 1080}), ref=ref)
+                pg = ctx.new_page()
+                goto(pg, base, query, a0)
+                if mode == "hers":
+                    named(pg)
+                st.append(pg.evaluate(GSTATE, [a0, end, 0.05]))
+                ctx.close()
+            diff = [(x[0], x, y) for x, y in zip(*st) if x != y]
+            (out / f"google-post-{mode}.json").write_text(json.dumps({"base": base_ref, "n": len(st[1]), "diff": diff[:5]}, indent=1))
+            check(f"google post ({mode}): {a0} .. {end} s every card's state + texts (but google / google-images) + captions == {base_ref} ({len(st[1])} frames)",
+                  len(st[0]) == len(st[1]) > 100 and not diff, diff[:1])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
@@ -1791,7 +1914,9 @@ def main():
     ap.add_argument("--break-herend", action="store_true")
     ap.add_argument("--break-burst", action="store_true")
     ap.add_argument("--hers-raw", help="her saved scan result (JSON) instead of the read-only production GET")
-    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers"], help="run only this part (iteration)")
+    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers", "google"], help="run only this part (iteration)")
+    ap.add_argument("--base", help="google post: compare the cards after google-images' entrance with this git ref's page / js / css")
+    ap.add_argument("--break-gtime", action="store_true")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -1862,6 +1987,10 @@ def main():
         broken, k = re.subn(r"for \(var k = 0; k < LANES; k\+\+\) lane\(\);", "for (var k = 0; k < list.length; k++) lane();", js)
         assert k == 1, "break: photoOnly's lanes not found"
         BREAK["burst"] = ("**/js/video-overlays.js", broken, "application/javascript")
+    if a.break_gtime:   # wire boundary: index.html with google's old removed cue (the page's cues and these checks' both)
+        html, k = re.subn(r'(data-prefab="google" data-cue-live="[\d.]+" data-cue-removed=")[\d.]+"', r'\g<1>%s"' % G_REMOVED_OLD, BREAK["steps"][1] if "steps" in BREAK else html)
+        assert k == 1, "break: google's data-cue-removed not found"
+        BREAK["gtime"] = (lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), html, "text/html")
     fl = {k: tuple(map(float, re.search(r'data-prefab="%s" data-cue-in="([\d.]+)" data-cue-out="([\d.]+)"' % k, html).groups())) for k in ("intro", "sites")}
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
@@ -1892,6 +2021,11 @@ def main():
             return 1 if fails else 0
         if a.only == "hers":
             hers(b, base, out, a.hers_raw, a.skip_prod)
+            for f in fails:
+                print("FAIL", f)
+            return 1 if fails else 0
+        if a.only == "google":
+            gsearch(b, base, out, cues, a.hers_raw, a.base)
             for f in fails:
                 print("FAIL", f)
             return 1 if fails else 0
@@ -2041,6 +2175,7 @@ def main():
         captions(b, base, out, name_q)
         sources(p, b, base, out)
         fill(b, base, out, name_q, a.name, fl["intro"], fl["sites"], cta)
+        gsearch(b, base, out, cues, a.hers_raw, a.base)
         if a.hers_raw or not a.skip_prod:
             hers(b, base, out, a.hers_raw, a.skip_prod)
         if not a.skip_prod:

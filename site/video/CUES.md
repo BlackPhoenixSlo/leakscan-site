@@ -15,7 +15,7 @@ iPhones before iOS 17.4), set from his words by `tools/video/cues_from_take.py`.
 
 **Removed cue = "they get removed".** The take has no finger snaps (no snap gesture on screen, no transient above the
 speech; the tool still looks for them: a snap >= 9 dB over the speech near the removal word wins), so each removed cue
-sits on his word "removed".
+sits on his word "removed"; google's 0.5 s before it (12.36: the wipe runs while he says "they get removed").
 
 ## Fills: the intro + the sites gap card (own `data-cue-in` / `data-cue-out`, not cued prefabs)
 
@@ -44,7 +44,8 @@ half; under 260 px wide (`data-vo-tiny`) no captions.
 
 ## What a prefab does (`js/video-overlays.js`)
 
-- live: pops in from the right (0.45 s, scale 0.6 → 1.08 → 1) + a yellow / black word card top-right for 0.6 s
+- live: pops in from the right (0.45 s, scale 0.6 → 1.08 → 1; `google` / `google-images`: slides in from the right, no
+  pop) + a yellow / black word card top-right for 0.6 s
   (`GOOGLE`, `IMAGES`, `X`, `REDDIT`, `MEGA 52 GB`).
 - removed (the snap): 0.25 s shake + white flash + `GONE.` / `CLEAN.` / `NOTHING.` word card, then the compare wipe
   (0.95 s); meanwhile the counters roll: Google "About 4,120 results" → "About 3 results", Mega "52 GB · 318 videos" →

@@ -8,7 +8,7 @@ Mapping by meaning (Jack's real take does not read SCRIPT.md word for word; site
 - platform word: google = the first "Google"; google-images = the next "Images"; x = "X" / "ex" / "Twitter"; reddit; mega.
 - removal word = the first of removed / gone / deleted / nothing / hours / now after the platform word (before the next one).
 - live = platform word - 0.3 (never before the last card is out); removed = the snap if one stands clearly above the
-  speech within removal word -0.4 .. +0.3 s, else the removal word's start (removed - live >= 0.45, google-images >= 1.2);
+  speech within removal word -0.4 .. +0.3 s, else the removal word's start (google: - 0.5) (removed - live >= 0.45, google-images >= 1.2);
   google-images data-cue-tap = "Tap", else the end of "Images" (clamped to live + 0.45 .. removed - 0.7); out = the next
   platform word - 0.2, mega: its removal word's end + 0.5, always >= removed + 1.95.
 - data-cue-cta (the end card) = the end of the line before the "put / type your name" line + 0.5 (>= the mega out);
@@ -31,6 +31,7 @@ REMOVAL = {"removed", "gone", "deleted", "nothing", "hours", "now"}
 CTA_WORDS = {"name", "type"}
 LEAD, OUT_LEAD, MIN_HOLD, IN, TAP_MIN, TAP_MAX = 0.3, 0.2, 1.95, 0.45, 0.45, 0.7
 MIN_LIVE = {"google-images": 1.2}
+EARLY = {"google": 0.5}   # removed = the removal word - this (no snap): the google wipe runs while he says "they get removed"
 SR = 16000
 HINT = ("no speech-to-text installed. Throwaway venv, then re-run with its python:\n"
         "  uv venv ~/.cache/leakscan-whisper && uv pip install --python ~/.cache/leakscan-whisper faster-whisper 'opencv-python-headless<5'")
@@ -216,7 +217,7 @@ def cues(words, snap_list=()):
             raise ValueError(f"{pid}: no removal word after {words[j]['word']!r} at {words[j]['start']:.2f}")
         rs = words[r]["start"]
         sn = [s for s in snap_list if rs - 0.4 <= s[0] <= rs + 0.3]
-        c = {"pf": j, "r": r, "live": words[j]["start"] - LEAD, "removed": min(sn, key=lambda s: abs(s[0] - rs))[0] if sn else rs,
+        c = {"pf": j, "r": r, "live": words[j]["start"] - LEAD, "removed": min(sn, key=lambda s: abs(s[0] - rs))[0] if sn else rs - EARLY.get(pid, 0),
              "by": "snap" if sn else "word"}
         if pid == "google-images":
             tap = next((k for k in range(j, r) if n[k] == "tap"), None)
