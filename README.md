@@ -9,15 +9,20 @@ gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_depl
 Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py --variants` rebuilds them from
 the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB copy and any full-size photo > 200 KB).
 
-- Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card) · `#free` one Google
-  phone (All / Images / Videos tabs; after a scan her real results, `js/inline-scan.js`) · `#why` · `#how` (7 steps) ·
-  `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop close, page
-  behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs, `js/main.js`) ·
-  `#pricing` · `#faq` · `#removals` · `#contact`. `tools/check.py` fails if a section id is missing here.
+- Landing page (`site/index.html`), top to bottom: `#top` hero (scan form left; right: live report card, "Meet Jaka"
+  poster `.meet` under it where the player docks, privacy / billing lines; then the track record band) · `#free` one
+  Google phone (All / Images / Videos tabs; after a scan her real results, `js/inline-scan.js`) · `#why` · `#how` (7 steps
+  in 3 stages) · `#pricing` (per plan: price, then Covers / Runs / Re-uploads / Website) · `#website` (included in both
+  plans, so after the prices) · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop
+  close, page behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs,
+  `js/main.js`) · `#faq` · `#removals` · `#contact`. `tools/check.py` fails if a section id is missing here.
+  Phones: the Before / After phones and the `#removals` panels are swipe rows (one per view, the next peeks 14px) with
+  arrows + dots (`js/swipe.js`, static `.swipe-nav` markup: no shift).
+  Light theme: header + hero on blush paper; dark: velvet.
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
-  removed layer's chrome is cloned from the live one, `data-rm-copy`). Velvet section, centred head; 2x2 on desktop, a swipe row (scroll-snap) on phones. On screen each edge glides by itself (1-2 s CSS
+  removed layer's chrome is cloned from the live one, `data-rm-copy`). Velvet section, centred head (left on phones); 2x2 on desktop, a swipe row (scroll-snap, arrows + dots) on phones. On screen each edge glides by itself (1-2 s CSS
   transition) to a random 15-85 % and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
   reduced motion; a card's first input (Remove press, stage tap, handle key) stops its sweep for good. Remove / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
@@ -57,7 +62,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).
 - Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
-  `?pip=0` off. Landing: docked (absolute, scrolls with the page) right-aligned just below the hero card (example report,
+  `?pip=0` off. Landing: docked (absolute, scrolls with the page) right-aligned just below the hero card, exactly over the
+  `.meet-pic` poster (desktop at rest: a "Meet Jaka" caption bar, the controls on hover / focus) (example report,
   or the scan report card after a scan) at 55% of its width, never over a link / button / pill (else over the card's
   bottom-right, never > 25% of it); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
   user dragged, resized, tucked or closed it. Created after load + first scroll / pointer / key or idle; same-origin

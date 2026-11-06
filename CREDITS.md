@@ -13,3 +13,4 @@
   avatar). Google's name and colours appear only inside illustrative mockups.
 - **Video**: `site/video/` ships Jack's own recording (one 56.9 s take, his face and voice, no stock footage):
   `jack.webm` (VP9) + `jack.mp4` (H.264), and `transcript.json` (his words, transcribed locally; see `site/video/CUES.md`).
+  `site/img/meet/` holds one still from that take (1.5 s): the hero's "Meet Jaka" poster under the docked player.

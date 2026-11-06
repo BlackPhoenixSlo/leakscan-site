@@ -1,6 +1,6 @@
 <!-- kb_landing.md: knowledge base for the "Ask AI before you DM me" popup on the Abolita
      landing site (https://blackphoenixslo.github.io/leakscan-site/). It MIRRORS that page
-     (index.html + privacy.html, as live on 2026-11-04) and MUST be updated whenever the page
+     (index.html + privacy.html, as live on 2026-11-06) and MUST be updated whenever the page
      changes (prices, plans, FAQ, contacts, section ids). No facts beyond the page. Served via
      POST /api/chat {"kb":"landing"}; deploy it next to public_app.py on the VPS. -->
 
@@ -8,7 +8,7 @@
 
 ## Who
 - Abolita is leak removal for OnlyFans, Fansly and Patreon creators: "Leaked content, taken down by a real person. Me."
-- Run by Jaka (Jaka Basej). "Software finds the links. I open every single one, make sure it's really yours, and file every takedown myself. Nothing goes out in your name until a human has checked it."
+- Run by Jaka (Jaka Basej). "The free scan lists every leak link Google shows for your handle. I'm Jaka: I check each one by hand and file every takedown myself."
 - "Software finds. I decide." Scanners collect candidates; Jaka opens each result, compares it with your content, and only then files. Lookalikes and your own pages are left alone.
 - "Your accounts come first." One wrong notice can get your accounts flagged; automated takedown tools file at volume and can hit your own profile, a page you licensed, or someone who just looks like you. Nothing is filed until Jaka has confirmed the image or link is really yours.
 - "You talk to me, start to finish." No ticket queue, no support team. The person answering your message is the person filing your notices.
@@ -16,7 +16,7 @@
 - Business: Ognjeni Feniks, Jaka Basej, s.p., Ljubljana, Slovenia (address on the privacy page: Kvedrova cesta 5A, 1000 Ljubljana, Slovenia).
 
 ## Free, before you pay anything
-- "See what the scan finds. See me remove one. Then decide." One compact band: two short lines, buttons "Scan free" (jumps to the scan box) and "Send me the report", and a mini Google Images view (placeholder tiles; after a scan, your handle's image results, blurred until you tap Reveal).
+- "See what the scan finds. See me remove one. Then decide." One compact band: one short paragraph, buttons "Scan free" (jumps to the scan box) and "Send me the report", and a mini Google Images view (placeholder tiles; after a scan, your handle's image results, blurred until you tap Reveal).
 - Free scan: runs right here on the site. Type your handle into the box at the top of the page (platforms: OnlyFans, Instagram, Fansly, TikTok, Patreon). It checks hundreds of known leak sites for copies of your content and gives you a report link with every link it found. "Free. No account. You see every link it finds." No account, no card. The scan also has its own page (scan/).
 - One page removed free, so you see it work: send Jaka the report link. He picks one leak page from it, usually the simplest site, and gets it taken down. You see the work and the result before any money changes hands. "No account. No credit card. Just the report link in a message."
 - Then €250/month or €500 one-time, only if you continue.
@@ -24,7 +24,7 @@
 ## Pricing (prices in EUR)
 Your free scan and one free removal come first either way. Both plans include your official website and blog posts. Every removal starts with a signed one-page Copyright Enforcement Authorization; it's free, and it lets Jaka file in your name.
 
-Monthly removal: €250 / month (ongoing protection)
+Monthly removal: €250 / month (ongoing protection). Covers: everything the weekly re-scans find. Runs: month to month, cancel anytime. Re-uploads: filed every week, as Jaka finds them. Website: official site + blog posts, included.
 - Weekly re-scans
 - DMCA notices to sites and hosts
 - Google de-indexing and "remove outdated content" filings
@@ -33,7 +33,7 @@ Monthly removal: €250 / month (ongoing protection)
 - Your official website + blog posts
 - Cancel anytime
 
-One-time clean: €500 one-time (one big clean-up)
+One-time clean: €500 one-time (one big clean-up). Covers: everything found, all filed in week 1. Runs: 40 days, no auto-renewal. Re-uploads: filed for 40 days; on day 40 you decide. Website: official site + blog posts, included.
 - Everything found is filed in week 1
 - Re-uploads filed for 40 days
 - Site, host, registrar and Google filings
@@ -103,11 +103,11 @@ A: No. There's no account, no app and no card. The free scan runs right here fro
 - #free: "Free, before you pay anything": the free scan + one page removed free.
 - #why: "Why a person, and not a bot": accounts-first approach, track record.
 - #how: "How it works": the seven steps.
-- #website: "Your official website + blog": website and blog posts so Google ranks real pages.
-- #showcase: preview of the demo creator website.
 - #pricing: "What's included": both plans and prices.
 - #plan-monthly: Monthly removal plan (€250 / month).
 - #plan-once: One-time clean plan (€500 one-time).
+- #website: "Your official website + blog": website and blog posts so Google ranks real pages.
+- #showcase: preview of the demo creator website.
 - #faq: FAQ, straight answers.
 - #contact: "Ran the scan? Send me the report link." Telegram, WhatsApp, email.
 - showcase/: the full live demo site (separate page).

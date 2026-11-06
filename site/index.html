@@ -6,8 +6,8 @@
 <title>Abolita · Leaked content removed by a real person, not a bot</title>
 <meta name="description" content="Leaked content removed by a real person, not a bot. Free leak scan and one page removed free, then €250/month or €500 one-time. No account, no card.">
 <link rel="canonical" href="https://blackphoenixslo.github.io/leakscan-site/">
-<meta name="theme-color" content="#2a1531" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#251229" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f3f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#2c1634" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Abolita">
@@ -38,6 +38,7 @@
 <script src="js/personalize.js" defer></script>
 <script src="js/chat.js" defer></script>
 <script src="js/removals.js" defer></script>
+<script src="js/swipe.js" defer></script>
 <script src="js/pip.js" data-pip-auto="dock" defer></script>
 <script type="application/ld+json">
 {
@@ -223,8 +224,8 @@
       <ul>
         <li><a href="#scan">Free scan</a></li>
         <li><a href="#how">How it works</a></li>
-        <li><a href="#website">Your website</a></li>
         <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#website">Your website</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ul>
       <a class="btn btn-primary btn-sm" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan.%20My%20creator%20name%20%2F%20handles%3A%20">
@@ -241,21 +242,18 @@
     <div class="hero-copy">
       <p class="eyebrow">Leak removal for OnlyFans, Fansly and Patreon creators</p>
       <h1 id="hero-title">Leaked content, taken down by a real person. <span class="accent">Me.</span></h1>
-      <p class="lead">Hi, I'm Jaka. Software finds the links; I check each one is really yours and file every takedown myself. Nothing goes out in your name until a human has checked it.</p>
+      <p class="lead">The free scan lists every leak link Google shows for your handle. I'm Jaka: I check each one by hand and file every takedown myself.</p>
       <form id="scan" class="scan-form" method="get" action="scan/">
         <label class="scan-field scan-prefix"><span class="scan-pre" aria-hidden="true">onlyfans.com/</span><input class="scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="username" aria-label="OnlyFans username"></label>
         <label class="scan-field scan-prefix"><span class="scan-pre" aria-hidden="true">@</span><input class="scan-social" name="ig" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Instagram or X (optional)" aria-label="Instagram or X username (optional)"></label>
         <button class="btn btn-primary btn-lg" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg><span class="btn-t">Scan now</span></button>
       </form>
       <p class="scanned" data-p="scanned" hidden></p>
-      <p class="scan-note">Free, no account. The report opens right here.</p>
-      <ul class="assurances">
-        <li><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span>Your handle only goes to my own scan server; the report link is unlisted. <a href="privacy.html">Privacy</a></span></li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-gift"/></svg><span>One page removed free. Then €250/month or €500 once, only if you continue.</span></li>
-      </ul>
+      <p class="scan-note">Free, no account, no card. Report opens here.</p>
       <p class="scan-alt">Or message me: <a href="#contact">Telegram, WhatsApp, email</a></p>
     </div>
 
+    <div class="hero-side">
     <figure class="report-card" role="img" aria-label="Example of a weekly report: each leak link is listed as dead, cached or live, and every row is checked by Jaka.">
       <div class="report-head" aria-hidden="true">
         <div>
@@ -275,11 +273,21 @@
         <p><strong>Every row checked by Jaka</strong><span><b>Live</b> still up: I file a notice. <b>Cached</b> gone from the site, still in Google: I file de-indexing. <b>Dead</b> gone.</span></p>
       </div>
     </figure>
+    <div class="meet">
+      <p class="meet-cap"><strong>Meet Jaka</strong><span>One minute on how I work. Sound is off until you turn it on.</span><a href="video/">Watch it full screen</a></p>
+      <div class="meet-pic" aria-hidden="true"><img src="img/meet/jaka.webp" alt="" width="480" height="270" loading="lazy" decoding="async"></div>
+    </div>
+    <ul class="assurances">
+      <li><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span>Your handle only goes to my own scan server; the report link is unlisted. <a href="privacy.html">Privacy</a></span></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-gift"/></svg><span>One page removed free. Then €250/month or €500 once, only if you continue.</span></li>
+    </ul>
+    </div>
   </div>
   <div class="container">
     <div class="proof">
-      <p class="proof-stat"><strong>16,000+</strong><span>takedown links filed for creators</span></p>
-      <p class="proof-stat"><strong>570<small> of 633</small></strong><span>links I filed on fapello.com no longer resolve</span></p>
+      <p class="proof-k">My track record <span>Real filings, not an example</span></p>
+      <p class="proof-stat"><strong>16,000+</strong><span>takedown links I've filed for creators</span></p>
+      <p class="proof-stat"><strong>570<small> of 633</small></strong><span>fapello.com links I filed that no longer resolve</span></p>
     </div>
   </div>
 </section>
@@ -290,10 +298,7 @@
       <div class="free-copy">
         <p class="eyebrow">Free, before you pay anything</p>
         <h2 id="free-title">See what the scan finds. See me remove one. Then decide.</h2>
-        <ul class="free-lines">
-          <li><span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg></span><span><strong>A free leak scan, right here.</strong> Hundreds of leak sites checked, every link in one report.</span></li>
-          <li><span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-gift"/></svg></span><span><strong>One page removed, free.</strong> Send me the report link, I take one page down before you pay.</span></li>
-        </ul>
+        <p class="free-line">Hundreds of leak sites checked, every link in one report. Send me the report link and I take one page down before you pay.</p>
         <p class="free-actions">
           <a class="btn btn-primary" href="#scan"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Scan free</a>
           <a class="btn btn-ghost" href="#contact" data-free-send><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Send me the report</a>
@@ -320,8 +325,7 @@
     <div class="why-intro reveal">
       <p class="eyebrow">Why a person, and not a bot</p>
       <h2 id="why-title">One wrong notice can get <em>your</em> accounts flagged.</h2>
-      <p>Automated takedown tools file at volume. That sounds great until a notice hits your own profile, a page you licensed, or someone who just looks like you. Then it's your accounts that get flagged or banned, not the leak site.</p>
-      <p>So I work the other way round: nothing is filed until I've confirmed the image or link is really yours.</p>
+      <p>Automated tools file at volume, so a notice can hit your own profile, a page you licensed, or someone who just looks like you. Then it's your accounts that get flagged, not the leak site. So nothing is filed until I've confirmed it's really yours.</p>
       <div class="person">
         <img src="assets/avatar-jaka.svg" alt="Jaka, who runs Abolita" width="64" height="64" loading="lazy">
         <p><strong>Jaka</strong><span>Runs Abolita. Reads every message, checks every link, files every notice.</span></p>
@@ -384,12 +388,63 @@
   </div>
 </section>
 
-<section class="section section-alt" id="website" aria-labelledby="website-title">
+<section class="section section-alt" id="pricing" aria-labelledby="pricing-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">What's included</p>
+      <h2 id="pricing-title">Two plans. Both free until you've seen it work.</h2>
+    </div>
+    <ol class="trial reveal" aria-label="How every plan starts">
+      <li><span class="trial-n" aria-hidden="true">1</span><p><strong>Free scan</strong>Every leak link Google shows for your handle.</p></li>
+      <li><span class="trial-n" aria-hidden="true">2</span><p><strong>One page removed, free</strong>You see it work before you pay anything.</p></li>
+      <li><span class="trial-n" aria-hidden="true">3</span><p><strong>Then pick a plan, or don't</strong>No account and no card until you decide.</p></li>
+    </ol>
+    <div class="plans">
+      <article class="card plan plan-feature reveal" aria-labelledby="plan-monthly">
+        <p class="plan-kind">Ongoing protection</p>
+        <h3 id="plan-monthly">Monthly removal</h3>
+        <p class="price"><span class="amount">€250</span><span class="per">/ month</span></p>
+        <dl class="spec">
+          <div><dt>Covers</dt><dd>Everything the weekly re-scans find</dd></div>
+          <div><dt>Runs</dt><dd>Month to month, cancel anytime</dd></div>
+          <div><dt>Re-uploads</dt><dd>Filed every week, as I find them</dd></div>
+          <div><dt>Website</dt><dd>Your official site + blog posts, included</dd></div>
+        </dl>
+        <ul class="ticks">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>DMCA notices to sites and hosts</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Google de-indexing and "remove outdated content" filings</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Removal tracking on every link</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Weekly report: live / cached / dead</span></li>
+        </ul>
+        <a class="btn btn-primary btn-block" href="#scan"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Start with a free scan</a>
+      </article>
+      <article class="card plan reveal" aria-labelledby="plan-once">
+        <p class="plan-kind">One big clean-up</p>
+        <h3 id="plan-once">One-time clean</h3>
+        <p class="price"><span class="amount">€500</span><span class="per">one-time</span></p>
+        <dl class="spec">
+          <div><dt>Covers</dt><dd>Everything found, all filed in week 1</dd></div>
+          <div><dt>Runs</dt><dd>40 days, no auto-renewal</dd></div>
+          <div><dt>Re-uploads</dt><dd>Filed for 40 days; on day 40 you decide</dd></div>
+          <div><dt>Website</dt><dd>Your official site + blog posts, included</dd></div>
+        </dl>
+        <ul class="ticks">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Site, host, registrar and Google filings</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>After day 40 nothing happens unless you say so</span></li>
+        </ul>
+        <a class="btn btn-outline btn-block" href="#scan"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg>Start with a free scan</a>
+      </article>
+    </div>
+    <p class="fineprint reveal"><svg class="icon" aria-hidden="true"><use href="#i-file-pen-line"/></svg><span>Every removal starts with a signed one-page Copyright Enforcement Authorization. It's free, and it lets me file in your name. Prices in EUR.</span></p>
+  </div>
+</section>
+
+<section class="section" id="website" aria-labelledby="website-title">
   <div class="container">
     <div class="section-head reveal">
       <p class="eyebrow">Your official website + blog</p>
       <h2 id="website-title">Removing leaks is half the job. Owning your Google results is the other half.</h2>
-      <p>Even after a page dies, Google can keep showing it for a while, and new copies pop up. So both plans include an official website for you, plus blog posts I publish after removals. Google gets real pages about the real you to rank, so a search for your name has something better to show than a leak site.</p>
+      <p>Google can keep showing a dead page for a while, and new copies pop up. So both plans include an official website for you, plus blog posts I publish after removals: real pages about the real you, for Google to rank above the leaks.</p>
     </div>
     <ul class="ticks ticks-3 reveal">
       <li><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg><span><strong>An official website</strong> with your name, your links and your style.</span></li>
@@ -399,9 +454,10 @@
   </div>
 </section>
 
-<section class="section" id="showcase" aria-labelledby="showcase-title">
+<section class="section section-alt" id="showcase" aria-labelledby="showcase-title">
   <div class="container">
     <div class="section-head reveal">
+      <p class="eyebrow">Included: your website</p>
       <h2 id="showcase-title">This is the kind of site you get.</h2>
       <p data-p="demo-intro">A live demo built for a fictional creator. Scroll around inside it. Yours is built around your name, your links and your look.</p>
     </div>
@@ -449,55 +505,7 @@
         </div>
       </figure>
     </div>
-  </div>
-</section>
-
-<section class="section section-alt" id="pricing" aria-labelledby="pricing-title">
-  <div class="container">
-    <div class="section-head reveal">
-      <p class="eyebrow">What's included</p>
-      <h2 id="pricing-title">Two plans. Both free until you've seen it work.</h2>
-      <p>Your free scan and one free removal come first either way. Both plans include your official website and blog posts.</p>
-    </div>
-    <ol class="trial reveal" aria-label="How every plan starts">
-      <li><span class="trial-n" aria-hidden="true">1</span><p><strong>Free scan</strong>Every leak link Google shows for your handle.</p></li>
-      <li><span class="trial-n" aria-hidden="true">2</span><p><strong>One page removed, free</strong>You see it work before you pay anything.</p></li>
-      <li><span class="trial-n" aria-hidden="true">3</span><p><strong>Then pick a plan, or don't</strong>No account and no card until you decide.</p></li>
-    </ol>
-    <div class="plans">
-      <article class="card plan plan-feature reveal" aria-labelledby="plan-monthly">
-        <p class="plan-kind">Ongoing protection</p>
-        <h3 id="plan-monthly">Monthly removal</h3>
-        <p class="plan-for">For creators who keep posting. I re-scan every week and file new copies as they appear, until you cancel.</p>
-        <p class="price"><span class="amount">€250</span><span class="per">/ month</span></p>
-        <ul class="ticks">
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Weekly re-scans</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>DMCA notices to sites and hosts</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Google de-indexing and "remove outdated content" filings</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Removal tracking on every link</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Weekly report: live / cached / dead</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span><strong>Your official website + blog posts</strong></span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Cancel anytime</span></li>
-        </ul>
-        <a class="btn btn-primary btn-block" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20monthly%20plan%20%28%E2%82%AC250%2Fmonth%29.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Start with a free scan</a>
-      </article>
-      <article class="card plan reveal" aria-labelledby="plan-once">
-        <p class="plan-kind">One big clean-up</p>
-        <h3 id="plan-once">One-time clean</h3>
-        <p class="plan-for">For one big clean-up. Everything found is filed in week 1, re-uploads for 40 days, then you decide.</p>
-        <p class="price"><span class="amount">€500</span><span class="per">one-time</span></p>
-        <ul class="ticks">
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Everything found is filed in week 1</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Re-uploads filed for 40 days</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Site, host, registrar and Google filings</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span><strong>Your official website + blog posts</strong></span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>On day 40 you decide whether to continue</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>No auto-renewal</span></li>
-        </ul>
-        <a class="btn btn-outline btn-block" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20one-time%20clean%20%28%E2%82%AC500%29.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Start with a free scan</a>
-      </article>
-    </div>
-    <p class="fineprint reveal"><svg class="icon" aria-hidden="true"><use href="#i-file-pen-line"/></svg><span>Every removal starts with a signed one-page Copyright Enforcement Authorization. It's free, and it lets me file in your name. Prices in EUR.</span></p>
+    <div class="swipe-nav" data-swipe="ba"><button type="button" class="swipe-prev" aria-label="Previous" disabled><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button><span class="swipe-dots"><button type="button" class="swipe-dot" aria-label="Before" aria-current="true"></button><button type="button" class="swipe-dot" aria-label="After"></button></span><button type="button" class="swipe-next" aria-label="Next"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button></div>
   </div>
 </section>
 
@@ -653,6 +661,7 @@
         <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Remove</button></p>
       </article>
     </div>
+    <div class="swipe-nav" data-swipe="rm"><button type="button" class="swipe-prev" aria-label="Previous" disabled><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button><span class="swipe-dots"><button type="button" class="swipe-dot" aria-label="Mega" aria-current="true"></button><button type="button" class="swipe-dot" aria-label="X"></button><button type="button" class="swipe-dot" aria-label="Reddit"></button><button type="button" class="swipe-dot" aria-label="Leak sites"></button></span><button type="button" class="swipe-next" aria-label="Next"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button></div>
   </div>
 </section>
 
