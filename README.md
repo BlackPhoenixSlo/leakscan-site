@@ -180,6 +180,39 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   (https://blackphoenixslo.github.io/leakscan-site/), the fallback during the DNS transition. `netlify.toml` publishes `site/` if connected to Netlify.
 - Improvement loop: `LOOP.md`.
 
+## E2E result reuse
+
+`tools/scan_e2e.py` doesn't rerun a scenario whose inputs are unchanged since a green run, in any worktree:
+
+```
+cd ~/leakhunt
+uv run python <worktree>/tools/scan_e2e.py OUT                      # every scenario, reusing what it can
+uv run python <worktree>/tools/scan_e2e.py OUT --only pip --only askai
+uv run python <worktree>/tools/scan_e2e.py OUT --changed [REF]      # only what the diff reaches; REF default: merge-base with origin/main
+uv run python <worktree>/tools/scan_e2e.py OUT --no-reuse           # run anyway; a green run still fills
+```
+
+- A hit prints `<scenario>: reused green from <run folder>`, starts no stub and no browser, and takes no machine slot. Misses
+  wait for the machine gate on their own (`~/.slop/gate.py`, re-exec at nice 10); invoking through the gate as before still works.
+  Unselected: `skip <scenario>: diff doesn't reach it`. Selected scenarios still go through reuse.
+- **Before a deploy: a full `--no-reuse` run.** CI runs only `check.py`, `check_video.py` and `app/tests`, so nothing else
+  catches a stale hit.
+- Key (`tools/scan_e2e/reuse.py`) = env (Playwright's `browsers.json`, its version, Python major.minor, platform) + code (entry,
+  `common` / `main` / `reuse` / `reach`, the scenario's modules + their imports, the stub, `tools/fixtures/**`; Python by its ast: no
+  comments, no module docstring, no `BREAKS` in `common.py`) + reach: `{path: sha or null}` of everything the scenario read,
+  measured by an audit hook in the stub and the harness (`tools/scan_e2e/reach.py`), 404s and listed dirs included. No hand-kept
+  map: with every recorded file unchanged a deterministic scenario reads the same things.
+- Never reused or filled: a red run (it also evicts the green it would have hit), a `--break-*` / `--omit-*` run (these never read
+  the cache either), a run during which a reached file changed, an entry whose run folder is gone or now says something else.
+- Cache: `~/.leakscan-site/e2e-reuse/` (`E2E_REUSE_DIR` overrides): `<scenario>/<code_key>/<reach_key>.json`, `map/<scenario>.json` =
+  union of the paths over all complete runs on any branch, red ones too (`--changed` reads it; no map = selected). Safe to delete.
+- `NOT_CACHEABLE` in `reuse.py` is empty, audited: no check moves with the calendar and no request leaves loopback. Timing
+  budgets are load-sensitive, not calendar-sensitive, so they stay cacheable: a green under load stays green.
+- Limits: a new file shadowing an imported module is not seen (the import system's own listdir isn't recorded). A hit needs the same
+  env: `uv run` from `~/leakhunt` and the system `python3` have different Playwrights, so they don't share entries. A file the
+  scenario only sometimes loads (a lazy image) is a dep only of the runs that loaded it.
+- Proof: `tools/scan_e2e/reuse_proof.py EVIDENCE_DIR [--only s ...] [--break-key]` (temp worktrees + temp cache, the real CLI).
+
 ## One project, one origin (VPS)
 
 One container serves everything from the same origin (test host https://abolita.srv1395798.hstgr.cloud, later

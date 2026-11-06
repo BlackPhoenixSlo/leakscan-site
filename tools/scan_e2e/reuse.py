@@ -75,7 +75,7 @@ def tree_hash(r, memo):
     if r not in memo:
         p, h = ROOT / r, None
         if r.endswith("/"):
-            h = sha("\n".join(sorted(os.listdir(p))).encode()) if p.is_dir() else None
+            h = sha("\n".join(sorted(x for x in os.listdir(p) if x != ".DS_Store")).encode()) if p.is_dir() else None
         elif p.is_dir():
             h = "dir"
         elif p.is_file():

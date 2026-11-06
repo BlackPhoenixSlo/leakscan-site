@@ -18,7 +18,7 @@ def rel(path):
     """Repo-relative path (a .pyc → its .py), None if outside the repo / not a path."""
     try:
         p = os.path.abspath(os.fsdecode(path))
-    except TypeError:
+    except (TypeError, ValueError):   # an fd; a hook must never raise into the open() it watches
         return None
     if not p.startswith(ROOT + os.sep):
         return None
