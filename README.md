@@ -200,7 +200,9 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   links and `leakscan.last` writer, used by `js/scan.js` and `js/inline-scan.js`. Its `isPhoto(img)` keeps image tiles
   to people photos (strip, Images tab, #free phone, scan page strip / Images grid): a thumb drawn at 48x48
   with little soft texture or almost no skin (a site logo, banner, icon, placeholder) is dropped like a failed one;
-  a video still (scan page Videos tab, #free Videos rows) likewise falls back to its grey box, the row stays;
+  a video still (scan page Videos tab, #free Videos rows) likewise falls back to its grey box, the row stays; a
+  landing Links / Sites row icon shows its thumb only once it passed (same probe), else another photo of the same site
+  that passed, else the neutral letter (never another site's photo);
   pixels read via a CORS load of `/api/thumb`; refused → once more on `E.fresh`'s URL (`?c=1&u=`: a copy cached before
   the API sent ACAO / Vary would refuse forever), then plain (unreadable = kept). Thresholds + measured confusion: comment there.
 - `js/inline-scan.js`: with JS the form never leaves the page. The hero card turns into the live report (progress →

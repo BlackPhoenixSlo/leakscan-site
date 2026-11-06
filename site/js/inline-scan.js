@@ -194,32 +194,35 @@
   // comes back as a tiny placeholder), is dropped everywhere: its tile leaves the strip / grid / #free phone, the next
   // image takes the slot (the grid reflows, no gap) and every count says what is left. No dark empty squares. So is one
   // that is no person photo (a site logo, banner, icon: E.isPhoto); a tile fades in only once its probe passed.
+  // g.photo(src, fn): the same one probe per src for anything else (row icons): fn(true) person photo, fn(false) not.
   var BLANK = 16;   // px: a real thumb is larger on both sides
   var shows = function (im) { return im.naturalWidth >= BLANK && im.naturalHeight >= BLANK; };
   function gallery(m) {
     if (m.pics) return m.pics;
-    var g = m.pics = { views: [], subs: [], dead: {}, ok: {}, wait: {} };
+    var g = m.pics = { views: [], subs: [], dead: {}, ok: {}, wait: {}, cb: {}, sent: {} };
+    var settle = function (src, ok) { (g.cb[src] || []).forEach(function (fn) { fn(ok); }); delete g.cb[src]; };
     g.kill = function (src) {
       if (g.dead[src]) return;
       g.dead[src] = 1;
+      settle(src, false);
       m.images = m.images.filter(function (it) { return it.src !== src; });
       g.views = g.views.filter(function (v) { return v.box.isConnected; });
       g.views.forEach(function (v) { v.sync(); });
       g.subs.forEach(function (fn) { fn(m.images.length); });
     };
     g.when = function (src, fn) { if (g.ok[src]) fn(); else (g.wait[src] = g.wait[src] || []).push(fn); };
-    var pass = function (src) { g.ok[src] = 1; (g.wait[src] || []).forEach(function (fn) { fn(); }); delete g.wait[src]; };
-    m.images.slice().forEach(function (it) {
-      var probe = function (cors, f) {   // cors (API on another origin): readable pixels; refused → once more on a fresh
-        var im = new Image();             // URL (a stale cached copy without ACAO), then a plain load, kept
-        im.referrerPolicy = 'no-referrer';
-        if (cors) im.crossOrigin = 'anonymous';
-        im.onload = function () { if (shows(im) && E.isPhoto(im)) pass(it.src); else g.kill(it.src); };
-        im.onerror = function () { if (cors && !f) probe(true, 1); else if (cors) probe(false); else g.kill(it.src); };
-        im.src = f ? E.fresh(E.thumb(it.src)) : E.thumb(it.src);
-      };
-      probe(E.XO);
-    });
+    var pass = function (src) { g.ok[src] = 1; (g.wait[src] || []).forEach(function (fn) { fn(); }); delete g.wait[src]; settle(src, true); };
+    var probe = function (src, cors, f) {   // cors (API on another origin): readable pixels; refused → once more on a fresh
+      var im = new Image();                 // URL (a stale cached copy without ACAO), then a plain load, kept
+      im.referrerPolicy = 'no-referrer';
+      if (cors) im.crossOrigin = 'anonymous';
+      im.onload = function () { if (shows(im) && E.isPhoto(im)) pass(src); else g.kill(src); };
+      im.onerror = function () { if (cors && !f) probe(src, true, 1); else if (cors) probe(src, false); else g.kill(src); };
+      im.src = f ? E.fresh(E.thumb(src)) : E.thumb(src);
+    };
+    var start = function (src) { if (!g.sent[src]) { g.sent[src] = 1; probe(src, E.XO); } };
+    m.images.slice().forEach(function (it) { start(it.src); });
+    g.photo = function (src, fn) { if (g.ok[src] || g.dead[src]) fn(!!g.ok[src]); else { (g.cb[src] = g.cb[src] || []).push(fn); start(src); } };
     return g;
   }
   // view(m, box, max, cap, skip): box shows the first `max` images that are still alive (src not in skip), refilled in
@@ -262,9 +265,29 @@
     });
     return b;
   }
-  function rowLink(url, dom, thumbSrc, text, chip, label) {
-    var ico = E.fav(dom, 'live-ico', thumbSrc ? E.thumb(thumbSrc) : null);
-    if (!thumbSrc) { ico.style.background = ''; ico.classList.add('fav-none'); }   // same neutral letter as a failed thumb
+  // A row's icon: its thumb only once it passed the people check (g.photo: the image views' probe), else the first
+  // person photo from the same site (another row's thumb, an image whose result is on that domain), else the neutral
+  // letter (as a row with no thumb). Never another site's photo; a neutral tile until decided (no logo flashes).
+  function rowIco(m, dom, src) {
+    var ico = E.fav(dom, 'live-ico', null), g = gallery(m), seen = {};
+    ico.style.background = '';
+    var cands = [src].concat(m.rows.map(function (r) { return r.domain === dom && r.thumb; }), m.images.map(function (it) { return it.domain === dom && it.src; }))
+      .filter(function (u) { return u && !seen[u] && (seen[u] = 1); });
+    ico.classList.add(cands.length ? 'fav-wait' : 'fav-none');
+    (function next(i) {
+      if (i >= cands.length) { if (cands.length) { ico.classList.remove('fav-wait'); ico.classList.add('fav-none'); } return; }
+      g.photo(cands[i], function (ok) {
+        if (!ok) return next(i + 1);
+        var im = make('img', '', [], { src: E.thumb(cands[i]), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', 'data-src': cands[i] });
+        im.addEventListener('load', function () { ico.classList.remove('fav-wait'); }, { once: true });
+        im.addEventListener('error', function () { im.remove(); ico.classList.remove('fav-wait'); ico.classList.add('fav-none'); }, { once: true });
+        ico.appendChild(im);
+      });
+    })(0);
+    return ico;
+  }
+  function rowLink(m, url, dom, thumbSrc, text, chip, label) {
+    var ico = rowIco(m, dom, thumbSrc);
     return make('a', 'live-link', [ico, make('span', 'live-txt', text), chip,
       make('span', 'live-go', [icon('i-external-link')])], ext({ href: url, 'aria-label': label }));
   }
@@ -407,7 +430,7 @@
       // Links: the first rows (whole row = link) + the strip of what Google Images shows
       var links = make('div', 'live-panel', [make('ul', 'report-rows live-rows', m.rows.slice(0, ROWS).map(function (r) {
         var path = r.url.replace(/^https?:\/\/(www\.)?/, '');
-        return make('li', '', [rowLink(r.url, r.domain, r.thumb || thumbs[r.domain],
+        return make('li', '', [rowLink(m, r.url, r.domain, r.thumb || thumbs[r.domain],
           [make('span', 'live-dom', [r.domain]), make('span', 'live-ttl', [r.title || path])],
           make('span', 'chip live-badge ' + (r.badge === 'Live' ? 'chip-live' : 'chip-soft'), [r.badge]),
           r.domain + ': ' + (r.title || path) + ' (' + r.badge + ', opens in a new tab)')]);
@@ -440,7 +463,7 @@
       }
       // Sites: per site, its first link
       var sites = make('div', 'live-panel live-panel-sites', [make('ul', 'report-rows live-sites', m.sites.slice(0, MAX_SITES).map(function (s) {
-        return make('li', '', [rowLink(s.url, s.domain, s.thumb, [make('span', 'live-dom', [s.domain]),
+        return make('li', '', [rowLink(m, s.url, s.domain, s.thumb, [make('span', 'live-dom', [s.domain]),
           make('span', 'live-ttl', [s.url.replace(/^https?:\/\/(www\.)?/, '')])],
           make('span', 'chip chip-soft', [plural(s.n, 'link', 'links')]), s.domain + ': ' + plural(s.n, 'link', 'links') + ' (opens its first link in a new tab)')]);
       }))]);
