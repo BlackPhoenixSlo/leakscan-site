@@ -3,8 +3,10 @@
 //   data-pip-auto="r" (scan report): fixed top-right, once the URL has ?r=<slug> (the video personalizes itself with that scan).
 // ?pip=1 forces it on, ?pip=0 off. Same-origin iframe of ../video/ (?r= / ?name= passed through) in embed form: this script
 // injects a style into it (no name bar, no player UI: the stage fills the picture) and drives its <video> (starts muted).
-// On screen at once: mounted when this deferred script runs (before DOMContentLoaded), the box shows with a poster frame
-// (video/jack-poster.jpg by fetch(): it does not hold the page's load event) and the iframe starts at the page's load event
+// On screen at once: a phone's first paint already has a tiny still on the home spot (.pip-still, an inline script at the top of
+// the page; replaced here in one task, and its image stays under the poster until that is in). Mounted when this deferred
+// script runs (before DOMContentLoaded), the box shows with a poster frame = the take's first frame
+// (video/jack-poster.webp by fetch(): it does not hold the page's load event) and the iframe starts at the page's load event
 // (an iframe started before it holds it, its images too; load is ~1 s on Fast 4G), shown over the poster once its video has
 // a frame. FCP / LCP measured unchanged. Fixed, out of the flow: CLS 0.
 // Placement (Jack's iPhone): position fixed, top-anchored. The home spot = top-right under the sticky header / report nav,
@@ -371,8 +373,10 @@
     pic = pip.querySelector('.pip-pic');
     // the poster by fetch(), shown from a blob: a CSS / <img> load would hold the page's load event (and a later load event
     // lets the landing's own report thumbs hold it seconds more: measured 1.0 s -> 5.0 s with a stored scan)
-    fetch(new URL('jack-poster.jpg', VIDEO)).then(function (r) { return r.ok ? r.blob() : null; })
-      .then(function (b) { if (b) pic.style.backgroundImage = 'url(' + URL.createObjectURL(b) + ')'; }).catch(function () {});
+    var still = document.querySelector('.pip-still'), lq = still ? still.style.backgroundImage : '';
+    if (lq) pic.style.backgroundImage = lq;
+    fetch(new URL('jack-poster.webp', VIDEO)).then(function (r) { return r.ok ? r.blob() : null; })
+      .then(function (b) { if (b) pic.style.backgroundImage = 'url(' + URL.createObjectURL(b) + ')' + (lq && ',' + lq); }).catch(function () {});   // the still under it until its bytes decode: no black frame
     frame = document.createElement('iframe');
     frame.title = "Jack's video";
     frame.setAttribute('tabindex', '-1');
@@ -393,6 +397,7 @@
     if (window.visualViewport) visualViewport.addEventListener('resize', soon);   // height only (URL bar): the box stays (keep() clamps)
     pip.classList.add('on');   // the box + poster at once
     place();
+    if (still) still.remove();
 
     pip.addEventListener('pointerdown', down);
     pip.addEventListener('pointermove', over);

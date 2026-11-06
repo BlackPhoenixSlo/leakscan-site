@@ -37,6 +37,7 @@ BREAKS = {
     "pull": ("pip.js", "    if (drag.big) { pull(e, my); return; }\n", "    if (drag.big) return;\n"),   # expanded: no drag-down
     "dock": ("pip.js", "card = auto === 'dock' ? document.querySelector('.hero .report-card') : null;", "card = null;"),   # no dock anchor
     "pipload": ("pip.js", "if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });", "go();"),   # the iframe at once: holds the load event
+    "still": ("pip.css", ".pip-still { position: fixed;", ".pip-still { display: none; position: fixed;"),   # no still in the first paint
     "pipfollow": ("pip.js", "    if (home && home.k === k) return home; var sy = scrollY;\n", "    var sy = 0;\n"),   # #79's floating spot: re-placed off the form at every scroll
     "pipvis": ("pip.js", "&& !S.t && innerWidth >= 720; }\n  function inView(d) {   // a dock spot is used only on a wide screen and while all of it is on screen under the header\n"
                "    return innerWidth >= 720 && d.y >= topInset() && d.y + Math.round(d.w * 9 / 16) + BAR <= vh() - 8;\n",
