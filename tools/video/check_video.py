@@ -17,7 +17,7 @@
   data-cue-say-start (named: the name in the take's 1.5 s silent opening, its 2 s pill out before the first prefab); the
   generic end card (.vo-cta) exists with the exact ask + a form (input name=name) and its cue (data-cue-cta, default
   data-cue-say) is after the last out; the "for <name>" pill (.vo-for) exists; js/video-overlays.js keeps the generic name
-  "Your name", the ?sfx=0 switch and the production images (the landing's runScan / fetchResult + /api/media/)
+  "SophieStar" (generic persona), the ?sfx=0 switch and the production images (the landing's runScan / fetchResult + /api/media/)
 - one take: the <video> plays jack.webm (an mp4 <source> only next to an existing file); no second take (jack-named), no
   ?prefab= / CapCut clip mode (vo-solo, bg=green) left in the page, js, css or tools/video/
 - name bar (.vo-nb) under the stage, outside it: label "Your name", input name=name maxlength=40, button "Rebuild this
@@ -132,7 +132,7 @@ def modes(html, p, last_out):
         if not g:
             bad.append(f"video/index.html: prefab {pf.get('data-prefab')} has no .vo-kw (live + gone word card)")
     js = (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8")
-    for need, what in (("'Your name'", "the generic name"), ("q.get('sfx') !== '0'", "the ?sfx=0 switch"), ("E.runScan({", "the name bar's scan (landing runScan)"),
+    for need, what in (("'SophieStar'", "the generic persona"), ("q.get('sfx') !== '0'", "the ?sfx=0 switch"), ("E.runScan({", "the name bar's scan (landing runScan)"),
                        ("E.fetchResult(slug)", "the ?r= result read"), ("'/api/media/'", "her own photos (/api/media/)")):
         if need not in js:
             bad.append(f"js/video-overlays.js: {what} ({need}) missing")

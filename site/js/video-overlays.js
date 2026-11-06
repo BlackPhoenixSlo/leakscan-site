@@ -3,10 +3,10 @@
 // each .vo-pf (site/video/CUES.md, SCRIPT.md). draw(t) is a pure function of t (no CSS transitions): seeking and ?t= show
 // the exact frame. URL: ?name=<1-40 letters/digits/space . - _> (texts only) · ?r=<slug> (else the last scan) = a stored scan
 // result · ?t=<sec> seek · ?sfx=0 no sound.
-// Two modes (html[data-vo-mode]): "generic" ("Your name", default blurred thumbs, no speech; at data-cue-cta the cta-steps
+// Two modes (html[data-vo-mode]): "generic" (demo persona "SophieStar": sophiestar.com, @sophiestar; default blurred thumbs, no speech; at data-cue-cta the cta-steps
 // end card: a phone replica of the landing, one 10 s take: zoom onto the onlyfans.com/ field, types "Jaka Basej" (or the
 // viewer's typed name in its form) as a handle, "Scan now" → "Searching Google, step N of 9…" → the report "87 links found" + tabs + rows →
-// "Rewatch this video with YOUR content" + the name flip, looping after the video ends) and "named" (?name=, ?r= or the name
+// "Rewatch this video with YOUR content" + SophieStar flipping to the typed name (else stays), looping after the video ends) and "named" (?name=, ?r= or the name
 // bar: her texts, the name spoken at data-cue-say-start (in the take's 1.5 s silent opening) and data-cue-say, "for <name>"
 // pill 2 s; at data-cue-cta the same take, typing handle(DEMO) "jakabasej" (@jakabasej) too, the report = HER counts / rows /
 // thumbs, ending on "This is what I'd clear for <name>" + the contact row, held 5 s per loop).
@@ -39,7 +39,7 @@
   if (!root) return;
   var IN = 0.45, OUT = 0.4, SHAKE = 0.25, WIPE = 0.95, STAMP = 0.2, BURST = 0.6, KW = 0.6, SLIDE = 160;   // seconds; px
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
-  var GENERIC = 'Your name', WAIT_MAX = 45, HOLD_LEAD = 0.4;   // the scan hold: at most 45 s, 0.4 s before the first card
+  var GENERIC = 'SophieStar', WAIT_MAX = 45, HOLD_LEAD = 0.4;   // the scan hold: at most 45 s, 0.4 s before the first card
   // cta-steps: one 10 s take (s into its loop) in a phone replica of the landing: the hero, the camera zooms onto the
   // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form; named: DEMO), "Scan now"; the scan card
   // ("Searching <place>, step N of 9…", js/scan-engine.js progressInfo); the report card (LEAKS links rolling, tabs, rows)
@@ -88,10 +88,11 @@
   }
   var bump = function (k) { return k > 0 && k < 1 ? Math.sin(Math.PI * k) : 0; };
   var setText = function (el, s) { if (el && el.textContent !== s) el.textContent = s; };
-  function demoName() {   // what the hero types: the form's name once the viewer typed a valid one, else the demo name
+  function typedName() {   // the end card form's name once the viewer typed a valid one, else ''
     var inp = ctaEl && ctaEl.querySelector('input'), v = inp ? inp.value.replace(/\s+/g, ' ').trim() : '';
-    return v && NAME_RE.test(v) ? v : DEMO;
+    return v && NAME_RE.test(v) ? v : '';
   }
+  function demoName() { return typedName() || DEMO; }   // what the hero types
   var handle = function (n) { return n.toLowerCase().replace(/[^\p{L}\p{N}._]/gu, '') || 'creator'; };   // "Jaka Basej" → jakabasej
   var RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
   function lay(el, pg) {   // el's layout box in its page's px (offsets up to the .vo-pg, untransformed)
@@ -161,7 +162,7 @@
     bs.setProperty('--eo', eo.toFixed(3));
     bs.setProperty('--es', (0.9 + 0.1 * back(clamp((u - 8.75) / 0.35))).toFixed(4));
     bs.setProperty('--fl', ((f < 0.5 ? f : f - 1) * 180).toFixed(1));   // 0 → 90deg, swap the text, -90 → 0
-    setText(q1('.vo-mini-n'), f >= 0.5 ? name : GENERIC);
+    setText(q1('.vo-mini-n'), f < 0.5 ? GENERIC : c.named ? name : typedName() || GENERIC);   // generic: SophieStar → the typed name, else stays
     setText(q1('.vo-end-who'), name);
     bs.setProperty('--fp', (1 + 0.3 * bump((u - 9.3) / 0.3)).toFixed(3));
   }
@@ -224,7 +225,7 @@
       if (el.textContent !== v[k]) el.textContent = v[k];
     });
   }
-  function values(m) {   // m = LeakScanRemovals.model(result) + mine(result), or {name} from ?name= / the generic "Your name"
+  function values(m) {   // m = LeakScanRemovals.model(result) + mine(result), or {name} from ?name= / the generic GENERIC
     var name = m.name, h = (m.handle || name).toLowerCase().replace(/[^a-z0-9_.]/g, '') || 'creator';
     var v = { name: name, site: m.site || (h.replace(/[^a-z0-9-]/g, '') || 'creator') + '.com', ig: m.ig || h, tt: m.tt || m.ig || h, 'mega-title': m.mtitle || name + ' – pack', 'x-l1': m.xtext || name + ' leaked', 'x-l2': m.xtext ? '' : name + ' ' + (m.plat || 'onlyfans'),
       sub: m.sub || 'r/' + (h.replace(/\./g, '').slice(0, 14) || 'creator') + '_leaks', 'rd-title': m.rtitle || name + ' full pack, link in comments' };
@@ -424,7 +425,7 @@
     if (forEl) forc = { el: forEl, removed: Infinity, tap: Infinity };
     if (nb) { nb.removeAttribute('data-edit'); setText(nb.querySelector('.vo-nb-n'), n); }
   }
-  function generic() {   // back to "Your name": the end card, no pill, no speech
+  function generic() {   // back to the SophieStar persona: the end card, no pill, no speech
     who = null;
     mode('generic');
     forc = null;

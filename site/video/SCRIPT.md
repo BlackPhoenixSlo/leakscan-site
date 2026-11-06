@@ -30,7 +30,7 @@ Default seconds = guesses for a 40 s take (`data-cue-*` in `index.html`). When t
 | 6 | "**Reddit**. Leaks."; removed on "**Nothing**" | `reddit` | 21.6 | – | 23 | 25 |
 | 7 | "**Mega** folders"; removed on "**Gone** in a day" | `mega` | 25 | – | 28.2 | 30.4 |
 | 8 | – | none | – | – | – | – |
-| 9 | "**Type** your name" − 0.2 | `cta-steps` (`data-cue-cta`): the landing in a phone, one 10 s take (zoom onto the onlyfans.com/ field, types the handle, "Scan now" → "Searching Google, step N of 9…" → the report + tabs + rows); generic: "Rewatch this video with YOUR content", "Your name" flips to the name, + the form; named: `jakabasej` typed too, her real counts / rows / thumbs (after a scan), "This is what I'd clear for <name>" + the contact row | 32.6 | – | – | stays, loops past the end |
+| 9 | "**Type** your name" − 0.2 | `cta-steps` (`data-cue-cta`): the landing in a phone, one 10 s take (zoom onto the onlyfans.com/ field, types the handle, "Scan now" → "Searching Google, step N of 9…" → the report + tabs + rows); generic: "Rewatch this video with YOUR content", "SophieStar" flips to the name typed in the form (else stays), + the form; named: `jakabasej` typed too, her real counts / rows / thumbs (after a scan), "This is what I'd clear for <name>" + the contact row | 32.6 | – | – | stays, loops past the end |
 | end | last word's end + 0.3 (the 2 s hold) | named: the name spoken again, `data-cue-say` | 37.8 | – | – | – |
 
 Rules: live = 0.3 s before the platform word; removed = the word right after the snap; out = the next platform word
