@@ -106,7 +106,10 @@ If the take ends before a say / end-card cue, they come on `ended`. No spoken na
 1. Encode (nice 10): `ffmpeg -i TAKE.MOV -vf scale=1280:720 -c:v libvpx-vp9 -crf 34 -b:v 0 -g 30 -keyint_min 30 -row-mt 1
    -tile-columns 1 -deadline good -cpu-used 2 -pix_fmt yuv420p -pass 1|2 … -c:a libopus -b:a 96k site/video/jack.webm` (two
    passes; 1080p only if it stays <= 20 MB) and `ffmpeg -i TAKE.MOV -vf scale=1280:720 -c:v libx264 -profile:v main -crf 23
-   -maxrate 2500k -bufsize 5000k -g 30 -c:a aac -b:a 128k -movflags +faststart site/video/jack.mp4`.
+   -maxrate 2500k -bufsize 5000k -g 30 -c:a aac -b:a 128k -movflags +faststart site/video/jack.mp4`. A phone's mini player, same
+   timeline (duration within ~30 ms: the cues and the 720p switch rely on it): `ffmpeg -i TAKE.MOV -vf scale=-2:360 -c:v libvpx-vp9 -b:v 380k
+   -g 48 -keyint_min 48 -row-mt 1 -tile-columns 1 -deadline good -cpu-used 2 -pix_fmt yuv420p -pass 1|2 … -c:a libopus -b:a 48k -ac 1
+   -cues_to_front 1 site/video/jack-360.webm` and `site/video/jack-360.mp4` (H.264, `+faststart`, ~3 MB, keyframes <= 2 s).
 2. Cues + captions, one line, free + local (a throwaway venv outside the repo: `uv venv ~/.cache/leakscan-whisper && uv pip
    install --python ~/.cache/leakscan-whisper faster-whisper 'opencv-python-headless<5'`):
    `~/.cache/leakscan-whisper/bin/python tools/video/cues_from_take.py site/video/jack.webm --apply --evidence DIR`

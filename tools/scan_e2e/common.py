@@ -43,6 +43,11 @@ BREAKS = {
     "dock": ("pip.js", "card = auto === 'dock' ? document.querySelector('.hero .report-card') : null;", "card = null;"),   # no dock anchor
     "pipload": ("pip.js", "if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });", "go();"),   # the iframe at once: holds the load event
     "still": ("pip.css", ".pip-still { position: fixed;", ".pip-still { display: none; position: fixed;"),   # no still in the first paint
+    "pipmini": ("pip.js", "if (innerWidth < 720) u.searchParams.set('mini', '1');", ""),   # the phone's mini asks for no 360p files
+    "hdsync": ("pip.js", "    if (lag > 0.15) hdHide();\n", "    hd.classList.add('on');\n"),   # the 720p shown as soon as it has metadata, in sync or not
+    "hdmin": ("pip.js", "if (!big) { hdStop(); hdDrop(); return; }", "if (!big) { hdStop(); if (hd) { hd.pause(); hdHide(); } return; }"),   # minimize only pauses the layer: its download goes on
+    "hdguard": ("pip.js", "if (hd && big && !video.ended && !document.hidden) { hdOff = true; hdDrop(); play(); }", ""),   # the browser pausing the master = paused for good
+    "hdmine": ("pip.js", "if (!video.paused) mine = true; ", ""),   # the guard can't tell our own pauses from the browser's
     "pipfollow": ("pip.js", "    if (home && home.k === k) return home; var sy = scrollY;\n", "    var sy = 0;\n"),   # #79's floating spot: re-placed off the form at every scroll
     "pipvis": ("pip.js", "&& !S.t && innerWidth >= 720; }\n  function inView(d) {   // a dock spot is used only on a wide screen and while all of it is on screen under the header\n"
                "    return innerWidth >= 720 && d.y >= topInset() && d.y + Math.round(d.w * 9 / 16) + BAR <= vh() - 8;\n",

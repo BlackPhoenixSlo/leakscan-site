@@ -30,11 +30,14 @@
      typed + her report, a compact contact row instead of the form), on "You can put your name on the website". The video fills the whole stage; at every
      width the cards are drawn on its right half (no panel); .vo-capt = his words as captions on his left half
      (transcript.json); .vo-ui = full screen / theater button (top right), CC toggle under it, touch play bar (the full
-     stage width), "Rotate" hint. tools/video/check_video.py keeps them sane. -->
+     stage width), "Rotate" hint. tools/video/check_video.py keeps them sane.
+     Sources: ?mini=1 (js/pip.js, phones) = the 360p files first: the inline script runs before the parser reaches the static sources and
+     selection starts from its first <source>, so the 720p files get no request and stay as the fallback if a 360p file 404s; without ?mini=1 it does nothing (720p, no JS: 720p). -->
 <main class="vo" id="vo">
   <h1 class="vo-sr">Jack: leaks on Google, X, Reddit and Mega, before and after the removal</h1>
   <div class="vo-stage" data-cue-say="52.98" data-cue-cta="34.77">
     <video class="vo-video" controls controlslist="nofullscreen" playsinline preload="auto" width="1920" height="1080">
+      <script>/[?&]mini=1(&|$)/.test(location.search) && [['jack-360.webm', 'video/webm'], ['jack-360.mp4', 'video/mp4']].forEach(function (f) { var s = document.createElement('source'); s.src = f[0]; s.type = f[1]; document.currentScript.parentNode.appendChild(s); });</script>
       <source src="jack.webm" type="video/webm">
       <source src="jack.mp4" type="video/mp4">
     </video>

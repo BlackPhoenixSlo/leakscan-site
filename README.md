@@ -74,7 +74,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `faq/`, `removals/` and `compare/`, and their child pages. Each ends in the same free-scan + DM CTA. Legal and process claims link the
   primary source they were checked against; facts about Abolita come only from `index.html`. Comparisons are dated: re-check them against
   the other service's own pages before changing them. Linked from the homepage footer.
-- Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
+- Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`); a phone's
+  mini plays `jack-360.*` (`video/?mini=1`), expanding adds a muted 720p layer over it at the same second (no request before the tap; the mini stays the clock, the
+  sound and the overlays' master, and shows through whenever the 720p stalls; minimizing drops the layer and its download); a computer's mini and `/video/` directly stay 720p;
   `?pip=0` off. Landing: docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report,
   or the scan report card after a scan) at 55% of its width, never > 25% of the card, never over a link / button / pill
   (else just below the card); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the

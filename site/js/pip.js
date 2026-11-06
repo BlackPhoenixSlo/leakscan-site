@@ -22,6 +22,12 @@
 // min(960px, 70vw) centred, fixed right under the sticky header; the page keeps scrolling under it (no lock, nothing over
 // the rest). There a tap on the picture = play / pause; drag it down (follows the finger: translate + scale toward the mini
 // spot; released past 30% or flung down = mini, else snaps back), the chevron button or Esc = back to the mini player.
+// 360p mini, 720p expanded (phones, < 720 px wide; a computer's mini is 476-640 px, 720p all along): src() adds ?mini=1, video/index.html then
+// plays jack-360.*. That <video> stays the master for the clock, the sound (iPhone: unmute only inside the tap) and the overlays; expanding adds
+// a muted 720p <video> (.pip-hd) over it, under the overlays (no request before that), seeked ahead, revealed once it plays within 0.15 s of the
+// master and kept there (hdTick); hidden the moment it stalls or falls behind, so the still-playing mini shows through: never a freeze, maybe no HD.
+// Minimized / closed = the layer dropped, its download stopped (a re-expand starts again, off the HTTP cache). The master paused by nothing here (iOS as
+// the second video starts? unproven) = the same, the master played again, no 720p for the rest of this page view.
 // Docked (>= 720 px wide only, and only while that whole spot is on screen under the header): absolute, 2 x 55% of the card's
 // width, over the card's lower right and poking out of its bottom-right corner (it may cover the card's rows, never the scan
 // inputs / Scan now / "Scanned" line: else the home spot); re-placed on scroll / when the card changes (in-page scan → report card). Drag (pointer
@@ -38,7 +44,7 @@
   if (!forced && !auto) return;
   var VIDEO = new URL('../video/', me.src);
   var TOP = ['.site-header', '.rnav'], AVOID = ['#scan input', '#scan button[type=submit]', '[data-p=scanned]', '.mobile-cta', '.askai-launcher', '.ph-reveal'];
-  var EMBED = '.vo{--nb-h:0px}.vo-page{min-height:0;display:block}.vo-stage{width:100vw}.vo-nb,.vo-ui,.vo-wait{display:none!important}';
+  var EMBED = '.vo{--nb-h:0px}.vo-page{min-height:0;display:block}.vo-stage{width:100vw}.vo-nb,.vo-ui,.vo-wait{display:none!important}.pip-hd{opacity:0;z-index:1}.pip-hd.on{opacity:1}';
   var SVG = function (d, c) { return '<svg' + (c ? ' class="' + c + '"' : '') + ' viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + d + '</svg>'; };
   var I = { x: SVG('<path d="M18 6 6 18M6 6l12 12"/>'), exp: SVG('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>'),
     off: SVG('<path d="M11 5 6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6"/>'), on: SVG('<path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>'),
@@ -53,6 +59,7 @@
     var u = new URL(VIDEO), r = slug(), n = q.get('name');
     if (r) u.searchParams.set('r', r);
     if (n) u.searchParams.set('name', n);
+    if (innerWidth < 720) u.searchParams.set('mini', '1');   // a phone's mini plays the 360p files
     return u.href;
   }
   function vis(el) { var r = el.getBoundingClientRect(); return r.width && r.height && getComputedStyle(el).visibility !== 'hidden' ? r : null; }
@@ -199,11 +206,67 @@
     pip.style.setProperty('--s', '1');
     move(x, y);
   }
+  // ---------- 720p over the 360p mini while expanded (header comment). Every 50 ms while big: the master's clock leads, hd follows ----------
+  var hd = null, hdTimer = 0, hdAt = -1, hdTries = 0, hdOff = false;
+  function hdGo() { if (!hdTimer && !hdOff && video && /-360\./.test(video.currentSrc)) hdTimer = setInterval(hdTick, 50); }
+  function hdStop() { clearInterval(hdTimer); hdTimer = 0; }
+  function hdHide() { hd.classList.remove('on'); }
+  function hdDrop() {   // minimized, or the master starving / paused by the browser: stop the download (a re-expand starts again)
+    if (!hd) return;
+    hdStop();
+    hd.pause(); hd.removeAttribute('src'); hd.load(); hd.remove(); hd = null; hdAt = -1; hdTries = 0;
+  }
+  function hdMake() {   // first expand, once the master can play: same container, so no <source> list; after the master: querySelector still finds that
+    var d = video.ownerDocument;
+    hd = d.createElement('video');
+    hd.className = 'vo-video pip-hd';
+    hd.muted = true; hd.setAttribute('muted', '');
+    hd.playsInline = true; hd.setAttribute('playsinline', '');
+    hd.disablePictureInPicture = true; hd.setAttribute('disablepictureinpicture', ''); hd.setAttribute('disableremoteplayback', '');
+    hd.setAttribute('aria-hidden', 'true'); hd.setAttribute('tabindex', '-1');
+    hd.preload = 'auto';
+    hd.src = video.currentSrc.replace('-360.', '.');
+    video.parentNode.insertBefore(hd, video.nextSibling);
+  }
+  function hdSeek(t) {   // t, else ahead of the master (1, 2, 4, 8 s: it waits there until the master arrives; never past the end: stays on the mini)
+    var at = t != null ? t : video.currentTime + Math.min(8, Math.pow(2, hdTries++));
+    if (at > video.duration - 0.2) return;
+    if (!hd.paused) hd.pause();
+    hdAt = at; hd.currentTime = at;
+  }
+  function hdTick() {
+    if (!big) { hdStop(); hdDrop(); return; }   // minimized / closed: the mini plays on
+    if (!hd) { if (video.readyState >= 3) hdMake(); return; }
+    if (hd.readyState < 1) return;
+    var m = video.currentTime, d = m - hd.currentTime, lag = Math.abs(d);
+    if (lag > 0.15) hdHide();
+    if (video.paused || video.ended) {   // follows it, frame for frame
+      if (!hd.paused) { hd.pause(); hdAt = hd.currentTime; }   // play again = from here
+      if (lag > 0.04 && !hd.seeking) hdSeek(m);
+      return;
+    }
+    if (hd.paused) {   // waiting at hdAt: late (or the master jumped back, a replay) = further ahead
+      var ready = !hd.seeking && hd.readyState >= 3;
+      if (m > hdAt + (ready ? 0.15 : 0) || hdAt - m > 9) return hdSeek();
+      if (ready && m >= hdAt - 0.02) {
+        hd.playbackRate = 1;
+        var p = hd.play();
+        if (p && p.catch) p.catch(function (e) { if (e.name === 'NotAllowedError') hdDrop(); });
+      }
+      return;
+    }
+    if (lag > 0.5) return hdSeek();
+    if (hd.readyState < 3) return hdHide();
+    var r = lag < 0.03 ? 1 : lag < 0.15 ? (d > 0 ? 1.03 : 0.97) : (d > 0 ? 1.1 : 0.9);
+    if (hd.playbackRate !== r) hd.playbackRate = r;
+    if (lag <= 0.15 && !hd.classList.contains('on')) { hd.classList.add('on'); hdTries = 0; }
+  }
   function expand() {
     if (big || S.t) return;
     big = true;
     flip(place);
     if (video) { video.muted = false; play(); }
+    hdGo();
     sync();
   }
   function minimize() {
@@ -438,8 +501,16 @@
       video.setAttribute('disablepictureinpicture', '');
       video.setAttribute('disableremoteplayback', '');
       ['play', 'pause', 'volumechange'].forEach(function (ev) { video.addEventListener(ev, sync); });
+      video.addEventListener('waiting', function () { if (!video.seeking) hdDrop(); });
+      var mine = false, pause = video.pause;   // every script's pause (button, tap, tuck, X, off-screen, the overlays') comes through here, a browser's own doesn't
+      video.pause = function () { if (!video.paused) mine = true; pause.call(video); };
+      video.addEventListener('pause', function () {
+        if (mine) { mine = false; return; }
+        if (hd && big && !video.ended && !document.hidden) { hdOff = true; hdDrop(); play(); }
+      });
       if (video.readyState >= 2) show(); else video.addEventListener('loadeddata', show, { once: true });
       if (!S.t && !offPaused) play();
+      if (big) hdGo();
       sync();
       return true;
     }

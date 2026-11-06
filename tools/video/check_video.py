@@ -37,7 +37,7 @@
 - no external requests: no http(s):// or protocol-relative src/href/poster in the page, no http(s):// URL in
   js/video-overlays.js or css/video.css (the og:image <meta content> is a URL, not a load); no audio / font files
   (sound is synthesized, fonts are the system stack): no .mp3/.wav/.ogg/.m4a/.woff/.ttf/.otf reference, no @font-face / @import
-- the <video> sources exist and the placeholder / real video is <= VIDEO_BUDGET bytes each
+- the <video> sources exist and the placeholder / real video is <= VIDEO_BUDGET bytes each; jack-360.webm / .mp4 (?mini=1, selected by <video>'s first child) <= MINI_BUDGET
 Usage: python3 tools/video/check_video.py
 """
 import pathlib, re, sys
@@ -59,6 +59,7 @@ MIN_HOLD = 1.95                     # seconds from removed to out: wipe + stamp 
 EPS = 1e-6                          # cues are 2-decimal seconds: 17.96 - 16.01 is 1.9499.. in floats
 CUES = ("data-cue-live", "data-cue-removed", "data-cue-out")
 VIDEO_BUDGET = 60_000_000   # the real recording replaces the ~0.2 MB placeholder; keep the repo sane
+MINI_BUDGET = 4_000_000   # jack-360.*: what a phone's mini player streams on Slow 4G
 WHITEBOARD = ("Telegram", "Fapello", "Nudogram", "Erome", "Leakheaven", "Pornhub", "YouPorn", "JustTheGays")   # his whiteboard's site list
 PILL = 2.0   # js/video-overlays.js: the named "for <name>" pill shows 0 .. 2 s, then from data-cue-say
 
@@ -300,6 +301,15 @@ def main():
             bad.append(f"{f.relative_to(SITE)}: audio / font file or import {u} (sound is synthesized, fonts are the system stack)")
     if "jack.webm" not in p.sources:
         bad.append(f"video/index.html: <video> must play jack.webm (Jack's one take), got {p.sources}")
+    html = PAGE.read_text(encoding="utf-8")
+    if not re.search(r"<video[^>]*>\s*<script>[^<]*'jack-360\.webm'[^<]*'jack-360\.mp4'[^<]*</script>\s*<source src=\"jack\.webm\"", html):   # the phone's mini player: selected before the parser reaches the 720p sources
+        bad.append("video/index.html: the ?mini=1 script (jack-360.webm, then .mp4) must be <video>'s first child, right before the static <source>s")
+    for s in ("jack-360.webm", "jack-360.mp4"):
+        f = PAGE.parent / s
+        if not f.is_file():
+            bad.append(f"video/{s} missing (the phone's mini player)")
+        elif f.stat().st_size > MINI_BUDGET:
+            bad.append(f"video/{s}: {f.stat().st_size} bytes > {MINI_BUDGET}")
     for f in [PAGE, SITE / "js" / "video-overlays.js", SITE / "css" / "video.css"] + sorted((ROOT / "tools" / "video").glob("*.py")):
         if f.name == "check_video.py":
             continue
