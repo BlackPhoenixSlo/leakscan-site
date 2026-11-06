@@ -81,8 +81,8 @@ Plus:
 --break-swap serves video-overlays.js with the submit's rebuild(n) call removed: only the "swap:" checks go red.
 --break-demo serves video-overlays.js with the old demo name (DEMO = 'Orla Brennick'): only the typed-handle checks (generic "cta-steps: typed …
   DEMO", the "named flow" / "prod … end card" jakabasej ones) go red.
-- prod real images: every leak image on every card (.rm-img) blurred >= 5px (video cards: blur(5px), the floor =
-  styles.css .live-ico; removals.css / the report untouched), the after photos unblurred; the cards use people photos only:
+- prod real images: every leak image on every card (.rm-img) blurred exactly BLUR_PX = 2px (video cards: blur(2px);
+  removals.css / the report / styles.css .live-ico untouched), the after photos unblurred; the cards use people photos only:
   "prod logos:" the landing report (?r=PROD_SLUG, js/inline-scan.js gallery() + E.isPhoto, same proxy) and the video drop
   the same thumbs (its Images tab = the video's kept count, every landing tile in the video's kept set, none dropped by
   the video); per card a trigger (live + 0.15) + settled (live settled, removed + 2) shot: prod-<label>-<card>-<state>.png
@@ -101,7 +101,7 @@ Plus:
   field of her result (host / title / count / her thumb loaded), the wall = her top sites first, no SophieStar / Your name / Orla Brennick
   on screen or in a slot, the "for <name>" pill at 1 s; "hers handle": the intro (3 / 3.5 / 6 / 9.5 s) and the end card (36 / 37.85 /
   40 s) type onlyfans.com/<her handle> + "@<her handle>"; "hers end" (47 s): her report: '@<handle>', Images = her kept people
-  photos, rows = her hosts + titles (no *.example, no URL), "+N more", 9 of her photos blurred >= 5px, the contact footer <= 20 %
+  photos, rows = her hosts + titles (no *.example, no URL), "+N more", 9 of her photos blurred exactly 2px, the contact footer <= 20 %
   of the phone, no "This is what I'd clear"; never "jakabasej" outside the contact footer (on screen or in the DOM text);
   "hers counts": the end card's Links / Images / Sites == the landing report's for the same result (?r=: the landing ?r=;
   last: the landing's own scan; pip: the landing around the mini player); the landing's mini player (?pip=1, iframe loaded before the scan)
@@ -141,7 +141,13 @@ Plus:
   style, every card's text but google / google-images, the captions == REF's files (index.html, video-overlays.js,
   video.css served from git, declared). --only google = this part.
 --break-gtime serves index.html with google's old removed cue (G_REMOVED_OLD): only the "google timing" checks go red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--base REF] [--break-gtime] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--break-intro] [--skip-prod] [--only prod|captions|voice|fill|hers|google]
+- blur (blur(), checks "blur …"; 1920x1080 + phone 390x844, generic + ?r=PROD_SLUG = her saved result, declared: served locally,
+  every /api/thumb = a local photo (img/removals/editorial-01.webp, so her kept photos fill the cards + the end-card report),
+  media 404, no production): every leak image on every card (.rm-img / .vo-real, computed filter) = blur(2px) saturate(0.95),
+  .vo-real scale(1.2) kept, the after state's own photos (.vo-own) unblurred; shots at 11 / 15.5 / 47 s (blur-<vp>-<mode>-t<t>.png).
+  With --base REF: the same images' computed filters == REF's but blur(5px) → blur(2px). --only blur = this part.
+--break-blur serves css/video.css with blur(5px) back: only the "blur" checks go red.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--base REF] [--break-gtime] [--break-blur] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--break-intro] [--skip-prod] [--only prod|captions|voice|fill|hers|google|blur]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, json, pathlib, re, socket, subprocess, sys, time, urllib.parse, urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -384,7 +390,7 @@ REAL = """() => { const q = s => [...document.querySelectorAll(s)], im = i => [i
           own: q('.vo-own').map(im), count: (e => e && (e.__src || e.textContent))(document.querySelector('[data-vo="g-count"]')), photos: window.VideoOverlays.photos,
           cards: q('.vo-pf[data-prefab]').map(e => [e.dataset.prefab, [...e.querySelectorAll('.rm-img, .vo-real')].map(im)])}; }"""
 BLUR = lambda f: float(m[1]) if (m := re.search(r"blur\(([\d.]+)px\)", f or "")) else 0.0
-BLUR_MIN = 5   # px: the video cards' leak-image blur floor (= styles.css .live-ico, the site's lightest rule)
+BLUR_PX = 2   # px: the video cards' leak-image blur, exact (css/video.css .vo .rm-img / .vo-real; owner's call)
 # the landing report (?r=, js/inline-scan.js) once its probes settled: [Images tab count, every strip / grid tile src]
 LANDING = """() => { const n = document.querySelector('#tab-report-images .live-tab-n');
   return [n ? +n.textContent : null, [...document.querySelectorAll('.live-strip-track .gi-img, .live-grid .gi-img')].map(i => i.getAttribute('src'))]; }"""
@@ -539,16 +545,16 @@ def prod(b, base, out, cues, cta):
             v = pg.evaluate("() => [document.querySelector('video').paused, document.querySelector('video').currentTime]")
             check(f"prod ({label}): the held take plays on after the result", v[0] is False, v)
         real = pg.evaluate(REAL)
-        thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and BLUR(x[2]) >= BLUR_MIN for x in xs)
+        thumb = lambda xs, n: len(xs) >= n and all(x[0].startswith("/api/thumb?u=") and x[1] > 0 and BLUR(x[2]) == BLUR_PX for x in xs)
         check(f"prod img ({label}): Google: 3 real thumbs on the first row, loaded, blurred", len(real["g"]) == 3 and thumb(real["g"], 3), real["g"])
         check(f"prod img ({label}): Google Images: 6 real thumbs, loaded, blurred", len(real["grid"]) == 6 and thumb(real["grid"], 6), real["grid"][:2])
         check(f"prod img ({label}): cta-steps report: 9 of her people photos (rows + strip), loaded, blurred, all kept ones", len(real["rep"]) == 9 and thumb(real["rep"], 9)
               and all(x[0] in real["photos"]["kept"] for x in real["rep"]), real["rep"][:2])
         check(f"prod img ({label}): every .rm-img = a real /api/thumb one, loaded, blurred", thumb(real["all"], 13), [x for x in real["all"] if not x[0].startswith("/api/thumb")][:2])
         check(f"prod ({label}): Google rows = her real domains, count {want['count']!r}", real["grows"] == want["rows"][:4] and real["count"] == want["count"], (real["grows"], real["count"]))
-        weak = [(c, x[0][-24:], x[2]) for c, xs in real["cards"] for x in xs if BLUR(x[2]) < BLUR_MIN]
+        weak = [(c, x[0][-24:], x[2]) for c, xs in real["cards"] for x in xs if BLUR(x[2]) != BLUR_PX]
         n_leak = sum(len(xs) for _, xs in real["cards"])
-        check(f"prod blur ({label}): every leak image on every card ({n_leak} on {', '.join(c for c, xs in real['cards'] if xs)}) blurred >= {BLUR_MIN}px",
+        check(f"prod blur ({label}): every leak image on every card ({n_leak} on {', '.join(c for c, xs in real['cards'] if xs)}) blurred exactly {BLUR_PX}px",
               n_leak >= 22 and not weak, weak[:3] or sorted({x[2] for _, xs in real["cards"] for x in xs}))
         kept, dropped = real["photos"]["kept"], real["photos"]["dropped"]
         print(f"prod ({label}): people photos kept {len(kept)}, dropped {len(dropped)} (logos / banners / icons / dead)")
@@ -762,10 +768,10 @@ def hers(b, base, out, raw_file, no_prod):
             hosts, rows = set(X["hosts"]), [d for d, _ in s["rows"]]
             ok = (ok and s["at"] == "@" + hh and len(s["tabs"]) == 3 and s["tabs"][1] == len(s["kept"]) and 0 < len(rows) <= 5 and all(d in hosts for d in rows)
                   and all(t2 and not re.search(r"https?://|www\.", t2) for _, t2 in s["rows"]) and s["more"] == f"+ {s['tabs'][0] - len(rows)} more in the full report"
-                  and len(s["real"]) == 9 and all(x[1] > 0 and x[0] in s["kept"] and BLUR(x[2]) >= BLUR_MIN for x in s["real"])
+                  and len(s["real"]) == 9 and all(x[1] > 0 and x[0] in s["kept"] and BLUR(x[2]) == BLUR_PX for x in s["real"])
                   and s["eo"] > .9 and s["contacts"] == CONTACTS and s["cov"] <= .20 and "clear for" not in s["cta"].lower())
             msg = (f"hers end ({label}) t=47: her report '@{hh}' Links / Images / Sites {s['tabs']} (Images = her kept photos), her rows {rows[:3]}…, none *.example, "
-                   f"{s['more']!r}, {len(s['real'])} of her people photos blurred >= {BLUR_MIN}px, contact footer {s['cov']:.1%} of the phone (<= 20 %)")
+                   f"{s['more']!r}, {len(s['real'])} of her people photos blurred exactly {BLUR_PX}px, contact footer {s['cov']:.1%} of the phone (<= 20 %)")
         check(msg + f", no 'jakabasej' outside the contact footer (on screen {s['jkOn']}, DOM {s['jkDom']}) -> {shot}", ok,
               {k: s[k] for k in ("on", "typed", "at", "tabs", "rows", "more", "jkOn", "jkDom", "cov", "eo")} | {"real": s["real"][:2]})
 
@@ -1893,6 +1899,86 @@ def gsearch(b, base, out, cues, raw_file, base_ref):
                   len(st[0]) == len(st[1]) > 100 and not diff, [d[0] for d in diff][:20])
 
 
+BLURS = """() => { const f = i => [i.className, (i.getAttribute('src') || '').slice(-40), i.naturalWidth, getComputedStyle(i).filter, getComputedStyle(i).transform];
+  return {cards: [...document.querySelectorAll('.vo-pf[data-prefab]')].map(e => [e.dataset.prefab, [...e.querySelectorAll('.rm-img, .vo-real')].map(f)]),
+          stray: [...document.querySelectorAll('.rm-img, .vo-real')].filter(i => !i.closest('.vo-pf[data-prefab]')).map(f),
+          own: [...document.querySelectorAll('.vo-own')].map(f), mode: document.documentElement.dataset.voMode}; }"""
+
+
+def blur(b, base, out, raw_file, base_ref):
+    """every leak image on every video card: computed blur exactly BLUR_PX (no image load needed; her thumbs = a local photo, declared)"""
+    raw = json.loads(pathlib.Path(raw_file).read_text(encoding="utf-8")) if raw_file else None
+    body = json.dumps(raw).encode() if raw else b"{}"
+    photo = (ROOT / "site/img/removals/editorial-01.webp").read_bytes()
+
+    def api(r):   # declared bypass, wire boundary: scan-result = her saved result, every thumb = one local photo, media 404
+        u = urllib.parse.urlsplit(r.request.url)
+        if u.path.startswith("/api/scan-result/") and raw and u.path.endswith("/" + PROD_SLUG):
+            return r.fulfill(body=body, content_type="application/json")
+        if u.path == "/api/thumb":
+            return r.fulfill(body=photo, content_type="image/webp")
+        return r.fulfill(status=404, body="{}")
+
+    def page(opts, ref=None):
+        ctx = ctx_new(b, **opts)
+        if ref:   # declared: REF's css/video.css (git show)
+            src = subprocess.run(["git", "-C", str(ROOT), "show", f"{ref}:site/css/video.css"], capture_output=True, text=True, check=True).stdout
+            ctx.route("**/css/video.css", lambda r: r.fulfill(body=src, content_type="text/css"))
+        for pat in ("**/api/scan-result/**", "**/api/thumb?**", "**/api/media/**"):
+            ctx.route(pat, api)
+        return ctx, guard(ctx, (base,))
+
+    def load(pg, query, t, mode):
+        goto(pg, base, query, t)
+        if mode == "hers":
+            try:
+                pg.wait_for_function("() => document.documentElement.dataset.voMode === 'named' && document.querySelectorAll('.vo-real').length >= 9", timeout=15000)
+            except Exception:
+                pass
+            pg.wait_for_timeout(300)
+        return pg.evaluate(BLURS)
+
+    modes = [("generic", "")] + ([("hers", f"r={PROD_SLUG}")] if raw else [])
+    for vp, opts in (("1920", dict(viewport={"width": 1920, "height": 1080})), ("phone", VIEWPORTS["phone"])):
+        for mode, query in modes:
+            ctx, ext = page(opts)
+            pg = ctx.new_page()
+            errs = []
+            console(pg, errs)
+            for t in (11, 15.5, 47):
+                s = load(pg, query, t, mode)
+                f = out / f"blur-{vp}-{mode}-t{t}.png"
+                (pg if vp == "1920" else pg.locator(".vo-stage")).screenshot(path=str(f))
+                print(f"blur {vp} {mode} t={t}: {[s[0] for s in pg.evaluate(VISIBLE)]} -> {f.name}")
+            lbl = f"{vp} {mode}"
+            imgs = [(c, x) for c, xs in s["cards"] for x in xs] + [("-", x) for x in s["stray"]]
+            per = {c: len(xs) for c, xs in s["cards"] if xs}
+            bad = [(c, x[0], x[1], x[3]) for c, x in imgs if BLUR(x[3]) != BLUR_PX or "saturate(0.95)" not in x[3]]
+            real = [x for c, x in imgs if "vo-real" in x[0]]
+            need = {"google", "google-images"} | ({"cta-steps"} if mode == "hers" else set())
+            check(f"blur ({lbl}): every leak image on every card ({len(imgs)} on {per}{', stray ' + str(len(s['stray'])) if s['stray'] else ''}) = blur({BLUR_PX}px) saturate(0.95)",
+                  len(imgs) >= 13 and need <= set(per) and not bad, bad[:6])
+            if mode == "hers":
+                check(f"blur ({lbl}): all {len(real)} .vo-real (intro + end-card report) = her (local stand-in) photos loaded, blur({BLUR_PX}px), scale(1.2) kept",
+                      len(real) >= 18 and all(x[2] > 0 and BLUR(x[3]) == BLUR_PX and x[4].startswith("matrix(1.2, 0, 0, 1.2") for x in real), [(x[2], x[3], x[4]) for x in real][:4])
+            check(f"blur ({lbl}): the after state's {len(s['own'])} own photos (.vo-own) unblurred", len(s["own"]) >= 4 and not [x for x in s["own"] if "blur" in x[3]], [x[3] for x in s["own"]][:4])
+            check(f"blur ({lbl}): mode {('named' if mode == 'hers' else 'generic')!r}, no console errors (but the declared media 404s), no requests outside the local server",
+                  s["mode"] == ("named" if mode == "hers" else "generic") and not ext and not [e for e in errs if "status of 404" not in e], (s["mode"], errs[:2], ext[:2]))
+            ctx.close()
+    if base_ref:   # the same images' computed filters vs REF's css: only the blur radius moved
+        for mode, query in modes:
+            st = []
+            for ref in (base_ref, None):
+                ctx, _ = page(dict(viewport={"width": 1920, "height": 1080}), ref=ref)
+                pg = ctx.new_page()
+                st.append(load(pg, query, 47, mode))
+                ctx.close()
+            norm = lambda s, px: [[c, [[x[0], x[1], x[3].replace(f"blur({px}px)", "blur(R)"), x[4]] for x in xs]] for c, xs in s["cards"]] + [s["stray"], [x[3] for x in s["own"]]]
+            was = sorted({x[3] for c, xs in st[0]["cards"] for x in xs})
+            check(f"blur base ({mode}): computed filters == {base_ref}'s ({was}) but blur(5px) → blur({BLUR_PX}px), same images / transforms / own photos",
+                  norm(st[0], 5) == norm(st[1], BLUR_PX) and was == ["blur(5px) saturate(0.95)"], was)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
@@ -1914,9 +2000,10 @@ def main():
     ap.add_argument("--break-herend", action="store_true")
     ap.add_argument("--break-burst", action="store_true")
     ap.add_argument("--hers-raw", help="her saved scan result (JSON) instead of the read-only production GET")
-    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers", "google"], help="run only this part (iteration)")
+    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers", "google", "blur"], help="run only this part (iteration)")
     ap.add_argument("--base", help="google post: compare the cards after google-images' entrance with this git ref's page / js / css")
     ap.add_argument("--break-gtime", action="store_true")
+    ap.add_argument("--break-blur", action="store_true")
     a = ap.parse_args()
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -1991,6 +2078,10 @@ def main():
         html, k = re.subn(r'(data-prefab="google" data-cue-live="[\d.]+" data-cue-removed=")[\d.]+"', r'\g<1>%s"' % G_REMOVED_OLD, BREAK["steps"][1] if "steps" in BREAK else html)
         assert k == 1, "break: google's data-cue-removed not found"
         BREAK["gtime"] = (lambda u: urllib.parse.urlsplit(u).path.endswith("/video/"), html, "text/html")
+    if a.break_blur:   # wire boundary: css/video.css with the old blur(5px) on .vo .rm-img / .vo-real
+        css, k = re.subn(r"filter: blur\(2px\)", "filter: blur(5px)", BREAK["full"][1] if "full" in BREAK else (ROOT / "site/css/video.css").read_text(encoding="utf-8"))
+        assert k == 2, f"break: {k} blur(2px) in video.css"
+        BREAK["blur"] = ("**/css/video.css", css, "text/css")
     fl = {k: tuple(map(float, re.search(r'data-prefab="%s" data-cue-in="([\d.]+)" data-cue-out="([\d.]+)"' % k, html).groups())) for k in ("intro", "sites")}
     pf = [(m[1], float(m[2]), float(m[3]), float(m[4])) for m in re.finditer(
         r'data-prefab="([\w-]+)" data-cue-live="([\d.]+)" data-cue-removed="([\d.]+)" data-cue-out="([\d.]+)"', html)]
@@ -2026,6 +2117,11 @@ def main():
             return 1 if fails else 0
         if a.only == "google":
             gsearch(b, base, out, cues, a.hers_raw, a.base)
+            for f in fails:
+                print("FAIL", f)
+            return 1 if fails else 0
+        if a.only == "blur":
+            blur(b, base, out, a.hers_raw, a.base)
             for f in fails:
                 print("FAIL", f)
             return 1 if fails else 0
@@ -2176,6 +2272,7 @@ def main():
         sources(p, b, base, out)
         fill(b, base, out, name_q, a.name, fl["intro"], fl["sites"], cta)
         gsearch(b, base, out, cues, a.hers_raw, a.base)
+        blur(b, base, out, a.hers_raw, a.base)
         if a.hers_raw or not a.skip_prod:
             hers(b, base, out, a.hers_raw, a.skip_prod)
         if not a.skip_prod:
