@@ -10,7 +10,7 @@
   end card .vo-cta, no cues of its own: data-cue-cta; a phone replica of the landing: 3 .vo-step scenes (hero with the
   site's h1 + the onlyfans.com/ field + "Scan now", scan card, report card with tabs + *.example placeholder rows only) +
   the "Rewatch this video with YOUR content" toast with the name flip + the real form inside it; named mode: the same take
-  typing jakabasej too, ending "This is what I'd clear for <name>" + the contact row, no form). The 5 cued ones each have numeric data-cue-live <
+  typing jakabasej too, the same demo report (never hers), ending on the compact contact row only, no name, no form). The 5 cued ones each have numeric data-cue-live <
   data-cue-removed < data-cue-out, and no overlap: each prefab is out before the next one comes in (cues ascending);
   room for the animations (js/video-overlays.js): removed - live >= 0.45 s pop-in (google-images: >= 1.2 s, its tap +
   grid; an optional data-cue-tap sits in live + 0.45 .. removed - 0.7), out - removed >= 1.95 s (snap shake 0.25 + wipe
@@ -143,7 +143,7 @@ def modes(html, p, last_out):
             bad.append(f"video/index.html: prefab {pf.get('data-prefab')} has no .vo-kw (live + gone word card)")
     js = (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8")
     for need, what in (("'SophieStar'", "the generic persona"), ("q.get('sfx') !== '0'", "the ?sfx=0 switch"), ("E.runScan({", "the name bar's scan (landing runScan)"),
-                       ("E.fetchResult(slug)", "the ?r= result read"), ("'/api/media/'", "her own photos (/api/media/)")):
+                       ("E.fetchResult(s)", "the ?r= / last scan result read"), ("'/api/media/'", "her own photos (/api/media/)")):
         if need not in js:
             bad.append(f"js/video-overlays.js: {what} ({need}) missing")
     css = (SITE / "css" / "video.css").read_text(encoding="utf-8")
@@ -176,9 +176,11 @@ def steps_and_player(html, p):
     pers = re.search(r"function personal\(n\) \{(.*?)\n  \}", js, re.S)
     if not pers or "ctac = cta(true)" not in pers[1]:
         bad.append("js/video-overlays.js: personal() must play cta-steps with her name (ctac = cta(true))")
-    for s in ("This is what I'd clear for", "Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"):
+    for s in ("Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"):
         if s not in html:
             bad.append(f"video/index.html: the named end toast lacks {s!r}")
+    if "This is what I'd clear for" in html or "vo-end-who" in html:
+        bad.append("video/index.html: the end card names the viewer (it is Jack's jakabasej demo in every mode)")
     if "function steps(c, t)" not in js:
         bad.append("js/video-overlays.js: cta-steps loop (steps()) missing")
     css = (SITE / "css" / "video.css").read_text(encoding="utf-8")

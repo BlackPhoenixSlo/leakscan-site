@@ -6,17 +6,18 @@
 // Two modes (html[data-vo-mode]): "generic" (demo persona "SophieStar": sophiestar.com, @sophiestar; default blurred thumbs, no pill; at data-cue-cta the cta-steps
 // end card: a phone replica of the landing, one 10 s take: zoom onto the onlyfans.com/ field, types "Jaka Basej" (or the
 // viewer's typed name in its form) as a handle, "Scan now" → "Searching Google, step N of 9…" → the report "87 links found" + tabs + rows →
-// "Rewatch this video with YOUR content" + SophieStar flipping to the typed name (else stays), looping after the video ends) and "named" (?name=, ?r= or the name
-// bar: her texts, the "for <name>" pill 0 .. 2 s and from data-cue-say (after his last word); nothing is ever spoken (Jack's
-// voice only, no speech synthesis); at data-cue-cta the same take, typing handle(DEMO) "jakabasej" (@jakabasej) too, the report = HER counts / rows /
-// thumbs, ending on "This is what I'd clear for <name>" + the contact row, held 5 s per loop).
+// "Rewatch this video with YOUR content" + SophieStar flipping to the typed name (else stays), looping after the video ends) and "named" (?name=, ?r=, the
+// last scan or the name bar: her texts, the "for <name>" pill 0 .. 2 s and from data-cue-say (after his last word); nothing is ever spoken (Jack's
+// voice only, no speech synthesis); at data-cue-cta the same take = Jack's own demo in every mode: typing handle(DEMO) "jakabasej" (@jakabasej),
+// the placeholder report (never her counts / rows / thumbs / name), ending on a compact contact row (no name), held 5 s per loop).
 // Production images (named): a scan result (js/scan-engine.js: ?r= → fetchResult(slug) = GET <API>/api/scan-result/<slug>; the
 // name bar → runScan = the landing's POST <API>/api/public-scan, onlyfans.com/<handle>) fills the cards like the landing
 // hero card (js/inline-scan.js model): Google rows = her real result domains + titles, Google Images grid + every .rm-img
 // = her real Google thumbs via <API>/api/thumb (blurred, .rm-img), people photos only: each probed like the landing
 // report's gallery() (js/inline-scan.js), kept if it loads >= 16 px and E.isPhoto (js/scan-engine.js) passes, so the
-// cards drop the same logos / banners / icons as the report (VideoOverlays.photos = {kept, dropped}); the cta-steps report = her real counts (links / images /
-// sites) + rows + thumbs; the after photos = her own SFW photos (GET <API>/api/media/<slug> → /<n>.jpg, unblurred .vo-own),
+// cards drop the same logos / banners / icons as the report (VideoOverlays.photos = {kept, dropped}); the cta-steps report (links / images /
+// sites) stay the demo's (jakabasej); the gap card's wall = her result's sites (hosts, most links first) then his whiteboard names;
+// the Mega caption = her folder's size; the after photos = her own SFW photos (GET <API>/api/media/<slug> → /<n>.jpg, unblurred .vo-own),
 // else the defaults. A failed scan / read = text only. Leak URLs are read for their host, never rendered.
 // While the name bar's scan runs: the .vo-wait status pill ("Searching Google, step N of 9…"); the take plays its intro and
 // holds (paused) on the intro's "Building YOUR video…" beat (no intro: just before the first card) until the result lands
@@ -43,7 +44,9 @@
 // the "Building YOUR video…" beat (build()); slides out before the google card. While the name bar's scan runs the take
 // holds on that beat (holdAt()). Gap card (.vo-sites, its data-cue-in .. -out, 28.2-34.6 s, "any of these websites…
 // like 10,000 of them"): site names from his whiteboard (text only, no logos / URLs) struck "Removed" in turn, the
-// counter rolling to 10,000+ (sites()). Neither is a cued prefab (pfs): no cue rules, no sounds, no confetti.
+// counter rolling to 10,000+ (sites()); named + a scan result: her sites' hosts first. Neither is a cued prefab (pfs): no cue rules, no sounds, no confetti.
+// Last scan: no ?r= / ?name= → localStorage leakscan.last (js/scan-engine.js remember(), the landing's scan), read at load and
+// again on its `storage` event (the landing's mini player iframe, js/pip.js, loaded before her scan finished: it turns hers in place).
 // Keys: space = play / pause, Esc closes the theater. textContent only; requests: transcript.json + the scan API above (js/scan-engine.js host) only.
 (function () {
   'use strict';
@@ -136,8 +139,7 @@
   }
   function steps(c, t) {   // cta-steps at t: u = seconds into its loop (from the card's live cue, = the clip's 0 s)
     var v = c.intro ? Math.min(Math.max(0, t - c.live), INTRO_U) : Math.max(0, t - c.live) % (c.named ? CYCLE + HOLD : CYCLE), u = c.named && !c.intro && v >= SETTLED ? Math.max(SETTLED, v - HOLD) : v;
-    var box = c.steps, name = c.named ? who : demoName(), rr = c.named ? real : null, bs = box.style,
-      h = handle(c.named ? DEMO : name), vh = rr ? rr.handle : handle(name), q1 = function (s) { return box.querySelector(s); };   // h typed / @: jakabasej in named mode too; vh: placeholder titles
+    var box = c.steps, bs = box.style, h = handle(c.named ? DEMO : demoName()), q1 = function (s) { return box.querySelector(s); };   // h typed / @ / the titles: jakabasej in named mode too
     var sc = box.querySelectorAll('.vo-step'), pgs = box.querySelectorAll('.vo-pg'), W = q1('.vo-scr').clientWidth, T0 = W / 390;
     Array.prototype.forEach.call(sc, function (el, i) {
       var a = u - SCENES[i][0], d = SCENES[i][1] - SCENES[i][0], o = i === 0 && u >= SCENES[2][1] ? clamp((u - SCENES[2][1]) / 0.2) : a >= 0 && a < d + 0.2 ? Math.min(i ? clamp(a / 0.2) : 1, clamp((d + 0.2 - a) / 0.2)) : 0;
@@ -161,7 +163,7 @@
     bs.setProperty('--bar', p.toFixed(3));
     bs.setProperty('--shim', (1 - (u * 0.8) % 1).toFixed(3));
     // 3 the report card: zoom onto "N links found" while it rolls to LEAKS, pull back over the tabs + rows; the end toast + flip
-    var tabs = rr ? [rr.links, rr.nimg, rr.sites] : TABS, L = tabs[0];   // her real counts, else the placeholder's
+    var tabs = TABS, L = tabs[0];   // the demo's counts, every mode (never the viewer's)
     var chip = lay(q1('.vo-mc'), pgs[2]), m = Math.round(L * (1 - Math.pow(1 - clamp((u - 7.2) / 0.75), 3))), f = clamp((u - 9.05) / 0.25);
     camera(pgs[2], [[7, top(1.42)], [7.5, [chip.x + chip.w / 2, chip.y + chip.h / 2 - 16, 2.4]], [8.1, [chip.x + chip.w / 2, chip.y + chip.h / 2 - 16, 2.4]], [8.6, top(0.8)]], u);
     setText(q1('.vo-mc-n'), String(m));
@@ -171,18 +173,14 @@
     Array.prototype.forEach.call(box.querySelectorAll('.vo-tabs2 b'), function (el, i) { setText(el, String(tabs[i])); });
     setText(q1('.vo-more'), '+ ' + Math.max(0, L - 5) + ' more in the full report');
     Array.prototype.forEach.call(box.querySelectorAll('.vo-row'), function (el, i) {
-      var r = rr && rr.rows[i], d = el.querySelector('.vo-dom');
-      if (d.__def == null) d.__def = d.textContent;
-      setText(d, r ? r.dom : d.__def);
-      setText(el.querySelector('.vo-ttl'), r ? r.title : i === 2 ? 'Search results for ' + vh : vh + ttl[i]);
+      setText(el.querySelector('.vo-ttl'), i === 2 ? 'Search results for ' + h : h + ttl[i]);
       el.style.setProperty('--ro', (u < 7 ? 1 : clamp((u - 8.15 - i * 0.08) / 0.2)).toFixed(3));
     });
     var eo = u < SCENES[2][1] ? clamp((u - 8.75) / 0.3) : clamp((SCENES[2][1] + 0.2 - u) / 0.2);
     bs.setProperty('--eo', eo.toFixed(3));
     bs.setProperty('--es', (0.9 + 0.1 * back(clamp((u - 8.75) / 0.35))).toFixed(4));
     bs.setProperty('--fl', ((f < 0.5 ? f : f - 1) * 180).toFixed(1));   // 0 → 90deg, swap the text, -90 → 0
-    setText(q1('.vo-mini-n'), f < 0.5 ? GENERIC : c.named ? name : typedName() || GENERIC);   // generic: SophieStar → the typed name, else stays
-    setText(q1('.vo-end-who'), name);
+    setText(q1('.vo-mini-n'), f < 0.5 ? GENERIC : typedName() || GENERIC);   // generic: SophieStar → the typed name, else stays (named: hidden)
     bs.setProperty('--fp', (1 + 0.3 * bump((u - 9.3) / 0.3)).toFixed(3));
   }
   function build(c, t) {   // the intro's "Building YOUR video…" beat: pops in over the phone, its bar fills
@@ -196,6 +194,8 @@
     var s = t - c.live, r = clamp((s - SITES_ROLL[0]) / (SITES_ROLL[1] - SITES_ROLL[0])), n = Math.round(SITES_N * (1 - Math.pow(1 - r, 3)));
     setText(c.n, thousands(n) + (r >= 1 ? '+' : ''));
     Array.prototype.forEach.call(c.items, function (el, i) {
+      var b = el.querySelector('b'), nm = c.names[i];
+      if (b.textContent !== nm) { b.textContent = nm; b.style.setProperty('--fs', Math.min(1, 12 / nm.length).toFixed(3)); }   // a long host shrinks to its tile
       el.style.setProperty('--k', clamp((s - SITES_STRIKE - i * SITES_STEP) / 0.2).toFixed(3));
       el.style.setProperty('--ti', clamp((s - 0.1 - i * 0.04) / 0.15).toFixed(3));
     });
@@ -299,7 +299,7 @@
     var v = { name: name, site: m.site || (h.replace(/[^a-z0-9-]/g, '') || 'creator') + '.com', ig: m.ig || h, tt: m.tt || m.ig || h, 'mega-title': m.mtitle || name + ' – pack', 'x-l1': m.xtext || name + ' leaked', 'x-l2': m.xtext ? '' : name + ' ' + (m.plat || 'onlyfans'),
       sub: m.sub || 'r/' + (h.replace(/\./g, '').slice(0, 14) || 'creator') + '_leaks', 'rd-title': m.rtitle || name + ' full pack, link in comments' };
     if (m.xat) { v['x-at'] = m.xat; v['x-name'] = m.xat.slice(1); v['x-av'] = m.xat.charAt(1).toUpperCase(); }
-    if (m.mmeta) { v['mega-meta'] = m.mmeta; var gb = /\d[\d.,]*\s*[KMGT]B/.exec(m.mmeta); if (gb) v['mega-gb'] = gb[0]; }
+    if (m.mmeta) { v['mega-meta'] = m.mmeta; var gb = /\d[\d.,]*\s*[KMGT]B/.exec(m.mmeta); if (gb) v['mega-gb'] = v['mega-cap'] = gb[0]; }
     if (m.mvid != null) v['mega-vid'] = m.mvid + ' files';
     if (m.mimg != null) v['mega-img'] = m.mimg + ' files';
     if (m.host) v.host = m.host;
@@ -355,7 +355,7 @@
   // raw → {slug, handle, links, sites, nimg (the landing card's Links / Sites / Images tabs), rows [{dom, title}] (titled ones),
   // imgs [/api/thumb URLs], gtotal}
   function report(raw) {
-    var seen = {}, by = {}, rows = [], res = [], sites = 0;
+    var seen = {}, by = {}, rows = [], res = [], sites = 0, hosts = [];
     var add = function (u, d, title) {
       var x = link(u);
       if (!x || seen[x.href]) return;
@@ -363,7 +363,8 @@
       if (!d) return;
       seen[x.href] = 1;
       rows.push({ dom: d, title: str(title, 200) });
-      if (!by[d]) { by[d] = 1; sites++; }
+      if (!by[d]) { by[d] = 0; sites++; hosts.push(d); }
+      by[d]++;
     };
     (Array.isArray(raw.hits) ? raw.hits : []).slice(0, 1000).forEach(function (h) { if (h) add(h.url, h.domain, h.title); });
     (Array.isArray(raw.results) ? raw.results : []).slice(0, 200).forEach(function (r) {
@@ -380,6 +381,7 @@
       E.imageItems(gi, res, okThumb, Infinity, true).filter(function (it) { return it.video && !had[it.src]; })).slice(0, 60);
     var g = typeof raw.google_total === 'number' && raw.google_total > 0 && raw.google_total < 1e9 ? Math.round(raw.google_total) : null;
     return { slug: raw.slug, handle: R && R.model(raw).handle, links: rows.length, sites: sites, nimg: items.length,
+      hosts: hosts.sort(function (a, b) { return by[b] - by[a]; }),   // most links first (stable: first seen on a tie)
       rows: rows.filter(function (r) { return r.title; }), imgs: items.map(function (it) { return E.thumb(it.src); }).filter(Boolean),
       gtotal: g && 'About ' + g.toLocaleString('en-US') + ' results' };
   }
@@ -408,13 +410,16 @@
     if (r.rows.length) {
       put(q1('.vo-pf[data-prefab="google"] .rm-live'), r.rows.slice(0, 4).map(function (x, i) { return row(x, i || !im.length ? [] : [at(0), at(1), at(2)]); }));
       put(q1('.vo-gi .vo-serp'), r.rows.slice(0, 2).map(function (x) { return row(x, []); }));
+      Array.prototype.forEach.call(root.querySelectorAll('.vo-gi .rm-live .gi-cap'), function (b, i) {   // no images yet / none kept: her hosts under the defaults
+        var d = r.rows[(i + 2) % r.rows.length].dom;
+        put(b, [letter(d, 'gi-fav'), el('span', 'gi-cap-t', [d])]);
+      });
     }
     if (im.length) {
       put(q1('.vo-gi .rm-live .vo-grid'), [0, 1, 2, 3, 4, 5].map(function (i) {
         var x = r.rows[i % Math.max(1, r.rows.length)], d = x ? x.dom : r.handle + '.com';
         return el('span', 'vo-gc', [el('span', 'vo-gt', [pic(at(i), 'rm-img')]), el('span', 'gi-cap', [letter(d, 'gi-fav'), el('span', 'gi-cap-t', [d])])]);
       }));
-      Array.prototype.forEach.call(root.querySelectorAll('.vo-rows .vo-th, .vo-strip i'), function (b, i) { put(b, [pic(at(i), 'vo-real')]); });
     }
   }
   // her own SFW photos (the scan's /api/media/<slug>: Instagram etc.) into the Google Images after grid, unblurred; none = defaults
@@ -475,6 +480,7 @@
     var g = gen, all = r.imgs;
     r.imgs = [];
     real = r;
+    wall(r.hosts);
     realize();   // her rows now, her images once probed
     photoOnly(all, function (kept) {
       if (g !== gen || real !== r) return;
@@ -500,6 +506,9 @@
   };
   var intro = function (nm) { return timed(introEl, { steps: introEl && introEl.querySelector('.vo-steps'), named: nm, intro: true }); };
   sitesc = timed(sitesEl, { items: sitesEl && sitesEl.querySelectorAll('.vo-sites-l li'), n: sitesEl && sitesEl.querySelector('.vo-sites-n') });
+  var WALL = sitesc ? Array.prototype.map.call(sitesc.items, function (li) { return li.querySelector('b').textContent; }) : [];   // his whiteboard names
+  function wall(hosts) { if (sitesc) sitesc.names = hosts.slice(0, WALL.length).concat(WALL).slice(0, WALL.length); }   // her sites first, then his names
+  wall([]);
   function personal(n) {
     who = n;
     mode('named');
@@ -523,6 +532,7 @@
   Array.prototype.forEach.call(imgs, function (im) { im.__def = im.getAttribute('src'); });
   function apply(v) {
     real = null;
+    wall([]);
     unput();
     Array.prototype.forEach.call(slots, function (el) { el.textContent = el.__def; if (el.classList.contains('vo-roll')) el.__src = el.__def; });
     Array.prototype.forEach.call(imgs, function (im) { if (im.getAttribute('src') !== im.__def) im.setAttribute('src', im.__def); });
@@ -539,10 +549,13 @@
     personal(name);
   }
   else {   // the shared scan result, same slug rule as js/removals.js (E.currentSlug: ?r= → last scan → none = generic)
-    var slug = E && E.currentSlug ? E.currentSlug() : null, g0 = gen;
-    if (slug && E.fetchResult && R) {
-      E.fetchResult(slug).then(function (raw) { if (g0 === gen && who === null) useResult(raw); }, function () { /* generic */ });
+    var g0 = gen, load = function (s, g) {
+      if (s && E.fetchResult && R) E.fetchResult(s).then(function (raw) { if (g === gen && (who === null || real)) useResult(raw); }, function () { /* generic */ });
+    };
+    if (E && E.currentSlug && q.get('r') === null) {   // the last scan: also whenever another page of this site (the landing around the mini player) stores a new one
+      window.addEventListener('storage', function (e) { if (e.key === 'leakscan.last' && g0 === gen) { var s = E.currentSlug(); if (s && (!real || real.slug !== s)) load(s, gen); } });
     }
+    load(E && E.currentSlug ? E.currentSlug() : null, g0);
   }
   var form = ctaEl && ctaEl.querySelector('form'), nbForm = nb && nb.querySelector('form');
 
