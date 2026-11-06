@@ -331,13 +331,13 @@
       ig: ok(so.instagram) || acc('instagram') || (plat === 'instagram' ? ok(raw.handle) : null), tt: acc('tiktok') || (plat === 'tiktok' ? ok(raw.handle) : null) };
   }
   // the scan's thumbs into every .rm-img, cycled, same as js/removals.js render(); a failed one falls back to its default
-  function thumbs(list) {
+  function thumbs(list, raw) {   // raw: list = raw scan thumbs, shown via E.put (the probe's cached load, no second request)
     if (!list || !list.length) return;
     Array.prototype.forEach.call(root.querySelectorAll('.rm-img'), function (im, i) {
       var def = im.getAttribute('src'), src = list[i % list.length];
       im.referrerPolicy = 'no-referrer';
-      im.addEventListener('error', function () { if (im.getAttribute('src') === src) im.setAttribute('src', def); }, { once: true });
-      im.setAttribute('src', src);
+      if (raw) { im.removeAttribute('crossorigin'); E.put(im, src); src = im.getAttribute('src'); } else im.setAttribute('src', src);
+      im.addEventListener('error', function () { if (im.getAttribute('src') === src) { im.removeAttribute('crossorigin'); im.setAttribute('src', def); } }, { once: true });
     });
   }
   // ---------- the production scan result → her real rows, counts, thumbs (= js/inline-scan.js model(), not loaded here) ----------
@@ -390,7 +390,7 @@
     var lm = E.reportModel && E.reportModel(raw, { handle: null, platform: 'onlyfans.com' });   // the landing report's own model: its Links / Sites counts
     return { slug: raw.slug, handle: R && R.model(raw).handle, links: lm ? lm.rows.length : rows.length, sites: lm ? lm.sites.length : sites, nimg: items.length,
       hosts: hosts.sort(function (a, b) { return by[b] - by[a]; }),   // most links first (stable: first seen on a tie)
-      rows: rows.filter(function (r) { return r.title; }), imgs: items.map(function (it) { return E.thumb(it.src); }).filter(Boolean),
+      rows: rows.filter(function (r) { return r.title; }), imgs: items.map(function (it) { return it.src; }).filter(function (u) { return E.thumb(u); }),   // raw: E.photo / E.put take these
       gtotal: g && 'About ' + g.toLocaleString('en-US') + ' results' };
   }
   function el(tag, cls, kids) {
@@ -399,7 +399,7 @@
     (kids || []).forEach(function (k) { if (k != null) e.appendChild(typeof k === 'string' ? document.createTextNode(k) : k); });
     return e;
   }
-  function pic(src, cls) { var im = el('img', cls); im.alt = ''; im.decoding = 'async'; im.referrerPolicy = 'no-referrer'; im.src = src; return im; }
+  function pic(src, cls) { var im = el('img', cls); im.alt = ''; im.decoding = 'async'; im.referrerPolicy = 'no-referrer'; E.put(im, src); return im; }   // src: a raw thumb (E.put: the probe's cached load)
   function letter(d, cls) { var s = el('span', cls, [d.charAt(0).toUpperCase()]); s.style.background = E.favColor(d); return s; }
   var swapped = [];   // boxes whose children realize() replaced, each with its default children
   function put(box, kids) {
@@ -449,32 +449,34 @@
       });
     }, noop);
   }
-  // people photos only: every thumb probed once as the landing report's gallery() does (js/inline-scan.js: CORS load when
-  // the API is another origin, refused → a plain one; kept if >= 16 px both sides and E.isPhoto), done(kept) when all
-  // settled (at most PROBE_MAX s: an unsettled one is left out until it settles, then done(kept) again: the Images count
-  // ends = the landing's, which waits for every one)
-  var BLANK = 16, PROBE_MAX = 6, people = { kept: [], dropped: [] };
+  // people photos only: each raw thumb's verdict from the engine's E.photo (the landing report's own rule and probe:
+  // >= 16 px, E.isPhoto, a 429 retried after RETRY_MS), LANES at a time, GAP s apart (= the engine's paced prober: under
+  // /api/thumb's 2/s; a burst got 429s = photos dropped, the Images count below the landing's on iPhone). done(kept) at
+  // PROBE_MAX s or once all settled; one settling later → done(kept, true) again: the Images count ends = the landing's.
+  // photos: kept / dropped as <API>/api/thumb URLs, settled once every one has its verdict
+  var PROBE_MAX = 6, LANES = 2, GAP = 1, people = { kept: [], dropped: [], settled: false };
   function photoOnly(list, done) {
-    var left = list.length, ok = {}, fin = false, end = function (late) {
+    var left = list.length, ok = {}, fin = false, i = 0, g = gen, end = function (late) {
       if (fin && !late) return;
       fin = true;
-      people = { kept: list.filter(function (u) { return ok[u] === 1; }), dropped: list.filter(function (u) { return ok[u] !== 1; }) };
+      var kept = list.filter(function (u) { return ok[u] === 1; });
+      people = { kept: kept.map(E.thumb), dropped: list.filter(function (u) { return ok[u] !== 1; }).map(E.thumb), settled: !left };
       if (api) api.photos = people;
-      done(people.kept, !!late);
+      done(kept, !!late);
     };
     if (!left) return end();
     setTimeout(end, PROBE_MAX * 1000);
-    list.forEach(function (u) {
-      var probe = function (cors) {
-        var im = new Image(), set = function (v) { if (ok[u] == null) { ok[u] = v; left--; if (!left || fin && v) end(fin); } };
-        im.referrerPolicy = 'no-referrer';
-        if (cors) im.crossOrigin = 'anonymous';
-        im.onload = function () { set(im.naturalWidth >= BLANK && im.naturalHeight >= BLANK && E.isPhoto(im) ? 1 : 0); };
-        im.onerror = function () { if (cors) probe(false); else set(0); };
-        im.src = u;
-      };
-      probe(E.XO);
-    });
+    var lane = function () {
+      if (i >= list.length || g !== gen) return;
+      var u = list[i++];
+      E.photo(u, function (v) {
+        if (ok[u] != null) return;
+        ok[u] = v ? 1 : 0; left--;
+        if (!left || fin) end(fin);
+        setTimeout(lane, GAP * 1000);
+      });
+    };
+    for (var k = 0; k < LANES; k++) lane();
   }
   // a scan result → named mode with her texts + real images (people photos only); false if unusable (text only stays);
   // done() once the images are in
@@ -495,12 +497,12 @@
     photoOnly(all, function (kept, late) {
       if (g !== gen || real !== r) return;
       r.nimg = kept.length;   // the report's Images tab: what is left, as on the landing
-      if (late) return draw(video.currentTime);   // a probe past PROBE_MAX: only the count (no thumb reshuffle mid-play)
+      if (late && r.imgs.length) return draw(video.currentTime);   // a probe past PROBE_MAX: only the count (no thumb reshuffle mid-play)
       r.imgs = kept;
-      thumbs(kept.length ? kept : all.length ? [] : m.thumbs);   // all dropped: the defaults stay (text only)
+      if (kept.length) thumbs(kept, true); else if (!all.length) thumbs(m.thumbs);   // all dropped: the defaults stay (text only)
       realize();
       draw(video.currentTime);
-      if (done) done();
+      if (done) { done(); done = null; }   // once: a late first photo comes through here too
     });
     draw(video.currentTime);
     return true;
