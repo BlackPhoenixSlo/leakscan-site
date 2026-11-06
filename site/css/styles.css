@@ -214,7 +214,7 @@ strong { font-weight: 600; }
   .hero h1 { font-size: 2.125rem; margin-bottom: .3em; }
   .hero .lead { font-size: 1rem; line-height: 1.5; margin-bottom: 0; }
   .hero .scan-form { margin-top: 18px; gap: 8px; }
-  .hero .scan-note { margin-bottom: 6px; }
+  .hero .scan-slot { margin-bottom: 6px; }
   .assurances { gap: 8px; font-size: .92rem; }
   .hero-grid { gap: 22px; }
 }
@@ -253,10 +253,18 @@ strong { font-weight: 600; }
 .more[open] .more-t::after { content: " \2212"; }
 .more p { margin: 6px 0 0; font-size: .92rem; line-height: 1.5; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); }
 /* Free-scan form: OnlyFans + optional Instagram / X. With JS it scans in place (js/inline-scan.js); without, a plain GET
-   to scan/. Stacked on phones; from 560px the OnlyFans field gets its own row, Instagram / X + button share the next
-   (one row of three clipped both placeholders and a typed handle at every width up to the 680px cap). */
-.scan-form { display: grid; gap: 10px; margin: 30px 0 12px; max-width: 640px; }
-@media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1fr) auto; } .scan-form > :first-child { grid-column: 1 / -1; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
+   to scan/. Stacked on phones; from 560px the OnlyFans field + button share one row, Instagram / X gets the next.
+   With JS (html.js) and :has(), an empty Instagram / X field folds behind "+ Add Instagram or X" (.scan-more, js/main.js
+   adds .ig-open); a typed or restored value keeps it open; no JS or no :has() = always shown. */
+.scan-form { display: grid; gap: 10px; margin: 30px 0 10px; max-width: 640px; }
+.scan-form .scan-ig { grid-column: 1 / -1; }
+@media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1fr) auto; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
+@media (min-width: 960px) and (max-width: 1099px) { .scan-form .btn-lg { min-width: 0; padding-inline: 1em; } .scan-form .btn-lg .icon { display: none; } }   /* narrow 2-column hero: the handle keeps room for 20 characters */
+.js .scan-form:not(.ig-open):has(.scan-social:placeholder-shown) .scan-ig { display: none; }
+.scan-more { margin: 0 0 10px; color: var(--muted); font-size: .92rem; line-height: 24px; }
+.scan-more button { display: none; margin-right: .5em; font-weight: 600; text-decoration: none; }
+@media (hover: hover) { .scan-more button:hover { text-decoration: underline; } }
+.js .scan-form:not(.ig-open):has(.scan-social:placeholder-shown) ~ .scan-more button { display: inline-block; }
 .scan-prefix { display: flex; flex-wrap: wrap; align-items: center; gap: 0; padding: 0 0 0 1.1em; cursor: text; }
 /* the field's own name, always shown (the placeholder is only an example) */
 .scan-lbl { flex: 0 0 100%; padding-top: 9px; font: 600 .76rem/1.2 var(--sans); letter-spacing: .02em; color: var(--muted); user-select: none; }
@@ -282,15 +290,17 @@ strong { font-weight: 600; }
   -webkit-appearance: none; appearance: none; cursor: pointer; padding-right: 2.6em;
   background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23948779' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 1em center / 18px;
 }
-.scan-note { margin: 0 0 12px; color: var(--muted); font-size: .97rem; line-height: 24px; }
+.scan-note { color: var(--muted); font-size: .97rem; line-height: 24px; }
 .scan-note strong { color: var(--ink); }
-/* after a scan this line takes the note's place: same slot, same height, nothing under the form moves */
-.scanned { display: flex; gap: .35em; margin: 0 0 12px; color: var(--muted); font-size: .95rem; line-height: 24px; white-space: nowrap; }
+/* after a scan this line takes the note's place: one grid cell, the note keeps its height (hidden), nothing under the form moves */
+.scan-slot { display: grid; margin: 0 0 12px; }
+.scan-slot > * { grid-area: 1 / 1; align-self: start; min-width: 0; margin: 0; }
+.scanned { display: flex; gap: .35em; margin: 0; color: var(--muted); font-size: .95rem; line-height: 24px; white-space: nowrap; }
 .scanned[hidden] { display: none; }
 .scanned > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .scanned strong { color: var(--ink); }
 .scanned .linkish { font: inherit; line-height: inherit; padding: 0; }
-.scanned:not([hidden]) + .scan-note { display: none; }
+.scanned:not([hidden]) + .scan-note { visibility: hidden; }
 .linkish { padding: 0; border: 0; background: none; font: inherit; color: var(--accent, inherit); text-decoration: underline; cursor: pointer; min-height: 24px; }
 .assurances { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); font-size: .95rem; line-height: 1.5; max-width: 36em; }
 .assurances li { display: flex; align-items: flex-start; gap: 10px; }
@@ -327,11 +337,17 @@ strong { font-weight: 600; }
 .report-rows li:last-child { border-bottom: 0; }
 .row-url { font: 500 .93rem/1.3 var(--sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .report-rows .thumb { width: 40px; height: 40px; border-radius: 10px; }
-/* illustration letters: the palette, not Google's (inline colours are the markup's defaults) */
-.report-rows li:nth-child(1) .lav { background: #6b3a5e !important; }
-.report-rows li:nth-child(2) .lav { background: #a24d77 !important; }
-.report-rows li:nth-child(3) .lav { background: #4a2a52 !important; }
-.report-rows li:nth-child(4) .lav { background: #94604a !important; }
+/* illustration rows: a blurred favicon-like mark per site (a shape on a tint), never a real logo or a letter */
+[data-p^="report-row"] .lav::before, [data-p^="report-row"] .lav::after { content: ""; position: absolute; filter: blur(2.5px); }
+[data-p^="report-row"] .lav::before { inset: 26%; border-radius: 50%; background: #fff; opacity: .85; }
+[data-p^="report-row"] .lav::after { left: 18%; right: 18%; bottom: 14%; height: 18%; border-radius: 3px; background: #ffd1e4; opacity: .7; }
+[data-p="report-row-1"] .lav { background: #6b3a5e; }
+[data-p="report-row-2"] .lav { background: #a24d77; }
+[data-p="report-row-2"] .lav::before { inset: 20% 30% 34%; border-radius: 4px; }
+[data-p="report-row-3"] .lav { background: #4a2a52; }
+[data-p="report-row-3"] .lav::before { inset: 24% 22% 40% 22%; border-radius: 50% 50% 8px 8px; background: #f7a8c8; }
+[data-p="report-row-4"] .lav { background: #94604a; }
+[data-p="report-row-4"] .lav::before { inset: 22% 40% 22% 22%; border-radius: 3px; }
 .report-foot { display: flex; gap: 12px; align-items: center; padding: 14px 16px; margin-top: 6px; background: var(--surface-2); border-radius: 14px; }
 .report-foot p { margin: 0; font-size: .9rem; line-height: 1.4; }
 .report-foot strong, .person strong { display: block; }
@@ -390,7 +406,7 @@ strong { font-weight: 600; }
 /* Free: one band. Left the two free offers, right a phone with Google for her handle (js/free-phone.js fills it). */
 .free-sec { padding: clamp(32px, 4vw, 56px) 0; }
 .free-band { display: grid; gap: clamp(24px, 4vw, 64px); align-items: center; }
-@media (min-width: 900px) { .free-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (min-width: 900px) { .free-sec { padding: 72px 0; } .free-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }   /* the heading level with the phone's top */
 .free-copy h2 { font-size: clamp(1.9rem, 3.6vw, 2.8rem); margin-bottom: .55em; }
 .free-line { margin: 0; color: var(--muted); font-size: 1.06rem; line-height: 1.55; max-width: 32em; }
 .free-send { color: var(--accent); font-weight: 600; text-underline-offset: 3px; white-space: nowrap; }
@@ -578,13 +594,15 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   .showcase-head h3 { font-size: 2rem; }
   .showcase-head p { font-size: .97rem; }
   .price { margin: 10px 0 18px; padding-bottom: 18px; }
-  #how .stages { gap: 26px; }
-  #how .stage { padding-top: 16px; }
-  #how .stage h3 { margin-bottom: 10px; }
-  #how .steps { gap: 12px; }
-  #how .record { padding: 26px 22px; border-radius: 22px; }
+  #how .steps { gap: 16px; }
+  .step { grid-template-columns: 52px minmax(0, 1fr); }
+  .step-n { font-size: 2.2rem; }
+  #how .record { margin-top: 28px; padding: 22px 20px; border-radius: 20px; }
+  #how .record p { font-size: 1.55rem; margin-bottom: .45em; }
   .record footer { font-size: .95rem; }
   .why-intro .person { display: none; }   /* Jaka is introduced in the hero and the contact card */
+  .why-grid { gap: 12px; }
+  .why-intro p:last-of-type { margin-bottom: 0; }
   .why-points .card { gap: 14px; padding: 18px 0; }
   .why-points .icon-badge { width: 36px; height: 36px; }
   .why-points h3 { font-size: 1.08rem; }
@@ -597,23 +615,24 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .record footer { font-size: 1.02rem; color: var(--muted); max-width: 52em; }
 
 /* Steps: a real sequence, so real numerals; ruled columns, no boxes */
-/* How it works: three stages (free / start / weekly), each a short numbered run of steps */
-.stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 40px; }
-@media (min-width: 820px) { .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; } }
-.stage { padding-top: 22px; border-top: 2px solid color-mix(in srgb, var(--ink) 20%, transparent); }
-.stage-k { display: flex; align-items: center; gap: 10px; min-height: 26px; margin: 0 0 8px; color: var(--muted); font-size: .95rem; font-weight: 600; }
-.stage h3 { font: 650 1.25rem/1.3 var(--sans); margin: 0 0 16px; }
-.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
-@media (min-width: 1100px) { .steps { grid-template-columns: 1fr 1fr; gap: 28px; } .step { grid-template-columns: 1fr; gap: 10px; } }   /* desktop: the four steps in one row, numeral on top */
-.step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; }
-.step-n { color: var(--accent); font: 600 2rem/1 var(--sans); }
-.step h4 { margin: 0 0 4px; font: 650 1.02rem/1.35 var(--sans); }
+/* How it works: four numeral-led steps; one row from 900px, numeral beside the text on phones */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
+@media (min-width: 900px) { .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px; } }
+.step { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 14px; align-content: start; }
+.step > :not(.step-n) { grid-column: 2; }
+.step-n { grid-row: span 2; color: var(--accent); font: 600 2.6rem/.9 var(--sans); letter-spacing: -.02em; font-variant-numeric: lining-nums tabular-nums; }
+@media (min-width: 900px) {
+  .step { grid-template-columns: 1fr; padding-top: 18px; border-top: 2px solid color-mix(in srgb, var(--ink) 18%, transparent); }
+  .step > :not(.step-n) { grid-column: 1; }
+  .step-n { grid-row: auto; font-size: 3.6rem; margin-bottom: 14px; }
+}
+.step h3 { margin: 0 0 4px; font: 650 1.05rem/1.35 var(--sans); }
 .step p { margin: 0; color: var(--muted); font-size: .95rem; line-height: 1.55; }
 .tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); font-size: .82rem; font-weight: 600; }
 
 /* Showcase */
 .browser-demo iframe { width: 100%; height: clamp(480px, 70vh, 720px); border: 0; background: var(--surface-2); }
-@media (max-width: 559px) { .browser-demo iframe { height: 300px; } .ba .phone { width: 270px; } .browser-demo + .center { margin-top: 18px; } }   /* phone: a window onto the demo, cut above its buttons ("Open the demo site" for the rest); one phone, a bit smaller */
+@media (max-width: 559px) { .browser-demo iframe { height: 324px; } .ba .phone { width: 270px; } .browser-demo + .center { margin-top: 18px; } }   /* phone: a window onto the demo, cut above its buttons ("Open the demo site" for the rest); one phone, a bit smaller */
 .browser-demo + .center { margin-top: 28px; }
 
 /* Pricing: the monthly plan in velvet, the one-time on paper */
@@ -630,12 +649,15 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .plan .ticks { margin-bottom: 24px; align-content: start; font-size: 1rem; line-height: 1.5; }
 .plan-note { margin: -8px 0 24px; color: var(--muted); font-size: .95rem; line-height: 1.5; }
 .plan > .btn-block { margin-top: auto; }   /* both buttons on one line, whatever is above them */
+.plan-alt { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: .92rem; }
+.plan-alt a { display: inline-block; min-height: 24px; color: var(--ink); font-weight: 600; text-decoration-color: var(--accent); text-underline-offset: 4px; }
+@media (hover: hover) { .plan-alt a:hover { color: var(--accent); } }
 /* under each price: what the plan covers, how long, re-uploads, the website (same four rows in both, so they compare) */
 .spec { margin: -8px 0 22px; display: grid; gap: 0; }
 .spec div { display: grid; grid-template-columns: 7.2em minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .spec dt { color: var(--muted); font-size: .9rem; font-weight: 600; letter-spacing: .02em; padding-top: .1em; }
 .spec dd { margin: 0; color: var(--ink); font-size: 1rem; line-height: 1.45; font-weight: 550; }
-@media (max-width: 559px) { .spec div { grid-template-columns: 5.6em minmax(0, 1fr); gap: 10px; } .spec dt { font-size: .86rem; } .spec dd { font-size: 1rem; } }
+@media (max-width: 559px) { .spec div { grid-template-columns: 5.4em minmax(0, 1fr); gap: 10px; padding: 7px 0; } .spec dt { font-size: .86rem; } .spec dd { font-size: .95rem; line-height: 1.4; } }
 .fineprint { display: flex; gap: 12px; align-items: flex-start; max-width: 760px; margin: 32px 0 0; color: var(--muted); font-size: .97rem; }
 .fineprint .icon { color: var(--accent); margin-top: .2em; }
 
@@ -645,9 +667,9 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   #faq > .container { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1.6fr); gap: 72px; align-items: start; }
   #faq .section-head { position: sticky; top: calc(var(--header-h) + 32px); }
 }
-.faq-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 0; }
-.faq-ai { margin: 20px 0 0; font-size: .95rem !important; }
-.faq-ai a { color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
+.faq-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; padding: 28px 4px 0; }
+.faq-foot > p { margin: 0; font-size: 1.05rem; }
+.faq-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
 .faq details { border-bottom: 1px solid var(--line); }
 .faq summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 4px; cursor: pointer; list-style: none; font: 600 1.12rem/1.35 var(--sans); border-radius: 8px; }
 .faq summary::-webkit-details-marker { display: none; }

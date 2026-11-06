@@ -130,15 +130,8 @@ def askai(browser, vp_name, vp):
     page.mouse.click(8, 8)
     page.wait_for_timeout(200)
     check(f"{v} backdrop click closes", not is_open())
-    faq_link = page.locator("#faq a[data-askai-open]")
-    bring(page, "#faq a[data-askai-open]", "center")
-    faq_link.click()
-    page.wait_for_timeout(200)
-    opened = is_open()
-    page.keyboard.press("Escape")
-    page.wait_for_timeout(200)
-    check(f"{v} FAQ 'Ask the AI' link opens it, focus returns to link", opened and not is_open()
-          and page.evaluate("document.activeElement.hasAttribute('data-askai-open')"))
+    check(f"{v} FAQ footer: Telegram + WhatsApp, no Ask-AI promo", page.locator("#faq .faq-foot a[href^='https://t.me/']").count() == 1
+          and page.locator("#faq .faq-foot a[href^='https://wa.me/']").count() == 1 and page.locator("#faq [data-askai-open]").count() == 0)
     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
 
     # 3. cached answers: chips + fuzzy typed questions, zero network

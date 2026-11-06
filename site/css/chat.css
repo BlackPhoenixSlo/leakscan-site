@@ -5,7 +5,7 @@
   min-height: 48px; padding: .6em 1.1em; border-radius: 999px;
   border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
   font: 600 .98rem/1.2 var(--sans); cursor: pointer; box-shadow: var(--shadow-lg);
-  transition: bottom .25s ease, transform .15s ease, border-color .15s, opacity .25s ease, visibility 0s;
+  transition: translate .25s ease, transform .15s ease, border-color .15s, opacity .25s ease, visibility 0s;
 }
 .askai-launcher[hidden] { display: none; }
 .askai-launcher .icon { color: var(--accent); width: 1.3em; height: 1.3em; }
@@ -14,7 +14,7 @@
 /* Phone: sit above the sticky "Free scan" bar when it is showing. Any width: while the hero is on screen (js/chat.js sets
    .in-hero) stay hidden: the scan is the hero's one action, and the pill would cover hero lines. */
 @media (max-width: 719px) {
-  .mobile-cta.show ~ .askai-launcher { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 62px); }
+  .mobile-cta.show ~ .askai-launcher { translate: 0 calc(max(16px, env(safe-area-inset-bottom)) - max(12px, env(safe-area-inset-bottom)) - 62px); }   /* a transform, not `bottom`: no layout shift */
 }
 .askai-launcher.in-hero { opacity: 0; visibility: hidden; transform: translateY(12px); transition-delay: 0s, 0s, 0s, 0s, .25s; }
 /* Any width: hidden while it would cover the hero card's actions or the before / after phones (js/chat.js). */

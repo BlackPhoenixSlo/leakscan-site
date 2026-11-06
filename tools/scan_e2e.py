@@ -65,8 +65,8 @@ tabs, the illustration without a scan, her handle / rows / tiles / videos + Reve
 Screenshots: <vp>-t*.png. --break-thumbs serves scan-engine.js with the gallery drop disabled: only `thumbs:` checks may go red.
 --break-people serves scan-engine.js with E.isPhoto always true (logos kept): only `thumbs:` checks may go red.
 
-removals (js/removals.js, the #removals "Where I remove from" panels): section placed after #faq and directly before
-#contact; demo defaults (Orla Brennick), neutral mock copy (no onlyfans / leaked / leaks); leak-side images blurred by
+removals (js/removals.js, the #removals "Where I remove from" panels): section placed after #free and directly before
+#website; demo defaults (Orla Brennick), neutral mock copy (no onlyfans / leaked / leaks); leak-side images blurred by
 default (+ Reveal); idle, the handle covers nothing and no edge line shows; Remove flips all 4 panels (Mega / X / Reddit /
 leak site) to their removed state and Show again back, with zero layout shift; a sideways drag on the stage moves the
 compare edge + clip, a tap does not; arrow keys on the handle; reduced motion = no transition; no horizontal overflow

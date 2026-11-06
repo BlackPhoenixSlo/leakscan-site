@@ -248,11 +248,12 @@
       <p class="lead">Find suspected leaks of you on Google. I'm Jaka, and I'm the one who files every takedown.</p>
       <form id="scan" class="scan-form" method="get" action="scan/">
         <label class="scan-field scan-prefix"><span class="scan-lbl" aria-hidden="true">OnlyFans username</span><span class="scan-pre" aria-hidden="true">onlyfans.com/</span><input class="scan-handle" name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="username" aria-label="OnlyFans username"></label>
-        <label class="scan-field scan-prefix"><span class="scan-lbl" aria-hidden="true">Instagram or X <i>(optional)</i></span><span class="scan-pre" aria-hidden="true">@</span><input class="scan-social" name="ig" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" aria-label="Instagram or X username (optional)"></label>
         <button class="btn btn-primary btn-lg" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-scan-search"/></svg><span class="btn-t">Find my leaks</span></button>
+        <label class="scan-field scan-prefix scan-ig" id="scan-ig"><span class="scan-lbl" aria-hidden="true">Instagram or X <i>(optional)</i></span><span class="scan-pre" aria-hidden="true">@</span><input class="scan-social" name="ig" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" aria-label="Instagram or X username (optional)" aria-describedby="scan-ig-why"></label>
       </form>
-      <p class="scanned" data-p="scanned" hidden></p>
-      <p class="scan-note"><strong>Free scan, no sign-up.</strong> Send me the report and I'll remove one page free.</p>
+      <p class="scan-more"><button class="linkish" type="button" aria-controls="scan-ig" aria-expanded="false">+ Add Instagram or X</button> <span id="scan-ig-why">The scan searches that name too.</span></p>
+      <div class="scan-slot"><p class="scanned" data-p="scanned" hidden></p>
+      <p class="scan-note"><strong>Your report opens right here</strong>, with a link to keep. Free, no email or phone needed. Send it to me and I'll remove one page free.</p></div>
       <p class="scan-alt">On Fansly or Patreon? <a href="#contact">Message me</a> instead: the scan reads OnlyFans usernames.</p>
       <ul class="assurances">
         <li><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><details class="more"><summary>Your username goes only to my own scan server. <span class="more-t">What's stored</span></summary><p>The server keeps the result so your report link works. Report pages are unlisted and marked noindex; anyone with the link can open it. No cookies, no tracking. <a href="privacy.html">Privacy policy</a></p></details></li>
@@ -274,10 +275,10 @@
         <span class="chip chip-soft"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>Re-scanned</span>
       </div>
       <ul class="report-rows" aria-hidden="true">
-        <li data-p="report-row-1"><span class="lav" style="background:#4285f4">L</span><span class="row-url">mirror.example/yourhandle</span><span class="chip chip-dead">Dead</span></li>
-        <li data-p="report-row-2"><span class="lav" style="background:#ab47bc">F</span><span class="row-url">galleries.example/p/2231</span><span class="chip chip-cached">Cached</span></li>
-        <li data-p="report-row-3"><span class="lav" style="background:#00acc1">P</span><span class="row-url">tube.example/v/yourname</span><span class="chip chip-live">Live</span></li>
-        <li data-p="report-row-4"><span class="lav" style="background:#fbbc05">F</span><span class="row-url">forum.example/thread/88</span><span class="chip chip-dead">Dead</span></li>
+        <li data-p="report-row-1"><span class="lav"></span><span class="row-url">fapell●.com/yourhandle</span><span class="chip chip-dead">Dead</span></li>
+        <li data-p="report-row-2"><span class="lav"></span><span class="row-url">leakgall●●y.net/p/2231</span><span class="chip chip-cached">Cached</span></li>
+        <li data-p="report-row-3"><span class="lav"></span><span class="row-url">thoth●●.tv/v/yourname</span><span class="chip chip-live">Live</span></li>
+        <li data-p="report-row-4"><span class="lav"></span><span class="row-url">simpc●●y.su/threads/88</span><span class="chip chip-dead">Dead</span></li>
       </ul>
       <div class="report-foot" aria-hidden="true">
         <p><strong>What each status means</strong><span><b>Live</b> still up: I file a notice. <b>Cached</b> gone from the site, still in Google: I file de-indexing. <b>Dead</b> gone.</span></p>
@@ -287,28 +288,6 @@
       <p class="meet-cap"><strong>Meet Jaka</strong><span>One minute on how I work. Sound stays off until you turn it on.</span><a href="video/">Watch it full screen</a></p>
       <div class="meet-pic" aria-hidden="true"><span class="meet-poster"><span class="meet-play"></span><span class="meet-name">Jaka Basej</span><span class="meet-sub">60-second intro · 0:57</span></span></div>
     </div>
-    </div>
-  </div>
-</section>
-
-<section class="section free-sec" id="free" aria-labelledby="free-title">
-  <div class="container">
-    <div class="free-band reveal">
-      <div class="free-copy">
-        <h2 id="free-title">What Google shows for your name.</h2>
-        <p class="free-line">The scan searches Google's results, images and videos for your username on hundreds of known leak sites. Run it and this phone shows yours, ready to <a class="free-send" href="#contact" data-free-send>message to me</a>.</p>
-      </div>
-      <figure class="free-phone">
-        <div class="phone phone-free" data-reveal-scope role="group" aria-label="Illustration: Google results for a creator's handle on a phone. Leak sites fill the results, the images and the videos; every leak thumbnail is blurred.">
-          <div class="phone-screen">
-            <div class="m-search" aria-hidden="true"><span data-p="scan-handle">@yourhandle</span><svg class="icon"><use href="#i-search"/></svg></div>
-            <div class="m-tabs" role="tablist" aria-label="Google result type"><button type="button" role="tab" id="tab-free-all" aria-controls="panel-free-all" aria-selected="false" tabindex="-1">All</button><button type="button" role="tab" id="tab-free-images" aria-controls="panel-free-images" aria-selected="true">Images</button><button type="button" role="tab" id="tab-free-videos" aria-controls="panel-free-videos" aria-selected="false" tabindex="-1">Videos</button></div>
-            <div class="m-panel" role="tabpanel" id="panel-free-all" aria-labelledby="tab-free-all" hidden><div class="m-illus"><div class="m-result bad"><span class="fav fav-l" style="background:#4285f4" aria-hidden="true">L</span><div><span class="m-site">leak-mirror.example</span><span class="m-title">@yourhandle: full gallery</span><span class="m-thumbs" aria-hidden="true"><span class="thumb t1"></span><span class="thumb t2"></span><span class="thumb t3"></span></span></div></div><div class="m-result bad"><span class="fav fav-l" style="background:#ab47bc" aria-hidden="true">F</span><div><span class="m-site">free-galleries.example</span><span class="m-title">@yourhandle: all photos and videos</span><span class="m-lines" aria-hidden="true"><i></i><i></i></span></div></div><div class="m-result bad"><span class="fav fav-l" style="background:#00acc1" aria-hidden="true">P</span><div><span class="m-site">pirate-tube.example</span><span class="m-title">@yourhandle videos (new)</span><span class="m-lines" aria-hidden="true"><i></i><i></i></span></div></div><div class="m-result bad"><span class="fav fav-l" style="background:#fbbc05" aria-hidden="true">F</span><div><span class="m-site">forum-dump.example</span><span class="m-title">@yourhandle forum thread</span><span class="m-lines" aria-hidden="true"><i></i><i></i></span></div></div></div></div>
-            <div class="m-panel" role="tabpanel" id="panel-free-images" aria-labelledby="tab-free-images"><div class="m-grid m-illus" aria-hidden="true"><span class="gi-card"><span class="gi-box thumb t1"></span><span class="gi-cap"><span class="gi-fav" style="background:#4285f4">L</span><span class="gi-cap-t">leak-mirror.example</span></span></span><span class="gi-card"><span class="gi-box thumb t2"></span><span class="gi-cap"><span class="gi-fav" style="background:#ab47bc">F</span><span class="gi-cap-t">free-galleries.example</span></span></span><span class="gi-card"><span class="gi-box thumb t3"></span><span class="gi-cap"><span class="gi-fav" style="background:#00acc1">P</span><span class="gi-cap-t">pirate-tube.example</span></span></span><span class="gi-card"><span class="gi-box thumb t4"></span><span class="gi-cap"><span class="gi-fav" style="background:#fbbc05">F</span><span class="gi-cap-t">forum-dump.example</span></span></span><span class="gi-card"><span class="gi-box thumb t5"></span><span class="gi-cap"><span class="gi-fav" style="background:#ea4335">P</span><span class="gi-cap-t">pics-hub.example</span></span></span><span class="gi-card"><span class="gi-box thumb t6"></span><span class="gi-cap"><span class="gi-fav" style="background:#34a853">P</span><span class="gi-cap-t">photo-rip.example</span></span></span><span class="gi-card"><span class="gi-box thumb t1"></span><span class="gi-cap"><span class="gi-fav" style="background:#ff7043">C</span><span class="gi-cap-t">clip-vault.example</span></span></span><span class="gi-card"><span class="gi-box thumb t2"></span><span class="gi-cap"><span class="gi-fav" style="background:#00acc1">I</span><span class="gi-cap-t">image-board.example</span></span></span><span class="gi-card"><span class="gi-box thumb t3"></span><span class="gi-cap"><span class="gi-fav" style="background:#fbbc05">L</span><span class="gi-cap-t">leak-hub.example</span></span></span></div></div>
-            <div class="m-panel" role="tabpanel" id="panel-free-videos" aria-labelledby="tab-free-videos" hidden><div class="m-illus"><div class="m-video bad"><span class="m-vthumb thumb t3" aria-hidden="true"><span class="m-play"></span><span class="m-dur">12:04</span></span><div><span class="m-site">pirate-tube.example</span><span class="m-title">@yourhandle full video (HD)</span></div></div><div class="m-video bad"><span class="m-vthumb thumb t5" aria-hidden="true"><span class="m-play"></span><span class="m-dur">8:47</span></span><div><span class="m-site">clip-vault.example</span><span class="m-title">@yourhandle full clip, no paywall</span></div></div><div class="m-video bad"><span class="m-vthumb thumb t2" aria-hidden="true"><span class="m-play"></span><span class="m-dur">21:16</span></span><div><span class="m-site">tube-mirror.example</span><span class="m-title">@yourhandle new videos (all)</span></div></div></div></div>
-          </div>
-        </div>
-      </figure>
     </div>
   </div>
 </section>
@@ -326,27 +305,109 @@
     <ul class="why-points">
       <li class="card reveal">
         <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></span>
-        <div><h3>Your own pages stay safe.</h3><p>Your profiles, pages you licensed and lookalikes are never filed against, so your accounts aren't put at risk.</p></div>
+        <div><h3>Your own pages stay safe</h3><p>Your profiles, pages you licensed and lookalikes are never filed against, so your accounts aren't put at risk.</p></div>
       </li>
       <li class="card reveal">
         <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-shield-check"/></svg></span>
-        <div><h3>Correct notices get acted on.</h3><p>One accurate notice to the site, then its host, registrar and Google, beats ten careless ones. Your income matters more than a big number on a report.</p></div>
+        <div><h3>Correct notices get acted on</h3><p>One accurate notice to the site, then its host, registrar and Google, beats ten careless ones. Your income matters more than a big number on a report.</p></div>
       </li>
       <li class="card reveal">
         <span class="icon-badge"><svg class="icon" aria-hidden="true"><use href="#i-heart-handshake"/></svg></span>
-        <div><h3>One person, start to finish.</h3><p>No ticket queue, no support team. Whoever reads your message files your notices: me.</p></div>
+        <div><h3>One person, start to finish</h3><p>No ticket queue, no support team. Whoever reads your message files your notices: me.</p></div>
       </li>
     </ul>
+  </div>
+</section>
+
+<section class="section" id="how" aria-labelledby="how-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2 id="how-title">After the free removal: what I do</h2>
+    </div>
+    <ol class="steps reveal">
+      <li class="step"><span class="step-n" aria-hidden="true">01</span><h3>You choose a plan and sign one page</h3><p>Monthly or one-time. The page is a free Copyright Enforcement Authorization: it lets me file in your name.</p></li>
+      <li class="step"><span class="step-n" aria-hidden="true">02</span><h3>Notices, then de-indexing</h3><p>DMCA notices to the site, then its host and registrar. Then I ask Google to drop the pages from its results.</p></li>
+      <li class="step"><span class="step-n" aria-hidden="true">03</span><h3>Your own pages go up</h3><p>Your own site (see below) gives Google real pages to rank above the leaks.</p></li>
+      <li class="step"><span class="step-n" aria-hidden="true">04</span><h3>Monthly plan: a weekly report</h3><p>I re-scan every week: what's live, cached and dead, and anything new I've filed.</p></li>
+    </ol>
+    <blockquote class="record reveal">
+      <p>Nobody can honestly promise every page comes down. I won’t pretend to.</p>
+      <footer>I’ll tell you straight what’s likely to go and what isn’t.</footer>
+    </blockquote>
+  </div>
+</section>
+
+<section class="section section-alt" id="pricing" aria-labelledby="pricing-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Pricing, in euros</p>
+      <h2 id="pricing-title">One removal free, then choose your plan</h2>
+      <p>Run the scan, send me the report, and I take one page down free, usually the simplest site. You see the result before you pay anything.</p>
+    </div>
+    <div class="plans">
+      <article class="card plan plan-feature reveal" aria-labelledby="plan-monthly">
+        <p class="plan-kind">Ongoing protection</p>
+        <h3 id="plan-monthly">Monthly removal</h3>
+        <p class="price"><span class="amount">€250</span><span class="per">/ month</span></p>
+        <dl class="spec">
+          <div><dt>Covers</dt><dd>Everything the weekly re&#8209;scans find</dd></div>
+          <div><dt>Runs</dt><dd>Month to month, cancel anytime</dd></div>
+          <div><dt>Re-uploads</dt><dd>Filed every week, as I find them</dd></div>
+        </dl>
+        <ul class="ticks">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Removal tracking on every link</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Weekly report: live / cached / dead</span></li>
+        </ul>
+        <a class="btn btn-primary btn-block" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20monthly%20plan%20%28%E2%82%AC250%2Fmonth%29.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Ask for monthly on Telegram</a>
+        <p class="plan-alt">or ask on <a href="https://wa.me/38640703992?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20monthly%20plan%20%28%E2%82%AC250%2Fmonth%29.%20My%20creator%20name%20%2F%20handles%3A%20" aria-label="WhatsApp: ask for monthly">WhatsApp</a></p>
+      </article>
+      <article class="card plan reveal" aria-labelledby="plan-once">
+        <p class="plan-kind">One big clean-up</p>
+        <h3 id="plan-once">One-time clean</h3>
+        <p class="price"><span class="amount">€500</span><span class="per">one-time</span></p>
+        <dl class="spec">
+          <div><dt>Covers</dt><dd>Everything found, all filed in week 1</dd></div>
+          <div><dt>Runs</dt><dd>40 days, no auto-renewal</dd></div>
+          <div><dt>Re-uploads</dt><dd>New copies I find in those 40 days are filed too; on day 40 you decide</dd></div>
+        </dl>
+        <p class="plan-note">No weekly report or per-link tracking: those come with the monthly plan.</p>
+        <a class="btn btn-outline btn-block" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20one-time%20clean%20%28%E2%82%AC500%29.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Ask for one-time on Telegram</a>
+        <p class="plan-alt">or ask on <a href="https://wa.me/38640703992?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20one-time%20clean%20%28%E2%82%AC500%29.%20My%20creator%20name%20%2F%20handles%3A%20" aria-label="WhatsApp: ask for one-time">WhatsApp</a></p>
+      </article>
+    </div>
+    <p class="fineprint reveal"><svg class="icon" aria-hidden="true"><use href="#i-file-pen-line"/></svg><span><strong>Both plans:</strong> DMCA notices to sites, hosts and registrars; Google de-indexing and "remove outdated content" requests; your own site (see below).</span></p>
+  </div>
+</section>
+
+<section class="section free-sec" id="free" aria-labelledby="free-title">
+  <div class="container">
+    <div class="free-band reveal">
+      <div class="free-copy">
+        <h2 id="free-title">What Google shows for your name</h2>
+        <p class="free-line">The scan searches Google's results, images and videos for your username on hundreds of known leak sites. Run it and this phone shows yours, ready to <a class="free-send" href="#contact" data-free-send>message to me</a>.</p>
+      </div>
+      <figure class="free-phone">
+        <div class="phone phone-free" data-reveal-scope role="group" aria-label="Illustration: Google results for a creator's handle on a phone. Leak sites fill the results, the images and the videos; every leak thumbnail is blurred.">
+          <div class="phone-screen">
+            <div class="m-search" aria-hidden="true"><span data-p="scan-handle">@yourhandle</span><svg class="icon"><use href="#i-search"/></svg></div>
+            <div class="m-tabs" role="tablist" aria-label="Google result type"><button type="button" role="tab" id="tab-free-all" aria-controls="panel-free-all" aria-selected="false" tabindex="-1">All</button><button type="button" role="tab" id="tab-free-images" aria-controls="panel-free-images" aria-selected="true">Images</button><button type="button" role="tab" id="tab-free-videos" aria-controls="panel-free-videos" aria-selected="false" tabindex="-1">Videos</button></div>
+            <div class="m-panel" role="tabpanel" id="panel-free-all" aria-labelledby="tab-free-all" hidden><div class="m-illus"><div class="m-result bad"><span class="fav fav-l" style="background:#4285f4" aria-hidden="true">L</span><div><span class="m-site">leak-mirror.example</span><span class="m-title">@yourhandle: full gallery</span><span class="m-thumbs" aria-hidden="true"><span class="thumb t1"></span><span class="thumb t2"></span><span class="thumb t3"></span></span></div></div><div class="m-result bad"><span class="fav fav-l" style="background:#ab47bc" aria-hidden="true">F</span><div><span class="m-site">free-galleries.example</span><span class="m-title">@yourhandle: all photos and videos</span><span class="m-lines" aria-hidden="true"><i></i><i></i></span></div></div><div class="m-result bad"><span class="fav fav-l" style="background:#00acc1" aria-hidden="true">P</span><div><span class="m-site">pirate-tube.example</span><span class="m-title">@yourhandle videos (new)</span><span class="m-lines" aria-hidden="true"><i></i><i></i></span></div></div><div class="m-result bad"><span class="fav fav-l" style="background:#fbbc05" aria-hidden="true">F</span><div><span class="m-site">forum-dump.example</span><span class="m-title">@yourhandle forum thread</span><span class="m-lines" aria-hidden="true"><i></i><i></i></span></div></div></div></div>
+            <div class="m-panel" role="tabpanel" id="panel-free-images" aria-labelledby="tab-free-images"><div class="m-grid m-illus" aria-hidden="true"><span class="gi-card"><span class="gi-box thumb t1"></span><span class="gi-cap"><span class="gi-fav" style="background:#4285f4">L</span><span class="gi-cap-t">leak-mirror.example</span></span></span><span class="gi-card"><span class="gi-box thumb t2"></span><span class="gi-cap"><span class="gi-fav" style="background:#ab47bc">F</span><span class="gi-cap-t">free-galleries.example</span></span></span><span class="gi-card"><span class="gi-box thumb t3"></span><span class="gi-cap"><span class="gi-fav" style="background:#00acc1">P</span><span class="gi-cap-t">pirate-tube.example</span></span></span><span class="gi-card"><span class="gi-box thumb t4"></span><span class="gi-cap"><span class="gi-fav" style="background:#fbbc05">F</span><span class="gi-cap-t">forum-dump.example</span></span></span><span class="gi-card"><span class="gi-box thumb t5"></span><span class="gi-cap"><span class="gi-fav" style="background:#ea4335">P</span><span class="gi-cap-t">pics-hub.example</span></span></span><span class="gi-card"><span class="gi-box thumb t6"></span><span class="gi-cap"><span class="gi-fav" style="background:#34a853">P</span><span class="gi-cap-t">photo-rip.example</span></span></span><span class="gi-card"><span class="gi-box thumb t1"></span><span class="gi-cap"><span class="gi-fav" style="background:#ff7043">C</span><span class="gi-cap-t">clip-vault.example</span></span></span><span class="gi-card"><span class="gi-box thumb t2"></span><span class="gi-cap"><span class="gi-fav" style="background:#00acc1">I</span><span class="gi-cap-t">image-board.example</span></span></span><span class="gi-card"><span class="gi-box thumb t3"></span><span class="gi-cap"><span class="gi-fav" style="background:#fbbc05">L</span><span class="gi-cap-t">leak-hub.example</span></span></span></div></div>
+            <div class="m-panel" role="tabpanel" id="panel-free-videos" aria-labelledby="tab-free-videos" hidden><div class="m-illus"><div class="m-video bad"><span class="m-vthumb thumb t3" aria-hidden="true"><span class="m-play"></span><span class="m-dur">12:04</span></span><div><span class="m-site">pirate-tube.example</span><span class="m-title">@yourhandle full video (HD)</span></div></div><div class="m-video bad"><span class="m-vthumb thumb t5" aria-hidden="true"><span class="m-play"></span><span class="m-dur">8:47</span></span><div><span class="m-site">clip-vault.example</span><span class="m-title">@yourhandle full clip, no paywall</span></div></div><div class="m-video bad"><span class="m-vthumb thumb t2" aria-hidden="true"><span class="m-play"></span><span class="m-dur">21:16</span></span><div><span class="m-site">tube-mirror.example</span><span class="m-title">@yourhandle new videos (all)</span></div></div></div></div>
+          </div>
+        </div>
+      </figure>
+    </div>
   </div>
 </section>
 
 <section class="section section-alt rm" id="removals" aria-labelledby="removals-title" data-reveal-scope>
   <div class="container">
     <div class="section-head reveal">
-      <h2 id="removals-title">Where I remove from.</h2>
-      <p>Four places leaks sit, and how each looks once it's down. Re-enacted with a fictional creator: press Remove, or drag the handle.</p>
+      <h2 id="removals-title">Where I remove from</h2>
+      <p>Four places leaks sit, and how each looks once it's down. Re-enacted with a fictional creator: press Preview removal, or drag the handle.</p>
     </div>
-    <p class="rm-tools"><button class="reveal-btn rm-reveal" type="button" aria-pressed="false" data-reveal><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="reveal-t">Reveal images</span></button></p>
+    <p class="rm-tools"><button class="reveal-btn rm-reveal" type="button" aria-pressed="false" data-reveal data-reveal-t="Show demo images|Blur demo images"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span class="reveal-t">Show demo images</span></button></p>
     <div class="rm-grid">
       <article class="rm-card" data-rm="mega" aria-labelledby="rm-h-mega">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-mega"><span class="rm-ico rm-ico-mega" aria-hidden="true">M</span>Mega</h3><p class="rm-out">Folders behind aggregator packs disabled</p></div>
@@ -374,7 +435,7 @@
           </div>
           <span class="rm-handle" role="slider" tabindex="0" aria-label="Compare the Mega leak (left) with it removed (right)" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-valuetext="Leak live"><span class="rm-knob"></span></span>
         </div>
-        <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Remove</button></p>
+        <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Preview removal</button></p>
       </article>
       <article class="rm-card" data-rm="x" aria-labelledby="rm-h-x">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-x"><span class="rm-ico rm-ico-x" aria-hidden="true">X</span>X</h3><p class="rm-out">Media disabled after copyright report</p></div>
@@ -392,7 +453,7 @@
           </div>
           <span class="rm-handle" role="slider" tabindex="0" aria-label="Compare the X post (left) with its media removed (right)" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-valuetext="Leak live"><span class="rm-knob"></span></span>
         </div>
-        <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Remove</button></p>
+        <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Preview removal</button></p>
       </article>
       <article class="rm-card" data-rm="reddit" aria-labelledby="rm-h-reddit">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-reddit"><span class="rm-ico rm-ico-rd" aria-hidden="true">r/</span>Reddit</h3><p class="rm-out">Removed on copyright notice</p></div>
@@ -411,7 +472,7 @@
           </div>
           <span class="rm-handle" role="slider" tabindex="0" aria-label="Compare the Reddit post (left) with it removed (right)" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-valuetext="Leak live"><span class="rm-knob"></span></span>
         </div>
-        <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Remove</button></p>
+        <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Preview removal</button></p>
       </article>
       <article class="rm-card" data-rm="site" aria-labelledby="rm-h-site">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-site"><span class="rm-ico rm-ico-site" aria-hidden="true"><svg class="icon"><use href="#i-globe"/></svg></span>Leak sites</h3><p class="rm-out">Profile 404 after a DMCA notice</p></div>
@@ -441,80 +502,10 @@
           </div>
           <span class="rm-handle" role="slider" tabindex="0" aria-label="Compare the leak site profile (left) with it removed (right)" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-valuetext="Leak live"><span class="rm-knob"></span></span>
         </div>
-        <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Remove</button></p>
+        <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Preview removal</button></p>
       </article>
     </div>
     <div class="swipe-nav" data-swipe="rm"><button type="button" class="swipe-prev" aria-label="Previous" disabled><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button><span class="swipe-dots"><button type="button" class="swipe-dot" aria-label="Mega" aria-current="true"></button><button type="button" class="swipe-dot" aria-label="X"></button><button type="button" class="swipe-dot" aria-label="Reddit"></button><button type="button" class="swipe-dot" aria-label="Leak sites"></button></span><button type="button" class="swipe-next" aria-label="Next"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button></div>
-  </div>
-</section>
-
-<section class="section" id="how" aria-labelledby="how-title">
-  <div class="container">
-    <div class="section-head reveal">
-      <h2 id="how-title">After the free removal: what I do.</h2>
-    </div>
-    <ol class="stages">
-      <li class="stage reveal">
-        <p class="stage-k">When you start</p>
-        <h3>I file everything</h3>
-        <ol class="steps">
-          <li class="step"><span class="step-n" aria-hidden="true">1</span><div><h4>You choose a plan and sign one page</h4><p>Monthly or one-time. The one page is a free Copyright Enforcement Authorization: it lets me file in your name.</p></div></li>
-          <li class="step"><span class="step-n" aria-hidden="true">2</span><div><h4>Notices, then de-indexing</h4><p>DMCA notices to the site, then its host and registrar. Then I ask Google to drop the pages from its results.</p></div></li>
-        </ol>
-      </li>
-      <li class="stage reveal">
-        <p class="stage-k">After that</p>
-        <h3>Google shows the real you</h3>
-        <ol class="steps" start="3">
-          <li class="step"><span class="step-n" aria-hidden="true">3</span><div><h4>Your own pages go up</h4><p>Your website and blog posts give Google real pages to rank above the leaks.</p></div></li>
-          <li class="step"><span class="step-n" aria-hidden="true">4</span><div><h4>Monthly plan: a weekly report</h4><p>I re-scan every week: what's live, cached and dead, and anything new I've filed.</p></div></li>
-        </ol>
-      </li>
-    </ol>
-    <blockquote class="record reveal">
-      <p>Nobody can honestly promise every page comes down. I won’t pretend to.</p>
-      <footer>I’ll tell you straight what’s likely to go and what isn’t.</footer>
-    </blockquote>
-  </div>
-</section>
-
-<section class="section section-alt" id="pricing" aria-labelledby="pricing-title">
-  <div class="container">
-    <div class="section-head reveal">
-      <p class="eyebrow">Pricing, in euros</p>
-      <h2 id="pricing-title">One removal free. Then choose your plan.</h2>
-      <p>Run the scan, send me the report, and I take one page down free, usually the simplest site. You see the result before you pay anything.</p>
-    </div>
-    <div class="plans">
-      <article class="card plan plan-feature reveal" aria-labelledby="plan-monthly">
-        <p class="plan-kind">Ongoing protection</p>
-        <h3 id="plan-monthly">Monthly removal</h3>
-        <p class="price"><span class="amount">€250</span><span class="per">/ month</span></p>
-        <dl class="spec">
-          <div><dt>Covers</dt><dd>Everything the weekly re&#8209;scans find</dd></div>
-          <div><dt>Runs</dt><dd>Month to month, cancel anytime</dd></div>
-          <div><dt>Re-uploads</dt><dd>Filed every week, as I find them</dd></div>
-        </dl>
-        <ul class="ticks">
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Removal tracking on every link</span></li>
-          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Weekly report: live / cached / dead</span></li>
-        </ul>
-        <a class="btn btn-primary btn-block" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20monthly%20plan%20%28%E2%82%AC250%2Fmonth%29.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Ask for monthly on Telegram</a>
-      </article>
-      <article class="card plan reveal" aria-labelledby="plan-once">
-        <p class="plan-kind">One big clean-up</p>
-        <h3 id="plan-once">One-time clean</h3>
-        <p class="price"><span class="amount">€500</span><span class="per">one-time</span></p>
-        <dl class="spec">
-          <div><dt>Covers</dt><dd>Everything found, all filed in week 1</dd></div>
-          <div><dt>Runs</dt><dd>40 days, no auto-renewal</dd></div>
-          <div><dt>Re-uploads</dt><dd>New copies I find in those 40 days are filed too; on day 40 you decide</dd></div>
-        </dl>
-        <p class="plan-note">No weekly report or per-link tracking: those come with the monthly plan.</p>
-        <a class="btn btn-outline btn-block" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%27d%20like%20the%20free%20Google%20scan%2C%20then%20the%20one-time%20clean%20%28%E2%82%AC500%29.%20My%20creator%20name%20%2F%20handles%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Ask for one-time on Telegram</a>
-      </article>
-    </div>
-    <p class="fineprint reveal"><svg class="icon" aria-hidden="true"><use href="#i-file-pen-line"/></svg><span><strong>Both plans:</strong> DMCA notices to sites, hosts and registrars; Google de-indexing and "remove outdated content" requests; your official website and blog posts (below).</span></p>
   </div>
 </section>
 
@@ -523,7 +514,7 @@
     <div class="web-top">
       <div class="section-head reveal">
         <p class="eyebrow">Included in both plans: your website</p>
-        <h2 id="website-title">Removing leaks is half the job. Owning your Google results is the other half.</h2>
+        <h2 id="website-title">An official home for your name</h2>
       </div>
       <ul class="ticks ticks-3 reveal">
         <li><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg><span><strong>An official website</strong> with your name, your links and your style.</span></li>
@@ -533,7 +524,7 @@
     </div>
     <div class="showcase" id="showcase" role="region" aria-labelledby="showcase-title">
       <div class="showcase-head reveal">
-        <h3 id="showcase-title">This is the kind of site you get.</h3>
+        <h3 id="showcase-title">This is the kind of site you get</h3>
         <p data-p="demo-intro">A live demo built for a fictional creator. Scroll around inside it. Yours is built around your name, your links and your look.</p>
       </div>
       <figure class="browser browser-demo reveal">
@@ -588,12 +579,10 @@
 <section class="section section-alt" id="faq" aria-labelledby="faq-title">
   <div class="container">
     <div class="section-head reveal">
-      <h2 id="faq-title">Straight answers.</h2>
-      <p>Something not covered here? Ask me.</p>
-      <p class="faq-cta"><a class="btn btn-primary" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%20have%20a%20question%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Telegram</a><a class="btn btn-ghost" href="https://wa.me/38640703992?text=Hi%20Jaka%2C%20I%20have%20a%20question%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-message-circle"/></svg>WhatsApp</a></p>
-    </div>
+      <h2 id="faq-title">Straight answers</h2>
+   </div>
     <div class="faq">
-      <details class="reveal" open>
+      <details class="reveal">
         <summary>Is my information safe?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
         <p>Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site has no cookies and no tracking.</p>
       </details>
@@ -629,7 +618,7 @@
         <summary>Do I need to register or create an account?<svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
         <p>No. There's no account, no app and no card. The free scan runs right here from just your handle. After that you message me on Telegram, WhatsApp or email, and everything happens in that chat.</p>
       </details>
-      <p class="faq-ai">Not sure what to ask? <a href="#contact" data-askai-open>Ask the AI</a> about this page.</p>
+      <div class="faq-foot"><p><strong>Not covered? Message me.</strong> I reply myself.</p><p class="faq-cta"><a class="btn btn-primary" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%20have%20a%20question%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Telegram</a><a class="btn btn-ghost" href="https://wa.me/38640703992?text=Hi%20Jaka%2C%20I%20have%20a%20question%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-message-circle"/></svg>WhatsApp</a></p></div>
     </div>
   </div>
 </section>

@@ -7,8 +7,9 @@
 Phone (390x844) + desktop (1440x900), each with JS on and off: type `@Some.Name` + `@some.ig`, submit.
 JS off: the navigation goes to the on-site scan page BASE_URL/scan/? with h=@Some.Name, ig=@some.ig (no go=, no p=).
 JS on: no navigation (the scan runs in place, js/inline-scan.js; tools/scan_e2e.py --only inline covers the rest).
-Controls (OnlyFans field, Instagram/X field, button) are >= 44px tall, stacked on phone; on desktop the OnlyFans field
-has its own row, Instagram/X + button share the next. At 390, 600, 960, 1024, 1440 px both placeholders and a
+With JS the empty Instagram/X field is folded behind "+ Add Instagram or X" (one click opens + focuses it); without JS
+it shows and the toggle doesn't. Controls (OnlyFans field, Instagram/X field, button) are >= 44px tall, stacked on phone;
+on desktop the OnlyFans field + button share a row, Instagram/X gets the next. At 390, 600, 960, 1024, 1440 px both placeholders and a
 20-character handle fit their input unclipped (canvas text width vs the input's content box). Every non-local request is aborted
 (so the scan page's API call never leaves the machine). Saves hero-before / settled screenshots to OUT_DIR.
 Prints one line per check; exit 1 if any fails.
@@ -49,13 +50,23 @@ with sync_playwright() as pw:
             form = page.locator("form#scan")
             form.scroll_into_view_if_needed()
             inp, soc, btn = page.locator("#scan input[name=h]"), page.locator("#scan input[name=ig]"), page.locator("#scan button")
+            more = page.locator(".scan-more button")
+            if js:
+                check(f"{tag} Instagram/X folded behind '+ Add Instagram or X'", not soc.is_visible() and more.is_visible()
+                      and more.inner_text() == "+ Add Instagram or X", f"field {soc.is_visible()}, toggle {more.is_visible()}")
+                page.screenshot(path=str(out / f"form-{vp_name}-folded.png"))
+                more.click()
+                check(f"{tag} toggle opens + focuses it, toggle goes", soc.is_visible() and not more.is_visible()
+                      and page.evaluate("document.activeElement.name") == "ig" and more.get_attribute("aria-expanded") == "true")
+            else:
+                check(f"{tag} Instagram/X shown, no toggle", soc.is_visible() and not more.is_visible())
             boxes = [el.bounding_box() for el in (page.locator("#scan .scan-prefix").nth(0), page.locator("#scan .scan-prefix").nth(1), btn)]
             check(f"{tag} tap targets >= 44px", all(b["height"] >= 44 for b in boxes),
                   ", ".join(f"{b['height']:.0f}" for b in boxes))
             tops = {round(b["y"]) for b in boxes}
             if vp_name == "desktop":
                 ys = [round(b["y"]) for b in boxes]
-                check(f"{tag} OnlyFans row, then Instagram/X + button row", ys[0] < ys[1] == ys[2], str(ys))
+                check(f"{tag} OnlyFans + button row, then Instagram/X row", ys[0] == ys[2] < ys[1], str(ys))
             else:
                 check(f"{tag} stacked", len(tops) == 3, str(sorted(tops)))
             if js:  # nojs shots are identical apart from reveal; keep the evidence folder small
@@ -89,6 +100,7 @@ with sync_playwright() as pw:
         page = browser.new_page(viewport={"width": w, "height": 900})
         page.route("**/*", lambda r, _q: r.continue_() if urlsplit(r.request.url).hostname in ("127.0.0.1", "localhost") else r.abort())
         page.goto(base, wait_until="load")
+        page.locator(".scan-more button").click()
         fit = page.evaluate(FIT)
         check(f"{w}px placeholders + 20-char handle fit (name, room, need)", all(room >= need for _n, room, need in fit), str(fit))
         page.close()

@@ -457,6 +457,7 @@
   if (window.ResizeObserver) new ResizeObserver(later).observe(document.body);   // the hero card growing into a report
   var rc = document.querySelector('.report-card');
   if (rc && window.MutationObserver) new MutationObserver(later).observe(rc, { attributes: true, attributeFilter: ['aria-busy'] });
+  launcher.addEventListener('transitionend', function (e) { if (e.propertyName === 'translate') later(); });   // lifted over / back from the sticky bar: re-check what it now covers
   launcher.addEventListener('focus', quiet);   // never hide the pill under keyboard focus (Esc returns focus here)
   launcher.addEventListener('blur', later);
   dlg.addEventListener('close', later);

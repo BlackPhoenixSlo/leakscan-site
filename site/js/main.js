@@ -22,6 +22,14 @@
 
   // Phone mockups: All / Images / Videos are real tabs (E.tablist: click, ←/→, Home / End). The screen has a fixed
   // height, so a switch never moves the page.
+  // Hero form: "+ Add Instagram or X" opens the folded optional field (CSS folds it only while empty: styles.css).
+  var scanForm = document.getElementById('scan'), igMore = document.querySelector('.scan-more button');
+  if (scanForm && igMore && scanForm.elements.ig) {
+    var igOpen = function () { scanForm.classList.add('ig-open'); igMore.setAttribute('aria-expanded', 'true'); };
+    igMore.addEventListener('click', function () { igOpen(); scanForm.elements.ig.focus(); });
+    scanForm.elements.ig.addEventListener('input', igOpen);   // cleared after an autofill: stays open while she types
+  }
+
   var E = window.LeakScanEngine;
   if (E) document.querySelectorAll('.phone').forEach(function (phone) { E.tablist(phone); });
 

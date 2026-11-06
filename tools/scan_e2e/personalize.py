@@ -109,8 +109,8 @@ def no_slug(t):
         lav: [...document.querySelectorAll('.report-card .report-rows .lav')].map(e => e.textContent)})""")
     check(f"{tag} no slug: phones = labelled illustrations (groups: their tabs are buttons), rows not links, no tap hint", static["links"] == 0
           and static["roles"] == ["group:true", "group:true"] and static["hidden"] == [None, None] and not static["hint"], static)
-    check(f"{tag} no slug: #free phone = static illustration (9 blurred tiles, no links), hero rows = letter avatars",
-          static["band"] == ["group", 0, 9] and static["lav"] == ["L", "F", "P", "F"], static)
+    check(f"{tag} no slug: #free phone = static illustration (9 blurred tiles, no links), hero rows = blurred site marks (no letters)",
+          static["band"] == ["group", 0, 9] and static["lav"] == ["", "", "", ""], static)
     bring(page, "#showcase")
     try:
         page.wait_for_function("() => { const f = document.querySelector('iframe[data-p=demo]'); const i = f && f.contentDocument && f.contentDocument.querySelector('img.hero__bg'); return i && i.complete && i.naturalWidth > 0; }", timeout=IFRAME_MS)

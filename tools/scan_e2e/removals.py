@@ -258,7 +258,7 @@ def removals_flow(browser, vp_name, vp):
         page = open_(ctx)
         order = page.evaluate("() => { const r = document.getElementById('removals'); return [r && r.previousElementSibling && r.previousElementSibling.id, r && r.nextElementSibling && r.nextElementSibling.id, r && r.closest('main') && r.closest('main').id]; }")
         if scheme == "light":
-            check(f"{tag} section sits after #faq, directly before #contact, inside <main>", order == ["faq", "contact", "main"], order)
+            check(f"{tag} section sits after #free, directly before #website, inside <main>", order == ["free", "website", "main"], order)
             t = page.evaluate(RM_TEXT)
             check(f"{tag} defaults: demo creator (Orla Brennick / brennickclay) in every panel",
                   t.get("name") == "Orla Brennick" and t.get("mega-title") == "brennickclay – pack" and t.get("x-l1") == "Orla Brennick full set"
@@ -287,7 +287,7 @@ def removals_flow(browser, vp_name, vp):
             fp_checks(tag, vp_name, page.evaluate(FP_STATE), "Orla Brennick", "brennickclay, orlabrennick", vp["width"])
         before = page.evaluate(RM_STATE)
         check(f"{tag} {scheme}: starts live (edge at 100, removed layer clipped away)", all(
-            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Remove" and s["shown"] == "live" for s in first["state"] + before), [first["state"], before])
+            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Preview removal" and s["shown"] == "live" for s in first["state"] + before), [first["state"], before])
         idle = page.evaluate(RM_IDLE)
         check(f"{tag} {scheme}: L10: idle, the handle covers no text / photo of the live leak and no edge line shows (leak-site photo grid aside)",
               all(not x[1] and x[2] == "0" for x in idle), idle)
@@ -309,7 +309,7 @@ def removals_flow(browser, vp_name, vp):
         page.locator("#removals .rm-btn").first.click()
         page.wait_for_timeout(1000)
         back = page.evaluate(RM_STATE)[0]
-        check(f"{tag} {scheme}: toggle: Show again puts the leak back", back["p"] == "100" and back["shown"] == "live" and back["label"] == "Remove", back)
+        check(f"{tag} {scheme}: toggle: Show again puts the leak back", back["p"] == "100" and back["shown"] == "live" and back["label"] == "Preview removal", back)
         if scheme == "light":
             # drag: grab the stage near its right edge, pull to 30 %
             st = page.locator('#removals .rm-card[data-rm="x"] .rm-stage')
@@ -347,7 +347,7 @@ def removals_flow(browser, vp_name, vp):
             page.locator("#removals .rm-reveal").click()
             page.wait_for_timeout(500)   # filter transition .25s
             rv = page.eval_on_selector_all("#removals .rm-img", "es => es.map(e => getComputedStyle(e).filter)")
-            check(f"{tag} Reveal unblurs, Blur images re-blurs", all(f == "none" for f in rv) and page.locator("#removals .rm-reveal").inner_text().strip() == "Blur images")
+            check(f"{tag} Show demo images unblurs, Blur demo images re-blurs", all(f == "none" for f in rv) and page.locator("#removals .rm-reveal").inner_text().strip() == "Blur demo images")
             page.locator("#removals .rm-reveal").click()
         ctx.close()
 

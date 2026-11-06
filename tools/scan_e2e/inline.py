@@ -80,7 +80,11 @@ def shot(run, page, name, el=None):
 def submit(run, page, h, social=""):
     run.net["bodies"].clear()
     page.locator("#scan input[name=h]").fill(h)
-    page.locator("#scan input[name=ig]").fill(social)
+    ig = page.locator("#scan input[name=ig]")
+    if social and not ig.is_visible():   # folded behind "+ Add Instagram or X" while empty
+        page.locator(".scan-more button").click()
+    if ig.is_visible():
+        ig.fill(social)
     page.locator("#scan button[type=submit]").click()
 
 
@@ -142,6 +146,7 @@ def before_submit(run):
     page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
     page.wait_for_timeout(300)
     net["nav"].clear()
+    page.locator(".scan-more button").click()   # she opens the folded Instagram / X field before typing in it
     lc0 = lcol(page)
     submit(run, page, "@demo.creator", "https://www.instagram.com/demo.ig/")
     page.wait_for_function("() => /step/.test((document.querySelector('.report-card .live-status') || {}).textContent || '')", timeout=5000)

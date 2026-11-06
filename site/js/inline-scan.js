@@ -27,6 +27,7 @@
     if (!msg) { msg = make('p', 'inline-msg', [], { role: 'alert' }); form.parentNode.insertBefore(msg, form.nextSibling); }
     msg.textContent = text || '';
     msg.hidden = !text;
+    if (field === 'ig') form.classList.add('ig-open');   // folded Instagram / X field (styles.css): open before focus
     if (text) form.elements[field || 'h'].focus();
   }
   form.noValidate = true; // own messages below, same rules as scan/

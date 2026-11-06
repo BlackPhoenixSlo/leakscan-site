@@ -144,7 +144,7 @@
     h.setAttribute('aria-valuenow', p);
     h.setAttribute('aria-valuetext', p === LIVE ? 'Leak live' : p === GONE ? 'Removed' : p + '% leak, ' + (LIVE - p) + '% removed');
     b.setAttribute('aria-pressed', String(gone));
-    b.textContent = gone ? 'Show again' : 'Remove';
+    b.textContent = gone ? 'Show again' : 'Preview removal';
   }
   var now = function (card) { return +card.querySelector('.rm-handle').getAttribute('aria-valuenow'); };
 

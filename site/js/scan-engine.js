@@ -428,8 +428,9 @@
     var on = scope.classList.contains('revealed');
     Array.prototype.forEach.call(scope.querySelectorAll('[data-reveal]'), function (b) {
       b.setAttribute('aria-pressed', String(on));
-      var t = b.querySelector('.reveal-t');   // a button with a .rv-w (" images", hidden on narrow screens) keeps it
-      if (t) t.textContent = (on ? 'Blur' : 'Reveal') + (b.querySelector('.rv-w') ? '' : ' images');
+      var t = b.querySelector('.reveal-t'), own = (b.getAttribute('data-reveal-t') || '').split('|');   // own labels: "off|on"
+      if (t && own.length === 2) t.textContent = own[on ? 1 : 0];   // a button with a .rv-w (" images", hidden on narrow screens) keeps it
+      else if (t) t.textContent = (on ? 'Blur' : 'Reveal') + (b.querySelector('.rv-w') ? '' : ' images');
     });
   }
   document.addEventListener('click', function (e) {
