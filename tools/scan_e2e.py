@@ -39,8 +39,8 @@ aborted and none may be attempted (the demo uses system fonts).
 sheet (app/thumb_sheet.py, E.sheet in js/scan-engine.js; phone, desktop, WebKit iPhone 13): the same report with /api/thumb-sheet off (404, an API
 without it: every other scenario runs so) and on: the landing (hero, #free phone, the phones, removals panels, the video's kept / dropped photos; end card
 count = the report's) and scan/?r= (Images, Videos) show exactly the same, DEAD / BLANK / LOGO dropped alike (E.isPhoto on the same bytes); server's log: one sheet for
-page + iframe, no /api/thumb (a thumb the sheet does not name, and only that, goes there); tiles are <img>s on blob URLs; blur, Reveal. --break-sheet500: the
-stub answers 500: the views stay the same, only the request-count and blob checks go red.
+page + iframe, no /api/thumb (a thumb the sheet does not name, and only that, goes there); tiles are <img>s on blob URLs; blur, Reveal; a tile paints before the sheet's body ends; a sheet cut halfway: same landing, only the rest asks /api/thumb.
+--break-sheet500: the stub answers 500: the views stay the same, only the request-count, blob and read-as-it-arrives checks go red.
 
 askai (js/chat.js, the "Ask AI before you DM me" popup): launcher covers no hero text at load (phone: hidden while
 the hero is on screen), visible and clear of the hero CTA (desktop) / sticky bar (phone),

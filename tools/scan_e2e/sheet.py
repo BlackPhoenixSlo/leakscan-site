@@ -28,6 +28,8 @@ VIDEOS = "() => [...document.querySelectorAll('#g-stage .g-v')].map(v => [v.quer
 LOADED = """(sel) => { const m = [...document.querySelectorAll(sel)].filter(i => i.getAttribute('src')), l = m.filter(i => i.complete && i.naturalWidth >= 16);
   return [m.length, m.filter(i => i.getAttribute('src').startsWith('blob:')).length, l.length]; }"""
 PEOPLE = "() => window.VideoOverlays && window.VideoOverlays.photos"
+STREAMED = """() => document.querySelector('.report-card a.gi-card img[src^="blob:"], .phone-free a.gi-card img[src^="blob:"]')?.naturalWidth >= 16
+  && !performance.getEntriesByType('resource').some(r => r.name.includes('/api/thumb-sheet/'))"""
 SETTLED = "() => { const p = window.VideoOverlays && window.VideoOverlays.photos; return !!p && p.settled; }"
 
 
@@ -82,6 +84,7 @@ def sheet_flow(pw, chromium, vp_name, vp, engine="chromium"):
             nocell = slug == "demoNoCell01"
             mode("off")
             c0, _, net0, base, th0, sh0 = landing(browser, vp_name, vp, slug, opts)
+            start, th_start = base, th0
             c0.close()
             mode(on)
             c1, page, net1, got, th1, sh1 = landing(browser, vp_name, vp, slug, opts)
@@ -120,9 +123,25 @@ def sheet_flow(pw, chromium, vp_name, vp, engine="chromium"):
             mode(on)
             c1, page, net1, rgot, th, sh = report(browser, vp_name, vp, slug, opts)
             # WebKit: main's per-thumb list is not the same run to run either (E.isPhoto on the fixture's 2000 px stand-ins, undecoded: 2026-11-06-perf-sheet-*/webkit_scanpage): how many, not which
-            same = (len(rgot["images"]), rgot["videos"]) == (len(rbase["images"]), rbase["videos"]) if engine == "webkit" else rgot == rbase
+            same = (len(rgot["images"]), rgot["videos"]) == (len(rbase["images"]), rbase["videos"]) if engine == "webkit" else (sorted(rgot["images"]), rgot["videos"]) == (sorted(rbase["images"]), rbase["videos"])   # sorted: see LANDING
             check(f"{tag} scan page shows the same with the sheet: Images tab tiles, Videos rows", same and not any(x in u for u in rgot["images"] for x in ("DEAD", "BLANK", "LOGO")), {k: (rbase[k], rgot[k]) for k in rbase if rbase[k] != rgot[k]})
             check(f"{tag} scan page: one sheet, no /api/thumb", sh == 1 and th == 0, [sh, th])
+            c1.close()
+            mode("500" if "sheet500" in cfg.broken else "slow")
+            c1, net1 = new_ctx(browser, vp_name, vp, **opts)
+            page = c1.new_page()
+            page.goto(cfg.base + "?r=" + slug, wait_until="commit")
+            try:   # Resource Timing lists a request once its body has ended
+                page.wait_for_function(STREAMED, timeout=8000)
+                streamed = page.evaluate(STREAMED)
+            except Exception:
+                streamed = False
+            check(f"{tag} read as it arrives: a tile paints while the sheet's second half is on its way", streamed)
+            c1.close()
+            mode("500" if "sheet500" in cfg.broken else "cut")
+            c1, _, _, got, th1, sh1 = landing(browser, vp_name, vp, slug, opts)
+            check(f"{tag} sheet cut halfway: same landing; what came stays, only the rest asks /api/thumb", {k: got[k] for k in got if k != "video"} == {k: start[k] for k in start if k != "video"} and got["video"]["kept"] == start["video"]["kept"]
+                  and sh1 == 1 and 0 < th1 < th_start, {"requests": [sh1, th1, th_start], **{k: (start[k], got[k]) for k in start if start[k] != got[k]}})
             c1.close()
     finally:
         mode("off")

@@ -40,7 +40,7 @@ Serves site/ and the API routes of the contract the scan page talks to:
   logo_png(): a flat site-logo PNG (no person photo: the image views must drop it). STALE → no ACAO unless the URL has
   ?c=1 (a copy cached before the API sent CORS: the views retry once on E.fresh's URL, then drop the logo).
 - GET /api/thumb-sheet/<slug> → app/thumb_sheet.py's body from the same bytes (DEAD in dead[]; NOCELL in neither list). --sheet / POST
-  /__stub/sheet?mode=off|on|500: off (default) = 404, an API without it (every other scenario: the per-thumb path). GET /api/_thumb-log,
+  /__stub/sheet?mode=off|on|500|slow|cut: off (default) = 404, an API without it (every other scenario: the per-thumb path). GET /api/_thumb-log,
   /api/_sheet-log: what reached the server. --thumb-bucket rate:burst: /api/thumb's bucket (the API's: 120:60); --seed, --thumb-dir: a saved
   result + real thumb bytes, for local probes only (never committed).
 - demoBrokenT1: the fixture with three page-result thumbs swapped for DEAD / BLANK ones (images[] too), page result #7's
@@ -390,6 +390,14 @@ class Handler(RangeHandler):
             self.send_header("Cache-Control", "max-age=3600")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
+            if OPTS.sheet in ("slow", "cut"):   # slow: half, then 4 s later the rest; cut: half, then 1 s later the connection drops
+                self.wfile.write(body[:len(body) // 2])
+                self.wfile.flush()
+                time.sleep(1 if OPTS.sheet == "cut" else 4)
+                self.close_connection = OPTS.sheet == "cut"
+                if self.close_connection:
+                    return
+                body = body[len(body) // 2:]
             return self.wfile.write(body)
         if u.path == "/api/thumb":
             THUMB_LOG.append([round(time.time(), 3), u.query, self.headers.get("Referer") or ""])

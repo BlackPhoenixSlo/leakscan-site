@@ -346,39 +346,55 @@
   }
   // ---------- one file instead of dozens of /api/thumb requests ----------
   // GET <API>/api/thumb-sheet/<slug> (app/thumb_sheet.py): 8 digits = the manifest's length, the manifest {cells: [[src, type, bytes]],
-  // dead: [src]}, then the thumbs' original bytes back to back. A cell becomes a blob URL: a real <img>, readable pixels (same origin),
-  // no request, no decoding until an <img> asks. put() holds while one is on its way. No sheet (404 / 5xx / an old server / a network
-  // error / too slow) or a thumb it does not name: /api/thumb, as always. A same-origin frame (js/pip.js) uses the page's sheet.
+  // dead: [src]}, then the thumbs' original bytes back to back, read as they arrive. A cell becomes a blob URL: a real <img>, readable
+  // pixels (same origin), no further request, no decoding until an <img> asks. put() holds a thumb until its cell is here or the sheet
+  // is over. No sheet (404 / 5xx / an old server / a network error / too slow) or a thumb it does not name: /api/thumb, as always.
+  // A same-origin frame (js/pip.js) uses the page's sheet.
   var SHEET_MS = 20000, CELL_MS = 16, sheets = {}, opened = {}, cells = {}, sheetsOut = 0, held = new Map();
-  function readSheet(slug) {   // → Promise of {cells: {src: blob URL}, dead: [src]}; never rejects
-    if (host) return host.readSheet(slug);
-    if (sheets[slug]) return sheets[slug];
+  function readSheet(slug, each) {   // each(src, blob URL | null = dead) per thumb: at once for those already read → Promise: the sheet is over; never rejects
+    if (host) return host.readSheet(slug, each);
+    var s = sheets[slug];
+    if (s) { s.got.forEach(function (c) { each(c[0], c[1]); }); s.subs.push(each); return s.end; }
+    s = sheets[slug] = { got: [], subs: [each] };
+    var say = function (src, u) { s.got.push([src, u]); s.subs.forEach(function (fn) { try { fn(src, u); } catch (e) {} }); };   // a frame may be gone
+    var buf = new Uint8Array(0), size = 0, list = null, at = 0, text = function (b) { return new TextDecoder().decode(b); };
+    var chew = function () {   // cuts off buf what is complete
+      for (;;) {
+        var n = !size ? 8 : !list ? size : list[at] ? list[at][2] : Infinity;
+        if (buf.length < n) return;
+        var part = buf.subarray(0, n);
+        buf = buf.subarray(n);
+        if (!size) size = +text(part);
+        else if (!list) { var j = JSON.parse(text(part)); list = j.cells; j.dead.forEach(function (u) { say(u, null); }); }
+        else { say(list[at][0], URL.createObjectURL(new Blob([part], { type: list[at][1] }))); at++; }
+      }
+    };
     var ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, SHEET_MS);
-    return (sheets[slug] = fetch(API + '/api/thumb-sheet/' + encodeURIComponent(slug), { credentials: 'omit', signal: ctl.signal }).then(function (res) {
-      if (!res.ok) throw new Error('no sheet');
-      return res.blob();
-    }).then(function (b) {
-      return b.slice(0, 8).text().then(function (n) {
-        return b.slice(8, 8 + +n).text().then(function (m) {
-          var j = JSON.parse(m), at = 8 + +n, out = { cells: {}, dead: j.dead };
-          j.cells.forEach(function (c) { out.cells[c[0]] = URL.createObjectURL(b.slice(at, at += c[2], c[1])); });
-          return out;
+    return (s.end = fetch(API + '/api/thumb-sheet/' + encodeURIComponent(slug), { credentials: 'omit', signal: ctl.signal }).then(function (res) {
+      if (!res.ok || !res.body) throw new Error('no sheet');
+      var reader = res.body.getReader(), next = function () {
+        return reader.read().then(function (r) {
+          if (r.done) return;
+          var b = new Uint8Array(buf.length + r.value.length);
+          b.set(buf);
+          b.set(r.value, buf.length);
+          buf = b;
+          chew();
+          return next();
         });
-      });
-    }).catch(function () { return { cells: {}, dead: [] }; }).then(function (s) { clearTimeout(timer); return s; }));
+      };
+      return next();
+    }).catch(function () {}).then(function () { clearTimeout(timer); }));
   }
   function sheet(slug) {
-    if (opened[slug] || !window.fetch || !window.AbortController || !window.Blob || !Blob.prototype.text) return;
+    if (opened[slug] || !window.fetch || !window.AbortController || !window.TextDecoder) return;
     opened[slug] = 1;
     sheetsOut++;
-    readSheet(slug).then(function (s) {
-      Object.keys(s.cells).forEach(function (u) { cells[u] = s.cells[u]; });
-      s.dead.forEach(function (u) { verdict(u, false); });
-      if (--sheetsOut) return;
-      var q = held;
-      held = new Map();
-      q.forEach(function (src, img) { if (img.isConnected || !img.parentNode) put(img, src); });
-    });
+    var free = function (src, img) { held.delete(img); if (img.isConnected || !img.parentNode) put(img, src); };
+    readSheet(slug, function (src, u) {
+      if (u) cells[src] = u; else verdict(src, false);
+      held.forEach(function (s, img) { if (s === src) free(s, img); });
+    }).then(function () { if (!--sheetsOut) held.forEach(free); });
   }
   // A progress event's text → {pct: 5..95 | null, stage: what to show}.
   function progressInfo(text) {
@@ -656,8 +672,8 @@
   // img's waiting thumb. A thumb the sheet says is dead fails at once: watchThumb's onDead, no request.
   function put(img, src) {
     if (!src) return held.delete(img);
-    if (sheetsOut && !via[src] && !cells[src]) { img.removeAttribute('src'); return held.set(img, src); }
     if (verdicts[src] === false) return setTimeout(function () { img.dispatchEvent(new Event('error')); });
+    if (sheetsOut && !via[src] && !cells[src]) { img.removeAttribute('src'); return held.set(img, src); }
     var p = via[src] || (cells[src] ? { u: cells[src] } : { u: thumb(src), cors: XO });
     if (p.cors) img.crossOrigin = 'anonymous';
     img.src = p.u;
