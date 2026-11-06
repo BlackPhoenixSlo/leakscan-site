@@ -6,8 +6,8 @@
 <title>Free leak scan · Abolita</title>
 <meta name="description" content="Free leak scan: see what Google shows for your handle, pages, images and videos, and every leak link it found. No account, no card.">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#fbf8f3" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#15120f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#edeff2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#19161d" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Abolita">
@@ -34,12 +34,10 @@
 <body>
 <script>
 // Jack's still in the first paint, on a phone's home spot (360+: under that the landing overflows and the box's width isn't known yet), pip.js's on / off rules;
-// a tucked / moved / resized player waits for js/pip.js (which takes the still over when it mounts). Styled in css/pip.css (.pip-still).
+// js/pip.js takes the still over when it mounts. Styled in css/pip.css (.pip-still).
 (function () {
-  var q = new URLSearchParams(location.search), W = innerWidth, s, w, e;
+  var q = new URLSearchParams(location.search), W = innerWidth, w, e;
   if (W < 360 || W >= 720 || q.get('pip') === '0' || !/^[A-Za-z0-9_-]{1,64}$/.test(q.get('r') || '') || !('PointerEvent' in window) || !('IntersectionObserver' in window)) return;
-  try { s = JSON.parse(sessionStorage.getItem('leakscan.pip')); } catch (x) { /* private mode */ }
-  if (s && (s.t || s.p || s.w)) return;
   w = Math.round(Math.min(320, W * 0.45));
   e = document.createElement('div');
   e.className = 'pip-still';
@@ -176,7 +174,7 @@
   <section class="scan-section" id="send" aria-labelledby="send-title">
     <div class="container">
       <div class="contact-card">
-        <img class="contact-avatar" src="../assets/avatar-jaka.svg" alt="Jaka" width="88" height="88">
+        <img class="contact-avatar" src="../assets/jaka.webp" alt="Jaka" width="88" height="88">
         <h2 id="send-title">Send me this report. I remove one page free so you see it work.</h2>
         <p>Send it on whichever app you already use. You'll be talking to me, not a bot and not a team.</p>
         <div class="channels">

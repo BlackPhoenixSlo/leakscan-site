@@ -3,26 +3,39 @@
 Google Ads landing site for Abolita: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
 cookies or third-party requests on the landing pages except `js/analytics.js` (Google Ads, see below). `site/` is what ships. `site/showcase/` is the demo of
 the official site each client gets (fictional creator, built from the tessa template); the landing page links and
-iframes it as `showcase/`. The demo uses system fonts too (no Google Fonts); `tools/check.py` fails if it loads any
+iframes it as `showcase/`. Landing fonts are self-hosted in `site/fonts/` (Young Serif display + Schibsted Grotesk body,
+OFL, Latin subset, both preloaded, metric-matched fallbacks so the swap doesn't shift); the demo uses system fonts (no
+Google Fonts); `tools/check.py` fails if it loads any
 third-party host that `privacy.html` does not disclose. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py --variants` rebuilds them from
 the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB copy and any full-size photo > 200 KB).
 
-- Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card) · `#free` one Google
-  phone (All / Images / Videos tabs; after a scan her real results, `js/inline-scan.js`) · `#why` · `#how` (7 steps) ·
-  `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop close, page
-  behind inert, focus back to the button; then the Before / After Google phones for "<name> nude leaks", real ARIA tabs,
-  each tab scrolling inside the fixed screen with "Show more" for its next `.m-batch`, `js/main.js`) ·
-  `#pricing` · `#faq` · `#removals` · `#contact`. `tools/check.py` fails if a section id is missing here.
+- Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card; the mini player docks
+  by `.hero .report-card`) · `#why` (Jaka's letter with his photo `assets/jaka.webp`, three rules, the record) · `#how`
+  (You 1-3, Me 4-5) · `#website` (its two points, then `#showcase` inside it: a demo preview card, live iframe 440px tall
+  (`data-src` until the page has loaded and it is within 800px of the screen: `js/main.js`; Chrome's own lazy distance started it
+  during load and held the video player)
+  with a "Full screen" in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button;
+  under 560px a still of the demo's top, `assets/demo/top.webp`, opens the same pop-out; then `#free`, the page's one
+  Google phone block `.ba`: Before / After one at a time via real ARIA tabs `.ba-tabs`, `js/main.js`; Before = the
+  scan's phone `.phone-free` (All / Images / Videos tabs, lists scroll inside the screen + Show more; after a scan her
+  real results, `js/inline-scan.js` + `js/free-phone.js`, "Send it to me" link), After = her own pages first (search "<name> nude leaks", each tab scrolling inside the
+  screen with "Show more" for its next `.m-batch`, `js/main.js`); no JS = both) · `#pricing` (Monthly on the deep card, One-time outlined, plan-specific Telegram CTAs) · `#faq` · `#removals`
+  (the deep room; phones: a swipe row, arrows + dots, `js/swipe.js`) · `#contact`. `tools/check.py` fails if a section
+  id is missing here.
+- Look: every colour / radius / face is a token in `css/styles.css` `:root` (paper `--bg`, the `--fold` band under
+  `#how` and `#pricing`, the `--deep` mulberry room for `#removals` and the Monthly card, `--accent` mulberry; dark via
+  `prefers-color-scheme`). Young Serif for h1 / h2 / big numbers (weight 400, no synthesis), Schibsted Grotesk for the
+  rest; one section rhythm (36 / 60 / 80 px), one h2 scale, 6px buttons, no shadows except what floats (hero card, sticky pill).
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
   removed layer's chrome is cloned from the live one, `data-rm-copy`). On screen each edge glides by itself (1-2 s CSS
-  transition) to a random 15-85 % and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
-  reduced motion; a card's first input (Remove press, stage tap, handle key) stops its sweep for good. Remove / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
+  transition) to a random 55-85 % (the leak side: the button keeps reading Preview removal) and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
+  reduced motion; a card's first input (Preview removal press, stage tap, handle key) stops its sweep for good. Preview removal / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
-  vertical swipe leaves it); arrow / PageUp / PageDown / Home / End on the handle. "Reveal images" unblurs the
+  vertical swipe leaves it); arrow / PageUp / PageDown / Home / End on the handle. "Show demo images" (`data-reveal-t` labels) unblurs the
   `img/removals/` thumbs. Personalized from the same shared scan result as the hero card (`?r=` or last scan, and after
   an in-page scan on the `leakscan:result` event); each panel is all hers or all the demo, never a mix: Mega from the
   result's top-level `mega[]` (always present, `[]` = none; first item's `size` in bytes, `images`, `videos`, `age` ISO
@@ -70,8 +83,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   unmute, then play / pause); icon-only 30 px bar under the picture. Drag drops it where released (kept on-screen, under
   the sticky header / report nav); a fling / drag past the left or right edge tucks it (paused) with a `>` / `<` tab
   (tap / drag inward = back; Esc tucks, Enter on the tab returns); corner grip / pinch resizes (min 160 px, max 60% of
-  the width, 90% on phones); expand = `video/?r=&t=`; x closes for the session; spot / size / tucked / closed in
-  sessionStorage `leakscan.pip`. A phone's first paint already has Jack's still on the player's spot (`.pip-still`, an
+  the width, 90% on phones); expand = `video/?r=&t=`; x hides it behind a tab (tap = back); nothing stored: every
+  page load (reload, new page) starts on the home spot at default size. A phone's first paint already has Jack's still on the player's spot (`.pip-still`, an
   inline script + data URI after `<body>` in `index.html` and `scan/index.html`, keep the two the same; `pip.js` replaces
   it when it mounts; not on a computer, where the dock spot needs the card). E2E: `scan_e2e.py OUT --only pip` (phone,
   desktop, WebKit iPhone 13; `--break-tuck`, `--break-dock`, `--break-still`).
@@ -103,8 +116,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   card's request from `js/scan-engine.js` is shared, and a `?r=` link opened with the card below the fold scrolls it up); every value is
   validated and rendered with textContent / built elements, never leak titles or snippets. Landing: hero line +
   Reset, the phone sticky bar ("Free scan: type your handle" → "DM me on Telegram", `t.me/jakabasej` prefilled like
-  #contact's with her report link + @handle), both "Your website" phones (search "<name> nude leaks", top-4 leak domains by occurrences, the after phone's Removed rows = the same 4, blurred `/api/thumb` thumbs, IG / TikTok /
-  site rows hidden when unknown), hero card handles, showcase url bar + iframe `showcase/?r=` (until the iframe has
+  #contact's with her report link + @handle), the After phone (search "<name> nude leaks", her own pages, the Removed rows = her top-4 leak domains by occurrences, IG / TikTok /
+  site rows hidden when unknown; the Before phone is the scan's own, `js/free-phone.js`), hero card handles, showcase url bar + iframe `showcase/?r=` (its `data-src` until `js/main.js` starts it; until the iframe has
   loaded a page with `?r=`, a load without it, the lazy iframe's own first load of `showcase/` landing after the src
   change: Chrome's race, is sent on to its `?r=` src; after that first `?r=` load nothing in it is redirected). Slots are `data-p="…"`.
   Demo: once its scan result is in, its internal links keep `?r=` (scan-only too, so clicking around stays on her scan); the content changes
@@ -322,10 +335,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 
 ## Replace before launch
 
-- **Jaka's photo**: `site/assets/avatar-jaka.svg` is an initials placeholder (used 3x in `site/index.html`). Add a square
-  photo, e.g. `site/assets/jaka.webp` (at least 176x176), then
-  `sed -i '' 's#assets/avatar-jaka.svg#assets/jaka.webp#g' site/index.html && rm site/assets/avatar-jaka.svg`
-  and run the gate.
+- **Jaka's photo**: `site/assets/jaka.webp` (192x192, a frame of his own take) is used in the hero card, #why and
+  scan/. Swap it for a portrait shot if wanted (same name, square, at least 176x176).
 - **Imprint**: add registration number (matična številka) and tax number (davčna številka) to `site/imprint.html`
   if you want them shown.
 

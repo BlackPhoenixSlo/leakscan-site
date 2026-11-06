@@ -524,8 +524,9 @@
     var on = scope.classList.contains('revealed');
     Array.prototype.forEach.call(scope.querySelectorAll('[data-reveal]'), function (b) {
       b.setAttribute('aria-pressed', String(on));
-      var t = b.querySelector('.reveal-t');   // a button with a .rv-w (" images", hidden on narrow screens) keeps it
-      if (t) t.textContent = (on ? 'Blur' : 'Reveal') + (b.querySelector('.rv-w') ? '' : ' images');
+      var t = b.querySelector('.reveal-t'), own = (b.getAttribute('data-reveal-t') || '').split('|');   // own labels: "off|on"
+      if (t && own.length === 2) t.textContent = own[on ? 1 : 0];   // a button with a .rv-w (" images", hidden on narrow screens) keeps it
+      else if (t) t.textContent = (on ? 'Blur' : 'Reveal') + (b.querySelector('.rv-w') ? '' : ' images');
     });
   }
   document.addEventListener('click', function (e) {
@@ -743,7 +744,14 @@
       // moves; same for a top-up video still: after both, rank). Nothing left to show: it just leaves; with still(el) (a view where nothing seen may move: the scan
       // page) the last live tile moves into the slot if it and every tile after it are off screen, else the slot stays
       // as still(el) (an empty tile, data-hole). Then the box fills up to max, in order.
+      // One pass at a time: a cached thumb's load verdict lands inside add() (watchThumb → verdict → g.sync), and a
+      // nested pass on the same box would re-add what the outer one is still adding (measured: 10-15 repeated tiles).
       v.sync = function () {
+        if (v.busy) { v.again = true; return; }
+        v.busy = true;
+        try { do { v.again = false; pass(); } while (v.again); } finally { v.busy = false; }
+      };
+      var pass = function () {
         var have = {}, by = {}, kids = Array.prototype.slice.call(box.children);
         var src = function (el) { return el.getAttribute('data-src'); };
         var live = function (el) { return verdicts[src(el)] !== false && !el.hasAttribute('data-hole'); };

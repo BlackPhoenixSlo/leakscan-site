@@ -4,8 +4,8 @@ import json
 import types
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from .common import (COUNTS, FX, MEASURED, PIP_AWAY, PROFILE, TILES, bring, cfg, check, dead_thumb, digits, links, new_ctx, scan_images, served, settled_count, swipe,
-                     tiles_ok, video_stills)
+from .common import (COUNTS, FX, MEASURED, PIP_AWAY, PROFILE, TILES, bring, cfg, check, dead_thumb, digits, links, new_ctx, occurrences, scan_images, served,
+                     settled_count, swipe, tiles_ok, top_ok, video_stills)
 from .huge import IN_VIEW
 
 # layout shifts with their sources (PerformanceObserver, buffered from page start)
@@ -48,7 +48,7 @@ def tabs_flow(browser, vp_name, vp):
 
     shot = lambda page, name, el=None: (page.locator(el) if el else page).screenshot(path=str(cfg.out / f"{vp_name}-t{name}.png"))
     overflow = lambda page: page.evaluate("""() => ({doc: document.documentElement.scrollWidth, vw: innerWidth,
-        wide: [...document.querySelectorAll('.phone, .browser-demo, .report-card, .free-band, .ba')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.left < -0.5 || r.right > innerWidth + 0.5); }).map(e => e.className)})""")
+        wide: [...document.querySelectorAll('.phone, .browser-demo, .report-card, .ba')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.left < -0.5 || r.right > innerWidth + 0.5); }).map(e => e.className)})""")
 
     t = types.SimpleNamespace(browser=browser, vp_name=vp_name, vp=vp, tag=tag, net=net, broken=broken, m=m, ctx_=ctx_, shot=shot, overflow=overflow)
     report_card(t)
@@ -342,7 +342,8 @@ def scan_page(t):
               f"play badge on the {len(want & stills)} video results' stills, Videos tab reaches {nvid}",
               src(sv) == src(iv) and set(src(sv)) == want and len(sv) == len(want) and not tiles_ok(sv, vd, videos=True) and not tiles_ok(iv, vd, videos=True)
               and sb == ib == want & stills and sb and vn == nvid and badge[0] == '""' and badge[1] == "24px" and badge[2] == "absolute",
-              [len(sv), len(iv), len(want), len(sb), len(ib), tiles_ok(sv, vd, videos=True), vn, badge])
+              [len(sv), len(iv), len(want), len(sb), len(ib), tiles_ok(sv, vd, videos=True), vn, badge,
+               {"iv_not_wanted": sorted(set(src(iv)) - want)[:4], "iv_dupes": len(src(iv)) - len(set(src(iv))), "iv_bad": tiles_ok(iv, vd, videos=True)}])
         ctx.close()
     # every thumb fails (late, after the report is up): the All strip keeps its height (visible slots stay as empty tiles), nothing below moves
     ctx = ctx_()
@@ -531,10 +532,20 @@ def free_phone(t):
         page.evaluate("k => { const p = document.getElementById('panel-free-' + k); p.scrollTop = p.scrollHeight; }", k)
         page.wait_for_timeout(500)
         shot(page, f"3-free-{k}-more-end", "#free .free-phone")   # settled: every item, no button
-        y0 = page.evaluate("scrollY")
-        page.mouse.wheel(0, 200)
-        page.wait_for_timeout(500)
-        check(f"{tag} free: report → {k}: at the list's end a new wheel on the phone scrolls the page (no trap)", page.evaluate("scrollY") > y0)
+        # as she would: the pointer on the list, wheel to its end (until it stops), then, after a pause, a new wheel
+        bx = page.locator(f"#panel-free-{k}").bounding_box()
+        page.mouse.move(bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2)
+        page.evaluate("k => { const p = document.getElementById('panel-free-' + k); p.scrollTop = p.scrollHeight - p.clientHeight - 300; }", k)
+        page.wait_for_timeout(600)
+        y0, hov = page.evaluate("scrollY"), page.evaluate("[...document.querySelectorAll(':hover')].slice(-2).map(e => e.tagName + '.' + e.className)")
+        for _ in range(8):   # 300 px of list left, 1200 px of wheel: the list ends, then the page moves on
+            page.mouse.wheel(0, 150)
+            page.wait_for_timeout(80)
+        page.wait_for_timeout(1200)
+        pa = page.evaluate(PANEL, k)
+        check(f"{tag} free: report → {k}: wheeling on the phone past the list's end scrolls the page (no trap)",
+              pa["scroll"][0] + pa["scroll"][2] >= pa["scroll"][1] - 1 and pa["y"] > y0 and any("m-" in h or "phone" in h or "gi-" in h for h in hov),
+              (y0, pa["y"], pa["scroll"], hov))
         bring(page, ".phone-free", "center")
         page.wait_for_timeout(200)
     m["overflow_report"] = overflow(page)
@@ -542,8 +553,9 @@ def free_phone(t):
 
 
 def ba_phones(t):
-    """(4) Before / After phones: '<name> nude leaks' in both; each tab fills the screen, scrolls inside it and its
-    "Show more" adds the next group up to the last, then goes. Without a scan (illustration) and with ?r= (her name)."""
+    """(4) The After phone (#91; the Before one is #free's, part 3): '<name> nude leaks', the Before phone's size; each tab
+    fills the screen, scrolls inside it and its "Show more" adds the next group up to the last, then goes. Without a scan
+    (illustration) and with ?r= (her name)."""
     tag, shot = t.tag, t.shot
     ITEMS = """(id) => { const p = document.getElementById(id), b = p.querySelector('.m-more'), ph = p.closest('.phone').getBoundingClientRect();
         const ids = [...p.querySelectorAll('.m-result, .gi-card, .m-video')].filter(e => e.getClientRects().length)
@@ -557,15 +569,17 @@ def ba_phones(t):
         if q:
             page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=9000)
         bring(page, "#showcase .ba", "center")
+        before_h = round(page.locator(".ba .phone-free").bounding_box()["height"])
+        page.locator("#ba-tab-after").click()
+        page.wait_for_timeout(200)
         # until the phones stop moving on the page (what loads above them settles: scroll anchoring moves scrollY)
         page.wait_for_function("""() => { const y = Math.round(document.querySelector('.ba').getBoundingClientRect().top + scrollY), w = window.__baY || (window.__baY = []);
             w.push(y); return w.length > 4 && w.slice(-5).every(v => v === y); }""", polling=250, timeout=10000)
-        lay = page.evaluate("""() => { const ps = [...document.querySelectorAll('.ba .phone')].map(p => p.getBoundingClientRect());
-            return {search: [...document.querySelectorAll('.ba [data-p=search]')].map(e => e.textContent), h: ps.map(r => Math.round(r.height)),
-              top: ps.map(r => Math.round(r.top)), side: ps[1].left > ps[0].right}; }""")
-        check(f"{tag} ba: {how}: both phones search '{who} nude leaks', equal height (desktop: side by side, same top)",
-              lay["search"] == [f"{who} nude leaks"] * 2 and lay["h"][0] == lay["h"][1] and (lay["side"] and lay["top"][0] == lay["top"][1]) == (t.vp_name == "desktop"), lay)
-        for side in ("before", "after"):
+        lay = page.evaluate("""() => ({search: [...document.querySelectorAll('.ba [data-p=search]')].map(e => e.textContent),
+            h: Math.round(document.querySelector('#ba-after .phone').getBoundingClientRect().height)})""")
+        check(f"{tag} ba: {how}: After phone searches '{who} nude leaks', the Before phone's height (one block, one at a time)",
+              lay["search"] == [f"{who} nude leaks"] and lay["h"] == before_h, [lay, before_h])
+        for side in ("after",):
             fig = f".ba-item:has(#panel-{side}-all)"
             for k in ("all", "images", "videos"):
                 pid = f"panel-{side}-{k}"
@@ -599,11 +613,12 @@ def ba_phones(t):
                 page.evaluate("id => { const p = document.getElementById(id); p.scrollTop = p.scrollHeight; }", pid)
                 page.wait_for_timeout(500)
                 shot(page, f"4-ba-{'r-' if q else ''}{side}-{k}-end", fig)   # settled: every item, no button
-        if q:   # the after phone's Removed rows (the later ones under "Show more") = the before phone's leak sites
+        if q:   # the after phone's Removed rows (the later ones under "Show more") = her top 4 leak sites
             page.locator("#tab-after-all").click()
-            g = page.evaluate("""() => [1, 2, 3, 4].map(i => [(document.querySelector(`.ba [data-p=leak-${i}] .m-site`) || {}).textContent,
-                (document.querySelector(`.ba [data-p=gone-${i}] .m-site`) || {}).textContent, !!document.querySelector(`.ba [data-p=gone-${i}]`)?.getClientRects().length])""")
-            check(f"{tag} ba: report: after phone's Removed rows (all shown after Show more) = the before phone's 4 leak sites", all(x[0] and x[0] == x[1] and x[2] for x in g), g)
+            g = page.evaluate("""() => [1, 2, 3, 4].map(i => [(document.querySelector(`.ba [data-p=gone-${i}] .m-site`) || {}).textContent,
+                !!document.querySelector(`.ba [data-p=gone-${i}]`)?.getClientRects().length])""")
+            check(f"{tag} ba: report: after phone's Removed rows (all shown after Show more) = her top 4 leak sites by the served hits' occurrences",
+                  all(x[0] and x[1] for x in g) and top_ok([x[0] for x in g], occurrences(served(FX["slug"])["hits"]), 4), g)
         ctx.close()
 
 
@@ -617,37 +632,45 @@ def order_popout(t):
     order = page.evaluate("""() => { const y = e => e.getBoundingClientRect().top + scrollY, b = e => e.getBoundingClientRect().bottom + scrollY;
         const w = document.getElementById('website'), sc = document.getElementById('showcase'), fr = sc.querySelector('.browser-demo'), ba = document.querySelector('.ba');
         return {website: Math.round(y(w)), showcase: Math.round(y(sc)), frameBottom: Math.round(b(fr)), ba: Math.round(y(ba)), inShowcase: sc.contains(ba),
+          free: ba.id, beforeIsFree: !!document.querySelector('#ba-before .phone-free'), phones: document.querySelectorAll('.phone').length,
           link: (a => a && a.getAttribute('href'))(sc.querySelector('a.btn[data-p=demo]'))}; }""")
-    check(f"{tag} order: #website copy → demo iframe (#showcase) → Before / After phones below it; 'Open the demo site' link kept",
-          order["website"] < order["showcase"] < order["frameBottom"] <= order["ba"] and order["inShowcase"] and order["link"] == "showcase/", order)
-    bring(page, "#showcase .ba", "center")
+    # one Google phone block (#free): Before = the scan's phone (.phone-free), After = her own pages; below the demo on phones, beside it on desktop
+    check(f"{tag} order: #website copy → demo (#showcase) → the one Before / After block (#free, Before = the scan phone), "
+          "below the demo (phone) / beside it (desktop); 'Open the demo site' link kept; 2 phones on the page",
+          order["website"] < order["showcase"] < order["frameBottom"] and order["inShowcase"] and order["free"] == "free" and order["beforeIsFree"]
+          and order["phones"] == 2 and (order["frameBottom"] <= order["ba"] if vp_name == "phone" else order["showcase"] < order["ba"] < order["frameBottom"])
+          and order["link"] == "showcase/", order)
+    bring(page, "#free", "center")
     page.wait_for_timeout(900)
     ok, shifts = [], []
-    for side in ("before", "after"):
+    for side, pre in (("before", "free"), ("after", "after")):
+        page.locator(f"#ba-tab-{side}").click()
+        page.wait_for_timeout(200)
         for k in ("images", "videos", "all"):
             t0 = page.evaluate("performance.now()")
-            page.locator(f"#tab-{side}-{k}").click()
+            page.locator(f"#tab-{pre}-{k}").click()
             page.wait_for_timeout(300)
             shifts += page.evaluate("t0 => window.__ls.filter(x => x[0] >= t0 && x[1] > 0 && !x[3].every(n => n.startsWith('BUTTON.askai-launcher'))).map(x => [x[1], x[3]])", t0)
-            r = page.evaluate("(id) => document.getElementById(id).closest('.phone').getBoundingClientRect().height", f"panel-{side}-{k}")
-            vis = page.evaluate(f"[...document.querySelectorAll('[id^=panel-{side}-]')].filter(p => !p.hidden).map(p => p.id)")
+            r = page.evaluate("(id) => document.getElementById(id).closest('.phone').getBoundingClientRect().height", f"panel-{pre}-{k}")
+            vis = page.evaluate(f"[...document.querySelectorAll('[id^=panel-{pre}-]')].filter(p => !p.hidden).map(p => p.id)")
             # the ones on screen (the rest are lazy: below the list's fold or in a later "Show more" group)
-            imgs = page.evaluate(f"""[...document.querySelectorAll('#panel-{side}-{k} img')].filter(i => {{ const r = i.getBoundingClientRect(), p = i.closest('.m-panel').getBoundingClientRect();
+            imgs = page.evaluate(f"""[...document.querySelectorAll('#panel-{pre}-{k} img')].filter(i => {{ const r = i.getBoundingClientRect(), p = i.closest('.m-panel').getBoundingClientRect();
                 return r.height && r.top < p.bottom && r.bottom > p.top; }}).map(i => i.complete && i.naturalWidth > 0)""")
-            ok.append([side, k, vis == [f"panel-{side}-{k}"], all(imgs), round(r)])
+            ok.append([side, k, vis == [f"panel-{pre}-{k}"], all(imgs), round(r)])
             if k != "all":
-                shot(page, f"2-ba-{side}-{k}", "#showcase .ba")
+                shot(page, f"2-ba-{side}-{k}", "#free")
     hs = {x[4] for x in ok}
-    check(f"{tag} before/after: All / Images / Videos switch in both phones, their photos load, phone height fixed (no CLS)",
+    check(f"{tag} before/after: Before / After tabs, then All / Images / Videos in each phone; photos load, one phone size (no CLS)",
           all(x[2] and x[3] for x in ok) and len(hs) == 1 and not shifts, (ok, shifts))
-    shot(page, "2-before-after", "#showcase .ba")
+    page.locator("#ba-tab-before").click()
+    shot(page, "2-before-after", "#free")
     m["overflow_before_after"] = overflow(page)
     # pop-out
     bring(page, "#showcase .browser-demo", "center")
     page.wait_for_timeout(1200)
     LAY = """() => { const r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top + scrollY), Math.round(b.width), Math.round(b.height)]; };
         const f = document.querySelector('#showcase .browser-demo');
-        return {y: Math.round(scrollY), ba: r(document.querySelector('.ba')), head: r(document.querySelector('#showcase .section-head')), link: r(document.querySelector('#showcase a.btn[data-p=demo]')),
+        return {y: Math.round(scrollY), ba: r(document.querySelector('.ba')), head: r(document.querySelector('#showcase .showcase-head')), link: r(document.querySelector('#showcase a.btn[data-p=demo]')),
           pop: f.classList.contains('is-pop'), fig: (b => [Math.round(b.left), Math.round(b.top), Math.round(b.right), Math.round(b.bottom)])(f.getBoundingClientRect()),
           vw: innerWidth, vh: innerHeight, role: f.getAttribute('role'), modal: f.getAttribute('aria-modal'), lock: document.documentElement.classList.contains('pop-lock'),
           focus: document.activeElement.className, inert: document.querySelector('.site-header, header').inert && document.getElementById('pricing').inert,
@@ -691,6 +714,21 @@ def order_popout(t):
     check(f"{tag} popout: Esc inside the demo, the Close button and the backdrop close it too", in_frame is False and by_btn is False and by_bd["pop"] is False and by_bd["y"] == l0["y"],
           (in_frame, by_btn, by_bd["pop"]))
     shot(page, "2-popout-closed")
+    st = page.evaluate("""() => { const f = document.querySelector('#showcase .browser-demo'), i = f.querySelector('iframe'), s = f.querySelector('.demo-shot');
+        return {iframe: getComputedStyle(i).visibility, shot: getComputedStyle(s).display, href: s.getAttribute('href'), img: s.querySelector('img').naturalWidth}; }""")
+    if vp_name == "phone":   # no nested scroll: a still of the demo's top; a tap opens the same full-screen layer
+        page.locator("#showcase .demo-shot").click()
+        page.wait_for_timeout(400)
+        sp = page.evaluate(LAY)
+        shot(page, "2-popout-from-still")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        se = page.evaluate(LAY)
+        check(f"{tag} popout: phone shows a still (frame hidden, image loaded, no-JS link to showcase/); tapping it opens the full-screen demo, Esc closes, nothing moved",
+              st["iframe"] == "hidden" and st["shot"] == "block" and st["href"] == "showcase/" and st["img"] > 0 and sp["pop"] and sp["role"] == "dialog"
+              and not se["pop"] and se["y"] == l0["y"], (st, sp["pop"], se["pop"]))
+    else:
+        check(f"{tag} popout: desktop shows the live frame, no still", st["iframe"] == "visible" and st["shot"] == "none", st)
     m["popout"] = {"before": l0, "open": l1, "after_close": l2}
     ov = [m.get("overflow_no_scan"), m.get("overflow_report"), m["overflow_before_after"]]
     check(f"{tag} layout: no horizontal overflow at {vp['width']} px (document, phones, demo frame, card)",

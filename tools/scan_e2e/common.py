@@ -140,10 +140,13 @@ def break_routes(ctx, only=None):
                   r.fulfill(body=b, content_type=ct) if r.request.url.startswith("http") else r.continue_())
 
 
-# Declared bypass for flows that test the report, not the mini player: it starts put away, as after its X (a tab at the
-# top-right corner). Floating, it stays top-right while the page scrolls (pip.js, by design) and so covers what sits there
-# (e.g. the demo's full-screen button), where Playwright's click would re-scroll and retry. The pip scenario covers the player.
-PIP_AWAY = "try { if (!sessionStorage.getItem('leakscan.pip')) sessionStorage.setItem('leakscan.pip', JSON.stringify({t: 'r', c: 1})); } catch (e) {}"
+# Declared bypass for flows that test the report, not the mini player: put away as soon as it mounts, by a script click on
+# its X (a tab at the top-right corner; focus put back where it was: X focuses the tab). Floating, it stays top-right
+# while the page scrolls (pip.js, by design) and so covers what sits there (e.g. the demo's full-screen button), where
+# Playwright's click would re-scroll and retry. pip.js stores nothing, so this runs on every page. The pip scenario covers the player.
+PIP_AWAY = """if (window.top === window) { const o = new MutationObserver(() => { const x = document.querySelector('.pip-x'); if (!x) return;
+  o.disconnect(); const a = document.activeElement; x.click(); if (a && a !== document.body && a.focus) a.focus({preventScroll: true}); else if (document.activeElement) document.activeElement.blur(); });
+  o.observe(document, {childList: true, subtree: true}); }"""
 
 
 def new_ctx(browser, vp_name, vp, net=None, *, route=None, console_ok=None, init=(), **opts):

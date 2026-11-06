@@ -138,7 +138,7 @@ def before_submit(run):
     shot(run, page, "1-band-before", "#free")
     band_h0 = ill(page)["h"]
     fh = page.evaluate("Math.round(document.getElementById('free').getBoundingClientRect().height)")
-    check(f"{tag} band: #free compact (<= 640 px desktop: the phone beside the copy / 1240 px phone: stacked)", fh <= (1240 if vp_name == "phone" else 640), fh)
+    check(f"{tag} band: #free = the Before / After phone block, compact (<= 720 px: one phone + its caption)", fh <= 720, fh)
     page.evaluate("scrollTo({top: 0, behavior: 'instant'})")
     page.wait_for_timeout(300)
     net["nav"].clear()
@@ -404,12 +404,15 @@ def hero_look(run):
           hue: [...document.querySelectorAll('.report-card .live-ico')].filter(e => e.style.background).length}; }""")
     check(f"{tag} hero: a failed row thumb falls back to a neutral theme-coloured letter; no letter hue anywhere in the card (neutral while thumbs load)", fb["n"] >= 1 and fb["ok"] and fb["hue"] == 0, fb)
     # hover looks only where there is hover (a tap leaves nothing tinted)
-    hover(page, ".report-card .live-link")
+    hit = page.evaluate("""() => { for (const e of document.querySelectorAll('.report-card .live-link')) { if (!e.getClientRects().length) continue;   // the first row the pointer can reach: #90's 640 px player may cover the top rows (by design)
+        e.scrollIntoView({block: 'center', behavior: 'instant'}); const r = e.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (t && e.contains(t)) { e.setAttribute('data-hv', ''); return e.textContent.trim().slice(0, 30); } } return null; }""")
+    hover(page, ".report-card .live-link[data-hv]")
     page.wait_for_timeout(250)
-    hv = page.evaluate("getComputedStyle(document.querySelector('.report-card .live-link')).backgroundColor")
+    hv = page.evaluate("getComputedStyle(document.querySelector('.report-card .live-link[data-hv]')).backgroundColor")
     hov = page.evaluate("matchMedia('(hover: hover)').matches")   # Playwright's screenshots flip a touch context to hover: ask the page
     bare = page.evaluate(BARE_HOVER)
-    check(f"{tag} hero: row hover tint only where hover exists (phone: none after a tap; no :hover rule, a:hover included, outside @media (hover: hover))", (hv == "rgba(0, 0, 0, 0)") == (not hov) and not bare, [hv, hov, bare])
+    check(f"{tag} hero: row hover tint only where hover exists (phone: none after a tap; no :hover rule, a:hover included, outside @media (hover: hover))", (hv == "rgba(0, 0, 0, 0)") == (not hov) and not bare, [hv, hov, bare, hit])
     page.mouse.move(0, 0)
     # the Ask AI pill never sits on the card's actions or on the before / after phones
     def pill_clear(sel):
@@ -444,13 +447,13 @@ def hero_personalize(run):
         page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=5000)
     except Exception:
         pass
-    texts = lambda sel: page.eval_on_selector_all(sel, "els => els.filter(e => e.offsetParent !== null).map(e => e.textContent.trim())")
+    texts = lambda sel: page.eval_on_selector_all(sel, "els => els.filter(e => !e.closest('[data-p-off]')).map(e => e.textContent.trim())")   # either Before / After tab
     name = PROFILE["display_name"]
-    check(f"{tag} hero: personalize line + phones' leak domains", "Scanned @demo.creator" in page.locator("[data-p=scanned]").inner_text()
-          and top_ok([page.locator(f'[data-p="leak-{k}"] .m-site').inner_text() for k in range(1, 5)], occurrences(d["hits"]), 4))
-    check(f"{tag} profile: phones search for '<name> nude leaks', IG row = the typed Instagram", texts("[data-p=search]") == [name + " nude leaks"] * 2
-          and texts('[data-p="ig"] .m-title') == [f"{name} (@demo.ig)"] * 2, (texts("[data-p=search]"), texts('[data-p="ig"] .m-title')))
-    check(f"{tag} hero: showcase iframe + button carry the slug", page.locator("iframe[data-p=demo]").get_attribute("src") == "showcase/?r=" + slug
+    check(f"{tag} hero: personalize line + After phone's Removed rows = top 4 leak domains", "Scanned @demo.creator" in page.locator("[data-p=scanned]").inner_text()
+          and top_ok([page.locator(f'[data-p="gone-{k}"] .m-site').inner_text() for k in range(1, 5)], occurrences(d["hits"]), 4))
+    check(f"{tag} profile: After phone searches for '<name> nude leaks', IG row = the typed Instagram", texts("[data-p=search]") == [name + " nude leaks"]
+          and texts('[data-p="ig"] .m-title') == [f"{name} (@demo.ig)"], (texts("[data-p=search]"), texts('[data-p="ig"] .m-title')))
+    check(f"{tag} hero: showcase iframe + button carry the slug", page.locator("iframe[data-p=demo]").evaluate("f => f.getAttribute('src') || f.getAttribute('data-src')") == "showcase/?r=" + slug
           and page.locator("a[data-p=demo]").get_attribute("href") == "showcase/?r=" + slug)
     try:
         page.wait_for_function("() => (document.querySelector('.live-media') || {}).textContent === 'Photos ready: see your demo site'", timeout=12000)
@@ -464,9 +467,10 @@ def hero_personalize(run):
     bring(page, "#free", "center")
     page.wait_for_timeout(700)
     shot(run, page, "4-band", "#free")
-    bring(page, "#showcase .ba", "center")
-    page.wait_for_timeout(700)
-    shot(run, page, "5-phones", "#showcase .ba")
+    page.click("#ba-tab-after")
+    page.wait_for_timeout(400)
+    shot(run, page, "5-phones-after", "#free")
+    page.click("#ba-tab-before")
 
 
 def reload_rescan(run):
