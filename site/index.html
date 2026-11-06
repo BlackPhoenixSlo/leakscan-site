@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="css/removals.css">
 <link rel="stylesheet" href="css/chat.css">
 <link rel="stylesheet" href="css/pip.css">
-<script>document.documentElement.classList.add('js')</script>
+<script>document.documentElement.classList.add('js');if(location.hash.length>1)document.documentElement.classList.add('arriving')</script>
 <script src="js/scan-engine.js" defer></script>
 <script src="js/main.js" defer></script>
 <script src="js/strip-drift.js" defer></script>
@@ -269,7 +269,7 @@
       </ul>
           <p class="report-foot" aria-hidden="true">Example report. Your scan replaces these rows.</p>
         </figure>
-        <p class="docket-proof"><strong>570 of 633</strong> links I reported on fapello.com are gone.</p>
+        <p class="docket-proof"><strong>570 of 633</strong> links I reported<span class="pf-site"> on fapello.com</span> are gone.</p>
         <div class="docket-side">
           <div class="pip-slot"></div>
           <p class="pip-cap">Every row checked by me.</p>
@@ -325,21 +325,11 @@
     <div class="parts">
       <div class="part part-you">
         <p class="part-h">You</p>
-        <div class="phases">
-          <div class="phase">
-            <p class="phase-h">Your free removal</p>
-            <ol class="steps">
-              <li class="step"><span class="step-n" aria-hidden="true">1</span><div><h3>Scan and send</h3><p>Run the free scan, send me the report link.</p></div></li>
-              <li class="step"><span class="step-n" aria-hidden="true">2</span><div><h3>Sign the authorization</h3><p>One page to sign. Then I take one page down, free.</p></div></li>
-            </ol>
-          </div>
-          <div class="phase phase-opt">
-            <p class="phase-h">Optional ongoing help</p>
-            <ol class="steps" start="3">
-              <li class="step"><span class="step-n" aria-hidden="true">3</span><div><h3>Continue only if you want</h3><p>Monthly or one‑time plans. Payment starts only here.</p></div></li>
-            </ol>
-          </div>
-        </div>
+        <ol class="steps">
+          <li class="step"><span class="step-n" aria-hidden="true">1</span><div><h3>Scan and send</h3><p>Run the free scan, send me the report link.</p></div></li>
+          <li class="step"><span class="step-n" aria-hidden="true">2</span><div><h3>Sign the authorization</h3><p>One page to sign. Then I take one page down, free.</p></div></li>
+          <li class="step"><span class="step-n" aria-hidden="true">3</span><div><h3>Pick a plan <span class="step-opt">(optional)</span></h3><p>Monthly or one‑time plans. Payment starts only here.</p></div></li>
+        </ol>
       </div>
       <div class="part part-me">
         <p class="part-h">Me</p>
@@ -369,12 +359,11 @@
     <div class="rm-grid">
       <article class="rm-card" data-rm="mega" id="rm-panel-mega" role="tabpanel" aria-labelledby="rm-tab-mega">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-mega">Mega</h3><p class="rm-out">Mega folders behind the pack: taken down</p></div>
-        <div class="rm-stage" style="--p:100" data-end="idle">
+        <div class="rm-stage" style="--p:100" data-end="idle" title="Drag to compare: the leak (left), removed (right)">
           <div class="rm-layer rm-live mg" aria-hidden="true">
             <div class="agg">
               <span class="agg-th"><img class="rm-img" src="img/removals/portrait.webp" alt="" width="240" height="240" loading="lazy" decoding="async"></span>
-              <span class="agg-b"><span class="agg-pill" data-rm-k="mega-pill">Trending</span><span class="agg-name" data-rm-k="name">Orla Brennick</span><span class="agg-meta" data-rm-k="mega-meta">4 GB · 369 images · 1069 videos · 7 minutes ago</span></span>
-              <span class="agg-open"><span class="mg-m">M</span>Open link</span>
+              <span class="agg-b"><span class="agg-name" data-rm-k="name">Orla Brennick</span><span class="agg-meta" data-rm-k="mega-meta">4 GB · 369 images · 1069 videos · 7 minutes ago</span></span>
             </div>
             <div class="mg-win">
               <div class="mg-bar"><span class="mg-logo">M</span><span class="mg-title" data-rm-k="mega-title">brennickclay – pack</span></div>
@@ -397,7 +386,7 @@
       </article>
       <article class="rm-card" data-rm="x" id="rm-panel-x" role="tabpanel" aria-labelledby="rm-tab-x" hidden>
         <div class="rm-top"><h3 class="rm-h" id="rm-h-x">X</h3><p class="rm-out">Media disabled after copyright report</p></div>
-        <div class="rm-stage" style="--p:100" data-end="idle">
+        <div class="rm-stage" style="--p:100" data-end="idle" title="Drag to compare: the leak (left), removed (right)">
           <div class="rm-layer rm-live xp" aria-hidden="true">
             <div class="xp-head"><span class="xp-av" data-rm-k="x-av">L</span><span class="xp-who"><b data-rm-k="x-name">Leak Mirror</b><span><span data-rm-k="x-at">@leak.mirror</span><span data-rm-k="x-age"> · 2h</span></span></span><span class="xp-logo">X</span></div>
             <p class="xp-text"><span data-rm-k="x-l1">Orla Brennick full set</span><span data-rm-k="x-l2">Orla Brennick new photos</span></p>
@@ -415,7 +404,7 @@
       </article>
       <article class="rm-card" data-rm="reddit" id="rm-panel-reddit" role="tabpanel" aria-labelledby="rm-tab-reddit" hidden>
         <div class="rm-top"><h3 class="rm-h" id="rm-h-reddit">Reddit</h3><p class="rm-out">Removed on copyright notice</p></div>
-        <div class="rm-stage" style="--p:100" data-end="idle">
+        <div class="rm-stage" style="--p:100" data-end="idle" title="Drag to compare: the leak (left), removed (right)">
           <div class="rm-layer rm-live rd" aria-hidden="true">
             <p class="rd-head"><span class="rd-ic">r/</span><b data-rm-k="sub">r/brennickclay_pics</b><span data-rm-k="rd-age">· 5h</span></p>
             <p class="rd-title" data-rm-k="rd-title">Orla Brennick full pack, link in comments</p>
@@ -433,7 +422,7 @@
       </article>
       <article class="rm-card" data-rm="site" id="rm-panel-site" role="tabpanel" aria-labelledby="rm-tab-site" hidden>
         <div class="rm-top"><h3 class="rm-h" id="rm-h-site">Leak sites</h3><p class="rm-out">Profile 404 after a DMCA notice</p></div>
-        <div class="rm-stage" style="--p:100" data-end="idle">
+        <div class="rm-stage" style="--p:100" data-end="idle" title="Drag to compare: the leak (left), removed (right)">
           <div class="rm-layer rm-live fp" aria-hidden="true">
             <div class="fp-bar"><svg class="icon fp-menu"><use href="#i-menu"/></svg><span class="fp-logo" data-rm-k="host">leak-mirror</span><span class="fp-pill fp-p1">Trending</span><span class="fp-pill fp-p2">Random</span><span class="fp-pill fp-p3">New</span></div>
             <p class="fp-search"><svg class="icon"><use href="#i-search"/></svg>Search</p>
@@ -575,6 +564,11 @@
     <div class="faq-side">
       <h2 id="faq-title">Straight answers.</h2>
       <p>Something else on your mind? <a href="#contact">Message me</a>.</p>
+      <div class="faq-me">
+        <img src="assets/jaka.webp" alt="" width="56" height="56" loading="lazy">
+        <p><strong>Jaka</strong>I answer every message myself.</p>
+        <a class="btn btn-primary btn-sm" href="https://t.me/jakabasej?text=Hi%20Jaka%2C%20I%20have%20a%20question%3A%20"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>Telegram @jakabasej</a>
+      </div>
     </div>
     <div class="faq">
       <details open>
@@ -620,7 +614,7 @@
 <section class="section contact" id="contact" aria-labelledby="contact-title">
   <div class="container contact-grid">
     <div class="contact-copy">
-      <h2 id="contact-title">Ran the scan? Send me the link.</h2>
+      <h2 id="contact-title">Ran the scan? <span>Send me the report link.</span></h2>
       <p>Paste the report link and your handle. You’ll be talking to me, not a bot.</p>
       <p class="hint">Not sure what to write? <q>Hi Jaka, I ran the free scan. My report link and handle: …</q></p>
     </div>
@@ -685,7 +679,7 @@
       <h2 id="askai-title">Ask about Abolita</h2>
       <button class="askai-close" type="button" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
-    <p class="askai-note">Answers come from this page. For your own case, message Jaka on <a href="https://t.me/jakabasej" target="_blank" rel="noopener">Telegram</a>, <a href="https://wa.me/38640703992" target="_blank" rel="noopener">WhatsApp</a> or <a href="mailto:me@jackbase.dev">email</a>.</p>
+    <p class="askai-note">Answers come from this page. For your case, message Jaka on <a href="https://t.me/jakabasej" target="_blank" rel="noopener">Telegram</a>, <a href="https://wa.me/38640703992" target="_blank" rel="noopener">WhatsApp</a> or <a href="mailto:me@jackbase.dev">email</a>.</p>
     <div class="askai-log" role="log" aria-live="polite" aria-label="Conversation"></div>
     <form class="askai-form">
       <label class="askai-sr" for="askai-input">Your question</label>

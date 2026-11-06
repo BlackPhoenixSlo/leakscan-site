@@ -26,6 +26,7 @@
   --deep-muted: #c9afbe;
   --deep-gone: #a88a9b;
   --deep-field: #3d1830;
+  --deep-field-line: #8f6a80;   /* the docket fields' edge: 3.7:1 on --deep */
   --deep-line: rgb(244 233 239 / .16);
   --deep-border: transparent;
   --blush: #f2b8d2;       /* the button on a docket surface */
@@ -58,7 +59,7 @@
     --surface: #221e28;
     --surface-2: #2c2733;
     --ink: #ece8f0;
-    --muted: #b5aebf;
+    --muted: #c8c1d2;     /* 10.2:1 on --bg, 9.4:1 on --surface */
     --gone: #8f8798;
     --line: #3a3442;
     --accent: #e58ab4;
@@ -67,6 +68,7 @@
     --on-accent: #2b0f20;
     --deep: #2e1222;      /* the docket keeps its berry and gains a border */
     --deep-border: #4a2238;
+    --deep-muted: #dcc6d3;   /* 10.7:1 on --deep, 9.5:1 on the field */
     --good: #72d1ae;
     --good-soft: #163328;
     --bad: #ff958a;
@@ -79,6 +81,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 12px); }
+html.arriving { scroll-behavior: auto; }   /* opened with a #link: land on it at once (a smooth jump stops short while the page settles); js/main.js drops the class after load */
 body {
   margin: 0; background: var(--bg); color: var(--ink);
   font: 400 1.0625rem/1.6 var(--sans);
@@ -183,8 +186,11 @@ strong { font-weight: 600; }
 @media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1fr) auto; } .scan-form > :first-child { grid-column: 1 / -1; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
 .scan-prefix { position: relative; display: flex; align-items: center; gap: 0; padding: 15px 0 0 1.1em; cursor: text; }
 .scan-prefix { container-type: inline-size; }
-@container (max-width: 269px) { .scan-lab-x { display: none; } }   /* the alias hint only where it fits */
-.scan-lab { position: absolute; left: 1.155rem; top: 7px; color: var(--muted); font: 600 .72rem/1 var(--sans); letter-spacing: .01em; pointer-events: none; }
+@container (max-width: 339px) { .scan-lab-x { display: none; } }   /* the alias hint only where it fits */
+.scan-lab { position: absolute; left: 1.155rem; top: 8px; color: var(--muted); font: 600 .875rem/16px var(--sans); white-space: nowrap; pointer-events: none; }
+/* label over value, the pair centred in the 56 px field (9..48), both on the 1.155rem left edge */
+.scan-prefix:has(> .scan-lab) { padding: 25px 0 7px 1.1em; }
+.scan-prefix:has(> .scan-lab) input { height: 22px; }
 .scan-prefix:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .scan-pre { color: var(--muted); font-size: .95rem; white-space: nowrap; user-select: none; }
 .scan-prefix input { flex: 1; min-width: 0; height: 38px; padding: 0 1em 0 .1em; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; }
@@ -218,11 +224,11 @@ strong { font-weight: 600; }
 .hero-grid > * { min-width: 0; }   /* no child (the scanned line, the report card) can widen the docket */
 .docket :focus-visible { outline-color: var(--deep-focus); }
 .docket .scan-form { margin: 0; max-width: none; gap: 8px; }
-.docket .scan-field { background: var(--deep-field); border-color: transparent; color: var(--on-deep); }
+.docket .scan-field { background: var(--deep-field); border-color: var(--deep-field-line); color: var(--on-deep); }
 @media (hover: hover) { .docket .scan-field:hover { border-color: var(--deep-gone); } }
 .docket .scan-prefix:focus-within { border-color: var(--deep-focus); box-shadow: 0 0 0 1px var(--deep-focus); }
 .docket .scan-lab, .docket .scan-pre { color: var(--deep-muted); }
-.docket .scan-prefix input::placeholder { color: var(--deep-muted); opacity: .8; }
+.docket .scan-prefix input::placeholder { color: var(--deep-muted); opacity: .85; }
 .docket .btn-primary { background: var(--blush); color: var(--on-blush); }
 @media (hover: hover) { .docket .btn-primary:hover { background: #f7cde0; color: var(--on-blush); } }
 .docket .inline-msg { color: var(--st-live); }
@@ -282,15 +288,17 @@ html:not(.js) .pip-cap, .pip-x .pip-cap { margin: 0; }
   .st { font-size: 1rem; }
 }
 @media (min-width: 720px) and (max-width: 959px) { .docket-body { grid-template-columns: minmax(0, 1fr) 300px; } }
-/* the proof line fills the left column's foot so it ends with the video column (hidden under 960 px and once a scan is live) */
-.docket-proof { display: none; }
+/* the proof line: under the video caption (narrow), 16 px under the example rows (>= 960 px); gone once a scan is live */
+.docket-proof { order: 1; margin: -6px 0 0; color: var(--deep-muted); font-size: .875rem; line-height: 20px; }
+.docket-proof strong { color: var(--on-deep); font-weight: 600; }
+.report-card.is-live ~ .docket-proof { display: none; }
+@media (max-width: 479px) { .docket-proof .pf-site { display: none; } }   /* one 14 px line on a phone */
+@media (min-width: 720px) and (max-width: 959px) { .docket-proof { padding: 0 24px 20px; margin: 0; } }
 @media (min-width: 960px) {
   .docket-body { grid-template-rows: auto 1fr; }
   .docket-body > .report-card { grid-area: 1 / 1; }
   .docket-side { grid-area: 1 / 2 / span 2; }
-  .docket-proof { display: block; grid-area: 2 / 1; align-self: end; margin: 0; padding: 0 24px 20px; color: var(--deep-muted); font-size: .906rem; line-height: 21px; }
-  .docket-proof strong { color: var(--on-deep); font-weight: 600; }
-  .report-card.is-live ~ .docket-proof { display: none; }
+  .docket-proof { grid-area: 2 / 1; align-self: start; margin: -4px 0 0; padding: 0 24px 20px; font-size: .906rem; line-height: 21px; }   /* card foot pad 20 - 4 = 16 */
 }
 @media (max-width: 719px) {
   .docket .scan-form { grid-template-columns: minmax(0, 1fr); }
@@ -499,7 +507,10 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* #free: the offer, once; the screen beside it shows her results after a scan (js/inline-scan.js) */
 .free-band { display: grid; gap: 28px; align-items: center; }
 @media (min-width: 860px) { .free-band { grid-template-columns: minmax(0, 1fr) 320px; gap: 64px; } }
-@media (min-width: 1100px) { .free-band { grid-template-columns: minmax(0, 640px) 1fr; } #free .free-phone { justify-items: end; } }   /* the mock on the grid's right edge */
+@media (min-width: 1100px) {   /* wide: the copy ~610 px (h2 in 3 lines), the mock 460 px on the grid's right edge, 3 whole rows of ~138 x 100 thumbs */
+  .free-band { grid-template-columns: minmax(0, 1fr) 460px; gap: 48px; } #free .free-phone { justify-items: end; }
+  #main .free-phone .phone-free { width: 460px; height: 494px; } #main .free-phone .phone-free .m-grid .gi-box { height: 100px; }
+}
 .free-copy h2 { max-width: 15ch; }
 @media (min-width: 1100px) { .free-copy h2 { max-width: none; } }
 .free-copy > p:not(.free-actions) { color: var(--ink); max-width: 36em; }
@@ -538,33 +549,25 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .proof-t { color: var(--muted); font-size: .906rem; line-height: 21px; }
 @media (min-width: 720px) { .proof { grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 20px; } .proof-t { font-size: 1.0625rem; line-height: 1.6; } }
 
-/* #how, on the fold: "You" (1-2 = the free removal, 3 = optional ongoing help) and "Me" (4-5) */
+/* #how, on the fold: "You" (1-3, the 3rd optional) and "Me" (4-5) */
 .how h2 { max-width: 20ch; margin-bottom: 20px; }
 .parts { display: grid; gap: 20px; }
 .part-h { margin: 0 0 6px; font: 600 1.1875rem/1.37 var(--sans); color: var(--ink); }
-.phases { display: grid; gap: 4px; }
-.phase-h { margin: 12px 0 4px; font: 600 .8125rem/20px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
-.phase-opt .phase-h { color: var(--muted); }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; }
 .step { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-content: start; padding: 10px 0; border-top: 1px solid var(--line); }
 .step-n { display: block; height: 32px; font: 400 2rem/36px var(--serif); font-synthesis: none; font-variant-numeric: lining-nums tabular-nums; color: var(--accent); }
 .step h3 { margin-bottom: .15em; font-size: 1.0625rem; line-height: 1.5; }
+.step-opt { color: var(--muted); font-weight: 400; }
 .step p { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.5; }
 @media (min-width: 1000px) {
   .parts { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 48px; }
-  .phases { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
-  .phase .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
-  .phase-opt .steps { grid-template-columns: minmax(0, 1fr); }
-  .phase-h { margin: 14px 0 0; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
-  .phase:not(.phase-opt) .phase-h { border-bottom-style: solid; border-bottom-color: var(--accent); }
-  .phase-h { white-space: nowrap; }
-  .part-me .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding-top: 43px; }   /* = a phase label: the numbers line up */
+  .part-you .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .part-me .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
   .part-h { padding-bottom: 12px; margin-bottom: 0; border-bottom: 2px solid var(--ink); }
   .step { grid-template-columns: 1fr; gap: 10px; padding: 18px 0 0; border-top: 0; }
   .step-n { height: 44px; font-size: 2.75rem; line-height: 44px; }
   .step h3 { font-size: 1.1875rem; line-height: 1.37; }
 }
-@media (min-width: 1000px) and (max-width: 1199px) { .phase-h { letter-spacing: .02em; font-size: .75rem; } }   /* "Optional ongoing help" on one line in the 1fr column */
 
 /* #pricing: Monthly on the docket, One-time on paper with a 1 px ink rule; the inclusions said once above */
 .plans { display: grid; gap: 16px; }
@@ -639,7 +642,9 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   .ba-switch button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
   .ba-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .js .ba-copy .ba-label { display: block; margin: 8px 0 0; color: var(--muted); font-size: .906rem; }
-  .js .ba-item:not(.is-on), .js .ba-item figcaption { display: none; }
+  .js .ba-item { grid-area: 1 / 1; }   /* both screens in one cell: the hidden one stays laid out (and personalized) */
+  .js .ba-item:not(.is-on) { visibility: hidden; }
+  .js .ba-item figcaption { display: none; }
   .ba-arrow { display: none; }
   .ba { gap: 16px; justify-items: stretch; }
   #main .ba .phone { width: 100%; aspect-ratio: auto; height: 358px; }
@@ -651,7 +656,13 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 @media (min-width: 960px) {
   .faq-grid { grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 80px; align-items: start; }
   .faq-side { position: sticky; top: calc(var(--header-h) + 32px); }
+  .faq-me { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 16px; align-items: center; max-width: 340px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .faq-me img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
+  .faq-side .faq-me p { color: var(--ink); }
+  .faq-me p strong { display: block; font-weight: 600; }
+  .faq-me .btn { grid-column: 1 / -1; justify-self: start; }
 }
+@media (max-width: 959px) { .faq-me { display: none; } }   /* phone: #contact follows with the same channels */
 .faq { border-top: 1px solid var(--ink); }
 .faq details { border-bottom: 1px solid var(--line); }
 .faq summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 52px; padding: 12px 0; cursor: pointer; list-style: none; font-weight: 600; font-size: 1.0625rem; line-height: 1.4; }
@@ -665,7 +676,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* #contact: the last word, three ways to reach him */
 .contact-grid { display: grid; gap: 24px; }
 @media (min-width: 900px) { .contact-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 80px; align-items: center; } }
-@media (min-width: 900px) { .contact-copy h2 { max-width: 14ch; } }
+@media (min-width: 900px) { .contact-copy h2 { max-width: 560px; } .contact-copy h2 span { display: block; } }   /* two lines, the break after "scan?" */
 .contact-copy > p:not(.hint) { color: var(--muted); max-width: 32em; margin-bottom: 0; }
 .hint { color: var(--muted); font-size: .95rem; margin: 12px 0 0; }
 .hint q { color: var(--ink); font-style: normal; }
@@ -938,11 +949,12 @@ a.gi-card:focus-visible .gi-go { opacity: 1; transform: none; }
 }
 
 /* ---- the live report: a paper sheet laid in the docket (the page's own tokens: placeholders stay light) ---- */
-.report-card.is-live { color: var(--ink); background: var(--bg); border-radius: 6px; padding: 16px 14px; margin-inline: -8px; }
+.report-card.is-live { color: var(--ink); background: var(--bg); border-radius: 6px; padding: 16px 14px; }   /* inside the docket's padding: no bleed into the gutter */
+@media (max-width: 559px) { .report-card.is-live { padding-inline: 10px; } .report-card.is-live .live-tab { padding: 0 8px; } }   /* the three tabs fit 390 px whole */
 .report-card.is-live .report-head { border-color: var(--line); }
 .report-card .chip { padding: 0; border-radius: 0; background: none; font-weight: 600; }   /* status words, not pills */
 .report-card .chip-live { color: var(--bad); }
 .report-card .chip-dead, .report-card .chip-soft { color: var(--muted); }
-@media (min-width: 720px) { .report-card.is-live { margin: 16px 0 20px 16px; padding: 18px; } }
+@media (min-width: 720px) { .report-card.is-live { margin: 0 0 20px 16px; padding: 18px; } }   /* top 0: the card top stays put when the result lands */
 @media (prefers-color-scheme: dark) { .rm-stage .fp { filter: brightness(.9); } }
 .row-url { font-variant-numeric: normal; }

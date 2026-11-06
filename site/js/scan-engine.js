@@ -663,7 +663,9 @@
           }), last = after[after.length - 1];
           if (last) { add(box, by[src(last)], mk, el); add(box, nx, mk, last); } else add(box, nx, mk, el);
         });
-        spare.forEach(function (it) { if (box.children.length < max) add(box, it, mk); });
+        // add() can sync this view again before it returns (a thumb already in the cache passes at once): skip what that added
+        var inBox = function (u) { return Array.prototype.some.call(box.children, function (k) { return src(k) === u; }); };
+        spare.forEach(function (it) { if (box.children.length < max && !inBox(it.src)) add(box, it, mk); });
       };
       views.push(v);
       v.sync();

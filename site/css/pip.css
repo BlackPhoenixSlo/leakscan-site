@@ -21,22 +21,25 @@
 .pip iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
 .pip-hit { position: absolute; inset: 0; }
 .pip { container-type: inline-size; }
-.pip-poster { position: absolute; inset: 0; z-index: 1; display: flex; background: #2b0f20; color: #e6d6df; cursor: pointer; }
+.pip-poster { position: absolute; inset: 0; z-index: 1; background: #2b0f20; color: #e6d6df; cursor: pointer; }
 .pip.posted .pip-bar, .pip.posted .pip-rs { visibility: hidden; }   /* until the first play: the poster only (the 40 px stay) */
-.pip-poster img { flex: none; width: 58%; height: 100%; object-fit: cover; object-position: 50% 30%; }
-.pip-poster p { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 10px; min-width: 0; margin: 0; padding: 0 16px;
-  font: 500 .875rem/1.35 var(--sans, system-ui, sans-serif); }
-.pip-poster strong { color: #fff; font-weight: 600; white-space: nowrap; }
-.pip-poster-go { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: #f2b8d2; color: #2b0f20; }
-.pip-poster-go svg { width: 18px; height: 18px; margin-left: 2px; stroke: none; }
-/* a small player (floating, 45vw on a phone): the portrait over the picture, the play mark + caption in the bar's strip */
+/* the portrait fills the 16:9 picture, the play mark centred on it, the caption one line in the bar's 40 px strip */
+.pip-poster { overflow: hidden; }
+.pip-poster::before { content: ""; position: absolute; inset: -24px -24px calc(var(--bar) - 24px); background: url(../assets/jaka.webp) 50% 30% / cover; filter: blur(16px) brightness(.5); }
+.pip-poster::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--bar); background: #2b0f20; }   /* the caption strip over the blur's edge */
+.pip-poster img { position: absolute; left: 50%; top: 0; height: calc(100% - var(--bar)); width: auto; aspect-ratio: 1; transform: translateX(-50%); object-fit: cover; }
+.pip-poster p { display: contents; }
+.pip-poster-go { position: absolute; z-index: 1; left: 50%; top: calc((100% - var(--bar)) / 2); display: flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: #f2b8d2; color: #2b0f20; box-shadow: 0 2px 12px rgb(0 0 0 / .35); }
+.pip-poster-go svg { width: 22px; height: 22px; margin-left: 3px; stroke: none; }
+.pip-poster-t { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: var(--bar); padding: 0 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 500 .875rem/var(--bar) var(--sans, system-ui, sans-serif); text-align: center; }
+.pip-poster strong { color: #fff; font-weight: 600; }
+/* a small player (floating, 45vw on a phone) */
 @container (max-width: 259px) {
-  .pip-poster { flex-direction: column; }
-  .pip-poster img { width: 100%; height: auto; flex: 1; min-height: 0; }
-  .pip-poster p { flex: none; flex-direction: row; align-items: center; gap: 8px; height: var(--bar); padding: 0 8px; font-size: .75rem; }
-  .pip-poster-go { width: 28px; height: 28px; flex: none; }
-  .pip-poster-go svg { width: 13px; height: 13px; }
-  .pip-poster-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pip-poster-go { width: 40px; height: 40px; margin: -20px 0 0 -20px; }
+  .pip-poster-go svg { width: 16px; height: 16px; margin-left: 2px; }
+  .pip-poster-t { padding: 0 8px; font-size: .75rem; }
 }
 .pip-bar { display: flex; align-items: center; height: var(--bar); padding: 0 4px; background: #2b0f20; }
 .pip-bar i { flex: 1; }

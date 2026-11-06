@@ -57,7 +57,7 @@
 .rm-stage { position: relative; height: calc(var(--rm-h) * var(--rm-s)); overflow: hidden; overflow: clip; border-radius: 12px; border: 1px solid var(--line); touch-action: pan-y;
   user-select: none; -webkit-user-select: none; cursor: ew-resize; }
 .rm .rm-stage { grid-area: stage; border-radius: 14px; }
-@media (prefers-color-scheme: dark) { .rm .rm-stage { border-color: #26222c; box-shadow: 0 0 0 7px #26222c; } }   /* the 8 px frame drawn outside: same inner box as light, the idle knob stays clear */
+@media (prefers-color-scheme: dark) { .rm .rm-stage { margin: 7px; border-color: #26222c; box-shadow: 0 0 0 7px #26222c; } }   /* the 8 px frame inside the column: its outer edge = the tab row's and the caption's */
 html:not(.js) .rm-stage { cursor: auto; }
 .rm-layer { position: absolute; left: 0; top: 0; width: calc(100% / var(--rm-s)); height: var(--rm-h); overflow: hidden; transform: scale(var(--rm-s)); transform-origin: 0 0; }
 .rm-gone { clip-path: inset(0 0 0 calc(var(--p) * 1%)); }
@@ -134,6 +134,7 @@ html:not(.js) .rm .xp-off { color: var(--xp-mut); }
 .agg { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 4px 12px; align-items: center; padding: 10px; border-radius: 12px; background: #16181d; color: #f1f2f4; }
 .agg-th { grid-row: span 2; width: 56px; height: 56px; overflow: hidden; border-radius: 10px; background: #2b2e35; }
 .agg-b { display: grid; min-width: 0; }
+.rm .agg-th { grid-row: auto; }   /* the section's card: name + meta only (no pill, no button) */
 .agg-pill { justify-self: start; padding: 1px 8px; border-radius: 999px; background: #ff3d6e; color: #fff; font: 800 .62rem/1.6 var(--sans); letter-spacing: .08em; text-transform: uppercase; }
 .agg-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agg-meta { color: #a9adb6; font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

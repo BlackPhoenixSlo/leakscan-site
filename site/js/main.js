@@ -22,6 +22,12 @@
 
   // Phone mockups: All / Images / Videos are real tabs (E.tablist: click, ←/→, Home / End). The screen has a fixed
   // height, so a switch never moves the page.
+  // opened with a #link: the inline head script set html.arriving (instant scroll); smooth again once the page has loaded
+  if (document.documentElement.classList.contains('arriving')) {
+    var arrived = function () { requestAnimationFrame(function () { requestAnimationFrame(function () { document.documentElement.classList.remove('arriving'); }); }); };
+    if (document.readyState === 'complete') arrived(); else window.addEventListener('load', arrived);
+  }
+
   var E = window.LeakScanEngine;
   if (E) document.querySelectorAll('.phone').forEach(function (phone) { E.tablist(phone); });
 

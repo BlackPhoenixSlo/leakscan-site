@@ -71,7 +71,7 @@
   var PANELS = {
     mega: { hosts: /(^|\.)mega\.(nz|io)$/, fill: function (raw, who) {
       var mm = megaMeta(raw);
-      return mm && { name: who.name, 'mega-title': who.handle + ' – pack', 'mega-pill': null, 'mega-meta': mm.meta,
+      return mm && { name: who.name, 'mega-title': who.handle + ' – pack', 'mega-meta': mm.meta,
         'mega-img': mm.img !== null ? mm.img + ' files' : null, 'mega-vid': mm.vid !== null ? mm.vid + ' files' : null, 'mega-note': null };   // the demo's own file row
     } },
     x: { hosts: /(^|\.)(x|twitter)\.com$/, fill: function (raw, who) {

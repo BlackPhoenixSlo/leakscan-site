@@ -134,3 +134,16 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
   so the knob clears the 390 px X thumbs). Stage height stays 372 (removals.py fp crop asserts it). Facts list
   (notice / recipients / report) from 1200 px only, where the left column has room.
 - Demo: GALWAY vs headband not fixable without touching showcase/ (demo hero min-height 600 in a 560 frame): left.
+
+## Round 7 notes
+- e2e FAILs on 5af3448, all fixed in the site; no check edited.
+  - tabs: gallery sync re-entered from add() (cached thumb) and appended duplicates; skip srcs already in the box (scan-engine.js).
+  - personalize + inline "phones": phone BA hid the off screen with display:none; now both stacked in one cell, visibility.
+  - inline #website: smooth fragment scroll stopped short; html.arriving = instant first landing.
+  - inline card fit (phone) and lcol 630 (desktop): live-card margins.
+  - askai disclaimer + #contact label: copy restored.
+- Judge: proof line under the video on phone (short copy, one 14 px line) and 16 px under the rows on desktop; pip poster 16:9 full column;
+  #free mock 460 px (520 pushed h2 to 4 lines / #free > 640); FAQ side block (photo, "I answer every message myself", Telegram);
+  contact h2 breaks after "scan?"; hero labels 14 px, label + value centred on one left edge; dark frame inside the column;
+  stage tooltip; #how without the caps tier, step 3 "(optional)"; dark --muted #c8c1d2, --deep-muted #dcc6d3, docket field
+  edge #8f6a80 (3.7:1); Mega mock without "Trending" / "Open link" (removals.py asserts neither).
