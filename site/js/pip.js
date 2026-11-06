@@ -359,7 +359,10 @@
   function tabUp(e) {
     if (!tdrag || e.pointerId !== tdrag.id) return;
     var dx = e.clientX - tdrag.sx; tdrag = null;
-    if ((S.t === 'l' && dx > 16) || (S.t === 'r' && dx < -16)) { tmoved = true; setTimeout(function () { tmoved = false; }, 400); untuck(); }
+    // a tap counts here too: WebKit (iPhone) sends no click for it once the page is scrolled (the pointer was captured)
+    if (Math.abs(dx) <= 16 || (S.t === 'l' && dx > 16) || (S.t === 'r' && dx < -16)) {
+      tmoved = true; setTimeout(function () { tmoved = false; }, 400); untuck(); setTimeout(function () { snd.focus(); }, 0);
+    }
   }
 
   function mount() {
