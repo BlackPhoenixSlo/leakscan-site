@@ -269,7 +269,8 @@
     }
     // Hero "Weekly report" card + "Free scan report" illustration: only the handle for now. Their rows / "N links
     // found" pill are marked (report-row-*, scan-row-*, scan-count) but stay the illustration: no invented statuses.
-    each($$('[data-p="report-handle"], [data-p="scan-handle"]'), function (el) { text(el, '@' + m.handle); });
+    each($$('[data-p="report-handle"]'), function (el) { text(el, '@' + m.handle); });
+    each($$('[data-p="scan-handle"]'), function (el) { text(el, m.handle + ' nude leaks'); });   // the #free phone's Google query
     var demo = 'showcase/?r=' + encodeURIComponent(m.slug);
     each($$('[data-p="demo"]'), function (el) {
       var k = el.tagName === 'IFRAME' ? 'src' : 'href';

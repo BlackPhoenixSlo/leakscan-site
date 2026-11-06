@@ -588,7 +588,8 @@
   // keeps box showing the first `max` images not dead as mk(it) tiles (tile(cap) = the engine's tile, with / without its
   // site caption); a dead one leaves and the next takes its slot (in place, see v.sync). count() → {ok: seen to load,
   // alive: ok + not checked yet, text: "24" once settled, "24+" before ("…" while none is checked)}: never more than
-  // will show. onCount(fn) → fn(count()) now and on every change; returns its unsubscribe. close(): done with it.
+  // will show. view(box, max) again on a box it shows: that view's new max (a "Show more"). onCount(fn) → fn(count()) now
+  // and on every change; returns its unsubscribe. close(): done with it.
   function tail(e) { var r = []; for (; e; e = e.nextElementSibling) r.push(e); return r; }
   function seen(e) {   // any part of e on screen: in the viewport and inside every clipping ancestor (a strip, a phone's screen)
     var r = e.getBoundingClientRect(), ok = function (c) { return r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom; };
@@ -631,7 +632,9 @@
     };
     g.tile = function (cap) { return function (it) { return tile(it, slug, cap); }; };
     g.view = function (box, max, mk, still) {
-      var v = { box: box };
+      var v = views.filter(function (x) { return x.box === box; })[0];
+      if (v) { v.max = max; v.sync(); return box; }
+      v = { box: box, max: max };
       // a dead tile: the next live image not shown takes its very slot, so nothing after it moves. A report tile never
       // sits before a result tile: when the next one is a report tile and a live result tile comes later in the box,
       // the last such result tile takes the dead slot and the report tile its slot (new nodes in both: still nothing
@@ -663,7 +666,7 @@
           }), last = after[after.length - 1];
           if (last) { add(box, by[src(last)], mk, el); add(box, nx, mk, last); } else add(box, nx, mk, el);
         });
-        spare.forEach(function (it) { if (box.children.length < max) add(box, it, mk); });
+        spare.forEach(function (it) { if (box.children.length < v.max) add(box, it, mk); });
       };
       views.push(v);
       v.sync();
