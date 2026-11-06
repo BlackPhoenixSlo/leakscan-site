@@ -22,6 +22,12 @@
    past its right edge, so focusing it (Tab, a tap) slid both layers out of view */
 .rm-stage { position: relative; height: var(--rm-h); overflow: hidden; overflow: clip; border-radius: 12px; border: 1px solid var(--line); touch-action: pan-y;
   user-select: none; -webkit-user-select: none; cursor: ew-resize; }
+/* desktop: the four mock UIs sit back at 70% saturation until one is hovered or focused (colour only, nothing moves);
+   dark: the white mock screens are also dimmed, not glaring */
+.rm-stage { filter: saturate(var(--rm-sat, 1)); }
+@media (min-width: 820px) { .rm-stage { --rm-sat: .7; } .rm-card:is(:hover, :focus-within) .rm-stage { --rm-sat: 1; } }
+@media (min-width: 820px) and (prefers-reduced-motion: no-preference) { .rm-stage { transition: filter .25s; } }
+@media (prefers-color-scheme: dark) { .rm-stage { filter: brightness(.86) saturate(calc(var(--rm-sat, 1) * .95)); } }
 html:not(.js) .rm-stage { cursor: auto; }
 .rm-layer { position: absolute; inset: 0; overflow: hidden; }
 .rm-gone { clip-path: inset(0 0 0 calc(var(--p) * 1%)); }

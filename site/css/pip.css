@@ -41,7 +41,10 @@
 .pip .pip-bar { position: relative; background: #1d1022; }
 .pip .pip-bar::after { content: "Meet Jaka"; position: absolute; inset: 0; display: flex; align-items: center; padding: 0 12px;
   color: #f6dcea; font: 600 12px/1 "Avenir Next", Avenir, system-ui, sans-serif; letter-spacing: .03em; pointer-events: none; transition: opacity .15s; }
-.pip.muted .pip-bar::after { content: "Meet Jaka \00b7  sound off"; }
+.pip.muted .pip-bar::after { content: "\25B6\FE0E  Meet Jaka \00b7  60 seconds \00b7  sound off" / "Meet Jaka, 60 seconds, sound off"; }
+.pip .pip-bar::after { white-space: nowrap; overflow: hidden; }
+.pip { container-type: inline-size; }
+@container (max-width: 239px) { .pip.muted .pip-bar::after { content: "\25B6\FE0E  Meet Jaka \00b7  sound off" / "Meet Jaka, sound off"; } }   /* small floating player: one line */
 .pip .pip-bar > * { opacity: 0; transition: opacity .15s; }
 .pip.touched .pip-bar > *, .pip:focus-within .pip-bar > * { opacity: 1; }
 .pip.touched .pip-bar::after, .pip:focus-within .pip-bar::after { opacity: 0; }

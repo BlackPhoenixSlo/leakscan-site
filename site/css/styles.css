@@ -55,10 +55,12 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --p-bg: #110a14;
-    --p-surface: #251a2b;
-    --p-surface-2: #2d2033;
-    --p-alt: #1d1222;
+    /* dark = two surfaces + one raised tone: page #150c19, band (alt sections, header, hero, removals, footer) #241429,
+       raised cards #33213b; surface-2 is only for small controls inside them */
+    --p-bg: #150c19;
+    --p-surface: #33213b;
+    --p-surface-2: #3d2a45;
+    --p-alt: #241429;
     --p-ink: #f8eff5;
     --p-muted: #e0d3e5;
     --p-line: #4a3752;
@@ -72,9 +74,9 @@
     --p-bad-soft: #42182a;
     --p-warn: #f1c46a;
     --p-warn-soft: #3a2e14;
-    --v-bg: #2c1634;
-    --v-surface: #3a2242;
-    --v-surface-2: #43294b;
+    --v-bg: #241429;
+    --v-surface: #33213b;
+    --v-surface-2: #3d2a45;
     --v-muted: #dccbe1;
     --v-line: #5c4064;
     --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 10px 30px -6px rgb(0 0 0 / .45);
@@ -119,6 +121,9 @@ h1, h2, h3 { margin: 0 0 .5em; text-wrap: balance; }
 h1, h2 { font-family: var(--display); font-weight: 500; line-height: 1.04; letter-spacing: -.022em; font-optical-sizing: none; font-variation-settings: "opsz" 24; }
 h1 { font-size: clamp(2.5rem, 7.4vw, 4.5rem); }
 h2 { font-size: clamp(2.05rem, 5vw, 3.35rem); }
+/* at H3-like sizes (phones, small screens, legal subheads) Bodoni's hairlines thin out: one step heavier there */
+@media (max-width: 719px) { h1, h2, .record p { font-weight: 600; } }
+.legal h2 { font-weight: 600; }
 h3 { font: 600 1.18rem/1.3 var(--sans); letter-spacing: -.005em; }
 p { margin: 0 0 1em; text-wrap: pretty; }
 strong { font-weight: 600; }
@@ -218,7 +223,7 @@ strong { font-weight: 600; }
   .hero .lead { font-size: 1rem; line-height: 1.5; margin-bottom: 0; }
   .hero .scan-form { margin-top: 18px; gap: 8px; }
   .hero .scan-slot { margin-bottom: 6px; }
-  .scan-help { column-gap: 16px; font-size: .92rem; }
+  .scan-help { font-size: .92rem; }
   .hero-grid { gap: 22px; }
 }
 /* right column: the example card, "Meet Jaka" (js/pip.js docks the player exactly over .meet-pic: 55% of the card,
@@ -229,22 +234,20 @@ strong { font-weight: 600; }
 .hero-side .report-card { max-width: none; }
 .meet { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: 14px; }
 .meet-cap { margin: 0; display: grid; gap: 4px; font-size: .9rem; line-height: 1.4; color: color-mix(in srgb, var(--ink) 80%, var(--bg)); }
-.meet-cap strong { font: 650 1.12rem/1.3 var(--sans); color: var(--ink); }
 .meet-cap a { color: var(--accent); font-weight: 600; text-underline-offset: 3px; justify-self: start; }
 .meet-pic { flex: 0 0 55%; display: block; padding-bottom: 30px; border-radius: 12px; overflow: hidden; background: #1d0f22; color: #fff; text-decoration: none; box-shadow: 0 4px 14px rgb(0 0 0 / .14); }
 /* a designed poster (no still from the take): name, length, one play mark; pip.js docks the player over it, so it stays a
    plain box (a link here would count as a control and block the dock); "Watch it full screen" is the link */
-.meet-poster { position: relative; display: grid; align-content: end; gap: 2px; aspect-ratio: 16 / 9; padding: 14px 16px; background: #2a1531; }
-.meet-play { position: absolute; top: 14px; right: 14px; width: 44px; height: 44px; border-radius: 50%; background: #f3b6d2; }
-.meet-play::after { content: ""; position: absolute; top: 50%; left: 53%; translate: -50% -50%; border: 9px solid transparent; border-left: 14px solid #2a1531; border-right: 0; }
-.meet-name { font: 500 1.45rem/1.1 var(--display); font-variation-settings: "opsz" 24; }
-.meet-sub { font: 500 .85rem/1.3 var(--sans); color: #f3b6d2; }
+/* the poster (before / without the player): one centred play disc + "Meet Jaka · 60 seconds", nothing else on it */
+.meet-poster { position: relative; display: grid; place-items: center; align-content: center; gap: 10px; aspect-ratio: 16 / 9; padding: 14px 16px; background: #2a1531; }
+.meet-play { position: relative; width: 56px; height: 56px; border-radius: 50%; background: #f3b6d2; }
+.meet-play::after { content: ""; position: absolute; top: 50%; left: 54%; translate: -50% -50%; border: 11px solid transparent; border-left: 18px solid #2a1531; border-right: 0; }
+.meet-sub { font: 600 .9rem/1.3 var(--sans); color: #fbf2f7; }
 @media (prefers-color-scheme: dark) { .meet-poster { background: #3d2347; } .meet-pic { box-shadow: 0 0 0 1px rgb(255 255 255 / .1); } }
 @media (max-width: 719px) {   /* phone: the video full width under the card (pip.js docks the player over it), the caption below */
   .meet { flex-direction: column-reverse; align-items: stretch; gap: 12px; }
   .meet-pic { flex: none; width: 100%; }
   .meet-cap { display: block; }
-  .meet-cap strong { margin-right: .35em; }
   .meet-cap a { display: table; margin-top: 4px; }
   .hero { padding-bottom: 32px; }
 }
@@ -259,16 +262,17 @@ strong { font-weight: 600; }
    to scan/. Stacked on phones; from 560px the OnlyFans field + button share one row, Instagram / X gets the next.
    With JS (html.js) and :has(), an empty Instagram / X field folds behind "+ Instagram or X" (.scan-more in the help
    line, js/main.js adds .ig-open); a typed or restored value keeps it open; no JS or no :has() = always shown.
-   Under the form two lines: the note (.scan-slot) and the help line (IG toggle · Fansly / Patreon · What's stored). */
+   Under the form: the note (.scan-slot), then one link row (+ Instagram or X · What's stored). Fansly / Patreon is the field's helper text (.scan-hint). */
 .scan-form { display: grid; gap: 10px; margin: 30px 0 10px; max-width: 640px; }
 .scan-form .scan-ig { grid-column: 1 / -1; }
 @media (min-width: 560px) { .scan-form { grid-template-columns: minmax(0, 1fr) auto; } .scan-form .btn-lg { padding-inline: 1.2em; min-width: 10.5em; } }
 @media (min-width: 960px) and (max-width: 1099px) { .scan-form .btn-lg { min-width: 0; padding-inline: 1em; } .scan-form .btn-lg .icon { display: none; } }   /* narrow 2-column hero: the handle keeps room for 20 characters */
 .js .scan-form:not(.ig-open):has(.scan-social:placeholder-shown) .scan-ig { display: none; }
-.scan-help { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 20px; max-width: 640px; color: var(--muted); font-size: .95rem; line-height: 24px; }
+.scan-help { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; max-width: 640px; color: var(--muted); font-size: .95rem; line-height: 24px; }
 .scan-help > p { margin: 0; }
 .scan-more { display: contents; }
 .scan-more button { display: none; font-weight: 600; text-decoration: none; }
+.scan-more button::after { content: "\00B7" / ""; display: inline-block; margin-left: 14px; color: var(--muted); font-weight: 400; }   /* one row: + Instagram or X · What's stored */
 @media (hover: hover) { .scan-more button:hover { text-decoration: underline; } }
 .js .scan-form:not(.ig-open):has(.scan-social:placeholder-shown) ~ .scan-help .scan-more button { display: inline-block; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
@@ -314,8 +318,11 @@ strong { font-weight: 600; }
 .assurances > p { position: absolute; z-index: 6; left: 0; right: 0; top: calc(100% + 6px); max-width: 36em; margin: 0; padding: 12px 14px;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
 .assurances a { color: var(--accent); text-underline-offset: 3px; }
-.scan-alt a { color: var(--ink); font-weight: 600; text-decoration-color: var(--accent); text-underline-offset: 4px; }
-@media (hover: hover) { .scan-alt a:hover { color: var(--accent); } }
+/* helper text under the OnlyFans field (its aria-describedby): the non-OnlyFans route, kept out of the link row */
+.scan-hint { margin: -4px 0 0 4px; color: var(--muted); font-size: .9rem; line-height: 24px; }
+.scan-hint a { color: var(--ink); font-weight: 600; text-decoration-color: var(--accent); text-underline-offset: 4px; }
+@media (hover: hover) { .scan-hint a:hover { color: var(--accent); } }
+@media (min-width: 560px) { .scan-form .scan-hint { grid-area: 2 / 1; } .scan-form .btn-lg { grid-area: 1 / 2; } .scan-form .scan-ig { grid-row: 3; } }
 /* the track record: real numbers, labelled as such, right under the form (the card beside / below is the example) */
 .proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px clamp(20px, 3vw, 40px); max-width: 36em; margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
 .proof-k { grid-column: 1 / -1; margin: 0; font: 600 .97rem/1.4 var(--sans); color: var(--ink); }
@@ -393,9 +400,8 @@ strong { font-weight: 600; }
 /* Sections: left-aligned heads, Didot h2, generous rhythm */
 .section { padding: clamp(40px, 7vw, 88px) 0; }
 .section-alt { background: var(--p-alt); }
-@media (prefers-color-scheme: dark) {   /* dark: sections keep their edges; the white mock screens are dimmed, not glaring */
+@media (prefers-color-scheme: dark) {   /* dark: sections keep their edges */
   .section-alt { box-shadow: inset 0 1px 0 var(--p-line), inset 0 -1px 0 var(--p-line); }
-  .rm-stage { filter: brightness(.86) saturate(.95); }
 }
 /* Where I remove from: the other velvet room, head left like every section, the four mock-ups on paper */
 .rm.section-alt { background: var(--bg); box-shadow: none; color: var(--ink); }
@@ -556,26 +562,24 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .ticks-3 li { gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 1.02rem; line-height: 1.55; }
 .ticks-3 strong { color: var(--ink); }
 .ticks-3 .icon { flex: none; color: var(--accent); width: 26px; height: 26px; margin-top: 0; }
-/* #website (the add-on under pricing): the argument + the three things on top, then #showcase: the demo, before / after */
-@media (min-width: 960px) {
-  .web-top { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 80px; align-items: start; }
-  .web-top .section-head { margin-bottom: 0; }
-  .web-top .ticks-3 { border-top: 1px solid var(--ink); }
-  .web-top .ticks-3 li { padding: 22px 0; font-size: 1.08rem; }
+/* #website: one heading, its two points as a row under it, then #showcase: a compact demo card beside the Before / After phone */
+@media (min-width: 720px) {
+  .ticks-3 { grid-template-columns: 1fr 1fr; column-gap: 48px; border-top: 0; }
+  .ticks-3 li { border-top: 1px solid var(--ink); border-bottom: 0; padding: 18px 0 0; }
 }
-.showcase { margin-top: clamp(40px, 6vw, 80px); }
-.showcase-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 16px 32px; }
-.showcase-head h3 { margin: 0; font: 500 clamp(2rem, 3vw, 2.4rem)/1.1 var(--display); font-optical-sizing: none; font-variation-settings: "opsz" 24; }
+#website .section-head { margin-bottom: clamp(20px, 3vw, 32px); }
+.showcase { margin-top: clamp(36px, 5vw, 64px); }
 .showcase-head p { margin: 0; max-width: 34em; color: var(--muted); }
-.showcase .browser { margin-top: clamp(18px, 3vw, 28px); }
+.showcase-head .showcase-k { margin-bottom: 4px; color: var(--ink); font: 650 1.05rem/1.35 var(--sans); }
+.showcase .browser { margin-top: 18px; }
 .showcase .ba-item figcaption { min-height: 32px; }
-/* desktop: the demo site on the left, the one Google phone beside it */
+/* desktop: the demo as a preview card (live frame, 440 px tall, full screen on demand) on the left, the one Google phone beside it */
 @media (min-width: 960px) {
-  .js .showcase { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "head head" "demo tabs" "demo ba" "btn ba"; column-gap: 48px; align-items: start; }
-  .js .showcase-head { grid-area: head; }
+  .js .showcase { display: grid; grid-template-columns: minmax(0, 620px) 320px; justify-content: space-between; grid-template-areas: "head tabs" "demo ba" "btn ba"; column-gap: 64px; align-items: start; }
+  .js .showcase-head { grid-area: head; align-self: end; }
   .js .showcase .browser-demo, .js .showcase .demo-hold { grid-area: demo; }   /* popped out: its placeholder keeps the cell */
-  .js .showcase .browser-demo + .center { grid-area: btn; }
-  .js .ba-tabs { grid-area: tabs; margin-top: clamp(18px, 3vw, 28px); }
+  .js .showcase .browser-demo + .center { grid-area: btn; margin-top: 20px; text-align: left; }
+  .js .ba-tabs { grid-area: tabs; margin-top: 0; align-self: end; justify-self: center; }
   .js .showcase .ba { grid-area: ba; }
 }
 
@@ -611,12 +615,12 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   .step > :not(.step-n) { grid-column: 1; }
   .step-n { grid-row: auto; font-size: 3.6rem; margin-bottom: 14px; }
 }
-.step h3 { margin: 0 0 4px; font: 650 1.05rem/1.35 var(--sans); }
-.step p { margin: 0; color: var(--muted); font-size: .95rem; line-height: 1.55; }
+.step h3 { margin: 0 0 6px; font: 650 1.05rem/1.35 var(--sans); text-wrap: pretty; }
+.step p { margin: 0; max-width: 26ch; color: var(--muted); font-size: 1rem; line-height: 1.55; }
 .tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 3px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); font-size: .82rem; font-weight: 600; }
 
 /* Showcase */
-.browser-demo iframe { width: 100%; height: clamp(480px, 70vh, 720px); border: 0; background: var(--surface-2); }
+.browser-demo iframe { width: 100%; height: 440px; border: 0; background: var(--surface-2); }
 /* phone: no nested scroll. A still of the demo's top (with its buttons) opens the full-screen frame (js/main.js; no JS =
    the demo page). The frame keeps its box, hidden, so it still lazy-loads for the pop-out. */
 .demo-shot { display: none; }
@@ -662,7 +666,6 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 @media (max-width: 559px) {   /* phone: the reasons as a tight ruled list; the website list, the steps compact (after the base rules it overrides) */
   .ticks-3 li { padding: 14px 0; font-size: .97rem; line-height: 1.5; }
   .ticks-3 .icon { width: 22px; height: 22px; }
-  .showcase-head h3 { font-size: 2rem; }
   .showcase-head p { font-size: .97rem; }
   .price { margin: 10px 0 18px; padding-bottom: 18px; }
   #how .steps { gap: 16px; }
@@ -994,10 +997,10 @@ a.gi-card:focus-visible .gi-go { opacity: 1; transform: none; }
 
 /* dark: the paper bits inside the velvet hero need their own lift (paper and velvet are both dark there) */
 @media (prefers-color-scheme: dark) {
-  .hero .scan-field { background: #3a2342; border-color: #6e5177; }
+  .hero .scan-field { border-color: #6e5177; }
   .hero .report-card { border-color: #5a4262; }
   .card, .plan, .rm .rm-card, .channel { border-color: #4f3b57; }
-  .record { background-color: #34203b; border: 1px solid rgb(255 255 255 / .08); }   /* lighter than the section it sits in */
-  .contact-card, .plan-feature { border: 1px solid rgb(255 255 255 / .08); }
+  .record, .contact-card, .plan-feature { background-color: var(--surface); border: 1px solid rgb(255 255 255 / .08); }   /* the raised tone, not a third band */
+  .plan-feature { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }   /* the featured plan: same tone, an orchid edge */
   .section + .section:not(.section-alt):not(.rm) { box-shadow: inset 0 1px 0 var(--p-line); }
 }

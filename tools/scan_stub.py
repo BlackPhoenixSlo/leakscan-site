@@ -77,7 +77,7 @@ MEDIA_POLLS, MEDIA_MODE = {}, {}
 SCAN_HOST = "https://scan.srv1395798.hstgr.cloud"   # only ever a string in JSON; the stub never contacts it
 CHAT_LOG = []
 CHAT_ANSWER = (
-    "Short answer: it's **€250/month** or **€500 one-time**, and the scan plus one removal come first, free. "
+    "Short answer: it's **€250/month** or **€500 one-time**, and the scan plus one takedown filed free come first. "
     "Details: [Pricing](#pricing).\n\n"
     "- Message Jaka on [Telegram](https://t.me/jakabasej)\n"
     "- Monthly plan: **weekly re-scans**\n"

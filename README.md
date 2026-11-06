@@ -15,31 +15,38 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   header: phones / tablets get a compact "Free scan" button beside the menu ("Scan" under 375px), its slot always
   kept, shown (opacity / visibility, no shift) only while the hero form is off screen (IntersectionObserver on `#scan`) ·
   `#top` hero (left: offer-led h1, Jaka's line that he files every takedown himself; scan form: OnlyFans field + "Find my leaks" on one row from 560px; the optional Instagram / X field
-  folds behind "+ Instagram or X" (`.scan-more`; CSS `html.js` + `:has()`, open while it has a value; no JS = shown),
-  two helper lines: "Free, no email. Your report opens here…" (`.scan-note`), then one row: "+ Instagram or X", the
-  Fansly / Patreon line (message me: the scan takes an OnlyFans username only) and "What's stored" in a
+  folds behind "+ Instagram or X" (`.scan-more`; CSS `html.js` + `:has()`, open while it has a value; no JS = shown);
+  the OnlyFans field's helper text `.scan-hint` (its `aria-describedby`; under the field, above the button on phones):
+  "Fansly or Patreon? Message me instead." (the scan takes an OnlyFans username only); under the form "Free, no email.
+  Your report opens here…" (`.scan-note`), then one link row "+ Instagram or X · What's stored", the latter a
   `<details class="more">` that opens as a popover (`privacy.html`'s facts; check.py's FAQ match skips `.more`), then
   the track-record numbers; right: example report card (masked leak hosts, blurred CSS site marks, no
   links; statuses Live / Still in Google / Removed), "Meet Jaka" poster `.meet` under it where the player docks) · `#why` · `#how` (4 numeral-led steps, one row
   from 900px, numeral beside the text on phones, then the "nobody can promise every page" note) · `#pricing` (the one
-  place the free start is spelled out: heading + one line; per plan: price, then Covers / Runs / Re-uploads, the
-  one-time plan files new copies found within its 40 days, monthly adds the weekly re-scan, report and tracking; buttons aligned at the foot = plan-specific
-  Telegram messages, the same text on WhatsApp under each; one "Both plans" line under them) · `#removals` · `#website`, the add-on in both plans ("An official home for your name": the three things you get, the
-  only place website + blog posts are spelled out), then `#showcase` inside it (demo iframe with a "Full screen"
+  place the free start is spelled out: "One takedown free" + one line (the free part is a filed takedown, not a promised
+  removal); per plan: price, then the same four rows Covers / Runs / Re-uploads / Ends, each card about its own plan only
+  (monthly adds its tracking + weekly report ticks; no upsell in the one-time card); buttons aligned at the foot = plan-specific
+  Telegram messages, the same text on WhatsApp under each; one "Both plans" line under them, "your own site" links `#website`) · `#removals` · `#website`, the add-on in both plans ("An official home for your name", the section's one heading; its two points as a
+  2-column row under it from 720px, the only place website + blog posts are spelled out), then `#showcase` inside it (labelled by a
+  plain line, not a heading; a compact demo preview card: live iframe 440px tall, with a "Full screen"
   in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button; phones show a still of the demo's top
   (`assets/demo/top.webp`, a link to `showcase/` that opens the same pop-out) instead of the live frame; then the page's
   one Google phone block `#free` (`.ba`): one Before / After phone at a time, picked by real ARIA tabs `.ba-tabs`,
   `js/main.js`; Before = the scan's phone `.phone-free` (All / Images / Videos tabs; after a scan her real results,
   `js/inline-scan.js` + `js/free-phone.js`, "Send it to me" link), After = her own pages first; without JS both show;
-  desktop: demo left, phone right) · `#faq` (desktop: sticky head; all closed; footer "Not covered? Message me." + Telegram / WhatsApp)
+  desktop: the preview card left, the phone right) · `#faq` (desktop: sticky head; all closed; footer "Not covered? Message me." + Telegram / WhatsApp)
   · `#contact` (what to send to start: the report link or the username; the signed Copyright Enforcement Authorization
   before any filing). `tools/check.py` fails if a section id is missing here. One container width for every section on desktop.
   Phones: `#removals` is the page's only swipe row (one per view, the next peeks 14px, arrows + dots, `js/swipe.js`,
   static `.swipe-nav` markup: no shift). The "Free scan" bar shows once the scan form and the report card are both
   off screen, hides over the demo, `#contact`, the footer and any focused control under it; safe-area aware.
   Light theme: header + hero on blush paper, flat surfaces (no gradients, no button glows), cards / fields = 1px line +
-  one soft shadow; dark: velvet. Section heads vary: eyebrow only on hero, pricing, website. Phones: "Meet Jaka" video
-  full width, caption under it; its poster is CSS (name, "60-second intro · 0:57", play mark; a plain box, the player docks over it).
+  one soft shadow; dark: two surfaces (page `--p-bg`; bands = alt sections, header, hero, removals, footer) + one raised card
+  tone (`--p-surface` = `--v-surface`), the featured plan marked by an orchid edge. Display headings go one weight up (600)
+  under 720px, where Bodoni's hairlines thin out. Section heads vary: eyebrow only on hero, pricing, website. Phones: "Meet Jaka" video
+  full width, caption under it (no second "Meet Jaka" heading: the player's bar carries the name); its poster is CSS (a centred play disc
+  + "Meet Jaka · 60 seconds"; the player docks over it). The player's resting bar: "▶ Meet Jaka · 60 seconds · sound off"
+  (under 240px wide: "▶ Meet Jaka · sound off"). `#removals` desktop: the mock UIs at 70% saturation until hovered / focused (colour only).
   Jaka's portrait everywhere = the CSS `.jdisc` "J" disc (not `.mono`: scan.css's monospace class) (no photo). Eyebrow rule line only in the hero. FAQ leads with
   privacy, what you need, timing; Ask-AI lives only in its launcher. "Meet Jaka" player under 520px: overlay cards
   shrink to the right edge (`data-vo-small`), off the captions.
