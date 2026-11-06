@@ -17,7 +17,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
-  removed layer's chrome is cloned from the live one, `data-rm-copy`). On screen each edge glides by itself (1-2 s CSS
+  removed layer's chrome is cloned from the live one, `data-rm-copy`). Velvet section, centred head; 2x2 on desktop, a swipe row (scroll-snap) on phones. On screen each edge glides by itself (1-2 s CSS
   transition) to a random 15-85 % and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
   reduced motion; a card's first input (Remove press, stage tap, handle key) stops its sweep for good. Remove / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
@@ -57,9 +57,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).
 - Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
-  `?pip=0` off. Landing: docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report,
-  or the scan report card after a scan) at 55% of its width, never > 25% of the card, never over a link / button / pill
-  (else just below the card); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
+  `?pip=0` off. Landing: docked (absolute, scrolls with the page) right-aligned just below the hero card (example report,
+  or the scan report card after a scan) at 55% of its width, never over a link / button / pill (else over the card's
+  bottom-right, never > 25% of it); once the hero scrolls out it floats bottom-right, and re-docks on scroll back unless the
   user dragged, resized, tucked or closed it. Created after load + first scroll / pointer / key or idle; same-origin
   iframe of `video/?r=&name=` made embed-only from the host (injected style; `<video>` driven directly: muted start, tap =
   unmute, then play / pause); icon-only 30 px bar under the picture. Drag drops it where released (kept on-screen, under
@@ -142,7 +142,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.
 - Ask-AI popup: `js/chat.js` + `css/chat.css`, markup at the end of `index.html` (launcher + `<dialog id="askai">`; also
-  opened by any `[data-askai-open]` link; on phones (<720px) the launcher stays hidden while the hero is on screen). Chips and typed questions that fuzzy-match an FAQ question (or "what does it
+  opened by any `[data-askai-open]` link; the launcher stays hidden while the hero is on screen). Chips and typed questions that fuzzy-match an FAQ question (or "what does it
   cost") are answered instantly from the page's own FAQ / pricing text, no network. Everything else streams from
   `POST <API>/api/chat` (`{kb:"landing", messages (last 8), slug?}` → SSE `token`/`done`/`failed`; API origin =
   `<body data-api>`, else the scan server on github.io, else same origin; from file:// or on any error → contacts). Answers are built as DOM nodes;

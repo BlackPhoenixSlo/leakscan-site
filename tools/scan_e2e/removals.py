@@ -271,18 +271,18 @@ def removals_flow(browser, vp_name, vp):
             check(f"{tag} removed layers carry the live post's chrome (copied once from the live layer)",
                   gone == [["mega", 0, 0], ["x", 3, 0], ["reddit", 3, 0], ["site", 2, 0]], gone)
             outs = page.eval_on_selector_all("#removals .rm-out", "es => es.map(e => e.textContent)")
-            check(f"{tag} one outcome line per panel", outs == ["Mega: folders behind aggregator packs disabled", "X: media disabled after copyright report",
-                                                             "Reddit: removed on copyright notice", "Leak sites: profile 404 after a DMCA notice"], outs)
+            check(f"{tag} one outcome line per panel", outs == ["Folders behind aggregator packs disabled", "Media disabled after copyright report",
+                                                             "Removed on copyright notice", "Profile 404 after a DMCA notice"], outs)
             DEMO = page.evaluate(RM_PANEL)
             check(f"{tag} no links in the section (mock-ups only)", page.locator("#removals a").count() == 0)
         settled_imgs(page)
         blur = page.eval_on_selector_all("#removals .rm-img", "es => es.map(e => [e.getAttribute('src'), getComputedStyle(e).filter, e.naturalWidth])")
         check(f"{tag} {scheme}: every leak-side image blurred by default, loaded from site/img", len(blur) == 13 and all(
             "blur(" in b[1] and b[0].startswith("img/removals/") and b[2] > 0 for b in blur), blur)
-        sw = page.evaluate("() => [document.documentElement.scrollWidth, innerWidth, Math.max(...[...document.querySelectorAll('#removals *')].map(e => e.parentElement.closest('.rm-stage') ? 0 : e.getBoundingClientRect().right))]")
+        sw = page.evaluate("() => [document.documentElement.scrollWidth, innerWidth, Math.max(...[...document.querySelectorAll('#removals *')].map(e => e.parentElement.closest('.rm-stage') || (e.parentElement.closest('.rm-grid') && getComputedStyle(document.querySelector('#removals .rm-grid')).overflowX === 'auto') ? 0 : e.getBoundingClientRect().right))]")   # phone: the swipe row clips its panels
         check(f"{tag} {scheme}: no horizontal overflow", sw[0] <= sw[1] and sw[2] <= sw[1] + 0.5, sw)
         cols = page.evaluate("() => new Set([...document.querySelectorAll('#removals .rm-card')].map(c => Math.round(c.getBoundingClientRect().x))).size")
-        check(f"{tag} {scheme}: layout {'stacked' if vp_name == 'phone' else '2x2'}", cols == (1 if vp_name == "phone" else 2), cols)
+        check(f"{tag} {scheme}: layout {'swipe row' if vp_name == 'phone' else '2x2'}", cols == (4 if vp_name == "phone" else 2), cols)
         if scheme == "light":
             fp_checks(tag, vp_name, page.evaluate(FP_STATE), "Orla Brennick", "brennickclay, orlabrennick", vp["width"])
         before = page.evaluate(RM_STATE)

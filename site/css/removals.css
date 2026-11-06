@@ -113,6 +113,13 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .xp-media { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; height: 196px; overflow: hidden; border-radius: 16px; border: 1px solid var(--xp-line); }
 .xp-off { display: grid; place-items: center; grid-template-columns: 1fr; padding: 20px; background: var(--xp-off); color: var(--xp-mut); font-size: .9rem; text-align: center; }
 .xp-acts { display: flex; justify-content: space-between; margin-top: 10px; padding-right: 20%; color: var(--xp-mut); font-size: .8rem; }
+/* X action counts: reply / repost / like / views icons (inline masks, no requests) */
+.xa { display: inline-flex; align-items: center; gap: 5px; }
+.xa::before { content: ""; width: 14px; height: 14px; background: currentColor; -webkit-mask: var(--xa) center / contain no-repeat; mask: var(--xa) center / contain no-repeat; }
+.xa-re { --xa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/%3E%3C/svg%3E"); }
+.xa-rt { --xa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 2 4 4-4 4'/%3E%3Cpath d='M3 11v-1a4 4 0 0 1 4-4h14'/%3E%3Cpath d='m7 22-4-4 4-4'/%3E%3Cpath d='M21 13v1a4 4 0 0 1-4 4H3'/%3E%3C/svg%3E"); }
+.xa-lk { --xa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z'/%3E%3C/svg%3E"); }
+.xa-vw { --xa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3v18h18'/%3E%3Cpath d='M18 17V9'/%3E%3Cpath d='M13 17V5'/%3E%3Cpath d='M8 17v-3'/%3E%3C/svg%3E"); }
 
 /* 3. Reddit */
 .rd { --rd-bg: #fff; --rd-ink: #1c1c1c; --rd-mut: #576f76; --rd-off: #edeff1; background: var(--rd-bg); color: var(--rd-ink); padding: 14px 16px; font: 400 .9rem/1.4 var(--sans); }
@@ -192,3 +199,10 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 /* removed: the same site shell, the profile gone */
 .fp .fp-404 { margin: 52px 0 0; color: #d1d5db; font: 900 4.5rem/1 var(--fp-sans); letter-spacing: .04em; text-align: center; }
 .fp .fp-gh { margin: 12px 24px 0; color: #374151; font-size: 1rem; font-weight: 600; text-align: center; }
+/* phone: the four panels as a swipe row (one panel tall, not four); the next one peeks in */
+@media (max-width: 819px) {
+  .rm-grid { display: flex; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none;
+    margin-inline: -20px; padding: 4px 20px 16px; scroll-padding-inline: 20px; }
+  .rm-grid::-webkit-scrollbar { display: none; }
+  .rm-card { flex: 0 0 min(340px, 86%); scroll-snap-align: start; }
+}

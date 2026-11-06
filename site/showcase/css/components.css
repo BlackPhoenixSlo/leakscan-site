@@ -150,6 +150,9 @@
 .hero__eyebrow {
   margin-bottom: 1rem;
 }
+@media (max-width: 480px) {   /* one line in a phone-width frame */
+  .hero__eyebrow { letter-spacing: 0.12em; white-space: nowrap; }
+}
 
 .hero__title {
   color: var(--white);

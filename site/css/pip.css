@@ -1,5 +1,5 @@
 /* js/pip.js: mini player of site/video/. Picture (16:9, the iframe, nothing drawn over it) + a thin control bar under it.
-   Docked (.docked, landing): absolute, hanging off the bottom-right corner of the hero card, scrolls with the page.
+   Docked (.docked, landing): absolute, right-aligned just under the hero card, scrolls with the page.
    Floating: fixed in a corner, min(320px, 45vw). Drag anywhere but the buttons → nearest corner; fling / drag past the left
    or right edge → tucked off-screen, .pip-tab (chevron) at that edge brings it back. z 44: under the header (50) and the
    Ask-AI launcher (45). Never in the flow: CLS 0. */

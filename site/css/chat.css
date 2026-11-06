@@ -11,12 +11,12 @@
 .askai-launcher .icon { color: var(--accent); width: 1.3em; height: 1.3em; }
 @media (hover: hover) { .askai-launcher:hover { border-color: var(--accent); transform: translateY(-1px); } }
 @media (min-width: 720px) { .askai-launcher { right: 24px; bottom: 24px; } }
-/* Phone: sit above the sticky "Free scan" bar when it is showing. While the hero is on screen (js/chat.js sets
-   .in-hero) stay hidden: the pill would cover hero lines / contact buttons, and the hero has its own CTAs. */
+/* Phone: sit above the sticky "Free scan" bar when it is showing. Any width: while the hero is on screen (js/chat.js sets
+   .in-hero) stay hidden: the scan is the hero's one action, and the pill would cover hero lines. */
 @media (max-width: 719px) {
   .mobile-cta.show ~ .askai-launcher { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 62px); }
-  .askai-launcher.in-hero { opacity: 0; visibility: hidden; transform: translateY(12px); transition-delay: 0s, 0s, 0s, 0s, .25s; }
 }
+.askai-launcher.in-hero { opacity: 0; visibility: hidden; transform: translateY(12px); transition-delay: 0s, 0s, 0s, 0s, .25s; }
 /* Any width: hidden while it would cover the hero card's actions or the before / after phones (js/chat.js). */
 .askai-launcher.in-quiet { opacity: 0; visibility: hidden; transform: translateY(12px); transition-delay: 0s, 0s, 0s, 0s, .25s; }
 /* Narrow phones: icon only (the button keeps its aria-label). */

@@ -4,8 +4,8 @@
 // ?pip=1 forces it on, ?pip=0 off. Same-origin iframe of ../video/ (?r= / ?name= passed through) in embed form: this script
 // injects a style into it (no name bar, no player UI: the stage fills the picture) and drives its <video> (starts muted;
 // a tap on the picture = sound on, then play / pause). Controls live in a thin bar under the picture, never on it.
-// Docked: absolute (scrolls with the page), ~44% of the card's width, hanging off its bottom-right corner (<= 25% of the
-// card, never over a link / button / input: else just outside that corner, else floating); re-placed when the card
+// Docked: absolute (scrolls with the page), 55% of the card's width, right-aligned just under the card (else hanging off its
+// bottom-right corner, <= 25% of the card; never over a link / button / input; else floating); re-placed when the card
 // changes (in-page scan → report card). Floating: fixed, by default bottom-right at min(320px, 45vw), under the sticky header
 // / report nav and off the hero Scan now button, phone CTA bar, Ask-AI launcher, report Reveal pill. Drag (pointer events,
 // touch too): it stays where it is dropped (kept on-screen, under the header); fling / drag past the left or right edge →
@@ -56,7 +56,7 @@
     if (!r || !r.width) return null;
     var w = Math.round(r.width * DOCK), h = Math.round(w * 9 / 16) + 30, W = vw();
     var fit = function (x) { return Math.max(12, Math.min(x, W - w - 12)); };
-    var spots = [{ x: fit(r.right - w * 0.7), y: r.bottom - h * 0.7 }, { x: fit(r.right - w), y: r.bottom + 10 }];
+    var spots = [{ x: fit(r.right - w), y: r.bottom + 14 }, { x: fit(r.right - w * 0.7), y: r.bottom - h * 0.7 }];   // under the card first: the card's own note stays readable
     var live = [].filter.call(document.querySelectorAll(LIVE), function (el) {
       if (pip.contains(el) || tab.contains(el) || el.closest('.askai-launcher, .mobile-cta')) return false;   // fixed ones: they sit above the docked player (z)
       return !!vis(el);
