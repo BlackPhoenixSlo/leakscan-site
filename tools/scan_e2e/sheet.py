@@ -109,7 +109,8 @@ def sheet_flow(pw, chromium, vp_name, vp, engine="chromium"):
                 b1 = page.evaluate(blur)
                 page.locator(".report-card").screenshot(path=str(cfg.out / f"sheet-{vp_name}-{engine}-2-revealed.png"))
                 check(f"{tag} blur on, Reveal takes it off", "blur" in b0 and "blur" not in b1, [b0, b1])
-                check(f"{tag} no page errors", not net1["errors"] and not net1["outside"], net1["errors"][:2])
+                errs = [e for e in net1["errors"] if not ("STALE" in e and "access control" in e)]   # WebKit reports the stub's STALE thumb (no ACAO, on purpose) refused on the per-thumb path
+                check(f"{tag} no page errors", not errs and not net1["outside"], errs[:2])
             c1.close()
             if nocell:
                 continue

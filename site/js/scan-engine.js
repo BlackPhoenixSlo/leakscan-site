@@ -394,7 +394,7 @@
   // turn. A 200 (a hiccup, a bucket since refilled) has the bytes: they become the image, no third request. A CORS load (XO:
   // crossorigin) refused (no status) loads once more on fresh()'s URL, then plain (pixels unread: kept). Anything else is dead at once
   // (the proxy answers 404 / 4xx / 502 for a thumb Google no longer serves). Also right for an image that finished before it was
-  // watched. A tile taken off the page is not retried; a free-standing image (gallery()'s probe) is.
+  // watched. A tile taken off the page is not retried and gets no verdict; a free-standing image (gallery()'s probe) is retried.
   var BLANK_PX = 16, RETRY_MS = 2500, asks = [], asking = false, coolUntil = 0;
   // One status at a time per page (a frame uses its page's queue): one 429 stops all of them for RETRY_MS, so an empty bucket gets
   // what it refills, not a retry chain per thumb (each a new 429, each tile it kills pulling in the next): answer(status, response).
@@ -417,11 +417,14 @@
   }
   function watchThumb(img, onDead, onOk, photo) {
     var done = false;
-    var finish = function (ok) {
-      if (done) return;
+    var stop = function () {
       done = true;
       img.removeEventListener('load', load);
       img.removeEventListener('error', error);
+    };
+    var finish = function (ok) {
+      if (done) return;
+      stop();
       var fn = ok ? onOk : onDead;
       if (fn) fn(img);
     };
@@ -435,7 +438,8 @@
       if (!src || src.slice(0, 5) === 'blob:' || !window.fetch) return finish(false);   // bytes in hand: asking again gets the same
       askStatus(src, function (st, res) {
         if (done) return;
-        if (!(img.isConnected || !img.parentNode) || img.getAttribute('src') !== src) return finish(false);
+        if (img.parentNode && !img.isConnected) return stop();   // no verdict: it left while queued, its thumb may be fine (the prober checks it)
+        if (img.getAttribute('src') !== src) return finish(false);
         if (st === 200) return res.blob().then(function (b) { img.setAttribute('src', URL.createObjectURL(b)); }, function () { finish(false); });
         if (st === 0 && img.hasAttribute('crossorigin')) {   // XO refused: once more on E.fresh's URL (a copy cached before ACAO / Vary), then plain
           return src !== fresh(src) ? img.setAttribute('src', fresh(src)) : img.removeAttribute('crossorigin');
