@@ -32,7 +32,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   off screen, hides over the demo, `#contact`, the footer and any focused control under it; safe-area aware.
   Light theme: header + hero on blush paper, flat surfaces (no gradients, no button glows), cards / fields = 1px line +
   one soft shadow; dark: velvet. Section heads vary: eyebrow only on hero, pricing, website. Phones: "Meet Jaka" video
-  full width, caption under it; its poster is CSS (name, "60-second intro · 0:57", play mark; links to `video/`).
+  full width, caption under it; its poster is CSS (name, "60-second intro · 0:57", play mark; a plain box, the player docks over it).
   Jaka's portrait everywhere = the CSS `.mono` "J" disc (no photo). Eyebrow rule line only in the hero. FAQ leads with
   privacy, what you need, timing; the Ask-AI line sits under the list. Phone demo frame 300px (cut above its buttons).
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
