@@ -4,7 +4,8 @@ Google Ads landing site for Abolita: personal leak-removal service for creators.
 cookies, no third-party requests on the landing pages. `site/` is what ships. `site/showcase/` is the demo of
 the official site each client gets (fictional creator, built from the tessa template); the landing page links and
 iframes it as `showcase/`. Landing fonts are self-hosted in `site/fonts/` (Bodoni Moda display + Jost body, OFL, Latin subset, 2 preloaded,
-metric-matched fallbacks so the swap doesn't shift); the demo uses system fonts (no Google Fonts); `tools/check.py` fails if it loads any
+metric-matched fallbacks so the swap doesn't shift; Bodoni only for large headings at opsz 24, numbers / prices in
+Jost, italic only for the hero's "Me."); the demo uses system fonts (no Google Fonts); `tools/check.py` fails if it loads any
 third-party host that `privacy.html` does not disclose. Its own
 gates live in `tools/showcase/` (`check_ready.py`, `check_pages.py`, `check_deploy.py`, `_check_accounts.py`).
 Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py --variants` rebuilds them from
@@ -31,11 +32,13 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   off screen, hides over the demo, `#contact`, the footer and any focused control under it; safe-area aware.
   Light theme: header + hero on blush paper, flat surfaces (no gradients, no button glows), cards / fields = 1px line +
   one soft shadow; dark: velvet. Section heads vary: eyebrow only on hero, pricing, website. Phones: "Meet Jaka" video
-  full width, caption under it. Jaka's portrait everywhere = `img/meet/jaka-face.webp` (a crop of his own take).
+  full width, caption under it; its poster is CSS (name, "60-second intro · 0:57", play mark; links to `video/`).
+  Jaka's portrait everywhere = the CSS `.mono` "J" disc (no photo). Eyebrow rule line only in the hero. FAQ leads with
+  privacy, what you need, timing; the Ask-AI line sits under the list. Phone demo frame 300px (cut above its buttons).
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
-  removed layer's chrome is cloned from the live one, `data-rm-copy`). Velvet section right after `#why`, centred head (left on phones); 2x2 on desktop, a swipe row (scroll-snap, arrows + dots) on phones. On screen each edge glides by itself (1-2 s CSS
+  removed layer's chrome is cloned from the live one, `data-rm-copy`). Velvet section right after `#why`, head left like every section; 2x2 on desktop, a swipe row (scroll-snap, arrows + dots) on phones. On screen each edge glides by itself (1-2 s CSS
   transition) to a random 55-85 % (the leak side: the button keeps reading Remove) and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
   reduced motion; a card's first input (Remove press, stage tap, handle key) stops its sweep for good. Remove / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
@@ -238,7 +241,7 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 
 ## Inline scan
 
-- Hero form = OnlyFans username (`onlyfans.com/` prefix) + optional Instagram or X (`@` prefix, name `ig`) + "Scan now".
+- Hero form = OnlyFans username (`onlyfans.com/` prefix) + optional Instagram or X (`@` prefix, name `ig`) + "Find my leaks".
   The network comes only from a pasted URL (`instagram.com/<h>` → instagram, `x.com|twitter.com/<h>` → x); a bare name
   is sent as `instagram`. Body: `{platform: "onlyfans.com", handle, level: "low", instagram? | x?}`. Same two fields on
   `scan/`, which also reads `h=`, `ig=`, `x=` (and old `p=`).
@@ -290,8 +293,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 
 ## Replace before launch
 
-- **Jaka's photo** (optional): `site/img/meet/jaka-face.webp` is a 176x176 crop of his video take; swap in a real
-  portrait under the same name if wanted, then run the gate.
+- **Jaka's photo** (optional): the page uses a CSS "J" monogram (`.mono`) and a CSS video poster; to use a real
+  portrait, add a clothed, camera-facing square photo and swap the `.mono` spans for `<img>`, then run the gate.
 - **Imprint**: add registration number (matična številka) and tax number (davčna številka) to `site/imprint.html`
   if you want them shown.
 

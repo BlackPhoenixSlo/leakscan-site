@@ -209,6 +209,17 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 /* removed: the same site shell, the profile gone */
 .fp .fp-404 { margin: 52px 0 0; color: #d1d5db; font: 900 4.5rem/1 var(--fp-sans); letter-spacing: .04em; text-align: center; }
 .fp .fp-gh { margin: 12px 24px 0; color: #374151; font-size: 1rem; font-weight: 600; text-align: center; }
+/* dark: the leak site in its own dark theme, like the other three panels */
+@media (prefers-color-scheme: dark) {
+  .fp { background: #0f131a; color: #e5e7eb; }
+  .fp-bar, .fp .fp-search { background: #1c222c; box-shadow: none; }
+  .fp-menu, .fp-aka, .fp-count, .fp .fp-hr { color: #9ca3af; }
+  .fp-count b { color: #f3f4f6; }
+  .fp-av { border-color: #0f131a; }
+  .fp-hr::before, .fp-hr::after { background: #2d3440; }
+  .fp .fp-404 { color: #2d3440; }
+  .fp .fp-gh { color: #d1d5db; }
+}
 /* phone: the four panels as a swipe row (one panel tall, not four); the next one peeks in */
 @media (max-width: 819px) {
   .rm-grid { --cw: min(520px, calc(100vw - 52px)); --pad: calc((100vw - var(--cw)) / 2);

@@ -8,12 +8,12 @@
 
 ## Who
 - Abolita is leak removal for OnlyFans, Fansly and Patreon creators: "Leaked content, taken down by a real person. Me."
-- Run by Jaka (Jaka Basej), from Ljubljana. "Find suspected leaks of you on Google: sites, images and videos. I'm Jaka. I check each link by hand and file every takedown myself."
+- Run by Jaka (Jaka Basej), from Ljubljana. "Find suspected leaks of you on Google. I'm Jaka, and I'm the one who files every takedown."
 - #why: "Every link checked by hand before I file." A scanner can't tell a leaked set from your own promo page or from someone who looks like you; Jaka can. Nothing goes out until he has compared it with your content.
 - "Your own pages stay safe." Your profiles, pages you licensed and lookalikes are never filed against, so your accounts aren't put at risk.
 - "Correct notices get acted on." One accurate notice to the site, then its host, registrar and Google, beats ten careless ones.
 - "One person, start to finish." No ticket queue, no support team. Whoever reads your message files your notices: Jaka.
-- Track record ("My filings so far", counted from Jaka's own notices, not an example): 16,000+ leak links he has filed takedowns against, for creators; 570 of the 633 fapello.com links he filed against no longer resolve. "Nobody can honestly promise every page comes down, and I won't. I'll tell you straight what's likely to go and what isn't."
+- Track record ("My filings so far", counted from Jaka's own notices, not an example): 16,000+ takedown links filed for creators; of the 633 fapello.com links he filed against, 570 were gone when he last checked. "Nobody can honestly promise every page comes down. I won't pretend to. I'll tell you straight what's likely to go and what isn't."
 - Business: Ognjeni Feniks, Jaka Basej, s.p., Ljubljana, Slovenia (address on the privacy page: Kvedrova cesta 5A, 1000 Ljubljana, Slovenia).
 
 ## Free, before you pay anything
@@ -52,17 +52,20 @@ After that, "Google shows the real you":
 4. Monthly plan: a weekly report. Jaka re-scans every week: what's live, cached and dead, and anything new he has filed.
 
 ## FAQ (verbatim from the page)
-Q: Is this legal?
-A: Yes. If you created the content, you hold the copyright to it. A DMCA notice, and its equivalents in the EU and elsewhere, is the legal process for asking sites, hosts and Google to remove copies posted without your permission. You sign a one-page authorization so I can file those notices on your behalf.
-
-Q: Will my own accounts be affected?
-A: That's the exact risk I'm here to avoid. Nothing is filed until I've confirmed by hand that a link is really your content on a site you didn't authorize. Your own profiles, pages you licensed and people who just look like you are never filed against.
+Q: Is my information safe?
+A: Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site has no cookies and no tracking.
 
 Q: What do you need from me?
 A: For the free scan: just your handle, typed into the box at the top of this page. To get one page removed free, message me the report link. Before I file anything I need the signed one-page Copyright Enforcement Authorization, and now and then a link to your original post so I can show it's yours. I never need your passwords or logins.
 
 Q: How fast does it work?
 A: It depends on the site. Some act on a notice quickly; others ignore it, and then I go to their host, their registrar and Google. With the one-time clean, everything I find is filed in the first week. Google can keep showing a dead page for a while, so I ask Google to drop it too.
+
+Q: Is this legal?
+A: Yes. If you created the content, you hold the copyright to it. A DMCA notice, and its equivalents in the EU and elsewhere, is the legal process for asking sites, hosts and Google to remove copies posted without your permission. You sign a one-page authorization so I can file those notices on your behalf.
+
+Q: Will my own accounts be affected?
+A: No. Your own pages are never filed against. See how I check each link.
 
 Q: What if it comes back?
 A: Re-uploads happen. On the monthly plan I re-scan every week and file new copies as I find them. On the one-time clean, re-uploads are covered for 40 days, and on day 40 you decide whether to continue.
@@ -72,9 +75,6 @@ A: File anything without your signed authorization. File against a link I haven'
 
 Q: Can I cancel? Does anything auto-renew?
 A: The monthly plan can be cancelled anytime. The one-time clean never auto-renews: after 40 days nothing happens unless you say so.
-
-Q: Is my information safe?
-A: Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site has no cookies and no tracking.
 
 Q: Do I need to register or create an account?
 A: No. There's no account, no app and no card. The free scan runs right here from just your handle. After that you message me on Telegram, WhatsApp or email, and everything happens in that chat.
@@ -94,7 +94,7 @@ A: No. There's no account, no app and no card. The free scan runs right here fro
 
 ## Section anchor list (link with markdown, e.g. [Pricing](#pricing))
 - #top: hero: "Leaked content, taken down by a real person. Me." Intro by Jaka, the scan box, privacy line, track record, example report, "Meet Jaka" video.
-- #scan: the free scan box at the top (OnlyFans username, optional Instagram or X, "Scan now").
+- #scan: the free scan box at the top (OnlyFans username, optional Instagram or X, "Find my leaks").
 - #free: "What Google shows for your name": a Google phone for your handle (results, images, videos).
 - #why: "Every link checked by hand before I file": your own pages stay safe.
 - #removals: "Where I remove from": re-enacted removals on Mega, X, Reddit and a leak site.

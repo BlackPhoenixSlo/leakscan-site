@@ -14,5 +14,4 @@
   Everything else on the landing pages is CSS/SVG drawn for this site (device mockups, gradient thumbnails). Google's name and colours appear only inside illustrative mockups.
 - **Video**: `site/video/` ships Jack's own recording (one 56.9 s take, his face and voice, no stock footage):
   `jack.webm` (VP9) + `jack.mp4` (H.264), and `transcript.json` (his words, transcribed locally; see `site/video/CUES.md`).
-  `site/img/meet/` holds one still from that take (1.5 s): the hero's "Meet Jaka" poster under the docked player,
-  and `jaka-face.webp`, a 176 px crop of his face from the same take (12 s), used as his portrait across the page.
+  The hero's "Meet Jaka" poster under the docked player and Jaka's "J" monogram are drawn in CSS (no stills).
