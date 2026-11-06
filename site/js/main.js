@@ -100,16 +100,22 @@
       if (el) { el.classList.add('is-in'); io.unobserve(el); }
     });
 
+    // Phone sticky "Free scan" pill: only once the hero's form is off screen, and out of the way while the report card, the
+    // plan buttons, the contact channels or the footer pass under it (the bottom 12 % band of the screen).
     var cta = document.querySelector('.mobile-cta');
-    var hero = document.querySelector('.hero');
-    var contact = document.getElementById('contact');
-    if (cta && hero) {
-      var heroOut = false, contactIn = false, demoIn = false, demo = document.querySelector('#showcase .browser-demo');
-      var update = function () { cta.classList.toggle('show', heroOut && !contactIn && !demoIn); };
-      new IntersectionObserver(function (en) { heroOut = !en[0].isIntersecting; update(); }).observe(hero);
-      if (contact) new IntersectionObserver(function (en) { contactIn = en[0].isIntersecting; update(); }).observe(contact);
-      // and while the showcase preview is behind the bar (the bottom quarter of the screen): it would cover the preview
-      if (demo) new IntersectionObserver(function (en) { demoIn = en[0].isIntersecting; update(); }, { rootMargin: '-75% 0px 0px 0px' }).observe(demo);
+    var form = document.getElementById('scan');
+    if (cta && form) {
+      var formOut = false, quiet = 0, demoIn = false, demo = document.querySelector('#showcase .browser-demo');
+      var update = function () { cta.classList.toggle('show', formOut && !quiet && !demoIn); };
+      new IntersectionObserver(function (en) { formOut = !en[0].isIntersecting && en[0].boundingClientRect.top < 0; update(); }).observe(form);
+      var near = new IntersectionObserver(function (en) {
+        en.forEach(function (e) { e.target.__ctaIn = e.isIntersecting; });
+        quiet = [].filter.call(stops, function (el) { return el.__ctaIn; }).length; update();
+      }, { rootMargin: '-88% 0px 0px 0px' });
+      var stops = document.querySelectorAll('.hero .report-card, #pricing .plans, #contact .channels, .site-footer');
+      [].forEach.call(stops, function (el) { near.observe(el); });
+      // and while the showcase preview is in the lower half of the screen (the bar would sit on it)
+      if (demo) new IntersectionObserver(function (en) { demoIn = en[0].isIntersecting; update(); }, { rootMargin: '-50% 0px 0px 0px' }).observe(demo);
     }
   }
 })();

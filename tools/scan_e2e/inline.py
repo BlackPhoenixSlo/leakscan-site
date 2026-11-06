@@ -420,7 +420,7 @@ def hero_look(run):
         bring(page, "#showcase .browser-demo", "center")
         page.wait_for_timeout(500)
         on_demo = page.evaluate("document.querySelector('.mobile-cta').classList.contains('show')")
-        bring(page, "#pricing")
+        bring(page, "#faq")   # past the showcase; the pill also steps aside over the plan buttons (#pricing)
         page.wait_for_timeout(500)
         on_pricing = page.evaluate("document.querySelector('.mobile-cta').classList.contains('show')")
         check(f"{tag} sticky scan bar: hidden over the showcase preview, shown again past it", not on_demo and on_pricing, [on_demo, on_pricing])

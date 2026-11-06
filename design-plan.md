@@ -42,11 +42,11 @@ hero    | h1 serif 2 lines              | Weekly report card (ledger)  |
 #free   | h2 + the free offer, once      | Google phone (her results)   |
 #why    | portrait + letter (serif h2)   | three rules, hairline list ; stat line
 #how    5 numbered steps in one row (sequence = numbers earned)
+#removals h2 left + lede right ; 2x2 mock panels (phones: each panel scaled to .73)
 #website| h2                             | paragraph + 3 points          |
 #showcase browser frame (full width) ; before/after: text column | phone -> phone
 #pricing h2 + shared inclusions ; monthly (ink card) | one-time (outlined)
 #faq    | h2 + Ask the AI (sticky)       | questions, hairline list      |
-#removals h2 left + lede right ; 2x2 mock panels (e2e: after #faq, directly before #contact)
 #contact| portrait + h2 + line           | Telegram / WhatsApp / Email   |
 ```
 
@@ -83,4 +83,14 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
 - The showcase h2 is a sans caption so #website's serif h2 is the section's voice (two serif h2s stacked read as a repeat).
 - Left as is (JS-written, hook text): "Free scan report · OnlyFans" and "Open full report →" in the live card.
 - Logo: Young Serif "A" on mulberry (path from the font, OFL); favicons re-rendered; og.png not regenerated.
-
+## Round 2 notes
+- Phone 390: 8,975 px (measured; round 1 11,972). 1440: 8,065. CLS 0 both; no sideways scroll at 320 / 360 / 390.
+- Order: hero, free, why, how, removals, website, showcase, pricing, faq, contact. e2e edits (minimal, reported):
+  removals.py order -> ["how", "website", "main"]; FP_STATE reads tile / layer offsetHeight (layout px, the phone panels are
+  transform-scaled) so 112 / 372 still hold; inline.py checks the pill "shown again" at #faq (it now steps aside over the
+  plan buttons); askai.py: launcher hidden in the hero at every width, scroll to #how first on desktop too;
+  personalize.py tg_shot shoots at #faq.
+- Sticky pill: visibility-hidden when off (a full-page capture showed the parked pill over the report card).
+- Removed layers share the live layers' boxes (Reddit notice in the media slot, leak-site 404 in one pane).
+- Pip bar in the palette (deep mulberry, pink mute); no poster: the player autoplays its own intro, a poster would not show.
+- Dark mode dims the always-light mocks with filter: brightness(.93) (#fff -> ~#ededed); computed colours stay exact (e2e).

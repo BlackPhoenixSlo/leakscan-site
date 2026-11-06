@@ -71,11 +71,11 @@ def askai(browser, vp_name, vp):
         for (const q of r.getClientRects()) if (q.right > b.left && q.left < b.right && q.bottom > b.top && q.top < b.bottom) hit.push(n.textContent.trim()); }
       return hit; }""")
     check(f"{v} launcher covers no hero text at load", covered == [], covered)
+    check(f"{v} launcher hidden while hero on screen", not L.is_visible())
+    bring(page, "#how")
     if vp_name == "phone":
-        check(f"{v} launcher hidden while hero on screen", not L.is_visible())
-        bring(page, "#how")
         page.wait_for_selector(".mobile-cta.show", timeout=3000)
-        page.wait_for_timeout(500)
+    page.wait_for_timeout(500)
     check(f"{v} launcher visible + labelled", L.is_visible() and L.get_attribute("aria-label") == "Ask AI before you DM me"
           and "Ask AI before you DM me" in L.inner_text(), L.inner_text())
     lb = L.bounding_box()

@@ -53,10 +53,10 @@ def tg_bar(page):
 
 
 def tg_shot(page, name):
-    """Phone: the sticky bar in view (hero scrolled away, #pricing on screen), viewport screenshot."""
+    """Phone: the sticky bar in view (hero scrolled away, #faq on screen; it steps aside over the plan buttons), viewport screenshot."""
     if not page.evaluate("innerWidth < 720"):
         return
-    bring(page, "#pricing", "center")
+    bring(page, "#faq")
     try:
         page.wait_for_selector(".mobile-cta.show", timeout=3000)
     except Exception:

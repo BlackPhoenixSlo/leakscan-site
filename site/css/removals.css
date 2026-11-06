@@ -1,6 +1,9 @@
 /* #removals "Where I remove from": four mock panels (Mega, X, Reddit, a leak site), live leak vs. removed.
    Own file so it merges next to other work on styles.css; reuses its tokens (--surface, --line, --ink, --muted, ...). */
-.rm { --rm-h: 372px; }   /* one fixed stage height: no shift when a panel flips */
+.rm { --rm-h: 372px; --rm-s: 1; }   /* one fixed stage height: no shift when a panel flips */
+/* phones: each panel is drawn at its 372 px layout and scaled down as a whole, like a screenshot (shorter page, same mock;
+   clip and handle are % of the box, so the compare edge stays put) */
+@media (max-width: 559px) { .rm { --rm-s: .73; } }
 .rm-tools { display: flex; justify-content: flex-end; margin: -12px 0 14px; }
 .rm-grid { display: grid; gap: 20px; }
 @media (min-width: 820px) { .rm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; } }
@@ -20,10 +23,10 @@
 /* the compare stage: fixed height (no layout shift), removed layer on top, clipped from the left at --p % */
 /* overflow: clip, not hidden: a hidden box still scrolls to show a focused child, and the stage-wide handle at 100 % sits
    past its right edge, so focusing it (Tab, a tap) slid both layers out of view */
-.rm-stage { position: relative; height: var(--rm-h); overflow: hidden; overflow: clip; border-radius: 12px; border: 1px solid var(--line); touch-action: pan-y;
+.rm-stage { position: relative; height: calc(var(--rm-h) * var(--rm-s)); overflow: hidden; overflow: clip; border-radius: 12px; border: 1px solid var(--line); touch-action: pan-y;
   user-select: none; -webkit-user-select: none; cursor: ew-resize; }
 html:not(.js) .rm-stage { cursor: auto; }
-.rm-layer { position: absolute; inset: 0; overflow: hidden; }
+.rm-layer { position: absolute; left: 0; top: 0; width: calc(100% / var(--rm-s)); height: var(--rm-h); overflow: hidden; transform: scale(var(--rm-s)); transform-origin: 0 0; }
 .rm-gone { clip-path: inset(0 0 0 calc(var(--p) * 1%)); }
 /* the handle is a stage-wide box moved by transform (its % = the stage width): no layout shift while it animates;
    its left edge is the compare edge */
@@ -34,7 +37,7 @@ html:not(.js) .rm-stage { cursor: auto; }
 /* keep the knob inside the stage at both ends; idle (all live) it is parked in the bottom corner and the edge line is
    hidden, so nothing of the live leak is covered */
 .rm-stage[data-end="r"] .rm-knob { transform: translateX(-20px); }
-.rm-stage[data-end="idle"] .rm-knob { transform: translate(-20px, calc(var(--rm-h) / 2 - 30px)); }
+.rm-stage[data-end="idle"] .rm-knob { transform: translate(-20px, calc(var(--rm-h) * var(--rm-s) / 2 - 30px)); }
 .rm-stage[data-end="idle"] .rm-handle::before { opacity: 0; }
 .rm-stage[data-end="l"] .rm-knob { transform: translateX(20px); }
 .rm-knob::before, .rm-knob::after { content: ""; position: absolute; top: 50%; width: 7px; height: 7px; margin-top: -4px; border: solid var(--on-accent); border-width: 0 0 2px 2px; }
@@ -62,7 +65,15 @@ html:not(.js) .rm-stage { cursor: auto; }
 .rm-top { grid-area: top; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
 .rm-stage { grid-area: stage; }
 .rm-act { grid-area: act; }
-@media (max-width: 519px) { .rm-btn { min-width: 7.6em; padding-inline: .8em; } }
+@media (max-width: 519px) {
+  .rm-btn { min-width: 7.6em; padding-inline: .8em; }
+  /* phones: title + button on one row, the outcome line under both (one line, not two) */
+  .rm-card { grid-template-areas: "h act" "out out" "stage stage"; align-items: center; gap: 8px 12px; padding: 14px; }
+  .rm-top { display: contents; }
+  .rm-h { grid-area: h; }
+  .rm-out { grid-area: out; font-size: .85rem; }
+  .rm-grid { gap: 16px; }
+}
 .rm-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { display: none; }
 
@@ -129,9 +140,9 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .rd-title { margin: 8px 0 10px; font: 700 1.05rem/1.3 var(--sans); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .rd-media { height: 200px; overflow: hidden; border-radius: 14px; background: var(--rd-off); }
 .rd-acts { display: flex; gap: 18px; margin-top: 10px; color: var(--rd-mut); font-size: .8rem; font-weight: 600; }
-.rd-gone .rd-title { color: var(--rd-mut); opacity: .6; margin-bottom: 4px; }
-.rd-note { margin-bottom: 8px; color: var(--rd-mut); font-size: .88rem; }
-.rd-gone .rd-media { height: 170px; }
+.rd-gone .rd-title { color: var(--rd-mut); opacity: .6; }
+.rd-off { display: grid; place-items: center; padding: 20px; text-align: center; }
+.rd .rd-note { max-width: 15em; color: var(--rd-mut); font-size: .92rem; font-weight: 600; }
 .rd-gone .rd-acts { opacity: .5; }
 
 /* 4. a leak site, drawn after a real one (fapello-style profile page: light, Tailwind palette, pink-500 accent).
@@ -196,5 +207,6 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
   .fp-grid .rm-th { height: 96px; }
 }
 /* removed: the same site shell, the profile gone */
-.fp .fp-404 { margin: 52px 0 0; color: #d1d5db; font: 900 4.5rem/1 var(--fp-sans); letter-spacing: .04em; text-align: center; }
-.fp .fp-gh { margin: 12px 24px 0; color: #374151; font-size: 1rem; font-weight: 600; text-align: center; }
+.fp-pane { display: grid; align-content: center; height: 248px; margin: 10px 12px 0; padding: 0 16px; border-radius: 8px; background: #e5e7eb; }
+.fp .fp-404 { margin: 0; color: #6b7280; font: 900 4.5rem/1 var(--fp-sans); letter-spacing: .04em; text-align: center; }
+.fp .fp-gh { margin: 10px auto 0; max-width: 16em; color: #374151; font-size: 1rem; font-weight: 600; text-align: center; }

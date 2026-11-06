@@ -12,17 +12,20 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
 - Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card: a ledger, removed rows
   struck through once on load) · `#free` the free offer, said once, beside one Google phone (All / Images / Videos
   tabs; after a scan her real results, `js/inline-scan.js`) · `#why` (letter + three rules + the record) · `#how`
-  (5 steps) · `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop
+  (5 steps) · `#removals` · `#website` · `#showcase` (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop
   close, page behind inert, focus back to the button; then the Before / After Google phones, real ARIA tabs,
-  `js/main.js`; on phones the page's only swipe row, the second phone peeking) · `#pricing` · `#faq` · `#removals` ·
-  `#contact`. `tools/check.py` fails if a section id is missing here.
+  `js/main.js`; on phones the page's only swipe row, the second phone peeking) · `#pricing` · `#faq` · `#contact`.
+  Phone sticky "Free scan" pill (`js/main.js`): shown once the hero form is above the screen, hidden (visibility, not just
+  moved off) while the report card, the plan buttons, #contact's channels or the footer pass its bottom band, or the demo
+  preview sits in the lower half. `tools/check.py` fails if a section id is missing here.
 - Type and colour: Young Serif (display, h1 / h2 / prices, >= 32 px) + Schibsted Grotesk (everything else),
   self-hosted woff2 in `site/fonts/` (OFL, see CREDITS.md), metric-matched fallbacks; paper `#eceef0`, ink `#1c1b22`,
   one accent (mulberry `#8c1d52`, dark `#ec8db9`); tokens at the top of `css/styles.css`.
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
-  photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
-  removed layer's chrome is cloned from the live one, `data-rm-copy`). On screen each edge glides by itself (1-2 s CSS
+  photo grid cropped like a screenshot; removed = same shell + DMCA 404 in one pane), each a live leak vs. its removed state (the
+  removed layer's chrome is cloned from the live one, `data-rm-copy`, in the same boxes, so the seam never splits a word
+  out of line). Under 560 px each panel is drawn at its 372 px layout and scaled to .73 (`--rm-s`), like a screenshot. On screen each edge glides by itself (1-2 s CSS
   transition) to a random 15-85 % and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
   reduced motion; a card's first input (Remove press, stage tap, handle key) stops its sweep for good. Remove / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
@@ -147,7 +150,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
   need `profile`; `--omit-profile` turns only those red.
 - Ask-AI popup: `js/chat.js` + `css/chat.css`, markup at the end of `index.html` (launcher + `<dialog id="askai">`; also
-  opened by any `[data-askai-open]` link; on phones (<720px) the launcher stays hidden while the hero is on screen). Chips and typed questions that fuzzy-match an FAQ question (or "what does it
+  opened by any `[data-askai-open]` link; at every width the launcher stays hidden while the hero is on screen). Chips and typed questions that fuzzy-match an FAQ question (or "what does it
   cost") are answered instantly from the page's own FAQ / pricing text, no network. Everything else streams from
   `POST <API>/api/chat` (`{kb:"landing", messages (last 8), slug?}` → SSE `token`/`done`/`failed`; API origin =
   `<body data-api>`, else the scan server on github.io, else same origin; from file:// or on any error → contacts). Answers are built as DOM nodes;

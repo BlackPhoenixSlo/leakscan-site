@@ -66,9 +66,9 @@ FP_STATE = """() => { const c = document.querySelector('#removals .rm-card[data-
     count: [...c.querySelectorAll('.fp-count span')].map(e => [e.textContent.replace(/\\s+/g, ' ').trim(), cs(e.querySelector('b')).fontWeight]),
     search: [q('.fp-search').textContent.trim(), cs(q('.fp-search')).backgroundColor], bars: c.querySelectorAll('.fp-bar').length,
     bar: cs(q('.fp-bar')).backgroundColor, bg: cs(live).backgroundColor, font: cs(live).fontFamily,
-    tiles: [...c.querySelectorAll('.fp-grid .rm-img')].map(i => [i.complete && i.naturalWidth > 0, Math.round(i.parentElement.getBoundingClientRect().height)]),
+    tiles: [...c.querySelectorAll('.fp-grid .rm-img')].map(i => [i.complete && i.naturalWidth > 0, i.parentElement.offsetHeight]),
     cols: cs(q('.fp-grid')).gridTemplateColumns.split(' ').length, next: q('.rm-live .fp-next').textContent, gone: [q('.fp-404').textContent, q('.fp-gh').textContent],
-    goneShell: !!q('.rm-gone .fp-bar') && !!q('.rm-gone .fp-search'), crop: [live.scrollHeight > live.clientHeight, cs(live).overflowY, Math.round(st.height)],
+    goneShell: !!q('.rm-gone .fp-bar') && !!q('.rm-gone .fp-search'), crop: [live.scrollHeight > live.clientHeight, cs(live).overflowY, live.offsetHeight],
     logo: [q('.fp-logo').scrollWidth, q('.fp-logo').clientWidth],
     row1: (() => { const ts = [...c.querySelectorAll('.fp-grid .rm-th')], y = Math.round(ts[0].getBoundingClientRect().top);
       return ts.filter(t => Math.round(t.getBoundingClientRect().top) === y).map(t => { const r = t.getBoundingClientRect(); return [Math.round(r.top - st.top), Math.round(st.bottom - r.bottom)]; }); })(),
@@ -258,7 +258,7 @@ def removals_flow(browser, vp_name, vp):
         page = open_(ctx)
         order = page.evaluate("() => { const r = document.getElementById('removals'); return [r && r.previousElementSibling && r.previousElementSibling.id, r && r.nextElementSibling && r.nextElementSibling.id, r && r.closest('main') && r.closest('main').id]; }")
         if scheme == "light":
-            check(f"{tag} section sits after #faq, directly before #contact, inside <main>", order == ["faq", "contact", "main"], order)
+            check(f"{tag} section sits after #how, directly before #website, inside <main>", order == ["how", "website", "main"], order)
             t = page.evaluate(RM_TEXT)
             check(f"{tag} defaults: demo creator (Orla Brennick / brennickclay) in every panel",
                   t.get("name") == "Orla Brennick" and t.get("mega-title") == "brennickclay – pack" and t.get("x-l1") == "Orla Brennick full set"

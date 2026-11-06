@@ -430,7 +430,7 @@
   }
   form.addEventListener('submit', submit);
 
-  // Phone CSS (css/chat.css) hides the launcher while the hero is on screen; it appears with the sticky scan bar.
+  // css/chat.css hides the launcher while the hero is on screen (any width); on phones it appears with the sticky scan bar.
   var hero = document.querySelector('.hero');
   if (hero && 'IntersectionObserver' in window) {
     launcher.classList.add('in-hero');
