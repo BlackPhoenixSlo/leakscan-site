@@ -79,7 +79,7 @@ Q: Can I cancel? Does anything auto-renew?
 A: The monthly plan can be cancelled anytime. The one-time clean never auto-renews: after 40 days nothing happens unless you say so. And because the scan and the first removal are free, you only pay once you've seen the work.
 
 Q: Is my information safe?
-A: Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site has no cookies and no tracking.
+A: Your details are used only to answer you and to do the work. A copyright notice has to name the rights holder or their agent, and some recipients forward notices to the uploader or publish a copy (Google, for example, sends copies to the Lumen database). Ask me before we start and I'll walk you through what each one sees. This site sets ad cookies only if you accept them.
 
 Q: Do I need to register or create an account?
 A: No. There's no account, no app and no card. The free scan runs right here from just your handle. After that you message me on Telegram, WhatsApp or email, and everything happens in that chat.
