@@ -43,7 +43,7 @@
   if (S.x) return noPip();
   var save = function () { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } };
   var pip, pic, tab, frame, snd, pp, exp, xb, grip, video = null, wasPlaying = true, offPaused = false, mounted = false, pos = { x: 0, y: 0 };
-  var card = null, hero = null, heroIn = false, mode = '', big = false;
+  var card = null, hero = null, heroIn = false, mode = '', big = false, poster = null;
 
   function slug() { var r = new URLSearchParams(location.search).get('r'); return r && /^[A-Za-z0-9_-]{1,64}$/.test(r) ? r : ''; }
   function src() {
@@ -359,6 +359,23 @@
       '</div></div><div class="pip-bar"><button class="pip-pp" type="button">' + I.pp +
       '</button><button class="pip-snd" type="button"></button><i></i><button class="pip-exp" type="button"></button><button class="pip-x" type="button" aria-label="Close video">' + I.x + '</button></div>';
     pic = pip.querySelector('.pip-pic');
+    // landing: a still poster (his portrait, "Jaka, 57 s", play mark) over the muted autoplay until the first touch / key on
+    // the player: then it goes and the take restarts from 0 (the personalised intro included). Not a control: no hit target.
+    if (auto === 'dock') {
+      poster = document.createElement('div');
+      poster.className = 'pip-poster';
+      poster.setAttribute('aria-hidden', 'true');
+      poster.innerHTML = '<img src="' + new URL('../assets/jaka.webp', me.src).href + '" alt="" width="192" height="192" decoding="async"><p><span class="pip-poster-go">' +
+        SVG('<path d="M8 5v14l11-7z" fill="currentColor"/>') + '</span><strong>Jaka, 57 s</strong><span>Tap to watch</span></p>';
+      pic.insertBefore(poster, pip.querySelector('.pip-rs'));
+      var unposter = function () {
+        if (!poster) return;
+        poster.remove(); poster = null;
+        if (video) try { video.currentTime = 0; } catch (e) { /* not seekable yet */ }
+      };
+      pip.addEventListener('pointerdown', unposter, true);
+      pip.addEventListener('keydown', unposter, true);
+    }
     frame = document.createElement('iframe');
     frame.title = "Jack's video";
     frame.setAttribute('tabindex', '-1');

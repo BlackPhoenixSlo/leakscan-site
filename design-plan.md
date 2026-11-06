@@ -110,3 +110,16 @@ Revised: first draft had a small sentence-case kicker over each h2; cut (it was 
   for the glide to end: 0 seam cuts in 20 s samples of every panel (measured).
 - Lead wraps to 3 lines at 1440 (46ch), so the docket starts at y~444, not 412.
 - Ask-AI launcher text unchanged ("Ask AI before you DM me"): askai.py asserts it verbatim.
+
+## Round 5 notes
+- Demo frame: iframe 560 px, no fade; the demo hero (name, tagline, both buttons) fits at 390 and 1440.
+- Phone mocks (#free, before/after): flex column-wrap panels, wrappers display:contents, 4 px flex gap (no trailing
+  margin): an item that doesn't fit whole wraps off-screen. Image tiles fixed height (84 / 96 px). Screens 442 / 358 px.
+- Dark mocks: #26222B surface, #9DB7FF links, #E8E6EC text; light values unchanged.
+- Thumbs: blurred photo crops from assets/phone/ (no gradient art).
+- Docket: "570 of 633" proof line (already in #why) in the left column's foot at >= 960, baseline with the video
+  caption; hidden once a scan is live.
+- Pip poster (landing only): portrait + "Jaka, 57 s" + play mark over the muted autoplay; first pointerdown / key on
+  the player removes it and restarts the take at 0 (intro kept). Start offset (a) rejected: the intro covers 0.3-9.8 s,
+  every frame in it has overlays. Not a control: pip.py overPic stays 0.
+- Secondary h2s (removals, FAQ, contact, before/after h3) clamp 28-40 px; why/how/pricing keep 52.

@@ -94,6 +94,8 @@ h1, h2 { font-family: var(--serif); font-weight: 400; font-synthesis: none; marg
 /* 390: h1 44/46, h2 32/36; 1440: h1 88/88, h2 52/56 (linear between) */
 h1 { font-size: clamp(2.75rem, 4.19vw + 1.729rem, 5.5rem); line-height: 1.045; letter-spacing: -.01em; }
 h2 { font-size: clamp(2rem, 1.905vw + 1.536rem, 3.25rem); line-height: 1.11; letter-spacing: -.01em; max-width: 18ch; }
+/* secondary sections (removals, before / after, FAQ, contact): 28 px at 390, 40 at 1440; the hero-adjacent heads keep the h2 scale */
+:is(#removals-title, #faq-title, #contact-title), .ba-copy .ba-h { font-size: clamp(1.75rem, 1.143vw + 1.471rem, 2.5rem); line-height: 1.1; }
 h3 { font: 600 1.1875rem/1.37 var(--sans); letter-spacing: -.005em; margin: 0 0 .3em; text-wrap: balance; }
 @media (min-width: 1100px) { h1 { line-height: 1; letter-spacing: -.015em; } h2 { line-height: 1.077; } h3 { font-size: 1.3125rem; line-height: 1.333; } }
 p { margin: 0 0 1em; text-wrap: pretty; }
@@ -276,6 +278,16 @@ html:not(.js) .pip-cap, .pip-x .pip-cap { margin: 0; }
   .st { font-size: 1rem; }
 }
 @media (min-width: 720px) and (max-width: 959px) { .docket-body { grid-template-columns: minmax(0, 1fr) 300px; } }
+/* the proof line fills the left column's foot so it ends with the video column (hidden under 960 px and once a scan is live) */
+.docket-proof { display: none; }
+@media (min-width: 960px) {
+  .docket-body { grid-template-rows: auto 1fr; }
+  .docket-body > .report-card { grid-area: 1 / 1; }
+  .docket-side { grid-area: 1 / 2 / span 2; }
+  .docket-proof { display: block; grid-area: 2 / 1; align-self: end; margin: 0; padding: 0 24px 20px; color: var(--deep-muted); font-size: .906rem; line-height: 21px; }
+  .docket-proof strong { color: var(--on-deep); font-weight: 600; }
+  .report-card.is-live ~ .docket-proof { display: none; }
+}
 @media (max-width: 719px) {
   .docket .scan-form { grid-template-columns: minmax(0, 1fr); }
   .docket .scan-form .btn-lg { width: 100%; }
@@ -305,16 +317,20 @@ html:not(.js) .pip-cap, .pip-x .pip-cap { margin: 0; }
 .chip-live { background: var(--bad-soft); color: var(--bad); }
 .chip-soft { background: var(--surface-2); color: var(--muted); }
 
-/* Blurred abstract thumbnails (no imagery, pure gradients) */
-.thumb { display: block; position: relative; overflow: hidden; background: #c9d3e0; }
-.thumb::after { content: ""; position: absolute; inset: -30%; filter: blur(10px); }
+/* Leak thumbnails: the demo creator's photos (assets/phone, the same set the "after" phone and the demo site use),
+   blurred like every leak-side photo; [data-reveal] scopes lift the blur */
+.thumb { display: block; position: relative; overflow: hidden; background: #b49a8e; }
+.thumb::after { content: ""; position: absolute; inset: -12%; background: center / cover no-repeat; filter: blur(calc(var(--leak-blur) * 2 / 3)) saturate(.85); }
 .thumb .p-img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; filter: blur(calc(var(--leak-blur) * 2 / 3)); transform: scale(1.2); }
-.t1::after { background: radial-gradient(circle at 30% 35%, #c9d6e8 0 22%, transparent 42%), radial-gradient(circle at 70% 70%, #4f6d9a 0 28%, transparent 52%), linear-gradient(135deg, #9fb8d6, #3e557a); }
-.t2::after { background: radial-gradient(circle at 60% 30%, #e3efe7 0 20%, transparent 42%), radial-gradient(circle at 30% 75%, #4e8a72 0 30%, transparent 55%), linear-gradient(160deg, #b7d3c4, #2f5f4d); }
-.t3::after { background: radial-gradient(circle at 45% 45%, #efe7f6 0 22%, transparent 45%), radial-gradient(circle at 80% 20%, #7a63a8 0 22%, transparent 44%), linear-gradient(120deg, #d8c8e8, #574382); }
-.t4::after { background: radial-gradient(circle at 35% 60%, #f7ecd2 0 24%, transparent 48%), radial-gradient(circle at 75% 35%, #b9873a 0 22%, transparent 44%), linear-gradient(200deg, #f0d9a6, #8a6326); }
-.t5::after { background: radial-gradient(circle at 50% 30%, #dcecef 0 22%, transparent 44%), radial-gradient(circle at 25% 80%, #3f7f8c 0 28%, transparent 50%), linear-gradient(90deg, #a9d0d8, #2c5c66); }
-.t6::after { background: radial-gradient(circle at 65% 55%, #e9eaf0 0 24%, transparent 46%), radial-gradient(circle at 20% 25%, #5d6275 0 22%, transparent 42%), linear-gradient(150deg, #c9cbd6, #41455a); }
+.t1::after { background-image: url(../assets/phone/photo-1.jpg); }
+.t2::after { background-image: url(../assets/phone/photo-3.jpg); }
+.t3::after { background-image: url(../assets/phone/photo-5.jpg); }
+.t4::after { background-image: url(../assets/phone/photo-2.jpg); }
+.t5::after { background-image: url(../assets/phone/photo-4.jpg); }
+.t6::after { background-image: url(../assets/phone/photo-6.jpg); }
+.m-vthumb.t1::after { background-image: url(../assets/phone/clip-1.jpg); }
+.m-vthumb.t2::after { background-image: url(../assets/phone/clip-2.jpg); }
+.m-vthumb.t3::after { background-image: url(../assets/phone/clip-3.jpg); }
 /* Browser frame: a screen crop (no traffic lights), 14 px corners, a 1 px rule */
 .browser { margin: 0; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
 .browser-bar { display: flex; align-items: center; gap: 14px; padding: 8px 12px; background: var(--fold); border-bottom: 1px solid var(--line); }
@@ -376,7 +392,6 @@ html:not(.js) .pip-cap, .pip-x .pip-cap { margin: 0; }
 .phone .gi-box { background: linear-gradient(135deg, #e8eaed, #d2d6dc); border-radius: 8px; }
 .m-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; padding-top: 6px; }
 .m-grid .gi-box { aspect-ratio: 1; }
-.m-grid .gi-box.thumb::after { filter: blur(6px); }
 .m-grid .gi-box img:not(.gi-img) { display: block; width: 100%; height: 100%; object-fit: cover; }
 .m-grid .gi-cap { margin-top: 4px; font-size: .6rem; gap: 4px; }
 .m-grid .gi-fav { width: 12px; height: 12px; font-size: .45rem; }
@@ -419,9 +434,9 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* ---------- Sections: one paper, separated by space; the fold band only under #how and the showcase ---------- */
 .section { padding: 36px 0; }
 @media (min-width: 720px) { .section { padding: 60px 0; } }
-.how, .showcase { background: var(--fold); }
-.website { padding-bottom: 24px; }
-.showcase { padding-top: 36px; }
+.how, .website, .showcase { background: var(--fold); }   /* #website + #showcase: one band, heading to the last phone */
+.website { padding-bottom: 0; }
+.showcase { padding-top: 24px; }
 .section-head { margin-bottom: 24px; }
 .section-head h2 { margin-bottom: 12px; }
 .section-head p { color: var(--muted); max-width: 40em; margin: 0; }
@@ -436,9 +451,35 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 #main .phone { width: 300px; max-width: 100%; aspect-ratio: 9 / 16; padding: 0; border-radius: 14px; border: 1px solid var(--line); background: var(--mock); overflow: hidden; }
 #main .phone-screen { position: relative; height: 100%; overflow: hidden; background: var(--mock); color: #202124; padding: 14px; font-family: Arial, Helvetica, sans-serif; }
 #main .phone-screen::before { content: none; }
+/* each screen ends on a whole row: image tiles have a fixed height (rows land on the same y at any width); list panels
+   wrap a result that doesn't fit whole into a second column, clipped off to the right */
+#main .phone-screen { display: flex; flex-direction: column; }
+#main .phone-screen > .m-search { flex: none; }
+#main .phone-screen > .m-panel:not([hidden]) { flex: 1 1 0; min-height: 0; display: flex; flex-flow: column wrap; align-content: flex-start; gap: 4px 60px; overflow: hidden; }
+#main .m-panel :is(.m-result, .m-video) { margin-block: 0; }   /* the 4 px is the gap: no trailing margin to push a whole row out */
+#main .m-panel > :is(.m-illus:not(.m-grid), [data-live]) { display: contents; }
+#main .m-panel > *, #main .m-panel > :is(.m-illus, [data-live]) > * { flex: none; width: 100%; }
+#main .m-panel .m-grid { flex: 1 1 0; min-height: 0; overflow: hidden; align-content: start; }
+#main .phone .m-grid .gi-box { aspect-ratio: auto; height: 84px; }
+@media (max-width: 559px) { #main .phone .m-grid .gi-box { height: 96px; } }
 @media (prefers-color-scheme: dark) {
-  #main .phone, .browser-demo { padding: 8px; background: #26222c; border-color: #26222c; }
-  #main .phone-screen { border-radius: 8px; filter: brightness(.9); }
+  .browser-demo { padding: 8px; background: #26222c; border-color: #26222c; }
+  /* the Google screens get Google's own dark surfaces (no glare); the light values above stay as they are */
+  #main .phone { --mock: #26222b; background: var(--mock); }
+  #main .phone-screen { color: #e8e6ec; }
+  #main .phone .m-search { border-color: #4a4452; box-shadow: none; color: #e8e6ec; background: #2f2a35; }
+  #main .phone .m-search .icon, #main .phone .m-tabs [aria-selected="true"] { color: #9db7ff; border-bottom-color: #9db7ff; }
+  #main .phone .m-tabs { color: #b5aebf; border-bottom-color: #3a3442; }
+  #main .phone :is(.m-site, .m-head, .m-empty, .gi-cap, .m-go) { color: #b5aebf; }
+  #main .phone :is(.m-title, .m-links i) { color: #9db7ff; }
+  #main .phone .m-links i { border-color: #4a4452; }
+  #main .phone .m-result { border-bottom-color: #3a3442; }
+  #main .phone .m-lines i, #main .phone .gi-box { background: #3a3442; }
+  #main .phone .m-result.gone .m-title, #main .phone .strike { color: #8f8798; }
+  #main .phone :is(.fav-l, .gi-fav), #main .ba [data-p^="leak-"] .fav { background: #4a4452 !important; }
+  #main .phone .reveal-btn { border-color: #4a4452; color: #e8e6ec; }
+  #main .phone .reveal-btn[aria-pressed="true"], #main .phone .m-link:focus-visible .m-go { border-color: #9db7ff; color: #9db7ff; }
+  #main .phone .m-vthumb { background: #3a3442; }
   .browser-demo iframe { border-radius: 0 0 8px 8px; filter: brightness(.9); }
   .browser-demo .browser-bar { border-radius: 8px 8px 0 0; }
 }
@@ -458,14 +499,13 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .free-copy > p:not(.free-actions) { color: var(--ink); max-width: 36em; }
 .free-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 20px 0 0; }
 .free-phone { margin: 0; display: grid; justify-items: center; min-width: 0; }
-#main .phone-free { width: 300px; aspect-ratio: auto; height: 420px; }
+#main .phone-free { width: 300px; aspect-ratio: auto; height: 442px; }   /* 3 whole image rows */
 @media (max-width: 559px) {
   .free-copy h2 { margin-bottom: .4em; }
   .free-actions { margin-top: 16px; }
   .free-actions .btn { width: 100%; }
-  .free-actions .text-link { display: none; }
   .free-phone { justify-items: stretch; }
-  #main .phone-free { width: 100%; height: 264px; }
+  #main .phone-free { width: 100%; height: 358px; }   /* 2 whole image rows */
 }
 
 /* #why: a letter (portrait, serif heading, text), three rules beside it, the record as one line */
@@ -557,19 +597,14 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 @media (max-width: 559px) { .showcase-head { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
 .browser { margin-top: 20px; }
 .browser-demo { position: relative; }
-.browser-demo iframe { width: 100%; height: 280px; border: 0; background: var(--surface-2); }
-@media (min-width: 720px) { .browser-demo iframe { height: 360px; } }
-.browser-demo::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 56px; pointer-events: none;
-  background: linear-gradient(rgb(255 255 255 / 0), var(--mock)); }   /* the crop ends in a fade, not mid-line */
-@media (prefers-color-scheme: dark) { .browser-demo::after { left: 8px; right: 8px; bottom: 8px; background: linear-gradient(rgb(38 34 44 / 0), #26222c); } }
-.browser-demo.is-pop::after { content: none; }
+/* 560 px: the demo's whole hero (name, tagline, both buttons) sits inside the frame at 390 and 1440; no fade */
+.browser-demo iframe { display: block; width: 100%; height: 560px; border: 0; background: var(--surface-2); }
 .ba-wrap { display: grid; gap: 16px; margin-top: 32px; }
 .ba-wrap .ba-under { margin-top: 0; }
-.ba-copy .ba-h { font: 400 2rem/1.11 var(--serif); font-synthesis: none; letter-spacing: -.01em; margin-bottom: 10px; max-width: 18ch; }
+.ba-copy .ba-h { font-family: var(--serif); font-weight: 400; font-synthesis: none; letter-spacing: -.01em; margin-bottom: 10px; max-width: 18ch; }
 .ba-copy p { color: var(--muted); margin: 0; max-width: 34em; }
 @media (min-width: 1000px) {
   .ba-wrap { grid-template-columns: 320px minmax(0, 1fr); gap: 56px; align-items: start; margin-top: 56px; }
-  .ba-copy .ba-h { font-size: 2.5rem; }
 }
 .ba { display: grid; gap: 24px; justify-items: center; align-items: center; }
 @media (min-width: 820px) { .ba { grid-template-columns: 1fr auto 1fr; gap: 20px; } }
@@ -578,7 +613,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .ba-w { color: var(--ink); font-weight: 600; font-size: 1rem; }
 .ba-arrow { display: grid; place-items: center; width: 40px; height: 40px; color: var(--accent); }
 .ba-arrow .icon { width: 24px; height: 24px; }
-#main .ba .phone { aspect-ratio: 9 / 15; }
+#main .ba .phone { aspect-ratio: auto; height: 442px; }   /* = the #free screen: 3 whole image rows */
 /* phone (< 820 px): one screen at a time behind the Before | After switch (js/main.js); no JS = both, stacked */
 .ba-switch, .ba-label { display: none; }
 @media (max-width: 819px) {
@@ -590,7 +625,7 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   .js .ba-item:not(.is-on), .js .ba-item figcaption { display: none; }
   .ba-arrow { display: none; }
   .ba { gap: 16px; justify-items: stretch; }
-  #main .ba .phone { width: 100%; aspect-ratio: auto; height: 320px; }
+  #main .ba .phone { width: 100%; aspect-ratio: auto; height: 358px; }
 }
 
 /* #faq: the heading and the "ask" line stay put on desktop; the questions are a rule list */
@@ -647,7 +682,8 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 /* Footer: on paper, a rule inside the container */
 .site-footer { padding: 24px 0 28px; font-size: .95rem; }
 @media (min-width: 820px) { .site-footer { padding: 32px 0 36px; } }
-.footer-grid { display: grid; gap: 12px; padding-top: 22px; border-top: 1px solid var(--line); }
+.footer-grid { position: relative; display: grid; gap: 12px; padding-top: 22px; }
+.footer-grid::before { content: ""; position: absolute; top: 0; left: var(--gut); right: var(--gut); border-top: 1px solid var(--line); }   /* the rule spans the content, not the gutters */
 @media (min-width: 820px) { .footer-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 48px; } }
 .footer-grid p { color: var(--muted); margin: 12px 0 0; max-width: 30em; }
 .site-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; align-content: start; }

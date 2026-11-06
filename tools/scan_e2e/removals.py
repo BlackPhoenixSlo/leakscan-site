@@ -285,7 +285,7 @@ def removals_flow(browser, vp_name, vp):
             check(f"{tag} removed layers carry the live post's chrome (copied once from the live layer)",
                   gone == [["mega", 0, 0], ["x", 3, 0], ["reddit", 3, 0], ["site", 2, 0]], gone)
             outs = page.eval_on_selector_all("#removals .rm-out", "es => es.map(e => e.textContent)")
-            check(f"{tag} one outcome line per panel", outs == ["Folders behind aggregator packs disabled", "Media disabled after copyright report",
+            check(f"{tag} one outcome line per panel", outs == ["Mega folders behind the pack: taken down", "Media disabled after copyright report",
                                                              "Removed on copyright notice", "Profile 404 after a DMCA notice"], outs)
             DEMO = page.evaluate(RM_PANEL)
             check(f"{tag} no links in the section (mock-ups only)", page.locator("#removals a").count() == 0)
