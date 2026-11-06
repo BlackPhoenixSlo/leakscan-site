@@ -302,7 +302,7 @@ strong { font-weight: 600; }
 .icon-badge .icon { width: 22px; height: 22px; }
 
 /* Free: one band. Left the two free offers, right a phone with Google for her handle (js/free-phone.js fills it). */
-.free-sec { padding: clamp(40px, 6vw, 88px) 0; }
+.free-sec { padding: clamp(32px, 4vw, 56px) 0; }
 .free-band { display: grid; gap: clamp(24px, 4vw, 64px); align-items: center; }
 @media (min-width: 900px) { .free-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .free-copy h2 { font-size: clamp(1.9rem, 3.6vw, 2.8rem); margin-bottom: .55em; }
@@ -760,23 +760,26 @@ a.gi-card:focus-visible .gi-go { opacity: 1; transform: none; }
 
 /* Desktop: the settled report (card top under the sticky nav) fits a 1440×800 laptop screen, Send buttons included */
 @media (min-width: 960px) {
-  .report-card.is-live { padding: 18px; }
+  .report-card.is-live { padding: 16px 18px; }
   .live .report-head { position: relative; padding-bottom: 8px; }
+  .live .live-title { font-size: 1.4rem; line-height: 1.1; }
+  .live-strip-h { line-height: 1.2; }
   .live .report-head > div { min-width: 0; flex: 1; }
   .live .report-kicker { padding-right: 130px; }
   .live .live-count { position: absolute; top: -3px; right: 0; }
-  .live-socials, .live-aliases { line-height: 1.4; }
+  .live-socials, .live-aliases { line-height: 1.3; }
   .live-tabs { margin-top: 6px; }
-  .live-tab { min-height: 40px; }
+  .live-tab { min-height: 38px; }
   .live-link { min-height: 44px; padding-block: 2px; }
   .live-more { margin: 2px 0 4px; }
-  .live-strip-box { margin: 2px 0 0; padding-top: 8px; }
-  .live-strip-head { margin-bottom: 6px; }
+  .live-strip-box { margin: 2px 0 0; padding-top: 6px; }
+  .live-strip-head { margin-bottom: 4px; }
   .live-strip { height: 76px; }
   .live-strip .gi-card { height: 72px; }
   .live-panel .live-grid .gi-box { aspect-ratio: 4 / 3; }
   .live-imgs-head { margin: 6px 0 8px; }
   .live-actions { padding: 8px 12px; margin-top: 8px; }
+  .live-actions .btn-sm { min-height: 38px; padding-block: .35em; }
   .live-actions .live-send-h { flex-basis: auto; margin: 0 0 0 6px; }
   .live-actions .live-media { margin: 0; line-height: 1.4; }
 }
