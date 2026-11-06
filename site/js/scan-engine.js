@@ -93,6 +93,10 @@
       by[d].n += n;
       if (u && n > by[d].best) { by[d].best = n; by[d].url = u; }
     });
+    if (!out.length && raw && Array.isArray(raw.top_domains)) raw.top_domains.slice(0, 20).forEach(function (t) {   // a summary row kept only these
+      var d = t && clean.domain(t.domain);
+      if (d) out.push({ domain: d, n: typeof t.n === 'number' && t.n > 0 ? Math.min(t.n, 1e6) : 1, url: null, best: 0 });
+    });
     return out.sort(function (a, b) { return b.n - a.n; }).map(function (h) { return { domain: h.domain, n: h.n, url: h.url }; });
   }
 
@@ -414,14 +418,29 @@
     var u = UNITS.filter(function (x) { return ms >= x[1]; })[0], n = Math.floor(ms / u[1]);
     return n + ' ' + plural(n, u[0], u[0] + 's') + ' ago';
   }
-  // agedLine(asOf, again): "Scanned 2 hours ago · Scan again" (a <p>) once asOf is over 5 minutes old, else null;
-  // again(): the visitor asked for a fresh scan of the same inputs.
-  function agedLine(asOf, again) {
+  // What a stored report has lost to retention (the API's `retention`, README "Scan retention"): 'images' | 'details' | null.
+  // A scan that found nothing lost nothing. A view must say so, never "0 images" / "no leaks found".
+  function expiredOf(raw) {
+    var what = { trimmed: 'images', summary: 'details' }[raw && raw.retention];
+    return what && (raw.status !== 'empty' || raw.google_total > 0) ? what : null;
+  }
+  // The note that stands in for a report's lists once they expired: what the scan found, as far as it is kept.
+  function expiredNote(cls, raw) {
+    var hits = +raw.hit_count || 0, sites = +raw.domain_count || 0;
+    var hosts = rankHosts(raw).slice(0, 5).map(function (h) { return h.domain; }).join(', ');
+    return make('p', cls, [make('strong', '', ['This report’s details have expired.']),
+      ' ' + (hits ? 'The scan found ' + hits + ' ' + plural(hits, 'link', 'links') + ' on ' + sites + ' ' + plural(sites, 'site', 'sites') + (hosts ? ', most on ' + hosts : '') + '. ' : '') +
+      'Scan again for today’s list.']);
+  }
+  // agedLine(asOf, expired, again): "Scanned 2 hours ago · Scan again" (a <p>; expired, E.expiredOf: "Scanned 5 days ago,
+  // images expired · Scan again") once asOf is over 5 minutes old, else null; again(): the visitor asked for a fresh scan of
+  // the same inputs.
+  function agedLine(asOf, expired, again) {
     var ms = typeof asOf === 'string' && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(asOf) ? Date.now() - Date.parse(asOf) : NaN;
     if (!(ms > AGED_MS)) return null;
     var b = make('button', 'aged-again', ['Scan again'], { type: 'button' });
     b.addEventListener('click', again);
-    return make('p', 'aged', ['Scanned ' + ago(ms) + ' · ', b]);
+    return make('p', 'aged', ['Scanned ' + ago(ms) + (expired ? ', ' + expired + ' expired' : '') + ' · ', b]);
   }
   // A result's socials as runScan takes them: only what the validators pass.
   function socialsOf(raw) {
@@ -636,6 +655,9 @@
     if (!m.handle || !PLATFORMS[m.platform]) return null;
     m.socials = socialsOf(raw);
     m.asOf = raw.as_of;
+    m.raw = raw;
+    m.expired = expiredOf(raw);
+    m.hitCount = +raw.hit_count || 0;
     var al = raw.aliases && typeof raw.aliases === 'object' && Array.isArray(raw.aliases.discovered) ? raw.aliases.discovered : [];
     m.discovered = al.slice(0, 4).filter(function (a) { return clean.handle(a) === a && a !== m.handle; });
     var seen = {}, thumbOf = {}, sr = [], res = [];
@@ -839,7 +861,7 @@
     who: who, setMessages: setMessages, reportLinks: reportLinks, sendReport: sendReport, remember: remember, forget: forget, runScan: runScan,
     fetchResult: fetchResult, progressInfo: progressInfo, favColor: favColor, fav: fav, imageItems: imageItems, isVideo: isVideo,
     watchThumb: watchThumb, tablist: tablist, pager: pager, revealButton: revealButton, make: make, icon: icon,
-    agedLine: agedLine, socialsOf: socialsOf, siteGroups: siteGroups, reportModel: reportModel, gallery: gallery, linked: linked, plural: plural,
+    agedLine: agedLine, expiredOf: expiredOf, expiredNote: expiredNote, socialsOf: socialsOf, siteGroups: siteGroups, reportModel: reportModel, gallery: gallery, linked: linked, plural: plural,
     photoStats: photoStats, isPhoto: isPhoto, photo: photo, put: put, paced: paced, sheet: sheet, readSheet: readSheet, askStatus: askStatus, XO: XO
   };
 })();

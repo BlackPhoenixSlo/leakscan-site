@@ -46,7 +46,7 @@
       return row('m-result bad', r.url, r.domain, titleOf(r.title, r.url), f);
     }), function (n) { return n < m.rows.length; });
     put('all', [rows, more.el]);
-    var empty = function (what) { return [make('p', 'm-empty', ['No ' + what + ' results for @' + m.handle + ' right now.'])]; };
+    var empty = function (what) { return [make('p', 'm-empty', [m.expired ? 'This scan’s ' + what + ' results have expired.' : 'No ' + what + ' results for @' + m.handle + ' right now.'])]; };
     pics = E.gallery(m.images, m.slug);
     if (pics.count().alive) {
       var n = make('span', 'm-n'), box = make('div', 'm-grid'), tile = pics.tile(true);

@@ -1168,6 +1168,16 @@ def prune(days=30):
 # so the web-text query does not run into an unsolved captcha (prod: solved=False -> raw=0 -> no refine); a web-text
 # query that still came back raw=0 is retried ONCE after the Images step. Every other line that differs from upstream
 # ends in "# one-project". Re-sync: README.
+def drop_media(slug):
+    """Retention: a scan's media dir (the /api/media answer falls back to "none") -> dirs removed. media-cache is not
+    per-scan: it keeps CACHE_TTL (prune)."""
+    p = os.path.join(data_dir(), "media", slug)
+    if not SLUG_RE.match(slug or "") or not os.path.isdir(p):
+        return 0
+    shutil.rmtree(p)
+    return 1
+
+
 GOOGLE_HOME = "https://www.google.com/?safe=active&hl=en&gl=us"
 
 

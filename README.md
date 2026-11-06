@@ -348,6 +348,24 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   answered live, profile from the LLM. Log: `scan reuse hit level=low platform= aliases= hits= age=Ns media=`, and no
   `scan start` / `scan done` line for a hit. Tests: `app/tests/test_scan_reuse.py`.
 
+## Scan retention
+
+- By row age (`created_at`), `db.retain_scans`; a row is never deleted. `RETAIN_BIG_DAYS` (3), `RETAIN_SMALL_DAYS` (30). `public_app.run_retention`: at startup
+  and every 24 h in a daemon thread, never raises, one log line (`retention trimmed= summary= corrupt= errors= files= db_before= db_after= secs=`, no handles),
+  VACUUM only after a run that changed rows. `running` rows are skipped. The `retention` column (`full` | `trimmed` | `summary`, indexed) marks a row
+  done, so a daily run reads only rows newly over a cutoff.
+- Tiers, one table in `app/db.py`, default-keep (a key in no list stays forever): past big: `images results gallery img_meta excluded` go, plus the
+  slug's media dir and avatar, `profile.avatar=false`; past small: `top_domains` (top 20 from the hits) stored, `result_json = []`, `mega cse_sites mega_key
+  scan_key reused_from` go, `client_ip_hash verify_code verify_platform` NULL. `db.retain_row` is the pure part; the e2e stub builds its `demoTrimmed1` /
+  `demoSummary1` with it.
+- `off_row` recounts from `mega` + `results`, which go: leaving `full`, what it serves is baked into the row (`hits`, `hit_count`, `domain_count`, `status`,
+  `google_total`), so a served count never moves. Only rows stored before the aggregator rule differ from their stored values.
+- Files: media dirs and avatars by mtime follow at big + 1 day (orphans, a crash mid-run); `media-cache` keeps its own 7 d TTL.
+- Serving: `/api/scan-result` stays 200 with `retention`, `top_domains`; `/api/media` answers `none`, `/api/avatar` 404. The site says `Scanned 5 days ago,
+  images expired · Scan again` / `..., details expired · Scan again`, never "no images" (`expiredOf`, `expiredNote` in `site/js/scan-engine.js`).
+- A rollback to a build before this one restores upstream's `prune_scans(30)`: it deletes rows past 30 days at startup. Corrupt `extra_json` keeps its bytes.
+- Tests: `app/tests/test_retention.py`; under load: `python3 tools/retention_proof.py OUT [--rows 20000]` (mass seed, real endpoints over wire stubs).
+
 ## Replace before launch
 
 - **Jaka's photo**: `site/assets/jaka.webp` (192x192, a frame of his own take) is used in the hero card, #why and

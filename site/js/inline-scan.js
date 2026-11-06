@@ -153,20 +153,21 @@
     q('.live-aliases').textContent = m.discovered.length ? 'Also found as ' + m.discovered.map(function (a) { return '@' + a; }).join(', ') : '';
     q('.live-aliases').hidden = !m.discovered.length;
     q('.live-bar').hidden = true;
-    var aged = E.agedLine(m.asOf, function () { if (!busy) scan(m.handle, m.platform, null, m.socials); });
+    var aged = E.agedLine(m.asOf, m.expired, function () { if (!busy) scan(m.handle, m.platform, null, m.socials); });
     q('.live-aged').textContent = '';
     if (aged) q('.live-aged').appendChild(aged);
     var count = q('.live-count');
-    count.textContent = n + ' ' + E.plural(n, 'link found', 'links found');
-    count.className = 'chip live-count ' + (n ? 'chip-live' : 'chip-dead');
-    count.hidden = false;
+    var found = n || (m.expired && m.hitCount) || 0;   // its list expired, the count stands
+    count.textContent = found + ' ' + E.plural(found, 'link found', 'links found');
+    count.className = 'chip live-count ' + (found ? 'chip-live' : 'chip-dead');
+    count.hidden = !found && !!m.expired;
     var top = q('.live-open-top');
     top.href = E.reportUrl(m.slug);
     top.hidden = false;
     body.textContent = '';
     if (!n) {
       q('.live-status').textContent = '';
-      body.appendChild(make('p', 'live-empty', [make('strong', '', ['No leaks found for @' + m.handle + ' right now.']),
+      body.appendChild(m.expired ? E.expiredNote('live-empty', m.raw) : make('p', 'live-empty', [make('strong', '', ['No leaks found for @' + m.handle + ' right now.']),
         'Google shows no leak links for this handle at the moment. Send me the report and I’ll check by hand.']));
     } else {
       q('.live-status').textContent = ''; // the tab counts say it now

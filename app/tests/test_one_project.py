@@ -15,11 +15,11 @@ sys.path.insert(0, APP)
 SITES = {
     "public_app.py": {"hints": 4, "landing site": 2, "HEAD": 2, "aggregator rule": 3, "mega[]": 1, "aliases": 2,
                       "scan_begin": 2, "scan_end": 5, "estimate": 1, "domain_count": 1,
-                      "api_thumb Vary": 2, "thumb sheet": 2, "scan reuse": 12},
+                      "api_thumb Vary": 2, "thumb sheet": 2, "scan reuse": 12, "retention": 3},
     "cse_scanner.py": {"deadline": 6, "errors": 7},
     "profile_extract.py": {"hints": 8},
     "media_gather.py": {"NONE_TTL": 3, "warmup": 1, "web retry": 5},
-    "db.py": {"domain_count": 4, "get_scan": 1},
+    "db.py": {"domain_count": 4, "get_scan": 1, "retention": 4},
     "chat_proxy.py": {},
 }
 BLOCK = {"public_app.py": 1, "cse_scanner.py": 0, "profile_extract.py": 1, "media_gather.py": 1, "db.py": 1,
