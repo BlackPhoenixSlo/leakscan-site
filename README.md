@@ -71,8 +71,10 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   the sticky header / report nav); a fling / drag past the left or right edge tucks it (paused) with a `>` / `<` tab
   (tap / drag inward = back; Esc tucks, Enter on the tab returns); corner grip / pinch resizes (min 160 px, max 60% of
   the width, 90% on phones); expand = `video/?r=&t=`; x closes for the session; spot / size / tucked / closed in
-  sessionStorage `leakscan.pip`. E2E: `scan_e2e.py OUT --only pip` (phone, desktop, WebKit iPhone 13; `--break-tuck`,
-  `--break-dock`).
+  sessionStorage `leakscan.pip`. A phone's first paint already has Jack's still on the player's spot (`.pip-still`, an
+  inline script + data URI after `<body>` in `index.html` and `scan/index.html`, keep the two the same; `pip.js` replaces
+  it when it mounts; not on a computer, where the dock spot needs the card). E2E: `scan_e2e.py OUT --only pip` (phone,
+  desktop, WebKit iPhone 13; `--break-tuck`, `--break-dock`, `--break-still`).
 - Free scan: the hero form (`#scan`) scans in place with JS (see "Inline scan" below); without JS it GETs
   `h=<onlyfans>&ig=<instagram or x>` to `scan/` (`site/scan/index.html` +
   `css/scan.css` + `js/scan.js`, noindex, not in the sitemap). The page POSTs to Jaka's scan API

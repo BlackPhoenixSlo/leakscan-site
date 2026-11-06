@@ -4,7 +4,7 @@
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
-        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload]
+        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still]
 
 Starts tools/scan_stub.py on a free port (--omit-results / --omit-profile are passed through: break-it runs), then
 for phone (390x844) and desktop (1440x900) runs the scenarios below. Expected values come from what the stub serves
@@ -137,6 +137,7 @@ drag-down on the expanded player: only `pull:` checks may go red; --break-pipvis
 card whatever the screen: off-screen on a phone): only `vis:` / `follow:` / phone dock-spot checks may go red; --break-pipfollow
 serves it with #79's floating spot (re-computed off the form at the current scroll, every scroll): only `follow:` checks may go red.
 --break-pipload serves it with the iframe started at once (before the load event): only the `vis:` load-event checks may go red.
+--break-still serves pip.css with the first-paint still hidden: only `still:` checks may go red.
 Declared bypass: the tabs and huge flows start with the player put away, as after its X (common.PIP_AWAY): floating it
 stays top-right while scrolling (by design) and covers what sits there, e.g. the demo's full-screen button.
 
