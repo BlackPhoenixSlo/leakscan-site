@@ -28,12 +28,11 @@
 // events, touch too): it stays where it is dropped (kept on-screen, under the header, above the phone toolbar); fling /
 // drag past the left, right or bottom edge → tucked off-screen, a tab with a chevron beside where it went (tap / drag inward
 // = back); Esc (focus inside) tucks. Resize: the top-left corner grip (drag, arrow keys) or a pinch, 16:9, 168 px .. 60%
-// (phone 90%) of the screen width. A drag / resize / fling ends docking for the session; size and spot are kept. Paused
-// while off-screen / hidden. State (spot, size, tucked side, closed by X, moved) in sessionStorage 'leakscan.pip' (#79's
-// "closed" flag x there is ignored: never hidden on a visit).
+// (phone 90%) of the screen width. A drag / resize / fling ends docking for this page view; size and spot are kept. Paused
+// while off-screen / hidden. Nothing stored: every page load (reload, new page) starts on the home spot at default size.
 (function () {
   'use strict';
-  var me = document.currentScript, q = new URLSearchParams(location.search), KEY = 'leakscan.pip';
+  var me = document.currentScript, q = new URLSearchParams(location.search);
   if (!me || q.get('pip') === '0' || !('PointerEvent' in window) || !('IntersectionObserver' in window)) return;
   var auto = me.getAttribute('data-pip-auto') || '', forced = q.get('pip') === '1';
   if (!forced && !auto) return;
@@ -45,12 +44,7 @@
     off: SVG('<path d="M11 5 6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6"/>'), on: SVG('<path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>'),
     pp: SVG('<path d="M7 4v16l13-8z" fill="currentColor"/>', 'pip-i-play') + SVG('<path d="M8 5v14M16 5v14"/>', 'pip-i-pause'),
     dn: SVG('<path d="m6 9 6 6 6-6"/>'), rs: SVG('<path d="M5 15V5h10"/>'), l: SVG('<path d="m9 6 6 6-6 6"/>'), r: SVG('<path d="m15 6-6 6 6 6"/>') };
-  var S = { p: null, w: 0, t: '', u: 0, c: 0 }, num = function (v) { return typeof v === 'number' && isFinite(v) ? v : 0; };
-  try {
-    var s0 = JSON.parse(sessionStorage.getItem(KEY) || 'null');
-    if (s0) S = { p: Array.isArray(s0.p) ? [num(s0.p[0]), num(s0.p[1])] : null, w: num(s0.w), t: /^[lr]$/.test(s0.t) ? s0.t : '', u: s0.u ? 1 : 0, c: s0.c && s0.t ? 1 : 0 };   // no 'x' (#79's closed flag): never gone
-  } catch (e) { /* defaults */ }
-  var save = function () { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } };
+  var S = { p: null, w: 0, t: '', u: 0, c: 0 };   // this page view only: spot, size, tucked side, closed by X, moved
   var pip, pic, tab, frame, snd, pp, exp, xb, grip, video = null, wasPlaying = true, offPaused = false, mounted = false, pos = { x: 0, y: 0 };
   var card = null, mode = '', big = false, home = null;
 
@@ -222,17 +216,17 @@
   function tuck(side) {
     if (video) { wasPlaying = !video.paused; video.pause(); }
     if (mode === 'dock' || !S.p) { var r = pip.getBoundingClientRect(); S.p = keep(r.left, r.top, r.width, r.height); S.w = Math.round(r.width); }
-    S.t = side; S.c = 0; S.u = 1; save(); place(); sync();
+    S.t = side; S.c = 0; S.u = 1; place(); sync();
   }
   function untuck() {
-    S.t = ''; S.c = 0; save(); place();
+    S.t = ''; S.c = 0; place();
     if (video && wasPlaying) play();
     sync();
   }
   function close() {   // X: hidden behind a tab at the top-right corner (never gone); the tab = back to the same spot / dock
     if (big) { big = false; pip.classList.remove('drag'); pip.style.setProperty('--s', '1'); place(); }
     if (video) { wasPlaying = !video.paused; video.pause(); }
-    S.t = 'r'; S.c = 1; save(); place(); sync();
+    S.t = 'r'; S.c = 1; place(); sync();
     tab.focus();
   }
 
@@ -250,7 +244,7 @@
   function settle() {   // the user's spot / size from now on
     pip.classList.remove('drag');
     var w = pip.offsetWidth, k = keep(pos.x, pos.y, w, pip.offsetHeight);
-    S.p = k; S.w = w; S.u = 1; save(); place();
+    S.p = k; S.w = w; S.u = 1; place();
   }
   function setW(w, ax, ay) {   // resize keeping the point (ax, ay) in [0..1] of the box where it is
     var r = pip.getBoundingClientRect(), nw = lim(w), nh = Math.round(nw * 9 / 16) + BAR;

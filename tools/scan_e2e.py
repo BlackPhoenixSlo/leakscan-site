@@ -108,7 +108,8 @@ screen, Jack's iPhone report): landing with no interaction, dark + light, fresh 
 after DOMContentLoaded, first video frame < 3 s (Chromium: CDP Fast 4G; WebKit unthrottled, declared), CLS 0 over the whole
 load, fully inside the visual viewport top-right under the header at 0.5 / 1 / 2 s (wide: or docked, fully on screen),
 elementFromPoint at the inputs / Scan now / "Scanned" line = not the player, close X on the picture's top-right (>= 40 px)
-→ tab at the top-right corner (kept across a reload) → tap = back, same box; scrolled to the form / down: same spot.
+→ tab at the top-right corner → tap = back, same box; X again + reload = the full player back on its home spot
+(first load's box; phone top-right, desktop docked), nothing with 'pip' in session / localStorage; scrolled to the form / down: same spot.
 follow (Jack: "it didn't follow, it got hidden"): a rAF sampler records the rect every frame while scrolling 3 screens
 down and back, slowly and with fast flicks (Chromium phone: CDP touch gestures, flicks with momentum; desktop: wheel;
 WebKit: script scrollBy per frame, declared): phone = the same rect ±1 px in every frame; desktop = fully on screen in
@@ -128,8 +129,8 @@ the page scrolls under it (CDP touch scroll / wheel; WebKit: script scroll, decl
 Esc → mini; pull down follows the finger (15% → snaps back, 50% or a quick flick → mini); mini flung down → hidden with a
 '<' tab, tap → back; no new page / window.open anywhere. Free drop (stays mid-screen, kept on-screen under the header); fling or
 drag past the left / right edge tucks with a '>' / '<' tab (tap / inward drag = back where it was); corner grip / pinch
-resizes (16:9, min 168 px, max 60% / 90% phone width); Esc tucks, Enter on the tab returns; spot / size / tucked kept in
-sessionStorage; CLS 0; reduced motion = no transitions; no request
+resizes (16:9, min 168 px, max 60% / 90% phone width); Esc tucks, Enter on the tab returns; nothing stored: a new page
+after a drop starts on the home spot at default size; CLS 0; reduced motion = no transitions; no request
 off loopback, no console errors. Phone (Chromium, real touch via CDP), desktop 1440, WebKit iPhone 13 (taps are touch,
 drags use the mouse). take: inside the iframe (seeks via Range, as Pages): currentSrc = the first <source> the engine
 plays (jack.webm / jack.mp4), duration ~56.9 s, the 3 s frame is the real take (luminance / colourfulness, vs the
@@ -141,7 +142,8 @@ card whatever the screen: off-screen on a phone): only `vis:` / `follow:` / phon
 serves it with #79's floating spot (re-computed off the form at the current scroll, every scroll): only `follow:` checks may go red.
 --break-pipload serves it with the iframe started at once (before the load event): only the `vis:` load-event checks may go red.
 --break-still serves pip.css with the first-paint still hidden: only `still:` checks may go red.
-Declared bypass: the tabs and huge flows start with the player put away, as after its X (common.PIP_AWAY): floating it
+Declared bypass: the tabs and huge flows put the player away as soon as it mounts, by a script click on its X
+(common.PIP_AWAY, focus kept where it was): floating it
 stays top-right while scrolling (by design) and covers what sits there, e.g. the demo's full-screen button.
 
 A scenario part that raises (a Playwright timeout, a missing element) prints one FAIL line for it and the run goes on.

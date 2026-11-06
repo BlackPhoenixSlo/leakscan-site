@@ -3,7 +3,7 @@ import base64
 import os
 from urllib.parse import parse_qs, urlsplit
 
-from .common import LOOP, MEASURED, PIP_AWAY, break_routes, cfg, check
+from .common import LOOP, MEASURED, break_routes, cfg, check
 
 os.environ["PW_TEST_SCREENSHOT_NO_FONTS_READY"] = "1"   # WebKit's document.fonts.ready waits for the page's parse, so a screenshot while pip.js is held would hang (still:)
 
@@ -27,7 +27,7 @@ PIP_J = """() => { const p = document.querySelector('.pip'), t = document.queryS
     tab: t && !t.hidden ? {box: R(t), side: t.dataset.side, chev: t.innerHTML.includes('m9 6') ? '>' : t.innerHTML.includes('m15 6') ? '<' : '?'} : null,
     v, emb, src: f.src, focus: document.activeElement && document.activeElement.className, vw: document.documentElement.clientWidth, vh: innerHeight,
     hdr: Math.max(...['.site-header', '.rnav'].map(q => document.querySelector(q)).filter(Boolean).map(e => { const r = e.getBoundingClientRect(); return r.top < 140 ? r.bottom : 0; })),
-    ss: JSON.parse(sessionStorage.getItem('leakscan.pip') || 'null')}; }"""
+    store: [...Object.keys(sessionStorage), ...Object.keys(localStorage)].filter(k => /pip/i.test(k))}; }"""
 PIP_HIT = """([sel, inside]) => [...document.querySelectorAll(sel)].filter(e => { const r = e.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight && getComputedStyle(e).visibility !== 'hidden'; })
   .map(e => { const r = e.getBoundingClientRect(), pts = [[r.left + r.width / 2, r.top + r.height / 2], [r.left + 4, r.top + r.height / 2], [r.right - 4, r.top + r.height / 2]];
     return pts.every(([x, y]) => { const h = document.elementFromPoint(x, y); return h && h.closest(inside || sel) === e.closest(inside || sel); }); })"""
@@ -269,8 +269,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     pg.wait_for_function("() => document.readyState === 'complete'", timeout=15000)
     check(f"{tag} still: pip.js never comes: nothing left on the page after load", not pg.query_selector(".pip-still"), pg.evaluate("window.__st.at"))
     ctx.close()
-    MOVED = "try { sessionStorage.setItem('leakscan.pip', JSON.stringify({p: [40, 300], w: 200, t: '', u: 1, c: 0})); } catch (e) {}"
-    for what, url, init in (("?pip=0", "?pip=0", ""), ("closed by its X", "", PIP_AWAY), ("moved + resized", "", MOVED), ("report page without ?r=", "scan/", "")) + ((("computer", "", ""),) if not phone else ()):
+    for what, url, init in (("?pip=0", "?pip=0", ""), ("report page without ?r=", "scan/", "")) + ((("computer", "", ""),) if not phone else ()):
         ctx, pg, held, s = still_page(url, init)
         check(f"{tag} still: none: {what}", s is None, s)
         if what == "computer":
@@ -340,12 +339,20 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
                       and (abs(s["tab"]["box"][1] - b0[1]) <= 1 if phone else 0 <= s["tab"]["box"][1] - s["hdr"] <= 8 + 16 + 1) and s["tab"]["box"][1] >= s["hdr"]
                       and s["tab"]["box"][0] + s["tab"]["box"][2] == s["vw"], [s["tab"], b0, s["hdr"]])
                 shot(pg, f"{name}-closed-tab")
-                pg.reload(wait_until="domcontentloaded"); pg.wait_for_timeout(1500); s = st(pg)
-                check(f"{vt} after a close + reload: the tab is still there (never gone)", s["tucked"] and bool(s["tab"]), s["tab"])
                 if s["tab"]:
                     b = s["tab"]["box"]; tap(pg, b[0] + b[2] / 2, b[1] + b[3] / 2); pg.wait_for_timeout(300); s = st(pg)
                 check(f"{vt} tab tapped → back, fully on screen{' top-right' if phone else ''}, same box as before the X", s["on"] and not s["tab"] and on_screen(s) and (top_right(s) or not phone)
                       and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0, s["tab"]])
+                # reload (owner: "it should always be in the good spot"): X → tab → reload = a first visit's player on its home spot
+                m0 = s["mode"]
+                pg.click(".pip-x"); pg.wait_for_timeout(600); s = st(pg)
+                check(f"{vt} reload: X again → the tab", s["tucked"] and bool(s["tab"]), s["tab"])
+                pg.reload(wait_until="domcontentloaded"); pg.wait_for_timeout(1500); s = st(pg)
+                check(f"{vt} reload: after X + reload the full player is back on its home spot ({'top-right under the header' if phone else 'docked on the hero card'}), first load's box, no tab",
+                      s["on"] and not s["tucked"] and not s["tab"] and on_screen(s) and s["mode"] == m0 == ("float" if phone else "dock") and (top_right(s) or not phone)
+                      and all(abs(a - c) <= 1 for a, c in zip(s["box"], b0)), [s["box"], b0, s["mode"], m0, s["tab"]])
+                check(f"{vt} reload: nothing about the player in sessionStorage / localStorage", s["store"] == [], s["store"])
+                shot(pg, f"{name}-reload-home")
                 b0 = s["box"]
                 shot(pg, f"{name}-back")
                 pg.evaluate("(() => { const f = document.querySelector('#scan'); scrollTo(0, f.getBoundingClientRect().top + scrollY - 70); })()")
@@ -507,7 +514,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     mx, my = s["vw"] / 2, s["vh"] / 2
     s = drop(pg, cdp, s, mx, my)
     cx, cy = pic_c(s)
-    check(f"{tag} drop: released mid-screen it stays there (no snap)", s["on"] and abs(cx - mx) <= 3 and abs(cy - my) <= 3 and s["ss"]["p"], [s["box"], round(mx), round(my)])
+    check(f"{tag} drop: released mid-screen it stays there (no snap)", s["on"] and abs(cx - mx) <= 3 and abs(cy - my) <= 3, [s["box"], round(mx), round(my)])
     shot(pg, "2-dropped-middle")
     s = drop(pg, cdp, s, s["vw"] * 0.3, 5)
     check(f"{tag} drop: dragged up into the header it stays under it, fully on-screen", s["on"] and s["box"][1] >= s["hdr"] and s["box"][0] >= 8, [s["box"], s["hdr"]])
@@ -525,8 +532,9 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
           and isinstance(s["v"], dict) and not s["v"]["paused"], [s["box"], spot])
     shot(pg, "4-back")
 
-    s = ready(pg, "scan/?r=demoR3port01")   # fresh page: spot from sessionStorage
-    check(f"{tag} state: spot kept in sessionStorage across a reload", s["on"] and abs(s["box"][0] - spot[0]) <= 2 and abs(s["box"][1] - spot[1]) <= 2, [s["box"], spot])
+    s = ready(pg, "scan/?r=demoR3port01")   # a new page: nothing kept from the last one
+    check(f"{tag} reload: a new page after a drop starts on the home spot at default size (nothing kept), nothing in storage",
+          s["on"] and float_default(s) and top_right(s) and s["store"] == [], [s["box"], spot, s["store"]])
     s = drop(pg, cdp, s, s["vw"] - s["pic"][2] * 0.2, s["vh"] * 0.4)   # 30% past the right edge, slowly: kept on-screen, not tucked
     check(f"{tag} drop: half past the right edge without a fling → pulled fully on-screen", s["on"] and s["box"][0] + s["box"][2] == s["vw"] - 8, s["box"])
     s = fling(pg, cdp, s, 150)

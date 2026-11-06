@@ -34,12 +34,10 @@
 <body>
 <script>
 // Jack's still in the first paint, on a phone's home spot (360+: under that the landing overflows and the box's width isn't known yet), pip.js's on / off rules;
-// a tucked / moved / resized player waits for js/pip.js (which takes the still over when it mounts). Styled in css/pip.css (.pip-still).
+// js/pip.js takes the still over when it mounts. Styled in css/pip.css (.pip-still).
 (function () {
-  var q = new URLSearchParams(location.search), W = innerWidth, s, w, e;
+  var q = new URLSearchParams(location.search), W = innerWidth, w, e;
   if (W < 360 || W >= 720 || q.get('pip') === '0' || !/^[A-Za-z0-9_-]{1,64}$/.test(q.get('r') || '') || !('PointerEvent' in window) || !('IntersectionObserver' in window)) return;
-  try { s = JSON.parse(sessionStorage.getItem('leakscan.pip')); } catch (x) { /* private mode */ }
-  if (s && (s.t || s.p || s.w)) return;
   w = Math.round(Math.min(320, W * 0.45));
   e = document.createElement('div');
   e.className = 'pip-still';
