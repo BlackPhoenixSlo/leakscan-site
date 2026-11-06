@@ -300,9 +300,6 @@ strong { font-weight: 600; }
 .rm .rm-tools .btn-ghost, .rm .reveal-btn { background: transparent; color: var(--on-deep); border-color: var(--deep-field-line); }
 @media (hover: hover) { .rm .rm-tools .btn-ghost:hover, .rm .reveal-btn:hover { border-color: var(--blush); color: var(--blush); } }
 .rm .reveal-btn[aria-pressed="true"] { border-color: var(--blush); color: var(--blush); }
-.rm .swipe-prev, .rm .swipe-next { background: transparent; color: var(--on-deep); border-color: var(--deep-field-line); }
-.rm .swipe-dot::before { background: color-mix(in srgb, var(--on-deep) 35%, transparent); }
-.rm .swipe-dot[aria-current]::before { background: var(--blush); }
 
 /* #free = the Before phone (js/free-phone.js): its caption link sends her report (Telegram) once a scan ran */
 .free-send { margin-left: auto; color: var(--accent); font-weight: 600; text-underline-offset: 3px; white-space: nowrap; }
@@ -424,20 +421,6 @@ strong { font-weight: 600; }
 @media (hover: hover) { .ba-tabs [aria-selected="false"]:hover { color: var(--accent); } }
 .js .ba { display: grid; grid-template-columns: none; margin-top: 18px; scroll-margin-top: 70px; }   /* #free lands with its Before / After tabs in view */
 .js .ba .ba-arrow, .js .ba[data-show="before"] #ba-after, .js .ba[data-show="after"] #ba-before { display: none; }
-/* the swipe row's controls (#removals): phone only (where the row scrolls); static markup, so nothing shifts when JS wires it */
-.swipe-nav { display: none; }
-@media (max-width: 819px) {
-  .js .swipe-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
-  .swipe-prev, .swipe-next { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1.5px solid var(--line);
-    background: var(--surface); color: var(--ink); cursor: pointer; }
-  .swipe-prev .icon { transform: rotate(180deg); }
-  .swipe-prev:disabled, .swipe-next:disabled { opacity: .35; cursor: default; }
-  .swipe-dots { display: flex; gap: 2px; }
-  .swipe-dot { position: relative; width: 24px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer; }
-  .swipe-dot::before { content: ""; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 30%, transparent); transition: width .2s, margin .2s; }
-  .swipe-dot[aria-current]::before { width: 20px; margin-left: -10px; border-radius: 4px; background: var(--accent); }
-}
-@media (prefers-reduced-motion: reduce) { .swipe-dot::before { transition: none; } }
 .phone {
   width: 300px; max-width: 100%; aspect-ratio: 9 / 17.5; border-radius: 44px; padding: 10px;
   background: linear-gradient(150deg, #3a2a40, #140b17 60%); box-shadow: var(--shadow-lg), inset 0 0 0 1.5px #5a4760, inset 0 0 0 3px #1a101d;

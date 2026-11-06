@@ -29,12 +29,20 @@
 @media (min-width: 820px) and (hover: hover) { .rm-card:hover .rm-stage { --rm-sat: 1; } }
 @media (min-width: 820px) and (prefers-reduced-motion: no-preference) { .rm-stage { transition: filter .25s; } }
 @media (prefers-color-scheme: dark) { .rm-stage { filter: brightness(.86) saturate(calc(var(--rm-sat, 1) * .95)); } }
+/* #removals (draggable): never a filter on the stage. A filtered parent of the moving clip / handle is a cached layer
+   iOS Safari repaints late (the edge moved, the layers didn't, until the card scrolled away). Desktop: saturate the
+   layers; dark: a 14 % black veil (= brightness .86); phones: no filter at all */
+#removals .rm-stage { filter: none; transition: none; }
+@media (min-width: 820px) { #removals .rm-layer { filter: saturate(var(--rm-sat)); } }
+@media (min-width: 820px) and (prefers-reduced-motion: no-preference) { #removals .rm-layer { transition: filter .25s; } }
+@media (prefers-color-scheme: dark) { #removals .rm-stage::after { content: ""; position: absolute; inset: 0; z-index: 2; background: rgb(0 0 0 / .14); pointer-events: none; } }
 html:not(.js) .rm-stage { cursor: auto; }
 .rm-layer { position: absolute; inset: 0; overflow: hidden; }
-.rm-gone { clip-path: inset(0 0 0 calc(var(--p) * 1%)); }
+.rm-gone { clip-path: inset(0 0 0 calc(var(--p, 100) * 1%)); }
 /* the handle is a stage-wide box moved by transform (its % = the stage width): no layout shift while it animates;
-   its left edge is the compare edge */
-.rm-handle { position: absolute; inset: 0; z-index: 3; transform: translateX(calc(var(--p) * 1%)); pointer-events: none; }
+   its left edge is the compare edge. --p: no JS = 100 (all live), the video page's wipe; the landing's js/removals.js
+   writes clip + transform inline (plain values, no var() for the engine to re-resolve) */
+.rm-handle { position: absolute; inset: 0; z-index: 3; transform: translateX(calc(var(--p, 100) * 1%)); pointer-events: none; }
 .rm-handle::before { content: ""; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--accent); box-shadow: 0 0 0 1px rgb(0 0 0 / .12); }
 .rm-knob { position: absolute; top: 50%; left: 0; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; background: var(--accent);
   box-shadow: 0 2px 8px rgb(0 0 0 / .3); }
@@ -150,7 +158,12 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .rd.rm-layer .rd-acts { margin-top: 14px; line-height: 24px; }   /* the photo ends above the idle knob's corner (52 px up) */
 .rd-acts { display: flex; gap: 18px; margin-top: 10px; color: var(--rd-mut); font-size: .8rem; font-weight: 600; }
 .rd-gone .rd-title { color: var(--rd-mut); opacity: .6; margin-bottom: 4px; }
+#removals .rd-gone .rd-title { margin-bottom: 10px; }
 .rd-note { margin-bottom: 8px; color: var(--rd-mut); font-size: .88rem; }
+/* #removals: the note inside the empty photo box, the title's own margin: both layers keep one geometry (no row of the
+   removed post sits lower than the live one beside it) */
+#removals .rd-off { display: grid; place-items: center; padding: 20px; text-align: center; }
+#removals .rd-off .rd-note { margin: 0; }
 .rd-gone .rd-acts { opacity: .5; }
 
 /* 4. a leak site, drawn after a real one (fapello-style profile page: light, Tailwind palette, pink-500 accent).
@@ -227,12 +240,4 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
   .fp-hr::before, .fp-hr::after { background: #2d3440; }
   .fp .fp-404 { color: #2d3440; }
   .fp .fp-gh { color: #d1d5db; }
-}
-/* phone: the four panels as a swipe row (one panel tall, not four); the next one peeks in */
-@media (max-width: 819px) {
-  .rm-grid { --cw: min(520px, calc(100vw - 52px)); --pad: calc((100vw - var(--cw)) / 2);
-    display: flex; gap: calc(var(--pad) - 14px); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none;
-    margin-inline: calc(50% - 50vw); padding: 4px var(--pad) 16px; }
-  .rm-grid::-webkit-scrollbar { display: none; }
-  .rm-card { flex: 0 0 var(--cw); scroll-snap-align: center; }
 }

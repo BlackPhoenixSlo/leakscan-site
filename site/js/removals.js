@@ -1,13 +1,14 @@
 // #removals "Where I remove from": four mock panels (Mega, X, Reddit, a leak site), each a live leak vs. its removed
-// state. Remove / Show again animates the compare edge; the handle moves it (arrow keys on it; drag it, or drag sideways
-// anywhere on the stage: a tap or a vertical swipe never moves it): left of it = the live leak, right = removed. Idle
-// (all live) the handle is parked in the stage's bottom corner with no edge line, so nothing of the live leak is covered.
+// state. Each edge starts mid-stage (50 % ± 8 px, per card). Preview removal / Show again animates the edge to all
+// removed / all live; the handle moves it (arrow keys on it; drag it, or drag sideways anywhere on the stage: a tap or a
+// vertical swipe never moves it, the page scrolls): left of it = the live leak, right = removed. All live, the handle is
+// parked in the stage's bottom corner with no edge line, so nothing of the live leak is covered.
 // Personalized per panel from the page's scan result (E.currentSlug() → E.fetchResult, the one request shared with the
 // hero card; again on `leakscan:result` after an in-page scan): a panel is all hers or all the demo, never a mix. Shown
 // of hers: name / handle, a poster / subreddit / host read off her hits, mega[] counts and age, her Google thumbs.
 // Never a third-party title, never a leak URL (read for its host / path only), never an aggregator host. textContent
 // only. Own file so it merges next to other work.
-// Ambient sweep: on screen each edge glides by itself to a random spot (55-85: the leak side, "Remove" stays) and holds there, per card, never in step;
+// Ambient sweep: on screen each edge glides by itself to a random spot near the middle (42-58) and holds there, per card, never in step;
 // the first input on a card (a Remove press, a stage tap, a handle key) stops its sweep for good. None under
 // prefers-reduced-motion.
 // LeakScanRemovals.model(raw) (defined before the #removals check: site/js/video-overlays.js, whose page has none).
@@ -133,16 +134,20 @@
   });
 
   // ---------- compare: --p = edge position in % (LIVE = all live, GONE = all removed) ----------
-  var LIVE = 100, GONE = 0, HALF = 50, END = 5, STEP = 10, PAGE = 25, INTENT_PX = 8;
+  // The clip and the handle's transform are written inline as plain values on every move (a drag: every pointermove):
+  // no var() for the engine to re-resolve, so clip and edge repaint together. p keeps 0.1 % (a drag follows the finger);
+  // the button flips at the ends only (an edge near the middle still offers Preview removal)
+  var LIVE = 100, GONE = 0, HALF = 50, END = 5, STEP = 10, PAGE = 25, INTENT_PX = 8, JITTER_PX = 8;
   function set(card, p, anim) {
-    p = Math.max(GONE, Math.min(LIVE, Math.round(p)));
-    var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), b = card.querySelector('.rm-btn'), gone = p <= HALF;
+    p = Math.round(Math.max(GONE, Math.min(LIVE, p)) * 10) / 10;
+    var stage = card.querySelector('.rm-stage'), h = card.querySelector('.rm-handle'), b = card.querySelector('.rm-btn'), gone = p <= GONE + END, n = Math.round(p);
     stage.classList.toggle('rm-anim', !!anim);
-    stage.style.setProperty('--p', p);
+    card.querySelector('.rm-gone').style.clipPath = 'inset(0 0 0 ' + p + '%)';
+    h.style.transform = 'translateX(' + p + '%)';
     stage.setAttribute('data-end', p === LIVE ? 'idle' : p >= LIVE - END ? 'r' : p <= GONE + END ? 'l' : '');   // CSS keeps the knob in
     card.classList.toggle('is-removed', gone);
-    h.setAttribute('aria-valuenow', p);
-    h.setAttribute('aria-valuetext', p === LIVE ? 'Leak live' : p === GONE ? 'Removed' : p + '% leak, ' + (LIVE - p) + '% removed');
+    h.setAttribute('aria-valuenow', n);
+    h.setAttribute('aria-valuetext', n === LIVE ? 'Leak live' : n === GONE ? 'Removed' : n + '% leak, ' + (LIVE - n) + '% removed');
     b.setAttribute('aria-pressed', String(gone));
     b.textContent = gone ? 'Show again' : 'Preview removal';
   }
@@ -159,7 +164,7 @@
     c.t = 0;
     if (c.dead || !c.seen || document.hidden || mq.matches) return;
     var p = now(c.card), to, dur = Math.round(rnd(1000, 2000));
-    do { to = Math.round(rnd(55, 85)); } while (Math.abs(to - p) < 15);   // a visible move every time, always on the leak side: the button keeps reading "Remove"
+    do { to = Math.round(rnd(HALF - 8, HALF + 8)); } while (Math.abs(to - p) < 5);   // a visible move every time, never far from the middle
     c.stage.style.setProperty('--rm-t', dur + 'ms');
     set(c.card, to, true);
     c.t = setTimeout(function () { step(c); }, dur + rnd(1000, 3000));
@@ -190,7 +195,7 @@
     var c = sweeps[i] = { card: card, stage: stage, t: 0, seen: false, dead: still };
     // a press (pointer or key) stops the sweep before its click: no glide may flip Remove / Show again under the finger
     each(['pointerdown', 'keydown'], function (t) { card.querySelector('.rm-btn').addEventListener(t, function () { stop(c); }); });
-    card.querySelector('.rm-btn').addEventListener('click', function () { stop(c); set(card, now(card) <= HALF ? LIVE : GONE, true); });
+    card.querySelector('.rm-btn').addEventListener('click', function () { stop(c); set(card, now(card) <= GONE + END ? LIVE : GONE, true); });
     var at = function (e) { var r = stage.getBoundingClientRect(); return (e.clientX - r.left) / r.width * 100; };
     var start = function (e) {
       drag.on = true;
@@ -226,7 +231,7 @@
       stop(c);
       set(card, n, false);
     });
-    set(card, LIVE, false);
+    set(card, HALF + rnd(-JITTER_PX, JITTER_PX) / (stage.getBoundingClientRect().width || 300) * 100, false);   // mid-stage ± 8 px
     if (io) io.observe(card);
   });
   // Reveal / Blur: the [data-reveal] button in this [data-reveal-scope] section (one handler, js/scan-engine.js)

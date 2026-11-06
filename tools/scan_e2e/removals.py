@@ -15,7 +15,9 @@ RM_STATE = """() => { const y0 = scrollY, out = [...document.querySelectorAll('#
   const s = c.querySelector('.rm-stage'), b = c.querySelector('.rm-btn');
   s.scrollIntoView({block: 'center', behavior: 'instant'});
   const r = s.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width * .75, r.top + r.height / 2), cb = c.getBoundingClientRect();
+  const hr = c.querySelector('.rm-handle').getBoundingClientRect(), cm = /inset\\(0px 0px 0px ([\\d.]+)%\\)/.exec(getComputedStyle(c.querySelector('.rm-gone')).clipPath);
   return {k: c.dataset.rm, p: c.querySelector('.rm-handle').getAttribute('aria-valuenow'), pressed: b.getAttribute('aria-pressed'),
+    mid: +(hr.left - r.left - r.width / 2).toFixed(1), hp: +((hr.left - r.left) / r.width * 100).toFixed(2), cp: cm ? +cm[1] : null,
     label: b.textContent, clip: getComputedStyle(c.querySelector('.rm-gone')).clipPath,
     shown: top && top.closest('.rm-gone') ? 'gone' : top && top.closest('.rm-live') ? 'live' : String(top && top.className),
     box: [r.x, r.y + scrollY, r.width, r.height].map(Math.round), card: [cb.x, cb.y + scrollY, cb.width, cb.height].map(Math.round)}; });
@@ -55,8 +57,19 @@ def brand(d):   # js/removals.js brand(): the leak-site wordmark = host without 
 # every aria-valuenow change of the 4 handles from here on: [ms, card index, value]
 SW_REC = """() => { window.__sw = []; document.querySelectorAll('#removals .rm-handle').forEach((h, i) => new MutationObserver(() =>
   window.__sw.push([Math.round(performance.now()), i, +h.getAttribute('aria-valuenow')])).observe(h, {attributes: true, attributeFilter: ['aria-valuenow']})); }"""
+# per panel whose removed layer clones the live chrome: [selector, live rect, removed rect] of each shared row (top, left,
+# width, height in px): the two layers must keep one geometry, so nothing of the removed post sits beside a different
+# row of the live one at the edge
+RM_ALIGN = """() => [...document.querySelectorAll('#removals .rm-card')].flatMap(c => ['.xp-head', '.xp-text', '.xp-media', '.xp-acts', '.rd-head', '.rd-title', '.rd-media', '.rd-acts', '.fp-bar', '.fp-search']
+  .filter(q => c.querySelector('.rm-live ' + q) && c.querySelector('.rm-gone ' + q) && !c.querySelector('.rm-live ' + q).closest('[hidden]'))
+  .map(q => [c.dataset.rm + ' ' + q, ...['.rm-live ', '.rm-gone '].map(l => { const r = c.querySelector(l + q).getBoundingClientRect(); return [r.top, r.left, r.width, r.height].map(Math.round); })]))"""
+# one card mid-drag: the edge vs the finger, the clip vs the edge, what shows 12 px either side of the edge
+RM_MID = """k => { const c = document.querySelector(`#removals .rm-card[data-rm="${k}"]`), st = c.querySelector('.rm-stage'), r = st.getBoundingClientRect(),
+  hr = c.querySelector('.rm-handle').getBoundingClientRect(), cm = /inset\\(0px 0px 0px ([\\d.]+)%\\)/.exec(getComputedStyle(c.querySelector('.rm-gone')).clipPath),
+  y = r.top + r.height * .3, at = x => { const e = document.elementFromPoint(x, y); return e && e.closest('.rm-gone') ? 'gone' : e && e.closest('.rm-live') ? 'live' : String(e && e.className); };
+  return {edge: hr.left, hp: (hr.left - r.left) / r.width * 100, cp: cm ? +cm[1] : null, left: at(hr.left - 12), right: at(hr.left + 12), p: c.querySelector('.rm-handle').getAttribute('aria-valuenow')}; }"""
 SW_SEEN = """() => [...document.querySelectorAll('#removals .rm-card')].map(c => { const r = c.querySelector('.rm-stage').getBoundingClientRect();
-  return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; })"""   # phone swipe row: cards past the screen's side are off screen too (IntersectionObserver agrees)
+  return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; })"""
 FP_STATE = """() => { const c = document.querySelector('#removals .rm-card[data-rm="site"]'), q = s => c.querySelector(s), cs = e => getComputedStyle(e);
   const live = q('.rm-live'), st = q('.rm-stage').getBoundingClientRect();
   return {ring: cs(q('.fp-ring')).backgroundImage, av: [cs(q('.fp-av')).borderTopWidth, cs(q('.fp-av')).borderTopColor, cs(q('.fp-av')).borderTopLeftRadius],
@@ -133,9 +146,9 @@ def sweep_flow(ctx_, vp_name, tag):
     rec = since(t0)
     vis = [i for i in range(4) if seen[i]]
     per = {i: [e[2] for e in rec if e[1] == i] for i in vis}
-    need = 1 if vp_name == "phone" else 2   # phone: the swipe row shows one card (the next peeks with its stage off screen)
-    check(f"{tag} sweep: on-screen edges glide by themselves, no input (9 s: 2+ stops each, all in 15-85; {need}+ cards on screen)", len(vis) >= need and all(
-        len(per[i]) >= 2 and all(15 <= v <= 85 for v in per[i]) for i in vis), {"visible": vis, "per": per})
+    need = 1 if vp_name == "phone" else 2   # phone: one column, one or two stages on screen
+    check(f"{tag} sweep: on-screen edges glide by themselves, no input (9 s: 2+ stops each, all near the middle, 42-58; {need}+ cards on screen)", len(vis) >= need and all(
+        len(per[i]) >= 2 and all(42 <= v <= 58 for v in per[i]) for i in vis), {"visible": vis, "per": per})
     times = {i: [e[0] for e in rec if e[1] == i] for i in vis}
     synced = [(i, j) for i in vis for j in vis if i < j and len(times[i]) == len(times[j]) and all(abs(x - y) < 50 for x, y in zip(times[i], times[j]))]
     if vp_name != "phone":   # needs 2+ cards on screen: desktop's 2x2 (same JS on phones)
@@ -283,13 +296,23 @@ def removals_flow(browser, vp_name, vp):
             "blur(" in b[1] and b[0].startswith("img/removals/") and b[2] > 0 for b in blur), blur)
         sw = page.evaluate("() => [document.documentElement.scrollWidth, innerWidth, Math.max(...[...document.querySelectorAll('#removals *')].map(e => e.parentElement.closest('.rm-stage') || (e.parentElement.closest('.rm-grid') && getComputedStyle(document.querySelector('#removals .rm-grid')).overflowX === 'auto') ? 0 : e.getBoundingClientRect().right))]")   # phone: the swipe row clips its panels
         check(f"{tag} {scheme}: no horizontal overflow", sw[0] <= sw[1] and sw[2] <= sw[1] + 0.5, sw)
-        cols = page.evaluate("() => new Set([...document.querySelectorAll('#removals .rm-card')].map(c => Math.round(c.getBoundingClientRect().x))).size")
-        check(f"{tag} {scheme}: layout {'swipe row' if vp_name == 'phone' else '2x2'}", cols == (4 if vp_name == "phone" else 2), cols)
+        cols = page.evaluate("() => { const cs = [...document.querySelectorAll('#removals .rm-card')].map(c => c.getBoundingClientRect()); return [new Set(cs.map(r => Math.round(r.x))).size, new Set(cs.map(r => Math.round(r.y + scrollY))).size, cs.length, cs.every(r => r.width > 0 && r.height > 0 && r.left >= 0 && r.right <= innerWidth), document.querySelectorAll('.swipe-nav').length]; }")
+        check(f"{tag} {scheme}: layout {'one column (4 rows)' if vp_name == 'phone' else '2x2'}, all 4 cards on the page within its width, no carousel nav",
+              cols == ([1, 4, 4, True, 0] if vp_name == "phone" else [2, 2, 4, True, 0]), cols)
         if scheme == "light":
             fp_checks(tag, vp_name, page.evaluate(FP_STATE), "Orla Brennick", "brennickclay, orlabrennick", vp["width"])
         before = page.evaluate(RM_STATE)
-        check(f"{tag} {scheme}: starts live (edge at 100, removed layer clipped away)", all(
-            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Preview removal" and s["shown"] == "live" for s in first["state"] + before), [first["state"], before])
+        check(f"{tag} {scheme}: starts mid-stage (edge 50 % ± 10 px per card, clip at the edge, left leak / right removed, 'Preview removal')", all(
+            abs(s["mid"]) <= 10 and s["cp"] is not None and abs(s["cp"] - s["hp"]) <= .6 and s["pressed"] == "false" and s["label"] == "Preview removal" and s["shown"] == "gone"
+            for s in first["state"]) and len({s["mid"] for s in first["state"]}) > 1, [[s["k"], s["mid"], s["cp"], s["hp"], s["shown"], s["label"]] for s in first["state"]])
+        check(f"{tag} {scheme}: End on the handle = all live (edge 100, removed layer clipped away)", all(
+            s["p"] == "100" and s["pressed"] == "false" and s["label"] == "Preview removal" and s["shown"] == "live" for s in before), before)
+        al = page.evaluate(RM_ALIGN)
+        check(f"{tag} {scheme}: removed layer aligned with the live one (X / Reddit / leak-site shared rows: same box)", len(al) >= 10 and all(a[1] == a[2] for a in al),
+              [a for a in al if a[1] != a[2]] or len(al))
+        stg = page.evaluate("() => [...document.querySelectorAll('#removals .rm-stage')].map(s => [getComputedStyle(s).filter, getComputedStyle(s).touchAction])")
+        check(f"{tag} {scheme}: no CSS filter on a stage (iOS repaints a filtered parent of the moving clip late), touch-action pan-y (a vertical swipe scrolls the page)",
+              all(x == ["none", "pan-y"] for x in stg), stg)
         idle = page.evaluate(RM_IDLE)
         check(f"{tag} {scheme}: L10: idle, the handle covers no text / photo of the live leak and no edge line shows (leak-site photo grid aside)",
               all(not x[1] and x[2] == "0" for x in idle), idle)
@@ -325,8 +348,41 @@ def removals_flow(browser, vp_name, vp):
             page.mouse.up()
             d = page.evaluate(RM_STATE)[1]
             check(f"{tag} drag moves the edge and the clip (left = leak, right = removed)", 27 <= int(d["p"]) <= 33
-                  and d["clip"] == f"inset(0px 0px 0px {d['p']}%)" and d["shown"] == "gone", d)
+                  and d["cp"] is not None and abs(d["cp"] - int(d["p"])) <= .5 and abs(d["cp"] - d["hp"]) <= .6 and d["shown"] == "gone", d)
             st.screenshot(path=str(cfg.out / f"removals-{vp_name}-drag-x-30.png"))
+            if vp_name == "phone":   # a real touch drag (CDP touch events): the edge follows the finger on every move, before the finger lifts
+                cdp = ctx.new_cdp_session(page)
+                sel = '#removals .rm-card[data-rm="reddit"] .rm-stage'
+                bring(page, sel, "center")
+                page.wait_for_timeout(200)
+                r = page.locator(sel).bounding_box()
+                y = r["y"] + r["height"] * .3
+                tp = lambda t, x: cdp.send("Input.dispatchTouchEvent", {"type": t, "touchPoints": [] if t == "touchEnd" else [{"x": x, "y": y}]})
+                xs = [r["x"] + r["width"] * f for f in (.8, .78, .74, .7, .62, .55, .48, .4, .32, .25)]
+                pos0 = page.evaluate("[scrollX, scrollY]")
+                tp("touchStart", xs[0])
+                mids = []
+                for i, x in enumerate(xs[1:]):
+                    tp("touchMove", x)
+                    mids.append([round(x, 1), page.evaluate(RM_MID, "reddit")])
+                    if i == 5:
+                        page.locator(sel).screenshot(path=str(cfg.out / f"removals-{vp_name}-touch-drag-1-mid.png"))
+                pos1 = page.evaluate("[scrollX, scrollY]")
+                tp("touchEnd", xs[-1])
+                page.wait_for_timeout(300)
+                page.locator(sel).screenshot(path=str(cfg.out / f"removals-{vp_name}-touch-drag-2-settled.png"))
+                live = mids[2:]   # past the 8 px sideways intent
+                check(f"{tag} touch drag: the edge follows the finger on every move before it lifts (±2 px), clip = edge, leak left / removed right of it, page still",
+                      len(live) >= 6 and all(abs(m["edge"] - x) <= 2 and m["cp"] is not None and abs(m["cp"] - m["hp"]) <= .6 and m["left"] == "live" and m["right"] == "gone" for x, m in live)
+                      and all(a[1]["edge"] > b[1]["edge"] for a, b in zip(live, live[1:])) and pos1 == pos0, [pos0, pos1, mids])
+                p0 = page.evaluate(RM_MID, "reddit")["p"]
+                y0 = page.evaluate("scrollY")
+                cdp.send("Input.synthesizeScrollGesture", {"x": int(r["x"] + r["width"] * .5), "y": int(r["y"] + r["height"] * .5), "xDistance": 0, "yDistance": -220,
+                                                           "gestureSourceType": "touch", "speed": 800})
+                page.wait_for_timeout(600)
+                y1, p1 = page.evaluate("scrollY"), page.evaluate(RM_MID, "reddit")["p"]
+                check(f"{tag} touch: a vertical swipe on a stage scrolls the page, the edge stays", y1 - y0 >= 100 and p1 == p0, [y0, y1, p0, p1])
+                cdp.detach()
             page.locator('#removals .rm-card[data-rm="x"] .rm-handle').focus()
             page.keyboard.press("End")
             sr = page.locator('#removals .rm-card[data-rm="reddit"] .rm-stage')
@@ -360,7 +416,7 @@ def removals_flow(browser, vp_name, vp):
     page.wait_for_timeout(4000)
     rec = page.evaluate("window.__sw")
     vals = [h.get_attribute("aria-valuenow") for h in page.locator("#removals .rm-handle").all()]
-    check(f"{tag} sweep: reduced motion: no edge moves by itself (4 s on screen, all at 100)", not rec and vals == ["100"] * 4, [rec, vals])
+    check(f"{tag} sweep: reduced motion: no edge moves by itself (4 s on screen, all still mid-stage, 48-52)", not rec and all(48 <= int(v) <= 52 for v in vals), [rec, vals])
     page.locator("#removals .rm-btn").first.click()
     rm = page.evaluate("() => [getComputedStyle(document.querySelector('#removals .rm-gone')).transitionDuration, document.querySelector('#removals .rm-handle').getAttribute('aria-valuenow')]")
     check(f"{tag} toggle: reduced motion flips with no transition", rm == ["0s", "0"], rm)
