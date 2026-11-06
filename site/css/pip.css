@@ -1,33 +1,37 @@
-/* js/pip.js: floating mini player (picture-in-picture style) of site/video/. Fixed, so it never shifts the page (CLS 0).
-   16:9, min(320px, 45vw). Drag anywhere on it (.pip-hit over the inert iframe) → snaps to the nearest corner; fling / drag
-   past the left or right edge → tucked off-screen, .pip-tab (chevron) left at that edge brings it back. */
-.pip { position: fixed; left: 0; top: 0; z-index: 46; width: min(320px, 45vw); aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden;
-  background: #0b0c0e; box-shadow: 0 10px 30px rgb(0 0 0 / .35), 0 0 0 1px rgb(255 255 255 / .08); opacity: 0; visibility: hidden;
+/* js/pip.js: mini player of site/video/. Picture (16:9, the iframe, nothing drawn over it) + a thin control bar under it.
+   Docked (.docked, landing): absolute, hanging off the bottom-right corner of the hero card, scrolls with the page.
+   Floating: fixed in a corner, min(320px, 45vw). Drag anywhere but the buttons → nearest corner; fling / drag past the left
+   or right edge → tucked off-screen, .pip-tab (chevron) at that edge brings it back. z 44: under the header (50) and the
+   Ask-AI launcher (45). Never in the flow: CLS 0. */
+.pip { --bar: 30px; position: fixed; left: 0; top: 0; z-index: 44; width: var(--w, min(320px, 45vw)); border-radius: 12px; overflow: hidden;
+  background: #0b0c0e; box-shadow: 0 10px 30px rgb(0 0 0 / .35), 0 0 0 1px rgb(255 255 255 / .1); opacity: 0; visibility: hidden;
   transform: translate3d(var(--x, 0px), var(--y, 0px), 0); transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease, visibility 0s linear .3s;
-  touch-action: none; -webkit-user-select: none; user-select: none; }
+  touch-action: none; -webkit-user-select: none; user-select: none; cursor: grab; }
+.pip.docked { position: absolute; }
 .pip.on { opacity: 1; visibility: visible; transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease, visibility 0s; }
 .pip.on.tucked { visibility: hidden; transition: transform .3s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .3s; }
-.pip.drag { transition: none; cursor: grabbing; }
+.pip.drag, .pip.swap { transition: none; }
+.pip.drag { cursor: grabbing; }
+.pip.pop { animation: pip-pop .25s ease both; }
+@keyframes pip-pop { from { opacity: 0; } }
+.pip-pic { position: relative; aspect-ratio: 16 / 9; background: #000; }
 .pip iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
-.pip-hit { position: absolute; inset: 0; cursor: grab; }
-.pip button, .pip a { position: absolute; z-index: 2; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 32px; min-height: 32px;
-  padding: 0; border: 0; border-radius: 999px; background: rgb(0 0 0 / .62); color: #fff; font: 700 12px/1 var(--sans, system-ui, sans-serif); text-decoration: none; cursor: pointer; }
+.pip-hit { position: absolute; inset: 0; }
+.pip-bar { display: flex; align-items: center; gap: 2px; height: var(--bar); padding: 0 4px; background: #16181c; }
+.pip-bar i { flex: 1; }
+.pip-bar button, .pip-bar a { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 26px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: #d8dadf; cursor: pointer; }
+.pip.muted .pip-snd { background: #ffd400; color: #000; }
 .pip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.pip-x { top: 4px; right: 4px; }
-.pip-exp { top: 4px; left: 4px; }
-.pip-snd { left: 4px; bottom: 4px; }
-.pip.muted .pip-snd { padding: 0 10px 0 8px; background: #ffd400; color: #000; }
-.pip-snd span { display: none; }
-.pip.muted .pip-snd span { display: inline; }
-.pip-play { position: absolute; left: 50%; top: 50%; z-index: 1; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px;
-  border-radius: 999px; background: rgb(0 0 0 / .62); color: #fff; transform: translate(-50%, -50%); pointer-events: none; opacity: 0; }
-.pip.paused .pip-play { opacity: 1; }
+.pip-pp .pip-i-pause, .pip.paused .pip-pp .pip-i-play { display: block; }
+.pip-pp .pip-i-play, .pip.paused .pip-pp .pip-i-pause { display: none; }
+@media (hover: hover) { .pip-bar button:hover, .pip-bar a:hover { background: rgb(255 255 255 / .12); color: #fff; } .pip.muted .pip-snd:hover { background: #ffe14d; color: #000; } }
 .pip :focus-visible, .pip-tab:focus-visible { outline: 3px solid #2f80ff; outline-offset: -3px; }
-.pip-tab { position: fixed; top: 0; z-index: 46; display: flex; align-items: center; justify-content: center; width: 30px; height: 64px; padding: 0; border: 0;
+.pip-tab { position: fixed; top: 0; z-index: 44; display: flex; align-items: center; justify-content: center; width: 30px; height: 64px; padding: 0; border: 0;
   background: #0b0c0e; color: #fff; box-shadow: 0 6px 18px rgb(0 0 0 / .3); cursor: pointer; touch-action: none; transform: translateY(var(--ty, 0px)); }
 .pip-tab[hidden] { display: none; }
 .pip-tab[data-side="l"] { left: 0; border-radius: 0 10px 10px 0; }
 .pip-tab[data-side="r"] { right: 0; border-radius: 10px 0 0 10px; }
 .pip-tab svg { width: 20px; height: 20px; fill: none; stroke: #ffd400; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-@media (min-width: 720px) { .pip { border-radius: 14px; } }
-@media (prefers-reduced-motion: reduce) { .pip, .pip.on, .pip.on.tucked { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pip, .pip.on, .pip.on.tucked { transition: none; } .pip.pop { animation: none; } }
+.pip-bar .pip-rs { cursor: nwse-resize; touch-action: none; }

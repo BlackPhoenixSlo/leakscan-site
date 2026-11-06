@@ -331,8 +331,11 @@
   // fetchResult(slug) → Promise of the stored result; rejects with err.kind like runScan. One request per slug per page:
   // the landing's ?r= reopen asks from inline-scan.js and personalize.js, both get this promise (a failure is not kept).
   // Callers only read the result, never mutate it.
-  var results = {};
+  // In a same-origin frame (the landing's video mini player, js/pip.js) the page's own promise is used: still one request.
+  var results = {}, host = null;
+  try { if (window.parent !== window && window.parent.LeakScanEngine) host = window.parent.LeakScanEngine; } catch (e) { host = null; }
   function fetchResult(slug) {
+    if (host) return host.fetchResult(slug);
     if (results[slug]) return results[slug];
     return (results[slug] = fetch(API + '/api/scan-result/' + encodeURIComponent(slug), { credentials: 'omit' }).then(function (res) {
       if (res.ok) return res.json().then(withoutAggregators);
