@@ -24,6 +24,7 @@ from scan_e2e.common import ROOT, SCENARIOS  # noqa: E402
 MARKER = 'for r, h in e["reach"].items())'
 DROP = "E2E_PROOF_DROP"
 CHEAP_RED = ("site/js/chat.js", "return HOSTS.indexOf(h) >= 0;", "return true;")   # on disk, not a --break: a plain run that goes red
+KNOWN_RED = {"tabs", "removals"}   # both red on main at 5c51ad1 (measured), with or without this harness; drop one once it's fixed
 reds = []
 
 
@@ -88,7 +89,7 @@ def pick_file(maps, green, cost):
         for rel in m:
             if rel.startswith("site/") and rel.endswith((".js", ".css", ".html")):
                 by.setdefault(rel, set()).add(s)
-    return min(((rel, o) for rel, o in by.items() if o <= set(green)), key=lambda x: (len(x[1]), sum(cost[s] for s in x[1]), x[0]))
+    return min(((rel, o) for rel, o in by.items() if o <= set(green)), key=lambda x: (len(x[1]), sum(cost[s] for s in x[1]), x[0]), default=(None, set()))
 
 
 def main():
@@ -118,7 +119,7 @@ def main():
         cold = p.cli("0-cold", p.a, "--no-reuse", *sel)
         cost = {s: v["secs"] for s, v in json.loads((cold.folder / "e2e-summary.json").read_text())["per_scenario"].items()}
         green = [s for s, v in cold.ran.items() if v == "green"]
-        check("cold: every scenario ran; only the known tabs red", set(cold.ran) == {x for x in (a.only or SCENARIOS)} and not set(cold.ran) - set(green) - {"tabs"},
+        check(f"cold: every scenario ran; red only in {sorted(KNOWN_RED)}", set(cold.ran) == {x for x in (a.only or SCENARIOS)} and not set(cold.ran) - set(green) - KNOWN_RED,
               {s: cold.ran.get(s) for s in (a.only or SCENARIOS)})
         only = [x for s in green for x in ("--only", s)]
         cheap = min(green, key=lambda s: cost[s])
@@ -132,14 +133,15 @@ def main():
         maps = p.maps()
         rel, owner = pick_file(maps, green, cost)
         check("c: the map has a file only one scenario reaches", len(owner) == 1, f"{rel} → {sorted(owner)}")
-        os.environ[DROP] = rel if a.break_key else ""   # only the cli children read it, and only in a patched reuse.py
-        tail = "\n<!-- reuse proof -->\n" if rel.endswith(".html") else "\n/* reuse proof */\n"
-        p.edit(p.a, rel, tail)
-        r = p.cli("c-one-file", p.a, *only)
-        check(f"c: one reached file changed ({rel}): only {sorted(owner)} reruns", set(r.ran) == owner and set(r.reused) == set(green) - owner, f"{r.secs} s, ran {sorted(r.ran)}")
-        p.revert()
-        r = p.cli("c-reverted", p.a, *only, gated=False)
-        check("c2: reverted: the old entry hits again", set(r.reused) == set(green) and not r.ran)
+        if rel:
+            os.environ[DROP] = rel if a.break_key else ""   # only the cli children read it, and only in a patched reuse.py
+            tail = "\n<!-- reuse proof -->\n" if rel.endswith(".html") else "\n/* reuse proof */\n"
+            p.edit(p.a, rel, tail)
+            r = p.cli("c-one-file", p.a, *only)
+            check(f"c: one reached file changed ({rel}): only {sorted(owner)} reruns", set(r.ran) == owner and set(r.reused) == set(green) - owner, f"{r.secs} s, ran {sorted(r.ran)}")
+            p.revert()
+            r = p.cli("c-reverted", p.a, *only, gated=False)
+            check("c2: reverted: the old entry hits again", set(r.reused) == set(green) and not r.ran)
         mod = next((s for s in sorted(green, key=lambda s: cost[s]) if f"tools/scan_e2e/{s}.py" in reuse.code_inputs(s)
                     and not any(f"tools/scan_e2e/{s}.py" in reuse.code_inputs(o) for o in SCENARIOS if o != s)), None)
         if mod:
@@ -207,10 +209,11 @@ def main():
         check(f"f3: a new image in a listed dir (site/showcase/imgs/): selected by --changed, {cheap} misses", cheap in r.ran and not r.reused)
         p.revert()
 
-        p.edit(p.a, rel, tail)
-        r = p.cli("g-file", p.a, "--changed", "HEAD", *only, gated=False)
-        check(f"g1: --changed with {rel}: selects only {sorted(owner)}", set(r.skip) == set(green) - owner and owner <= set(r.reused) and not r.ran, r.skip)
-        p.revert()
+        if rel:
+            p.edit(p.a, rel, tail)
+            r = p.cli("g-file", p.a, "--changed", "HEAD", *only, gated=False)
+            check(f"g1: --changed with {rel}: selects only {sorted(owner)}", set(r.skip) == set(green) - owner and owner <= set(r.reused) and not r.ran, r.skip)
+            p.revert()
         p.edit(p.a, "README.md", "\nreuse proof\n")
         r = p.cli("g-readme", p.a, "--changed", "HEAD", *only, gated=False)
         check("g2: --changed with README.md: selects nothing, exit 0", set(r.skip) == set(green) and not r.ran and not r.reused and r.rc == 0)
