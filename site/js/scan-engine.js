@@ -1,6 +1,6 @@
 // Shared by every page that runs or shows a scan (landing, scan/, showcase/): API host, transport, the validators every
 // API value goes through, the current slug, thumb liveness, tablists, Reveal, the hero's report model and image tiles.
-// Plain ES2017, no tracking, no third parties. The API host is set in ONE place below: same origin, except on
+// Plain ES2017. This file: no tracking, no third parties (ads: js/analytics.js). The API host is set in ONE place below: same origin, except on
 // *.github.io (the VPS API host); <body data-api="..."> overrides it (tools/scan_stub.py does that).
 (function () {
   'use strict';

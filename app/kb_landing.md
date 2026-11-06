@@ -1,6 +1,6 @@
 <!-- kb_landing.md: knowledge base for the "Ask AI before you DM me" popup on the Abolita
      landing site (https://blackphoenixslo.github.io/leakscan-site/). It MIRRORS that page
-     (index.html + privacy.html, as live on 2026-11-04) and MUST be updated whenever the page
+     (index.html + privacy.html, as live on 2026-11-06) and MUST be updated whenever the page
      changes (prices, plans, FAQ, contacts, section ids). No facts beyond the page. Served via
      POST /api/chat {"kb":"landing"}; deploy it next to public_app.py on the VPS. -->
 
@@ -85,7 +85,7 @@ Q: Do I need to register or create an account?
 A: No. There's no account, no app and no card. The free scan runs right here from just your handle. After that you message me on Telegram, WhatsApp or email, and everything happens in that chat.
 
 ## Privacy (from privacy.html, short version)
-- The website uses no cookies, no analytics, no tracking pixels, no ads scripts.
+- Cookies: only Google Ads cookies, and only if you accept them in the banner. While Google Ads measurement is switched on, a banner offers Accept and Reject and "Cookie settings" in the footer changes the choice. Without Accept, no cookies are set, but Google still gets cookieless pings (page opened, scan finished, contact link clicked, page address, IP address). Your handle, name and report link are never part of this measurement. Details: privacy.html#cookies.
 - The free scan sends the handle and platform you enter to Jaka's own scan server, which runs the Google search and keeps the result so your report link works. Report pages are unlisted and marked noindex. Anyone with the report link can open the report, so share it only with people you trust.
 - When you message Jaka, what you send is used to answer you and, if you hire him, to do the work. He doesn't sell or share your data with anyone else. You can ask for access, correction or deletion any time by email.
 - Full policy: privacy.html

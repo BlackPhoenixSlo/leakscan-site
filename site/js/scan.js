@@ -1,5 +1,5 @@
-// Free scan page: runs the scan on Jaka's scan server and renders the report. Plain ES2017, no tracking, no third
-// parties. Transport, API host and message links live in js/scan-engine.js (shared with the landing hero).
+// Free scan page: runs the scan on Jaka's scan server and renders the report. Plain ES2017. This file: no tracking, no
+// third parties (ads: js/analytics.js). Transport, API host and message links live in js/scan-engine.js (shared with the landing hero).
 (function () {
   'use strict';
   var E = window.LeakScanEngine;
@@ -165,7 +165,7 @@
     setTitle('Free scan report', '@' + d.handle,
       empty ? 'Scan of what Google shows for your ' + name + ' handle.'
         : 'Copies found on ' + d.domain_count + ' ' + plural(d.domain_count, 'site', 'sites') + '. Here is what Google shows for your ' + name + ' handle.');
-    document.title = '@' + d.handle + ' · Free scan report · Abolita';
+    document.title = 'Free scan report · Abolita';   // no handle: gtag.js (js/analytics.js) sends document.title, page_title or not
     $('scan-aliases').textContent = d.discovered.length ? 'Also found as ' + d.discovered.map(function (a) { return '@' + a; }).join(', ') : '';
     show('scan-aliases', d.discovered.length > 0);
     $('summary').querySelector('[data-stat=domains]').textContent = num(d.domain_count);
