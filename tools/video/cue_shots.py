@@ -628,8 +628,8 @@ def hers_expect(raw):
         if r:
             add(r.get("link"), r.get("domain"), r.get("title"))
     hosts = sorted(n, key=lambda d: -n[d])   # stable: first seen on a tie
-    g, mg = raw.get("google_total"), next((m for m in raw.get("mega") or [] if isinstance(m, dict)), {})
-    counts = ([f"About {g:,} results"] if isinstance(g, int) and g > 0 else []) + [f"{mg[k]} {u}" for k, us in (("images", ("images", "files")), ("videos", ("videos", "files"))) if isinstance(mg.get(k), int) for u in us]
+    g, megas = raw.get("google_total"), [m for m in raw.get("mega") or [] if isinstance(m, dict)]   # any of her folders (js/removals.js picks one)
+    counts = ([f"About {g:,} results"] if isinstance(g, int) and g > 0 else []) + [f"{mg[k]:,} {u}" for mg in megas for k, us in (("images", ("images", "files")), ("videos", ("videos", "files"))) if isinstance(mg.get(k), int) and mg[k] > 0 for u in us]
     thumbs = {u for u in (raw.get("images") or []) if isinstance(u, str)} | {r.get("thumb") for r in raw.get("results") or [] if r and isinstance(r.get("thumb"), str)}
     pr = raw.get("profile") or {}
     return {"hosts": hosts, "titles": [t.strip() for _, t in rows if t and len(t.strip()) >= 12], "counts": counts, "thumbs": thumbs,
