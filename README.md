@@ -58,9 +58,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `tools/video/cues_from_take.py TAKE` (all via `cd ~/leakhunt && uv run python …`; `tools/video/serve.py` = local
   server with Range, which `<video>` seeking needs).
 - Search landing pages (indexed, in the sitemap; plain static HTML + `css/guides.css`, no JS of their own, edit the HTML directly): hubs
-  `faq/` and `removals/`, their child pages, `compare/abolita-vs-bruqi.html`. Each ends in the same free-scan + DM CTA. Legal and process claims link the
-  primary source they were checked against; facts about Abolita come only from `index.html`. The comparison is dated: re-check it against
-  Bruqi's own pages before changing it. Linked from the homepage footer.
+  `faq/`, `removals/` and `compare/`, and their child pages. Each ends in the same free-scan + DM CTA. Legal and process claims link the
+  primary source they were checked against; facts about Abolita come only from `index.html`. Comparisons are dated: re-check them against
+  the other service's own pages before changing them. Linked from the homepage footer.
 - Mini player (`js/pip.js` + `css/pip.css`): a 16:9 player of `video/` (CLS 0), on by default (landing and `scan/?r=`);
   `?pip=0` off. Landing: docked (absolute, scrolls with the page) over the bottom-right of the hero card (Weekly report,
   or the scan report card after a scan) at 55% of its width, never > 25% of the card, never over a link / button / pill
