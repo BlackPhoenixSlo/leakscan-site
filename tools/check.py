@@ -14,7 +14,7 @@ Checks every HTML file under site/ (except site/showcase/**):
 - exactly one <h1>, no duplicate ids, every <img> has alt + width + height
 - every <iframe> has a title and tabindex="-1" (keeps the embedded demo's ~35 links out of the landing page's Tab
   order; the link next to it is the keyboard route)
-- every JSON-LD block parses; FAQPage Q&A text equals the visible <details> FAQ
+- every JSON-LD block parses; FAQPage Q&A text equals the visible <details> FAQ (<details class="more"> disclosures excluded)
 - indexable page (no robots noindex) has canonical == SITE_URL + path (and og:url, if present, equal)
 - sitemap.xml lists exactly the indexable pages; robots.txt Sitemap line points at it
 - robots.txt Disallows no page that carries noindex, showcase/ included (blocked = noindex never read)
@@ -90,6 +90,7 @@ class Page(HTMLParser):
         self._faq = []          # [question, answer]
         self._stack = []
         self._cap = None
+        self._dk = []           # open <details>: True = an FAQ entry, False = an inline "more" disclosure (not FAQ)
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -118,10 +119,13 @@ class Page(HTMLParser):
         if tag == "script" and a.get("type") == "application/ld+json":
             self._in_ld = []
         if tag == "details":
-            self._faq.append(["", ""])
-        if tag == "summary" and self._faq:
+            self._dk.append("more" not in (a.get("class") or "").split())
+            if self._dk[-1]:
+                self._faq.append(["", ""])
+        in_faq = bool(self._dk) and self._dk[-1]
+        if tag == "summary" and self._faq and in_faq:
             self._cap = 0
-        if tag == "p" and self._faq and "details" in self._stack and self._cap is None:
+        if tag == "p" and self._faq and in_faq and self._cap is None:
             self._cap = 1
         for k in ("href", "src", "poster", "xlink:href"):
             if a.get(k) is not None:
@@ -137,6 +141,8 @@ class Page(HTMLParser):
         if self._stack and tag in self._stack:
             while self._stack and self._stack.pop() != tag:
                 pass
+        if tag == "details" and self._dk:
+            self._dk.pop()
         if tag == "script" and self._in_ld is not None:
             self.jsonld.append("".join(self._in_ld))
             self._in_ld = None

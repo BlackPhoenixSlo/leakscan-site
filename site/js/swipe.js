@@ -1,11 +1,11 @@
-// Phone swipe rows (#how stages, #showcase before/after phones, #removals panels): the static .swipe-nav after each row gets
+// Phone swipe row (#removals panels, the page's one carousel): the static .swipe-nav after it gets
 // working arrows + dots. CSS shows the nav only where the row scrolls (< 820px); the markup is static, so no shift.
 (function () {
   document.querySelectorAll('.swipe-nav').forEach(function (nav) {
     var row = nav.previousElementSibling;
-    while (row && !row.matches('.ba, .rm-grid, .stages')) row = row.previousElementSibling;
+    while (row && !row.matches('.rm-grid')) row = row.previousElementSibling;
     if (!row) return;
-    var items = [].slice.call(row.children).filter(function (el) { return el.matches('.ba-item, .rm-card, .stage'); });
+    var items = [].slice.call(row.children).filter(function (el) { return el.matches('.rm-card'); });
     var dots = [].slice.call(nav.querySelectorAll('.swipe-dot'));
     var prev = nav.querySelector('.swipe-prev'), next = nav.querySelector('.swipe-next');
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');

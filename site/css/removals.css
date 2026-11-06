@@ -85,6 +85,11 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .mg-logo { width: 24px; height: 24px; background: #d90007; color: #fff; font-size: .8rem; flex: none; }
 .mg-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mg-list { list-style: none; padding: 4px 0; }
+/* the window runs to the stage's foot (one height for all four panels): the rows share the room, no empty grey band */
+.mg.rm-live { display: flex; flex-direction: column; }
+.mg.rm-live .mg-win { flex: 1; display: flex; flex-direction: column; }
+.mg.rm-live .mg-list { flex: 1; display: flex; flex-direction: column; }
+.mg.rm-live .mg-list li { flex: 1; }
 .mg-list li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; }
 .mg-list li + li { border-top: 1px solid var(--mg-line); }
 .mg-fold { width: 28px; height: 22px; border-radius: 3px 3px 4px 4px; background: linear-gradient(#ffcc4d, #f5b72a); box-shadow: inset 0 4px 0 #f0a81f; }

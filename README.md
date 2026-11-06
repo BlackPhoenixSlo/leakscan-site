@@ -10,24 +10,29 @@ Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py
 the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB copy and any full-size photo > 200 KB).
 
 - Landing page (`site/index.html`), top to bottom, primary path first (scan, evidence, process, price, FAQ, contact):
-  `#top` hero (left: scan form with visible field labels, then who runs it + privacy facts from `privacy.html` + the
-  free start; right: live report card, "Meet Jaka" poster `.meet` under it where the player docks; then the track
-  record band) · `#free` one Google phone (All / Images / Videos tabs; after a scan her real results,
-  `js/inline-scan.js`) · `#why` · `#removals` · `#how` (7 steps in 3 stages, then the "nobody can promise every page"
-  note) · `#pricing` (per plan: price, then Covers / Runs / Re-uploads; plan buttons = plan-specific Telegram
-  messages) · `#website`, the add-on in both plans: the three things you get, then `#showcase` inside it (demo iframe
-  with a "Full screen" in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button;
-  then the Before / After Google phones, real ARIA tabs, `js/main.js`) · `#faq` · `#contact`. `tools/check.py` fails
-  if a section id is missing here. One container width for every section on desktop.
-  Phones: the `#how` stages, the Before / After phones and the `#removals` panels are swipe rows (one per view, the
-  next peeks 14px) with arrows + dots (`js/swipe.js`, static `.swipe-nav` markup: no shift); the pricing trial row
-  is hidden there (the heading, `#free` and stage 1 say it).
+  `#top` hero (left: scan form with visible field labels, the Fansly / Patreon line (message me: the scan takes an
+  OnlyFans username only), one privacy line with "What's stored" in a `<details class="more">` (`privacy.html`'s facts;
+  check.py's FAQ match skips `.more`), then the track-record numbers; right: live report card, "Meet Jaka" poster
+  `.meet` under it where the player docks) · `#free` one Google phone (All / Images / Videos tabs; after a scan her
+  real results, `js/inline-scan.js`) and a "Send me the report link" link, no repeat of the offer · `#why` ·
+  `#removals` · `#how` (4 steps in 2 stages once she starts, stacked on phones, then the "nobody can promise every
+  page" note) · `#pricing` (the one place the free start is spelled out: heading + one line; per plan: price, then
+  Covers / Runs / Re-uploads, the one-time plan says weekly re-scans / report / tracking are monthly-only; buttons
+  aligned at the foot = plan-specific Telegram messages) · `#website`, the add-on in both plans: the three things
+  you get, then `#showcase` inside it (demo iframe with a "Full screen" in-page pop-out: Esc / button / backdrop
+  close, page behind inert, focus back to the button; one Before / After Google phone at a time, picked by real ARIA
+  tabs `.ba-tabs`, `js/main.js`; without JS both show; desktop: demo left, phone right) · `#faq` (desktop: sticky
+  head with Telegram / WhatsApp buttons; "Will my own accounts be affected?" open) · `#contact`. `tools/check.py`
+  fails if a section id is missing here. One container width for every section on desktop.
+  Phones: `#removals` is the page's only swipe row (one per view, the next peeks 14px, arrows + dots, `js/swipe.js`,
+  static `.swipe-nav` markup: no shift). The "Free scan" bar shows once the scan form and the report card are both
+  off screen, hides over the demo, `#contact`, the footer and any focused control under it; safe-area aware.
   Light theme: header + hero on blush paper, cards / fields = 1px line + one soft shadow; dark: velvet.
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
   removed layer's chrome is cloned from the live one, `data-rm-copy`). Velvet section right after `#why`, centred head (left on phones); 2x2 on desktop, a swipe row (scroll-snap, arrows + dots) on phones. On screen each edge glides by itself (1-2 s CSS
-  transition) to a random 15-85 % and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
+  transition) to a random 55-85 % (the leak side: the button keeps reading Remove) and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
   reduced motion; a card's first input (Remove press, stage tap, handle key) stops its sweep for good. Remove / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
   vertical swipe leaves it); arrow / PageUp / PageDown / Home / End on the handle. "Reveal images" unblurs the

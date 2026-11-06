@@ -25,6 +25,24 @@
   var E = window.LeakScanEngine;
   if (E) document.querySelectorAll('.phone').forEach(function (phone) { E.tablist(phone); });
 
+  // Before / after: one phone at a time, picked by real tabs (click, ←/→, Home / End). Not E.tablist: that sets
+  // [hidden], and without JS both phones show. .ba[data-show] picks the one in view (CSS).
+  var baTabs = document.querySelector('.ba-tabs'), ba = document.querySelector('.ba[data-show]');
+  if (baTabs && ba) {
+    var bt = [].slice.call(baTabs.querySelectorAll('[role="tab"]'));
+    var pick = function (t, focus) {
+      bt.forEach(function (b) { var on = b === t; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+      ba.setAttribute('data-show', t.id.replace('ba-tab-', ''));
+      if (focus) t.focus();
+    };
+    baTabs.addEventListener('click', function (e) { var t = e.target.closest('[role="tab"]'); if (t) pick(t); });
+    baTabs.addEventListener('keydown', function (e) {
+      var i = bt.indexOf(document.activeElement), n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: bt.length - 1 }[e.key];
+      if (i < 0 || n === undefined) return;
+      e.preventDefault(); pick(bt[(n + bt.length) % bt.length], true);
+    });
+  }
+
   // Demo site: "Full screen" pops the frame out to a layer over the page (same iframe, no reload: it keeps its scroll).
   // Its slot keeps its height and the scrollbar gutter stays, so nothing behind it moves. Esc / the button / the
   // backdrop close it; focus goes back to the button; the rest of the page is inert meanwhile.
@@ -100,16 +118,27 @@
       if (el) { el.classList.add('is-in'); io.unobserve(el); }
     });
 
+    // Phone "Free scan" bar: only once the scan form and the example card are both off screen, never over the
+    // contact card, the footer or the demo preview, and never over whatever has focus (safe area: CSS).
     var cta = document.querySelector('.mobile-cta');
-    var hero = document.querySelector('.hero');
-    var contact = document.getElementById('contact');
-    if (cta && hero) {
-      var heroOut = false, contactIn = false, demoIn = false, demo = document.querySelector('#showcase .browser-demo');
-      var update = function () { cta.classList.toggle('show', heroOut && !contactIn && !demoIn); };
-      new IntersectionObserver(function (en) { heroOut = !en[0].isIntersecting; update(); }).observe(hero);
-      if (contact) new IntersectionObserver(function (en) { contactIn = en[0].isIntersecting; update(); }).observe(contact);
-      // and while the showcase preview is behind the bar (the bottom quarter of the screen): it would cover the preview
-      if (demo) new IntersectionObserver(function (en) { demoIn = en[0].isIntersecting; update(); }, { rootMargin: '-75% 0px 0px 0px' }).observe(demo);
+    if (cta) {
+      var st = { form: true, card: true, contact: false, foot: false, demo: false, focus: false };
+      var update = function () { cta.classList.toggle('show', !st.form && !st.card && !st.contact && !st.foot && !st.demo && !st.focus); };
+      var watch = function (sel, key, opts) {
+        var el = document.querySelector(sel);
+        if (!el) { st[key] = false; return; }
+        new IntersectionObserver(function (en) { st[key] = en[0].isIntersecting; update(); }, opts).observe(el);
+      };
+      watch('#scan', 'form'); watch('.hero .report-card', 'card'); watch('#contact', 'contact'); watch('.site-footer', 'foot');
+      // the showcase preview in the bottom quarter of the screen: the bar would sit on it
+      watch('#showcase .browser-demo', 'demo', { rootMargin: '-75% 0px 0px 0px' });
+      var covers = function (el) {   // in the bottom band the bar takes (its height + 12px gap + room)
+        if (!el || !el.getBoundingClientRect || cta.contains(el)) return false;
+        var r = el.getBoundingClientRect();
+        return r.bottom > innerHeight - cta.offsetHeight - 32 && r.top < innerHeight;
+      };
+      document.addEventListener('focusin', function (e) { st.focus = covers(e.target); update(); });
+      document.addEventListener('focusout', function () { st.focus = false; update(); });
     }
   }
 })();

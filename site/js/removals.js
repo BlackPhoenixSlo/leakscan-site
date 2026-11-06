@@ -7,7 +7,7 @@
 // of hers: name / handle, a poster / subreddit / host read off her hits, mega[] counts and age, her Google thumbs.
 // Never a third-party title, never a leak URL (read for its host / path only), never an aggregator host. textContent
 // only. Own file so it merges next to other work.
-// Ambient sweep: on screen each edge glides by itself to a random spot and holds there, per card, never in step;
+// Ambient sweep: on screen each edge glides by itself to a random spot (55-85: the leak side, "Remove" stays) and holds there, per card, never in step;
 // the first input on a card (a Remove press, a stage tap, a handle key) stops its sweep for good. None under
 // prefers-reduced-motion.
 // LeakScanRemovals.model(raw) (defined before the #removals check: site/js/video-overlays.js, whose page has none).
@@ -148,7 +148,7 @@
   }
   var now = function (card) { return +card.querySelector('.rm-handle').getAttribute('aria-valuenow'); };
 
-  // ---------- ambient sweep: glide (CSS transition, --rm-t 1-2 s) to a random 15-85, hold 1-3 s, repeat ----------
+  // ---------- ambient sweep: glide (CSS transition, --rm-t 1-2 s) to a random 55-85, hold 1-3 s, repeat ----------
   // Timers only, no per-frame JS. Runs while the card is on screen (IntersectionObserver) and the tab is visible.
   // reduced motion: no sweep at all; switched on mid-visit: the next step is skipped (edges stay put)
   var mq = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
@@ -159,7 +159,7 @@
     c.t = 0;
     if (c.dead || !c.seen || document.hidden || mq.matches) return;
     var p = now(c.card), to, dur = Math.round(rnd(1000, 2000));
-    do { to = Math.round(rnd(15, 85)); } while (Math.abs(to - p) < 15);   // a visible move every time
+    do { to = Math.round(rnd(55, 85)); } while (Math.abs(to - p) < 15);   // a visible move every time, always on the leak side: the button keeps reading "Remove"
     c.stage.style.setProperty('--rm-t', dur + 'ms');
     set(c.card, to, true);
     c.t = setTimeout(function () { step(c); }, dur + rnd(1000, 3000));
