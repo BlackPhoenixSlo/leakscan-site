@@ -67,7 +67,7 @@ BREAKS = {
 }
 
 # the run: set once by configure(); scenarios read cfg.out / cfg.base / cfg.api / cfg.broken
-cfg = types.SimpleNamespace(out=None, port=0, base="", api="", omit=False, omit_profile=False, scenarios=SCENARIOS, broken=set(), no_reuse=False, changed=None)
+cfg = types.SimpleNamespace(out=None, port=0, base="", api="", omit=False, omit_profile=False, scenarios=SCENARIOS, broken=set(), no_reuse=False, changed=None, engine=None)
 fails = []
 MEASURED = {}
 
@@ -78,6 +78,7 @@ def configure(argv):
     ap.add_argument("--only", choices=SCENARIOS, action="append")   # repeatable
     ap.add_argument("--no-reuse", action="store_true")   # run even on a hit; a green run still fills (reuse.py)
     ap.add_argument("--changed", nargs="?", const="", metavar="REF")   # only the scenarios the diff reaches; REF default: merge-base with origin/main
+    ap.add_argument("--engine", choices=("chromium", "webkit"))   # only that engine's part of a scenario (CI: pip in two jobs); a part neither reads nor fills the cache
     ap.add_argument("--omit-results", action="store_true")
     ap.add_argument("--omit-profile", action="store_true")
     for k in BREAKS:
@@ -93,8 +94,8 @@ def configure(argv):
     cfg.omit, cfg.omit_profile = a.omit_results, a.omit_profile
     cfg.scenarios = [s for s in SCENARIOS if not a.only or s in a.only]
     cfg.broken = {k for k in BREAKS if getattr(a, "break_" + k)}
-    cfg.no_reuse, cfg.changed = a.no_reuse, a.changed
-    if a.changed is not None and (cfg.broken or cfg.omit or cfg.omit_profile):
+    cfg.no_reuse, cfg.changed, cfg.engine = a.no_reuse, a.changed, a.engine
+    if a.changed is not None and (cfg.broken or cfg.omit or cfg.omit_profile or cfg.engine):
         ap.error("--changed reads the cache: a break run never does")
     return cfg
 

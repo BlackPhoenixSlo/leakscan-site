@@ -27,10 +27,10 @@ def scenario(s, parts, pw, browser, state):
     stub = start_stub(log if measure else None)
     reach.record(seen.add if measure else None)   # the harness's own reads: personalize reads site/index.html
     try:
-        for vp_name, vp in VIEWPORTS:
+        for vp_name, vp in VIEWPORTS if cfg.engine != "webkit" else ():
             for fn in parts:
                 flow(fn, vp_name, *BEFORE_VP.get(fn.__name__, lambda _pw, b: (b,))(pw, browser), vp_name, vp)
-        if s in ("pip", "sheet"):
+        if s in ("pip", "sheet") and cfg.engine != "chromium":
             for fn in parts:
                 flow(fn, "phone-webkit", pw, browser, "phone", None, "webkit")   # iPhone 13 (Playwright device), WebKit
     finally:

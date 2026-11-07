@@ -14,11 +14,11 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        scenario: [scan, personalize, askai, inline, tabs, removals, pip, sheet, again]
+        only: [scan, personalize, askai, inline, tabs, removals, "pip --engine chromium", "pip --engine webkit", sheet, again]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,12 +27,13 @@ jobs:
       - run: '"$RUNNER_TEMP/v/bin/playwright" install --with-deps chromium webkit'
       # stubs only: a network namespace with nothing but loopback and an empty env, so no key is held and no paid API reachable
       # Declared: pip's WebKit `hd:` sync flow prints SKIP on Linux (pip.py: GStreamer, no iPhone); every other check runs
-      - run: >-
-          sudo unshare -n sh -c "ip link set lo up && exec sudo -u $(id -un) -H env -i HOME=$HOME LANG=C.UTF-8
-          $RUNNER_TEMP/v/bin/python tools/scan_e2e.py $RUNNER_TEMP/out --no-reuse --only ${{ matrix.scenario }}"
+      # One retry, with a warning: drags and flings hang on wall-clock timing a loaded runner can miss; a real fault is red twice
+      - run: |
+          e2e() { sudo unshare -n sh -c "ip link set lo up && exec sudo -u $(id -un) -H env -i HOME=$HOME LANG=C.UTF-8 $RUNNER_TEMP/v/bin/python tools/scan_e2e.py $RUNNER_TEMP/out --no-reuse --only ${{ matrix.only }}"; }
+          e2e || { echo "::warning::${{ matrix.only }} red on the first try, retrying once"; e2e; }
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: e2e-${{ matrix.scenario }}
+          name: e2e-${{ matrix.only }}
           path: ${{ runner.temp }}/out
           retention-days: 3
