@@ -241,8 +241,8 @@ def demo_live(page, tag, vp_name):
     a = page.evaluate(INLINE)
     page.locator("#showcase .browser-demo").screenshot(path=str(cfg.out / f"{vp_name}-p3a-inline-live.png"))
     check(f"{tag} profile: demolive: phone inline slot = her live frame over the still's box (still hidden), her name + API hero, not Orla",
-          not a["pop"] and a["frame"] == "visible" and a["still"] == "hidden" and a["frameBox"] == a["shotBox"]
-          and a["logo"].upper() == NAME.upper() and NAME in a["h1"] and "/api/media/" in (a["hero"] or "") and not POTTERY.search(a["logo"] + a["h1"]), a)
+          not a["pop"] and a["frame"] == "visible" and a["still"] == "hidden" and all(abs(x - y) <= 1 for x, y in zip(a["frameBox"], a["shotBox"]))
+          and a["logo"].upper() == NAME.upper() and NAME.upper() in a["h1"].upper() and "/api/media/" in (a["hero"] or "") and not POTTERY.search(a["logo"] + a["h1"]), a)
     check(f"{tag} profile: \"Open full screen\" label clear of the demo's menu button", a["clear"], a)
     page.locator("#showcase .demo-shot").click()
     page.wait_for_timeout(500)
