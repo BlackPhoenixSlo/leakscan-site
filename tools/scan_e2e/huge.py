@@ -231,6 +231,10 @@ def huge_flow(browser, vp_name, vp):
         page.wait_for_timeout(300)
         page.keyboard.press("Enter")
         page.wait_for_timeout(400)
+        try:   # a loaded runner lands late (measured)
+            page.wait_for_function(f"({IN_VIEW})() === true", timeout=3000)
+        except Exception:
+            pass   # the check says what is shown
         nx = page.evaluate("() => { const a = document.activeElement, r = a.closest('.g-r'); return [a.className, [...document.querySelectorAll('#panel-google .g-r')].indexOf(r)]; }")
         nx.append(page.evaluate(IN_VIEW))
         check(f"{tag} keyboard More results → focus on the first new result, in view", nx == ["g-title", had, True], [nx, had])
