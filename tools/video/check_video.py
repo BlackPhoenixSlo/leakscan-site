@@ -18,6 +18,7 @@
 - after state (the .rm-gone layer) = the landing after-phone: google lists her site (data-vo=site) + instagram.com, no
   leak host (*.example, data-vo=host); google-images shows >= 4 of her own photos (<img>, not the blurred .rm-img) and no
   "No results" / copyright notice
+- default photos: every .rm-img / .vo-own src is a file in site/video/img/ (the video's own set, not the landing's crops)
 - both modes: .vo-stage has numeric data-cue-say (named: the "for <name>" pill from there, after the last prefab's out;
   its first 2 s pill at the take's start ends before the first prefab); the page never speaks (no speechSynthesis /
   SpeechSynthesisUtterance / data-cue-say-start in the page, js or css: Jack talks from the first second); the generic end card (.vo-cta) exists with the exact ask + a form (input name=name) and its cue (data-cue-cta, default
@@ -103,6 +104,16 @@ def after_state(html):
     own = [i for i in re.findall(r"<img\b[^>]*>", gi) if "rm-img" not in i]
     if len(own) < 4 or re.search(r"No results|Digital Millennium", gi):
         bad.append(f"video/index.html: google-images after state needs >= 4 unblurred photos (got {len(own)}), no 'No results' / notice")
+    return bad
+
+
+def default_photos(html):
+    """every default .rm-img / .vo-own src = an existing file in the video's own site/video/img/ (never the landing's crops)"""
+    bad = []
+    for tag in re.findall(r"<img\b[^>]*\b(?:rm-img|vo-own)\b[^>]*>", html):
+        src = (re.search(r'\bsrc="([^"]*)"', tag) or [None, ""])[1]
+        if not (src.startswith("img/") and (PAGE.parent / src).is_file()):
+            bad.append(f"video/index.html: default photo {src!r} must be a file in site/video/img/")
     return bad
 
 
@@ -253,6 +264,7 @@ def main():
     html = PAGE.read_text(encoding="utf-8")
     p.feed(html)
     bad += after_state(html)
+    bad += default_photos(html)
     bad += steps_and_player(html, p)
     bad += name_bar(html)
     cued = [a for a in p.prefabs if "data-cue-live" in a]

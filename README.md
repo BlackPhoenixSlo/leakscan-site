@@ -48,7 +48,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → his "they get removed" = shake + flash + "GONE." → the
   #removals compare wipe with rolling counters → "Removed" slam + CSS confetti → slide out; reduced motion = fades;
   WebAudio-synthesized pop / whoosh + thud after the play gesture, `?sfx=0` off; Google / Images after = the landing
-  after-phone: her `<name>.com` + Instagram + TikTok, her own unblurred photos), driven by `video.currentTime`
+  after-phone: her `<name>.com` + Instagram + TikTok, her own unblurred photos; default photos = the video's own `video/img/`: leak-* men in swimsuits (blurred), own-* men in suits, CREDITS.md), driven by `video.currentTime`
   against `data-cue-live / -removed / -out` (+ google-images `-tap`) on each `.vo-pf`. Two modes: named = `?name=`
   (1-40 letters / digits / space . - _) or the shared scan result (`?r=` / last scan, via `LeakScanRemovals.model`
   from `js/removals.js`, the same validators: texts; site / Instagram / TikTok from its profile, as personalize.js; with a scan result the

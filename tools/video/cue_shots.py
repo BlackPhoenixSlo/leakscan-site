@@ -26,7 +26,7 @@ Plus:
   no API), so a rebuild stays text only
 - personalized (tools/scan_stub.py, ?r=demoRemove1): named mode, texts from the scan result in every prefab; every
   .rm-img = the scan's thumbs via <API>/api/thumb, loaded, still blurred; the after photos = the stub's /api/media ones,
-  unblurred; shots drawn with the pure draw(t) (the stub has no Range); and ?name= keeps the default photos (img/removals)
+  unblurred; shots drawn with the pure draw(t) (the stub has no Range); and ?name= keeps the default photos (video/img/leak-*)
 - prod (production images, PROD_HANDLE's already-scanned result PROD_SLUG, no new scan): declared bypasses at the wire
   boundary (Playwright routes, outside service code): GET /api/scan-result|thumb|media on 127.0.0.1 → proxied read-only to
   the production API (thumb: gstatic u= only, else a local 404); POST /api/public-scan → an SSE built from that same saved
@@ -511,7 +511,7 @@ def prod(b, base, out, cues, cta):
             pg.goto(f"{base}video/")
             pg.wait_for_function("() => document.querySelector('video').readyState >= 3", timeout=15000)
             gen = pg.evaluate(IMGS)
-            check(f"prod ({label}): generic before the submit: default photos (img/removals)", len(gen) == 13 and all(x[0].startswith("../img/removals/") for x in gen), gen[:2])
+            check(f"prod ({label}): generic before the submit: default photos (video/img/leak-*)", len(gen) == 13 and all(x[0].startswith("img/leak-") for x in gen), gen[:2])
             pg.fill("#vo-nb-in", PROD_HANDLE)
             pg.press("#vo-nb-in", "Enter")
             t0 = time.monotonic()
@@ -2205,9 +2205,18 @@ def run(a):
                 check(f"{vp} {mode}: jack.webm is the playing source", (src or "").endswith("/video/jack.webm"), src)
                 if vp == "desktop" and mode == "named":   # defaults stay for ?name= (no scan photos without a scan)
                     im = pg.evaluate(IMGS)
-                    check(f"?name={a.name}: all {len(im)} .rm-img keep the default photos (img/removals), blurred",
-                          len(im) == 13 and all(s.startswith("../img/removals/") and "blur(" in f for s, w, f in im), im[:3])
-                if vp == "desktop" and mode == "generic":
+                    check(f"?name={a.name}: all {len(im)} .rm-img keep the default photos (video/img/leak-*), blurred",
+                          len(im) == 13 and all(s.startswith("img/leak-") and "blur(" in f for s, w, f in im), im[:3])
+                if vp == "desktop" and mode == "generic":   # the video's own default photos (site/video/img/): leak-* blurred, own-* not
+                    im, own = pg.evaluate(IMGS), pg.evaluate(OWN)
+                    check(f"generic: {len(im)} .rm-img = video/img/leak-*, loaded, blurred; {len(own)} .vo-own = video/img/own-*, loaded, unblurred",
+                          len(im) == 13 and len(own) == 6 and all(s.startswith("img/leak-") and w > 0 and "blur(" in f for s, w, f in im)
+                          and all(s.startswith("img/own-") and w > 0 and "blur" not in f for s, w, f in own), (im[:2], own[:2]))
+                    vimg = sorted({u for u in seen if "/video/img/" in u})
+                    st = {u.rsplit("/", 1)[1]: pg.request.get(u).status for u in vimg}
+                    old = sorted({u for u in seen if "/img/removals/" in u or "/assets/phone/" in u})
+                    check(f"generic: requests: {len(vimg)} video/img files, all 200 {st}; none of the landing's img/removals / assets/phone",
+                          len(vimg) == 12 and set(st.values()) == {200} and not old, (st, old[:3]))
                     # the form: trimmed + collapsed name → ?name=; an invalid one stays
                     if check("end card form: #vo-name present", pg.locator("#vo-name").count() == 1):
                         pg.fill("#vo-name", "<b>")
