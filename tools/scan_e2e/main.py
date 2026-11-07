@@ -5,7 +5,7 @@ import sys
 import time
 
 from . import reach, reuse
-from .common import MEASURED, VIEWPORTS, cfg, check, configure, fails, start_stub
+from .common import CHROMIUM, MEASURED, VIEWPORTS, cfg, check, configure, fails, start_stub
 
 BEFORE_VP = {"thumb_paint": lambda pw, browser: (pw,), "pip_flow": lambda pw, browser: (pw, browser), "photos_flow": lambda pw, browser: (pw, browser), "sheet_flow": lambda pw, browser: (pw, browser)}   # first args of a part; default (browser,)
 
@@ -62,7 +62,7 @@ def run(argv=None):
         from playwright.sync_api import sync_playwright   # lazily: a full hit needs no browser
         parts = {s: [getattr(importlib.import_module("." + f.split(".")[0], __package__), f.split(".")[1]) for f in reuse.FLOWS[s]] for s in todo}
         with sync_playwright() as pw:
-            browser = pw.chromium.launch()
+            browser = pw.chromium.launch(**CHROMIUM)
             for s in todo:
                 per[s] = scenario(s, parts[s], pw, browser, state)
                 save()   # a green scenario of a run killed later is still reusable

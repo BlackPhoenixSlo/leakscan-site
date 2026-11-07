@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import TimeoutError as PWTimeout
 
-from .common import PIP_AWAY, cfg, check, digits, new_ctx, scan_images, served
+from .common import PIP_AWAY, cfg, check, digits, new_ctx, scan_images, served, touch_scroll
 
 
 def by_site(d):
@@ -46,7 +46,7 @@ def strip_flow(page, cdp, tag, vp_name, vp, n_img):
           and s0["sw"] > s0["cw"] and s0["snap"] == "x mandatory" and s0["ox"] == "auto" and s0["bar"] == 0 and not s0["showMore"] and s0["open"] and s0["lazy"] and s0["start"], s0)
     sb = page.eval_on_selector("#panel-google .g-strip", "s => { const r = s.getBoundingClientRect(); return [r.left + r.width * .75, r.top + r.height / 2]; }")
     if phone:   # a real touch swipe (right → left), momentum + snap settle
-        cdp.send("Input.synthesizeScrollGesture", {"x": int(sb[0]), "y": int(min(sb[1], vp["height"] - 10)), "xDistance": -260, "yDistance": 0, "gestureSourceType": "touch", "speed": 1200})
+        touch_scroll(page, cdp, int(sb[0]), int(min(sb[1], vp["height"] - 10)), dx=-260, speed=1200)
     else:       # hover shows the arrows; the next arrow pages the strip
         page.mouse.move(*sb)
         page.wait_for_timeout(350)
@@ -178,8 +178,7 @@ def huge_flow(browser, vp_name, vp):
                     page.mouse.move(cx, cy)
                     page.mouse.wheel(0, 400)
                 else:
-                    page.context.new_cdp_session(page).send("Input.synthesizeScrollGesture", {"x": int(cx), "y": int(cy), "yDistance": -400, "speed": 1200,
-                                                                                            "gestureSourceType": "touch", "preventFling": True})
+                    touch_scroll(page, page.context.new_cdp_session(page), int(cx), int(cy), dy=-400, speed=1200)
                 page.wait_for_timeout(800)
                 z = page.evaluate(HO)
                 ho[f"{t}/{how}"] = {"hidden_at_top": [a0["rise"], a0["seen"], a0["op"]], "dy": z["y"] - a["y"], "st": [a["st"], z["st"], z["max"]],

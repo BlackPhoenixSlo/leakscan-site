@@ -25,9 +25,10 @@ jobs:
           persist-credentials: false
       - run: python3 -m venv "$RUNNER_TEMP/v" && "$RUNNER_TEMP/v/bin/pip" install -q playwright==1.63.0 curl_cffi
       - run: '"$RUNNER_TEMP/v/bin/playwright" install --with-deps chromium webkit'
-      # stubs only: a network namespace with nothing but loopback and sudo's reset env, so no key is held and no paid API reachable
+      # stubs only: a network namespace with nothing but loopback and an empty env, so no key is held and no paid API reachable
+      # Declared: pip's WebKit `hd:` sync flow prints SKIP on Linux (pip.py: GStreamer, no iPhone); every other check runs
       - run: >-
-          sudo unshare -n sh -c "ip link set lo up && exec sudo -u $(id -un) -H
+          sudo unshare -n sh -c "ip link set lo up && exec sudo -u $(id -un) -H env -i HOME=$HOME LANG=C.UTF-8
           $RUNNER_TEMP/v/bin/python tools/scan_e2e.py $RUNNER_TEMP/out --no-reuse --only ${{ matrix.scenario }}"
       - uses: actions/upload-artifact@v4
         if: failure()

@@ -21,6 +21,7 @@ FLOWS = {"scan": ("scan.scan_flow", "huge.huge_flow"), "personalize": ("personal
 SCENARIOS = tuple(FLOWS)
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 LOOP = ("127.0.0.1", "localhost")
+CHROMIUM = {"args": ["--enable-features=OverlayScrollbar"]} if sys.platform == "linux" else {}   # as on a Mac: a hidden classic scrollbar still takes its gutter under html.pop-lock's scrollbar-gutter: stable, an artifact (measured: shown, nothing moves)
 PROD_HOSTS = ("scan.srv1395798.hstgr.cloud", "72.62.92.114", "jackbase.me")
 PROFILE = FX["profile"]
 ACC = {a["platform"]: a for a in PROFILE["accounts"]}
@@ -267,6 +268,30 @@ def hover(page, sel):
     xy = page.eval_on_selector(sel, """e => { e.scrollIntoView({block: 'center', behavior: 'instant'});
         const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }""")
     page.mouse.move(*xy)
+
+
+def touch_scroll(page, cdp, x, y, dx=0, dy=0, speed=800, fling=False):
+    """The finger moves (dx, dy) from (x, y). CDP's synthesized touch gesture scrolls nothing on Linux, whatever the launch flags (measured, CI's Chromium 153), so there:
+    dispatched touches, past the 15 px slop, in strokes that stay on screen; a hold before the lift = no momentum."""
+    if sys.platform != "linux":
+        cdp.send("Input.synthesizeScrollGesture", {"x": x, "y": y, "xDistance": dx, "yDistance": dy, "speed": speed, "gestureSourceType": "touch", "preventFling": not fling})
+        return
+    touch = lambda kind, *at: cdp.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": [{"x": at[0], "y": at[1]}] if at else []})
+    vp, dist = page.viewport_size, max(abs(dx), abs(dy))
+    room = max(40, (x - 20 if dx < 0 else vp["width"] - 20 - x) if abs(dx) > abs(dy) else (y - 20 if dy < 0 else vp["height"] - 20 - y)) - 16
+    ux, uy = dx / dist, dy / dist
+    while dist > 0:
+        stroke, dist = min(room, dist), dist - min(room, dist)
+        touch("touchStart", x, y)
+        touch("touchMove", x + ux * 16, y + uy * 16)
+        n = max(1, round(stroke / speed * 60))
+        for i in range(1, n + 1):
+            page.wait_for_timeout(16)
+            touch("touchMove", x + ux * (16 + stroke * i / n), y + uy * (16 + stroke * i / n))
+        if not fling:
+            page.wait_for_timeout(150)
+        touch("touchEnd")
+        page.wait_for_timeout(16)
 
 
 def swipe(page, sel, extra=()):
