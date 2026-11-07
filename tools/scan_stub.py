@@ -13,6 +13,7 @@ Serves site/ and the API routes of the contract the scan page talks to:
   domains (deterministic, long-tail counts), 80 Google results, 30 images (report-view scale test); stub-videos →
   videos_result(): 45 results (34 video), 18 images[] (12 = video stills), 33 unique thumbs (video stills: badged in the scan page's Images tab, skipped by the landing's).
 - demoAged1 (as_of 2 h ago, 3 hits, both socials), demoYoung1 (as_of 4 min ago): the "Scanned ... · Scan again" line.
+- demoTrimmed1 (5 days old), demoSummary1 (2 months old): what retention leaves, by the API's own db.retain_row, media "none".
 - GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise. Preloaded: demoR3port01 (the
   fixture, with its synthetic `profile`), demoHuge0001 (huge_result()), demoVideos01 (videos_result()), demoNoProf01 (same, `profile` null: scan-only personalization, no leak-page
   Instagram), demoFoundIG1 (`profile` null, leak-page Instagram fills the IG rows) and evilR3port01
@@ -79,6 +80,7 @@ sys.path.insert(0, str(ROOT / "app"))
 from public_app import off_row   # the API's own aggregator rule for a stored row, not a copy
 import ratelimit   # the API's own bucket (--thumb-bucket)
 import thumb_sheet   # the API's own thumb list and body format
+import db                        # db.retain_row: the API's own retention, not a copy
 SITE = ROOT / "site"
 FIXTURE = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())
 EVIL = json.loads((ROOT / "tools" / "fixtures" / "scan-evil.json").read_text())
@@ -168,6 +170,13 @@ def huge_result(handle, n_links=1000, n_domains=100):
 
 def iso_ago(secs):
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - secs))
+
+
+def retained(tier, age_s):
+    """demoTrimmed1 / demoSummary1: what /api/scan-result serves for a row at that retention tier."""
+    r = {**json.loads(json.dumps(FIXTURE)), "mega": json.loads(json.dumps(MEGA)), "socials": {"instagram": "mira.ig"}}
+    extra, hits = db.retain_row(r, r["hits"], tier)
+    return {**extra, "hits": hits, "images": [], "results": [], "mega": extra.get("mega") or [], "retention": tier, "as_of": iso_ago(age_s)}
 
 
 OLD_API = {"demoRemove1"}   # served as an API from before the aggregator rule: the page's fallback guard must cope
@@ -595,13 +604,16 @@ def main():
                           ("demoVideos01", {**videos_result(FIXTURE["handle"]), "mega": []}),
                           ("demoAged1", {"mega": [], "as_of": iso_ago(2 * 3600 + 60), "hits": FIXTURE["hits"][:3], "results": [], "hit_count": 3,
                                          "socials": {"instagram": "mira.ig", "x": "mira_x"}}),
-                          ("demoYoung1", {"mega": [], "as_of": iso_ago(240)})):
+                          ("demoYoung1", {"mega": [], "as_of": iso_ago(240)}),
+                          ("demoTrimmed1", retained("trimmed", 5 * 86400 + 60)),
+                          ("demoSummary1", retained("summary", 61 * 86400))):
         seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
         if OPTS.omit_results:
             seed.pop("results", None)
         if OPTS.omit_profile:
             seed["profile"] = None
         STORE[slug] = seed if slug in OLD_API else off_row(seed)   # as /api/scan-result serves it
+    MEDIA_MODE.update(demoTrimmed1="none", demoSummary1="none")
     srv = ThreadingHTTPServer(("127.0.0.1", OPTS.port), Handler)
     print(f"scan stub on http://127.0.0.1:{srv.server_address[1]}/", flush=True)
     srv.serve_forever()

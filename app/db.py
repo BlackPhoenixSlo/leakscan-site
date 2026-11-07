@@ -17,6 +17,7 @@ import os
 import re
 import secrets
 import sqlite3
+import time  # one-project: retention
 from datetime import datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -48,7 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_scans_handle  ON scans(handle);
 
 @contextlib.contextmanager
 def _db(path=None):
-    conn = sqlite3.connect(path or DB_PATH)
+    conn = sqlite3.connect(path or DB_PATH, timeout=30)  # one-project: retention (a writer outwaits VACUUM)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -68,6 +69,7 @@ def init_db(path=None):
         cols = [r[1] for r in conn.execute("PRAGMA table_info(scans)").fetchall()]
         if "extra_json" not in cols:
             conn.execute("ALTER TABLE scans ADD COLUMN extra_json TEXT")
+        _retain_migrate(conn, cols)  # one-project: retention
         conn.commit()
     finally:
         conn.close()
@@ -127,6 +129,131 @@ def recent_scan(handle, key, value, max_age_s, path=None):
                       "AND level = 'low' AND status = 'complete' AND created_at >= ? AND json_extract(extra_json, ?) = ? "
                       "ORDER BY created_at DESC, rowid DESC LIMIT 1", (handle, since, "$." + key, value)).fetchone()
     return r and {"slug": r[0], "created_at": r[4], "age_s": r[1], "hits": json.loads(r[2] or "[]"), "extra": json.loads(r[3] or "{}")}
+
+
+# Retention, by row age (created_at), a row is never deleted. Default-keep: a key in neither list stays forever (so does
+# every column but RETAIN_NULL), so a future field is never silently lost.
+RETAIN_BIG = ("images", "results", "gallery", "img_meta", "excluded")              # past big_days: gone (+ files, profile.avatar=false)
+RETAIN_SMALL = ("mega", "cse_sites", "mega_key", "scan_key", "reused_from")        # past small_days: gone (+ result_json = [])
+RETAIN_NULL = ("client_ip_hash", "verify_code", "verify_platform")                 # past small_days: NULL
+TOP_DOMAINS = 20
+RETAIN_BATCH = 100                                                                 # rows per write transaction: writers get a turn
+
+
+def _retain_migrate(conn, cols):
+    """The `retention` marker ('full' | 'trimmed' | 'summary'), indexed: a daily run reads only rows newly over a cutoff."""
+    if "retention" not in cols:
+        conn.execute("ALTER TABLE scans ADD COLUMN retention TEXT NOT NULL DEFAULT 'full'")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_retention ON scans(retention, created_at)")
+
+
+def top_domains(hits, n=TOP_DOMAINS):
+    """[{domain, n}], most seen first: a domain's occurrences summed, a row without a number counts 1 (rankHosts in
+    site/js/scan-engine.js, which reads this list once the hits are gone)."""
+    by = {}
+    for h in hits if isinstance(hits, list) else []:
+        d = h.get("domain") if isinstance(h, dict) else None
+        if d and isinstance(d, str):
+            occ = h.get("occurrences")
+            by[d] = by.get(d, 0) + (occ if type(occ) in (int, float) and occ > 0 else 1)
+    return [{"domain": d, "n": c} for d, c in sorted(by.items(), key=lambda kv: -kv[1])[:n]]
+
+
+def retain_row(extra, hits, tier):
+    """What a scan keeps at a tier ('trimmed' | 'summary'), the one place that says so -> (extra, hits). Pure."""
+    out = {k: v for k, v in extra.items() if k not in RETAIN_BIG}
+    if isinstance(out.get("profile"), dict):
+        out["profile"] = {**out["profile"], "avatar": False}
+    if tier == "summary":
+        out = {k: v for k, v in out.items() if k not in RETAIN_SMALL}
+        out["top_domains"] = top_domains(hits)
+        hits = []
+    return out, hits
+
+
+def _json_or_none(text, kind):
+    try:
+        v = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    return v if isinstance(v, kind) else None
+
+
+def _retain_one(c, slug, tier, repair):
+    """One row, inside the batch's transaction -> (was it 'full', was its extra_json corrupt). Corrupt extra_json keeps its
+    bytes (nothing to read a key from); corrupt result_json keeps its bytes until 'summary'."""
+    r = c.execute("SELECT result_json, extra_json, status, hit_count, domain_count, retention FROM scans WHERE slug = ?",
+                  (slug,)).fetchone()
+    text, ex_text, status, hit_count, domain_count, was = r
+    hits, extra = _json_or_none(text, list), {} if ex_text is None else _json_or_none(ex_text, dict)
+    n_hits = len(hits or [])
+    if repair and hits is not None and extra is not None and was == "full":
+        # what the API serves now, baked in: off_row recounts from `mega` + `results`, which go. A row stored after the
+        # aggregator rule comes back the same.
+        row = repair({"hits": hits, "results": extra.get("results"), "mega": extra.get("mega"), "images": extra.get("images"),
+                      "google_total": extra.get("google_total"), "status": status, "hit_count": hit_count,
+                      "domain_count": domain_count})
+        hits, status, hit_count, domain_count = row["hits"], row["status"], row["hit_count"], row["domain_count"]
+        if "google_total" in extra:
+            extra = {**extra, "google_total": row["google_total"]}
+        if len(hits) != n_hits:
+            text = json.dumps(hits, ensure_ascii=False)
+    if extra is not None:
+        extra, kept = retain_row(extra, hits or [], tier)
+        if ex_text is not None or extra:
+            ex_text = json.dumps(extra, ensure_ascii=False, separators=(",", ":"))
+    if tier == "summary":
+        text = "[]"
+    nulls = ", ".join(f"{k} = NULL" for k in RETAIN_NULL) + ", " if tier == "summary" else ""
+    c.execute(f"UPDATE scans SET {nulls}result_json = ?, extra_json = ?, status = ?, hit_count = ?, domain_count = ?, "
+              "retention = ? WHERE slug = ?", (text, ex_text, status, hit_count, domain_count, tier, slug))
+    return was == "full", extra is None
+
+
+def retain_scans(big_days, small_days, path=None, repair=None):
+    """Apply the tiers to rows newly over a cutoff, `running` rows skipped; never deletes a row. repair(row): the API's
+    off_row (db can't import it). -> {trimmed, summary, corrupt, errors, slugs: rows that just left 'full': their files go}.
+    A row that raises stays as it was, for the next run."""
+    now = datetime.now(timezone.utc)
+    big, small = ((now - timedelta(days=d)).strftime("%Y-%m-%dT%H:%M:%SZ") for d in (big_days, small_days))
+    out = {"trimmed": 0, "summary": 0, "corrupt": 0, "errors": 0, "slugs": []}
+    with _db(path) as c:
+        todo = c.execute("SELECT slug, created_at FROM scans WHERE status != 'running' AND "
+                         "((retention = 'full' AND created_at < ?) OR (retention = 'trimmed' AND created_at < ?))",
+                         (big, small)).fetchall()
+    for i in range(0, len(todo), RETAIN_BATCH):
+        conn = sqlite3.connect(path or DB_PATH, timeout=30, isolation_level=None)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for slug, created in todo[i:i + RETAIN_BATCH]:
+                tier = "summary" if created < small else "trimmed"
+                try:
+                    full, corrupt = _retain_one(conn, slug, tier, repair)
+                except Exception:
+                    out["errors"] += 1
+                    continue
+                out[tier] += 1
+                out["corrupt"] += corrupt
+                if full:
+                    out["slugs"].append(slug)
+            conn.execute("COMMIT")
+        finally:
+            conn.close()
+        time.sleep(0.01)
+    return out
+
+
+def vacuum(path=None):
+    """Give retention's freed pages back to the disk, and the WAL VACUUM wrote. Writers wait (timeout), readers don't."""
+    conn = sqlite3.connect(path or DB_PATH, timeout=30, isolation_level=None)
+    try:
+        conn.execute("VACUUM")
+        for _ in range(10):   # busy while a reader sits on the old pages: VACUUM wrote the whole DB to the WAL
+            if not conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0]:
+                break
+            time.sleep(0.5)
+    finally:
+        conn.close()
 
 
 def scan_extra(slug, path=None):
@@ -278,7 +405,7 @@ def get_scan(slug, path=None):
     # whatever the worker stored so a share/reload renders the full report.
     for key in ("img_meta", "gallery", "cse_sites", "top_leaks", "n_leaks",
                 "n_media", "n_hosting", "n_sites", "quote", "links_by_domain",
-                "excluded", "mega", "results"):  # one-project: get_scan
+                "excluded", "mega", "results", "top_domains"):  # one-project: get_scan
         if key in extra:
             d[key] = extra[key]
     return d
@@ -303,14 +430,7 @@ def delete_scan(slug, path=None):
     return cur.rowcount > 0
 
 
-def prune_scans(max_age_days=30, path=None):
-    """Retention: delete scans older than the cutoff. Returns rows removed.
-    Call at startup (and optionally on a timer)."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).strftime(
-        "%Y-%m-%dT%H:%M:%SZ")
-    with _db(path) as c:
-        cur = c.execute("DELETE FROM scans WHERE created_at < ?", (cutoff,))
-    return cur.rowcount
+# upstream's prune_scans (deleted whole rows) is gone: retain_scans  # one-project: retention
 
 
 if __name__ == "__main__":

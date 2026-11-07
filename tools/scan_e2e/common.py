@@ -16,8 +16,8 @@ from . import reach
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 FX = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())   # the stub's fixture: expected profile / copy
-FLOWS = {"scan": ("scan.scan_flow", "huge.huge_flow"), "personalize": ("personalize.personalize_flow",), "askai": ("askai.askai",),   # scenario → its parts (module.function), in order
-         "inline": ("inline.inline_flow", "inline.thumb_paint"), "tabs": ("tabs.tabs_flow",), "removals": ("removals.removals_flow",), "pip": ("pip.pip_flow", "pip.photos_flow"), "sheet": ("sheet.sheet_flow",), "again": ("again.again_flow",)}
+FLOWS = {"scan": ("scan.scan_flow", "huge.huge_flow"), "personalize": ("personalize.personalize_flow", "expired.personal_flow"), "askai": ("askai.askai",),   # scenario → its parts (module.function), in order
+         "inline": ("inline.inline_flow", "inline.thumb_paint"), "tabs": ("tabs.tabs_flow",), "removals": ("removals.removals_flow",), "pip": ("pip.pip_flow", "pip.photos_flow"), "sheet": ("sheet.sheet_flow",), "again": ("again.again_flow", "expired.expired_flow")}
 SCENARIOS = tuple(FLOWS)
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 LOOP = ("127.0.0.1", "localhost")
@@ -59,6 +59,7 @@ BREAKS = {
     "sheet500": ("scan-engine.js", "var SHEET_MS = ", "var SHEET_MS = "),   # no script change: scan_e2e/sheet.py sets the stub's sheet endpoint to 500
     "sheetdead": ("scan-engine.js", "{ img.removeAttribute('src'); return setTimeout(function () { img.dispatchEvent(new Event('error')); }); }", "return setTimeout(function () { img.dispatchEvent(new Event('error')); });"),   # a dead thumb's img keeps its old src
     "askstall": ("scan-engine.js", "function () { ctl.abort(); }, ASK_MS", "function () {}, ASK_MS"),   # a stalled status holds the queue
+    "expired": ("scan-engine.js", "{ trimmed: 'images', summary: 'details' }[raw && raw.retention]", "null"),   # a retained report reads as a full one
     "again": ("scan-engine.js", "    if (o.fresh) body.fresh = true;\n", "\n"),   # "Scan again" scans without fresh:true
 }
 

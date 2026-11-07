@@ -1,0 +1,353 @@
+"""Retention (db.retain_scans, public_app.run_retention): the tiers on the real DB functions and what the real Handler serves
+afterwards. Mass + concurrency: tools/retention_proof.py. All data synthetic."""
+import http.client
+import json
+import os
+import sys
+import tempfile
+import threading
+import time
+import unittest
+from datetime import datetime, timedelta, timezone
+from http.server import ThreadingHTTPServer
+from unittest import mock
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+import chat_proxy
+import db
+import media_gather as mg
+import public_app
+import ratelimit
+
+MEGA = [{"url": "https://s.leakshaven.com/AAA", "host": "leakshaven.com", "via": "leakshaven.com", "title": "x", "status": "live"}]
+HITS = [{"domain": "a.example", "url": "https://a.example/1", "occurrences": 5, "live": True},
+        {"domain": "b.example", "url": "https://b.example/1", "occurrences": 9, "live": True},
+        {"domain": "a.example", "url": "https://a.example/2", "occurrences": 6, "live": True},
+        {"domain": "c.example", "url": "https://c.example/1", "live": True}]
+BIG = {"images": ["https://t.example/1.jpg"], "results": [{"link": "https://g.example/1", "domain": "g.example", "title": "t", "thumb": None}],
+       "gallery": [{"u": 1}], "img_meta": {"a": 1}, "excluded": ["x"]}
+SMALL = {"mega": MEGA, "cse_sites": [{"d": 1}], "mega_key": "k", "scan_key": "sk", "reused_from": "abcdefgh"}
+FOREVER = {"google_total": 1240, "socials": {"instagram": "mira"}, "aliases": {"declared": ["h"], "discovered": [], "socials": []},
+           "slugs": ["s"], "top_leaks": [{"u": 1}], "quote": {"p": 1}, "n_leaks": 3, "n_media": 2, "n_hosting": 1, "n_sites": 4, "mega_ok": True,
+           "accepted_urls": ["https://a.example/1"], "links_by_domain": {"a.example": ["u"]}, "removed_urls": ["u2"], "as_of": "2020-01-01T00:00:00Z",
+           "a_future_field": {"keep": "me"}}
+PROFILE = {"display_name": "Mira", "avatar": True, "bio": "b"}
+
+
+def ago(days):
+    return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        for p in (mock.patch.object(db, "DB_PATH", os.path.join(self.tmp.name, "t.db")),
+                  mock.patch.dict(os.environ, DATA_DIR=self.tmp.name),
+                  mock.patch.object(public_app, "RESULT_LIMITER", ratelimit.Limiter(rate_per_min=10000, burst=1000, max_concurrent=100))):
+            p.start()
+            self.addCleanup(p.stop)
+        db.init_db()
+
+    def seed(self, days, hits=HITS, status="complete", level="low", extra="default", **cols):
+        ex = {**BIG, **SMALL, **FOREVER, "profile": PROFILE} if extra == "default" else extra
+        slug = db.insert_scan(hits, handle="h", level=level, platform="onlyfans.com", status=status,
+                              extra=ex if isinstance(ex, dict) else None, client_ip_hash="ip")
+        with db._db() as c:
+            c.execute("UPDATE scans SET created_at=?, verify_code='v', verify_platform='p' WHERE slug=?", (ago(days), slug))
+            if not isinstance(ex, dict):
+                c.execute("UPDATE scans SET extra_json=? WHERE slug=?", (ex, slug))
+        return slug
+
+    def raw(self, slug):
+        with db._db() as c:
+            return dict(c.execute("SELECT * FROM scans WHERE slug=?", (slug,)).fetchone())
+
+    def run_tiers(self):
+        return db.retain_scans(3, 30, repair=public_app.off_row)
+
+
+class TestTiers(Base):
+    def test_full_under_big_days(self):
+        s = self.seed(2.9)
+        before = self.raw(s)
+        n = self.run_tiers()
+        self.assertEqual((n["trimmed"], n["summary"], n["slugs"]), (0, 0, []))
+        self.assertEqual(self.raw(s), before)
+
+    def test_trimmed(self):
+        s = self.seed(3.1)
+        before, n = self.raw(s), self.run_tiers()
+        self.assertEqual((n["trimmed"], n["summary"], n["slugs"]), (1, 0, [s]))
+        r = self.raw(s)
+        ex = json.loads(r["extra_json"])
+        self.assertEqual(r["retention"], "trimmed")
+        self.assertEqual(ex, {**SMALL, **FOREVER, "profile": {**PROFILE, "avatar": False}})
+        self.assertEqual(r["result_json"], before["result_json"])
+        for k in set(before) - {"extra_json", "retention"}:
+            self.assertEqual(r[k], before[k], k)
+
+    def test_summary_straight_from_full(self):
+        s = self.seed(30.1)
+        before, n = self.raw(s), self.run_tiers()
+        self.assertEqual((n["trimmed"], n["summary"], n["slugs"]), (0, 1, [s]))
+        r = self.raw(s)
+        self.assertEqual(json.loads(r["extra_json"]), {**FOREVER, "profile": {**PROFILE, "avatar": False}, "top_domains": [
+            {"domain": "a.example", "n": 11}, {"domain": "b.example", "n": 9}, {"domain": "c.example", "n": 1}]})
+        self.assertEqual((r["result_json"], r["retention"]), ("[]", "summary"))
+        self.assertEqual((r["client_ip_hash"], r["verify_code"], r["verify_platform"]), (None, None, None))
+        for k in ("slug", "level", "platform", "handle", "created_at", "status", "hit_count", "domain_count", "ownership_verified"):
+            self.assertEqual(r[k], before[k], k)
+
+    def test_trimmed_then_summary_same_as_straight(self):
+        a, b = self.seed(10), self.seed(30.1)
+        self.run_tiers()
+        with db._db() as c:
+            c.execute("UPDATE scans SET created_at=? WHERE slug=?", (ago(31), a))
+        n = self.run_tiers()
+        self.assertEqual((n["summary"], n["slugs"]), (1, []))    # its files went at 'trimmed'
+        self.assertEqual(self.raw(a)["extra_json"], self.raw(b)["extra_json"])
+
+    def test_idempotent_and_reads_no_old_row(self):
+        for d in (1, 10, 40):
+            self.seed(d)
+        self.run_tiers()
+        with db._db() as c:
+            before = [dict(r) for r in c.execute("SELECT * FROM scans ORDER BY slug")]
+        with mock.patch.object(db, "_retain_one", side_effect=AssertionError("touched")):
+            n = self.run_tiers()
+        self.assertEqual((n["trimmed"], n["summary"], n["errors"]), (0, 0, 0))
+        with db._db() as c:
+            self.assertEqual([dict(r) for r in c.execute("SELECT * FROM scans ORDER BY slug")], before)
+
+    def test_running_skipped(self):
+        s = self.seed(40, status="running")
+        before = self.raw(s)
+        self.assertEqual(self.run_tiers()["summary"], 0)
+        self.assertEqual(self.raw(s), before)
+
+    def test_null_and_corrupt_extra_never_raise(self):
+        null_t, null_s = self.seed(10, extra=None), self.seed(40, extra=None)
+        bad_t, bad_s = self.seed(10, extra="{not json"), self.seed(40, extra="[1,2")
+        arr = self.seed(40, extra="[]")
+        n = self.run_tiers()
+        self.assertEqual((n["trimmed"], n["summary"], n["corrupt"], n["errors"]), (2, 3, 3, 0))
+        self.assertIsNone(self.raw(null_t)["extra_json"])
+        self.assertEqual(json.loads(self.raw(null_s)["extra_json"])["top_domains"][0]["domain"], "a.example")
+        self.assertEqual(self.raw(bad_t)["extra_json"], "{not json")
+        self.assertEqual((self.raw(bad_s)["extra_json"], self.raw(bad_s)["result_json"]), ("[1,2", "[]"))
+        self.assertEqual(self.raw(arr)["extra_json"], "[]")
+        self.assertEqual(self.run_tiers()["corrupt"], 0)         # marked: not read again
+
+    def test_corrupt_result_json(self):
+        t, s = self.seed(10), self.seed(40)
+        with db._db() as c:
+            c.execute("UPDATE scans SET result_json='{bad' WHERE slug IN (?,?)", (t, s))
+        n = self.run_tiers()
+        self.assertEqual(n["errors"], 0)
+        self.assertEqual(self.raw(t)["result_json"], "{bad")
+        self.assertEqual(self.raw(s)["result_json"], "[]")
+        self.assertEqual(json.loads(self.raw(s)["extra_json"])["top_domains"], [])
+
+    def test_a_row_that_raises_waits_for_the_next_run(self):
+        a, b = self.seed(10), self.seed(10)
+        real, boom = db.retain_row, {a}
+
+        def flaky(extra, hits, tier):
+            if boom:
+                boom.clear()
+                raise ValueError("x")
+            return real(extra, hits, tier)
+        with mock.patch.object(db, "retain_row", flaky):
+            n = self.run_tiers()
+        self.assertEqual((n["trimmed"], n["errors"]), (1, 1))
+        self.assertEqual(self.run_tiers()["trimmed"], 1)
+        self.assertEqual({self.raw(a)["retention"], self.raw(b)["retention"]}, {"trimmed"})
+
+    def test_top_domains_cap_and_occurrence_rule(self):
+        hits = [{"domain": f"d{i}.example", "occurrences": i + 1} for i in range(30)] + [{"domain": "x.example", "occurrences": True},
+                {"domain": None}, "junk", {"domain": "y.example", "occurrences": -3}]
+        top = db.top_domains(hits)
+        self.assertEqual(len(top), 20)
+        self.assertEqual(top[0], {"domain": "d29.example", "n": 30})
+        self.assertEqual({t["n"] for t in db.top_domains(hits, 100) if t["domain"] in ("x.example", "y.example")}, {1})
+
+    def test_migration_on_a_table_from_before(self):
+        p = os.path.join(self.tmp.name, "old.db")
+        import sqlite3
+        c = sqlite3.connect(p)
+        c.executescript(db._SCHEMA)
+        c.execute("INSERT INTO scans (slug,handle,created_at,status,result_json) VALUES ('abcdefgh','h',?,'complete','[]')", (ago(5),))
+        c.commit()
+        c.close()
+        db.init_db(p)
+        db.init_db(p)
+        self.assertEqual(db.get_scan("abcdefgh", path=p)["retention"], "full")
+        self.assertEqual(db.retain_scans(3, 30, path=p)["trimmed"], 1)
+
+
+class TestServing(Base):
+    """The real Handler, before and after a run."""
+
+    def setUp(self):
+        super().setUp()
+        self.srv = ThreadingHTTPServer(("127.0.0.1", 0), public_app.Handler)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.addCleanup(self.srv.shutdown)
+
+    def get(self, path):
+        c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=20)
+        c.request("GET", path)
+        r = c.getresponse()
+        body = r.read()
+        c.close()
+        return r.status, json.loads(body) if r.getheader("Content-Type", "").startswith("application/json") else body
+
+    def files(self, slug):
+        os.makedirs(os.path.join(mg.data_dir(), "media", slug), exist_ok=True)
+        with open(os.path.join(mg.data_dir(), "media", slug, "0.jpg"), "wb") as fh:
+            fh.write(b"jpg")
+        with open(os.path.join(mg.data_dir(), "media", slug, "index.json"), "w") as fh:
+            json.dump({"status": "ready", "images": [{"n": 0}]}, fh)
+        os.makedirs(public_app._avatar_dir(), exist_ok=True)
+        with open(os.path.join(public_app._avatar_dir(), f"{slug}.jpg"), "wb") as fh:
+            fh.write(b"jpg")
+
+    def test_each_tier_stays_200_counts_stand(self):
+        young, mid, old, nothing = self.seed(1), self.seed(10), self.seed(40), self.seed(40, hits=[], status="empty")
+        before = {s: self.get(f"/api/scan-result/{s}")[1] for s in (young, mid, old, nothing)}
+        self.assertEqual(before[young]["retention"], "full")
+        for s in (mid, old, nothing):
+            self.files(s)
+        public_app.run_retention()
+        for s, tier in ((young, "full"), (mid, "trimmed"), (old, "summary"), (nothing, "summary")):
+            st, r = self.get(f"/api/scan-result/{s}")
+            self.assertEqual((st, r["retention"]), (200, tier))
+            for k in ("hit_count", "domain_count", "google_total", "status", "handle", "platform", "created_at", "aliases", "socials"):
+                self.assertEqual(r[k], before[s][k], (tier, k))
+        mid_r, old_r = self.get(f"/api/scan-result/{mid}")[1], self.get(f"/api/scan-result/{old}")[1]
+        self.assertEqual((mid_r["images"], mid_r["results"], mid_r["hits"]), ([], [], before[mid]["hits"]))
+        self.assertEqual(mid_r["mega"], MEGA)
+        self.assertEqual((old_r["hits"], old_r["mega"]), ([], []))
+        self.assertEqual(old_r["top_domains"][0], {"domain": "a.example", "n": 11})
+        self.assertFalse(old_r["profile"]["avatar"])
+
+    def test_files_and_answers_as_for_none(self):
+        s, keep = self.seed(10), self.seed(1)
+        self.files(s)
+        self.files(keep)
+        self.assertEqual(self.get(f"/api/avatar/{s}")[0], 200)
+        public_app.run_retention()
+        self.assertFalse(os.path.exists(os.path.join(mg.data_dir(), "media", s)))
+        self.assertEqual(self.get(f"/api/avatar/{s}")[0], 404)
+        self.assertEqual(self.get(f"/api/media/{s}/0.jpg")[0], 404)
+        st, m = self.get(f"/api/media/{s}")
+        self.assertEqual((st, m["status"], m["images"]), (200, "none", []))
+        st, p = self.get(f"/api/profile/{s}")
+        self.assertEqual((st, p["profile"]["avatar"], p["profile"]["display_name"]), (200, False, "Mira"))
+        self.assertTrue(os.path.exists(os.path.join(mg.data_dir(), "media", keep)))
+        self.assertEqual(self.get(f"/api/avatar/{keep}")[0], 200)
+
+    def test_media_cache_keeps_its_own_ttl_orphans_go(self):
+        croot, mroot = os.path.join(mg.data_dir(), "media-cache"), os.path.join(mg.data_dir(), "media")
+        os.makedirs(croot)
+        os.makedirs(os.path.join(mroot, "orphan000"))
+        os.makedirs(os.path.join(mroot, "young0000"))
+        for name in ("keep", "stale"):
+            open(os.path.join(croot, name), "w").close()
+        now = time.time()
+        os.utime(os.path.join(croot, "keep"), (now - 5 * 86400,) * 2)
+        os.utime(os.path.join(croot, "stale"), (now - mg.CACHE_TTL - 60,) * 2)
+        os.utime(os.path.join(mroot, "orphan000"), (now - 5 * 86400,) * 2)
+        os.utime(os.path.join(mroot, "young0000"), (now - 3.5 * 86400,) * 2)   # not past big + 1: its row may not be over the cutoff yet
+        public_app.run_retention()
+        self.assertEqual(sorted(os.listdir(croot)), ["keep"])
+        self.assertEqual(sorted(os.listdir(mroot)), ["young0000"])
+
+    def test_live_media_cache_entry_keeps_its_photos_until_its_ttl(self):
+        """The 7 d cache saves Browserbase calls: it reads the photos from the source scan's dir, so big must not end it early."""
+        s = self.seed(5, extra={**BIG, "profile": PROFILE})
+        self.files(s)
+        croot, d = os.path.join(mg.data_dir(), "media-cache"), os.path.join(mg.data_dir(), "media", s)
+        os.makedirs(croot)
+        entry = os.path.join(croot, "onlyfans-mira.json")
+        with open(entry, "w") as fh:
+            json.dump({"ts": time.time() - 5 * 86400, "slug": s, "images": [{"n": 0}]}, fh)
+        public_app.run_retention()
+        self.assertEqual(self.get(f"/api/media/{s}")[1]["status"], "none")      # the report: as for any expired row
+        self.assertEqual(self.get(f"/api/avatar/{s}")[0], 404)
+        g = mg._Gallery("repeat000")
+        self.assertTrue(g.from_cache("onlyfans-mira"))                          # the repeat scan: a hit, no gather
+        self.assertEqual((g.images, os.path.isfile(os.path.join(g.dir, "0.jpg"))), ([{"n": 0}], True))
+        with open(entry, "w") as fh:
+            json.dump({"ts": time.time() - mg.CACHE_TTL - 60, "slug": s, "images": [{"n": 0}]}, fh)
+        os.utime(entry, (time.time() - mg.CACHE_TTL - 60,) * 2)
+        os.utime(d, (time.time() - 5 * 86400,) * 2)
+        public_app.run_retention()
+        self.assertFalse(os.path.exists(d))                                     # expired: the next run takes them
+        self.assertFalse(os.path.exists(entry))
+        self.assertTrue(os.path.isfile(os.path.join(g.dir, "0.jpg")))           # the repeat's own copy stays
+
+    def test_pre_rule_row_keeps_what_was_served(self):
+        """A row stored before the aggregator rule: off_row recounts from mega + results, which go. What was served stays."""
+        pack = [{"domain": "leakshaven.com", "url": "https://leakshaven.com/p", "occurrences": 2}]
+        ex = {**BIG, **SMALL, **FOREVER, "profile": PROFILE, "results": BIG["results"] + [
+            {"link": "https://leakshaven.com/r", "domain": "leakshaven.com", "title": "t", "thumb": None}]}
+        mid, old = self.seed(10, hits=HITS + pack, extra=ex), self.seed(40, hits=HITS + pack, extra=ex)
+        before = {s: self.get(f"/api/scan-result/{s}")[1] for s in (mid, old)}
+        self.assertEqual(before[mid]["hit_count"], len(HITS))    # the repair is in play
+        self.assertLess(before[mid]["google_total"], FOREVER["google_total"])
+        self.assertEqual(self.raw(mid)["hit_count"], len(HITS) + 1)
+        public_app.run_retention()
+        for s in (mid, old):
+            r = self.get(f"/api/scan-result/{s}")[1]
+            for k in ("hit_count", "domain_count", "google_total", "status"):
+                self.assertEqual(r[k], before[s][k], k)
+        self.assertEqual(self.raw(mid)["hit_count"], len(HITS))  # baked
+        self.assertEqual(self.get(f"/api/scan-result/{mid}")[1]["hits"], before[mid]["hits"])
+        self.assertNotIn("leakshaven.com", [t["domain"] for t in self.get(f"/api/scan-result/{old}")[1]["top_domains"]])
+
+    def test_a_summary_row_of_nothing_never_zeroes_a_hit_row(self):
+        s = self.seed(40)
+        n = self.raw(s)["hit_count"]
+        public_app.run_retention()
+        public_app.run_retention()
+        self.assertEqual(self.get(f"/api/scan-result/{s}")[1]["hit_count"], n)
+        self.assertEqual(self.raw(s)["status"], "complete")
+
+    def test_chat_context_of_a_summary_row_is_not_no_leaks(self):
+        s = self.seed(40)
+        public_app.run_retention()
+        ctx = chat_proxy.scan_summary(public_app._summary_hits(public_app.scan_row(s)))
+        self.assertNotIn("no public leaks", ctx)
+        self.assertIn("a.example (11 matches)", ctx)
+
+    def test_run_never_raises_and_logs_one_line_without_handles(self):
+        self.seed(10)
+        lines = []
+        with mock.patch.object(public_app, "_event", lines.append):
+            self.assertEqual(public_app.run_retention()["trimmed"], 1)
+            with mock.patch.object(db, "retain_scans", side_effect=RuntimeError("boom")):
+                self.assertIsNone(public_app.run_retention())
+        self.assertEqual(len(lines), 2)
+        self.assertRegex(lines[0], r"^retention trimmed=1 summary=0 corrupt=0 errors=0 files=\d+ db_before=\d+ db_after=\d+ secs=")
+        self.assertIn("retention failed: RuntimeError", lines[1])
+        self.assertNotIn("handle", "".join(lines))
+
+    def test_vacuum_only_after_a_run_that_changed_rows(self):
+        with mock.patch.object(db, "vacuum") as v:
+            public_app.run_retention()
+            v.assert_not_called()
+            self.seed(10)
+            public_app.run_retention()
+            v.assert_called_once()
+            public_app.run_retention()
+            v.assert_called_once()
+
+    def test_reuse_lookup_never_sees_a_trimmed_row(self):
+        self.assertGreaterEqual(public_app.RETAIN_BIG_DAYS * 86400, public_app.SCAN_REUSE_TTL)
+
+
+if __name__ == "__main__":
+    unittest.main()

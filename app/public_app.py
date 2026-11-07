@@ -1607,6 +1607,63 @@ SCAN_REUSE_TTL = int(os.environ.get("SCAN_REUSE_TTL", str(leakshaven.CACHE_TTL))
 SCAN_REUSE_FIELD = "scan_key"                                                       # scans.extra_json, never served
 
 
+# Retention (db.retain_scans has the tiers). >= 1 day: a reuse source (6 h) is always whole; small never under big.
+RETAIN_BIG_DAYS = max(1.0, float(os.environ.get("RETAIN_BIG_DAYS", "3")))
+RETAIN_SMALL_DAYS = max(RETAIN_BIG_DAYS, float(os.environ.get("RETAIN_SMALL_DAYS", "30")))
+RETAIN_EVERY_S = 86400
+
+
+def _db_bytes():
+    return sum(os.path.getsize(p) for p in (db.DB_PATH, db.DB_PATH + "-wal") if os.path.exists(p))
+
+
+def _drop_files(slug, pins=()):
+    """A scan's avatar and media dir -> files or dirs removed."""
+    n = media_gather.drop_media(slug, pins)
+    p = _avatar_path(slug)
+    if p:
+        os.remove(p)
+        n += 1
+    return n
+
+
+def run_retention():
+    """One pass, never raises: the tiers, their files, the orphans (files whose row is gone or that crashed mid-run, a day
+    past big so a scan's own file can't go before its row; media-cache keeps its own TTL), VACUUM if rows changed. One
+    log line, no handles."""
+    t0, before = time.time(), _db_bytes()
+    n, files = None, 0
+    try:
+        n = db.retain_scans(RETAIN_BIG_DAYS, RETAIN_SMALL_DAYS, repair=off_row)
+        pins = media_gather.cache_pins()
+        for slug in n["slugs"]:
+            try:
+                files += _drop_files(slug, pins)
+            except OSError:
+                pass
+        files += _prune_avatars(RETAIN_BIG_DAYS + 1) + media_gather.prune(RETAIN_BIG_DAYS + 1, pins)
+        if n["trimmed"] or n["summary"]:
+            db.vacuum()
+        _event(f"retention trimmed={n['trimmed']} summary={n['summary']} corrupt={n['corrupt']} errors={n['errors']} "
+               f"files={files} db_before={before} db_after={_db_bytes()} secs={time.time() - t0:.1f}")
+    except Exception as e:
+        _event(f"retention failed: {type(e).__name__} {'rows done' if n else 'no rows'} secs={time.time() - t0:.1f}")
+    return n
+
+
+def _retention_loop():
+    while True:
+        run_retention()
+        time.sleep(RETAIN_EVERY_S)
+
+
+def _summary_hits(scan):
+    """A summary row has no hits: the chat's scan context reads its top_domains, not "no public leaks were found"."""
+    if scan and scan.get("retention") == "summary":
+        scan["hits"] = [{"domain": t.get("domain"), "occurrences": t.get("n")} for t in scan.get("top_domains") or []]
+    return scan
+
+
 def scan_reuse_key(platform, handle, aliases, socials):
     """Everything a quick scan's result depends on -> opaque key (instagram=y and x=y are different scans)."""
     return leakshaven.cache_key(platform, handle, aliases, [f"{k}={socials[k]}" for k in sorted(socials)])
@@ -1923,6 +1980,7 @@ class Handler(BaseHTTPRequestHandler):
             wc.sse_start(self)
             slug = body.get("slug")
             scan = scan_row(slug) if slug else None  # one-project: aggregator rule
+            _summary_hits(scan)  # one-project: retention
             landing = body.get("kb") == "landing"   # unknown kb values -> default scan-app mode
             kb_text = chat_proxy.load_kb(KB_LANDING_FILE if landing else KB_FILE)
             if landing and not kb_text:
@@ -2006,6 +2064,7 @@ class Handler(BaseHTTPRequestHandler):
             if key in row:
                 pub[key] = row[key]
         pub["mega"] = row.get("mega") or []  # one-project: mega[]
+        pub.update({k: row[k] for k in ("retention", "top_domains") if k in row})  # one-project: retention
         if row["level"] == "low":
             ex = _scan_extra_all(slug) or {}
             pub["as_of"] = ex.get("as_of") or row["created_at"]  # one-project: scan reuse
@@ -2285,15 +2344,7 @@ def main():
     except Exception as e:
         _event(f"reap skipped: {type(e).__name__}")
     try:
-        removed = db.prune_scans(30)
-        if removed:
-            _event(f"pruned {removed} old scans")
-        removed = _prune_avatars(30)
-        if removed:
-            _event(f"pruned {removed} old avatars")
-        removed = media_gather.prune(30)
-        if removed:
-            _event(f"pruned {removed} old media dirs/cache entries")
+        threading.Thread(target=_retention_loop, daemon=True, name="retention").start()  # one-project: retention
     except Exception as e:
         _event(f"prune skipped: {type(e).__name__}")
     srv = ThreadingHTTPServer((PUBLIC_HOST, PORT), Handler)

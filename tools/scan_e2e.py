@@ -5,7 +5,7 @@
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
         [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]
-        [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again]
+        [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again] [--break-expired]
 
 Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
 `reused green from <run folder>` and skips the browser; --no-reuse forces a run; --changed runs only what the diff reaches; break runs never touch it.
@@ -169,6 +169,11 @@ again (the "Scanned 2 hours ago · Scan again" line, js/scan-engine.js agedLine;
 ?r=demoAged1 shows it; a click re-POSTs the same handle, platform and both socials with fresh:true (the stub's log), the fresh result
 replaces the report (new ?r=, its counts, no line), a reload keeps it; the hero form's own scan never sends fresh. --break-again serves
 scan-engine.js without fresh in the body: only the `again: POST` checks may go red. Screenshots: <vp>-again-*.png.
+
+expired (part of again; personal_flow part of personalize): a report retention trimmed (stub demoTrimmed1 / demoSummary1, built by the API's
+db.retain_row): the line says "..., images expired" / "..., details expired" on hero and scan page, stored counts stand, nothing reads as "no images / no
+leaks" (hero, #free phone, scan page), Scan again replaces it; ?r= personalization and the showcase demo still fill from the kept profile and hosts, no
+broken image. --break-expired has the client ignore `retention`: only `expired:` checks may go red. Screenshots: <vp>-expired-*.png.
 
 A scenario part that raises (a Playwright timeout, a missing element) prints one FAIL line for it and the run goes on.
 """

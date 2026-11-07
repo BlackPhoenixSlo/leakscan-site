@@ -35,6 +35,11 @@
   }
   function hideAll() {
     ['scan-form', 'form-error', 'progress', 'error', 'summary', 'empty', 'report', 'scan-aliases', 'scan-aged'].forEach(function (id) { show(id, false); });
+    dropExpired();
+  }
+  function dropExpired() {   // built only for an expired report: the page's DOM budget (tools/scan_e2e/huge.py)
+    var note = $('expired');
+    if (note) note.remove();
   }
 
   // ---------- message links ----------
@@ -142,6 +147,7 @@
       images: Array.isArray(r.images) ? r.images : [], hits: hits, results: results, imgResults: every   // pages: 80; images: every result's thumb
     };
     d.status = r.status || (d.hit_count || results.length ? 'complete' : 'empty');
+    d.expired = E.expiredOf(r);
     var al = r.aliases && typeof r.aliases === 'object' && Array.isArray(r.aliases.discovered) ? r.aliases.discovered : [];
     d.discovered = al.slice(0, 4).filter(function (a) { return E.clean.handle(a) === a && a !== d.handle; });
     return d;
@@ -161,14 +167,16 @@
     var lead = $('scan-lead');   // the report header is a new view: a fresh lead node, so its new text is not a layout shift
     lead.replaceWith(lead.cloneNode(false));
     var name = PLATFORMS[state.platform] || state.platform;
-    var empty = d.status === 'empty';
+    var empty = d.status === 'empty' && !d.expired;
+    var noList = d.expired && !d.hits.length;   // retention took what #google shows at 'images', the hits behind #sites at 'details'
     setTitle('Free scan report', '@' + d.handle,
-      empty ? 'Scan of what Google shows for your ' + name + ' handle.'
+      empty || (d.expired && !d.domain_count) ? 'Scan of what Google shows for your ' + name + ' handle.'
+        : d.expired ? 'Copies found on ' + d.domain_count + ' ' + plural(d.domain_count, 'site', 'sites') + ' when this was scanned.'
         : 'Copies found on ' + d.domain_count + ' ' + plural(d.domain_count, 'site', 'sites') + '. Here is what Google shows for your ' + name + ' handle.');
     document.title = 'Free scan report · Abolita';   // no handle: gtag.js (js/analytics.js) sends document.title, page_title or not
     $('scan-aliases').textContent = d.discovered.length ? 'Also found as ' + d.discovered.map(function (a) { return '@' + a; }).join(', ') : '';
     show('scan-aliases', d.discovered.length > 0);
-    var aged = E.agedLine(raw.as_of, function () { state.social = null; state.again = E.socialsOf(raw); startScan(); });   // state.retry stays that same scan
+    var aged = E.agedLine(raw.as_of, d.expired, function () { state.social = null; state.again = E.socialsOf(raw); startScan(); });   // state.retry stays that same scan
     $('scan-aged').textContent = '';
     if (aged) $('scan-aged').appendChild(aged);
     show('scan-aged', !!aged);
@@ -179,7 +187,16 @@
     $('summary').querySelector('[data-stat=google]').textContent = '~' + num(d.google_total);
     show('summary', true);
     show('empty', empty);
-    ['rnav', 'google', 'sites'].forEach(function (id) { show(id, !empty); });
+    dropExpired();
+    if (noList) {
+      var note = E.expiredNote('scan-card empty-card', raw);
+      note.id = 'expired';
+      $('empty').after(note);
+    }
+    show('rnav', !empty && !noList);
+    show('google', !empty && !d.expired);
+    show('sites', !empty && !noList);
+    $('rnav').querySelector('[data-sec=google]').hidden = !!d.expired;
     $('rnav-who').textContent = '@' + d.handle;
 
     E.sendReport($('send'), d.slug, d.handle, state.platform);
@@ -191,7 +208,8 @@
     E.remember(raw, d.slug, d.handle, state.platform);
     mediaStatus(raw.profile && typeof raw.profile === 'object' ? d.slug : null);
     show('report', true);
-    if (!empty) { renderGoogle(); renderSites(); $('rnav-n').textContent = num(lx.groups.length); }
+    if (!empty && !d.expired) renderGoogle();
+    if (!empty && !noList) { renderSites(); $('rnav-n').textContent = num(lx.groups.length); }
     if (fresh) $('scan-title').focus({ preventScroll: true });
     navCurrent();
     painted();
