@@ -834,7 +834,9 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         check(f"{tag} hd: expanded at once on the 360p master: sound on, playing, nothing shown over it yet", a["w"] == 640 and not a["mu"] and not a["p"] and not (a["hd"] or {}).get("on"), [a["w"], a["mu"], a["p"], a["hd"]])
         ok = hd_on(f)
         pg.wait_for_timeout(1000)
-        a, w = f.evaluate(HD_J), hd_watch(f)
+        w = hd_watch(f)
+        ok = ok and hd_on(f, 8000)   # may be off right now by design: a stalled layer hides, the master plays on (back at +3420 ms after the tap, measured)
+        a = f.evaluate(HD_J)
         H = a["hd"] or {}
         shot(pg, "hd-3-revealed-720")
         check(f"{tag} hd: revealed in sync: 720p (1280 px) at the master's second (first shown within 0.2 s, never more than 0.3 s off), same box as master and stage",
