@@ -304,12 +304,15 @@
     }
   }
 
-  // runScan({platform, handle, social?: {net, handle}, onProgress(text), onResult(raw), onError(err)}): exactly one of
-  // onResult / onError. social adds `instagram` or `x` to the request body. A result is also announced to the page as
-  // the `leakscan:result` event (detail = the result), after onResult.
+  // runScan({platform, handle, social?: {net, handle}, socials?: {instagram?, x?}, fresh?, onProgress(text), onResult(raw),
+  // onError(err)}): exactly one of onResult / onError. social / socials add `instagram` / `x` to the request body; fresh
+  // asks the API not to reuse a recent result. A result is also announced to the page as the `leakscan:result` event
+  // (detail = the result), after onResult.
   function runScan(o) {
     var result = null, failed = null, body = { platform: o.platform, handle: o.handle, level: 'low' };
     if (o.social) body[o.social.net] = o.social.handle;
+    Object.assign(body, o.socials);
+    if (o.fresh) body.fresh = true;
     return streamScan(body, function (ev, data) {
       if (ev === 'progress') { if (o.onProgress) o.onProgress(data); }
       else if (ev === 'result') { if (window.performance && performance.mark) performance.mark('leakscan:result');
@@ -401,6 +404,30 @@
     var m = /(\d+)\s*\/\s*(\d+)/.exec(text);
     if (m && +m[2] > 0) return { pct: Math.min(96, 5 + 90 * (+m[1] / +m[2])), stage: 'Searching Google, step ' + m[1] + ' of ' + m[2] + '…' };
     return { pct: null, stage: text };
+  }
+
+  // ---------- how old a report is (hero card, scan page) ----------
+  // The API reuses a recent scan of the same inputs and a report link opens later: `as_of` says when its data was really
+  // scanned. An API from before sends none: no line.
+  var AGED_MS = 5 * 60000, UNITS = [['month', 30 * 864e5], ['day', 864e5], ['hour', 36e5], ['minute', 6e4]];
+  function ago(ms) {
+    var u = UNITS.filter(function (x) { return ms >= x[1]; })[0], n = Math.floor(ms / u[1]);
+    return n + ' ' + plural(n, u[0], u[0] + 's') + ' ago';
+  }
+  // agedLine(asOf, again): "Scanned 2 hours ago · Scan again" (a <p>) once asOf is over 5 minutes old, else null;
+  // again(): the visitor asked for a fresh scan of the same inputs.
+  function agedLine(asOf, again) {
+    var ms = typeof asOf === 'string' && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(asOf) ? Date.now() - Date.parse(asOf) : NaN;
+    if (!(ms > AGED_MS)) return null;
+    var b = make('button', 'aged-again', ['Scan again'], { type: 'button' });
+    b.addEventListener('click', again);
+    return make('p', 'aged', ['Scanned ' + ago(ms) + ' · ', b]);
+  }
+  // A result's socials as runScan takes them: only what the validators pass.
+  function socialsOf(raw) {
+    var so = raw && raw.socials && typeof raw.socials === 'object' ? raw.socials : {}, out = {};
+    ['instagram', 'x'].forEach(function (k) { var h = clean.handle(so[k]); if (h) out[k] = h; });
+    return out;
   }
 
   // ---------- thumbs that show: ONE rule everywhere ----------
@@ -607,8 +634,8 @@
     var m = { slug: slug, handle: clean.handle(raw.handle) || fb.handle, platform: PLATFORMS[raw.platform] ? raw.platform : fb.platform,
       rows: [], sites: [], images: [], profile: !!(raw.profile && typeof raw.profile === 'object'), socials: {}, discovered: [] };
     if (!m.handle || !PLATFORMS[m.platform]) return null;
-    var so = raw.socials && typeof raw.socials === 'object' ? raw.socials : {};
-    ['instagram', 'x'].forEach(function (k) { var h = clean.handle(so[k]); if (h) m.socials[k] = h; });
+    m.socials = socialsOf(raw);
+    m.asOf = raw.as_of;
     var al = raw.aliases && typeof raw.aliases === 'object' && Array.isArray(raw.aliases.discovered) ? raw.aliases.discovered : [];
     m.discovered = al.slice(0, 4).filter(function (a) { return clean.handle(a) === a && a !== m.handle; });
     var seen = {}, thumbOf = {}, sr = [], res = [];
@@ -812,7 +839,7 @@
     who: who, setMessages: setMessages, reportLinks: reportLinks, sendReport: sendReport, remember: remember, forget: forget, runScan: runScan,
     fetchResult: fetchResult, progressInfo: progressInfo, favColor: favColor, fav: fav, imageItems: imageItems, isVideo: isVideo,
     watchThumb: watchThumb, tablist: tablist, pager: pager, revealButton: revealButton, make: make, icon: icon,
-    siteGroups: siteGroups, reportModel: reportModel, gallery: gallery, linked: linked, plural: plural,
+    agedLine: agedLine, socialsOf: socialsOf, siteGroups: siteGroups, reportModel: reportModel, gallery: gallery, linked: linked, plural: plural,
     photoStats: photoStats, isPhoto: isPhoto, photo: photo, put: put, paced: paced, sheet: sheet, readSheet: readSheet, askStatus: askStatus, XO: XO
   };
 })();

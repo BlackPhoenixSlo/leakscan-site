@@ -5,13 +5,14 @@
     → open http://127.0.0.1:8930/  (or http://127.0.0.1:8930/scan/?r=demoR3port01, /?r=demoR3port01, /showcase/?r=demoR3port01)
 
 Serves site/ and the API routes of the contract the scan page talks to:
-- POST /api/public-scan  {platform, handle, level, instagram?, x?} → SSE over the response body: several `progress`, one
-  `result` (tools/fixtures/scan-sample.json with handle/platform/slug swapped in, plus `socials: {instagram?, x?}` echoed
+- POST /api/public-scan  {platform, handle, level, instagram?, x?, fresh?} (each body kept: GET /api/_scan-log, test hook) → SSE over the response body: several `progress`, one
+  `result` (tools/fixtures/scan-sample.json with handle/platform/slug swapped in, `as_of` now, plus `socials: {instagram?, x?}` echoed
   when sent; a bad instagram / x value → 400 bad_handle), `done`. Magic handles drive the error paths:
   stub-fail → `failed` + `done`; stub-429 → 429 rate_limited; stub-busy → 429 busy; stub-empty → status empty;
   stub-mixed → 3 hits (live true / false / missing) + the results; stub-huge → huge_result(): 1000 hit links on 100
   domains (deterministic, long-tail counts), 80 Google results, 30 images (report-view scale test); stub-videos →
   videos_result(): 45 results (34 video), 18 images[] (12 = video stills), 33 unique thumbs (video stills: badged in the scan page's Images tab, skipped by the landing's).
+- demoAged1 (as_of 2 h ago, 3 hits, both socials), demoYoung1 (as_of 4 min ago): the "Scanned ... · Scan again" line.
 - GET /api/scan-result/<slug> → the stored result, 404 {"error":"not_found"} otherwise. Preloaded: demoR3port01 (the
   fixture, with its synthetic `profile`), demoHuge0001 (huge_result()), demoVideos01 (videos_result()), demoNoProf01 (same, `profile` null: scan-only personalization, no leak-page
   Instagram), demoFoundIG1 (`profile` null, leak-page Instagram fills the IG rows) and evilR3port01
@@ -88,7 +89,7 @@ OPTS = argparse.Namespace(omit_results=False, omit_profile=False, delay=0.15, me
 THUMB_LIMITER, THUMB_LOG, SHEET_LOG, REAL_THUMBS = None, [], [], {}
 MEDIA_POLLS, MEDIA_MODE = {}, {}
 SCAN_HOST = "https://scan.srv1395798.hstgr.cloud"   # only ever a string in JSON; the stub never contacts it
-CHAT_LOG = []
+CHAT_LOG, SCAN_LOG = [], []
 CHAT_ANSWER = (
     "Short answer: it's **€250/month** or **€500 one-time**, and the scan plus one removal come first, free. "
     "Details: [Pricing](#pricing).\n\n"
@@ -165,12 +166,16 @@ def huge_result(handle, n_links=1000, n_domains=100):
             "google_total": 48200, "status": "complete"}
 
 
+def iso_ago(secs):
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - secs))
+
+
 OLD_API = {"demoRemove1"}   # served as an API from before the aggregator rule: the page's fallback guard must cope
 
 
 def make_result(handle, platform, empty=False):
     r = json.loads(json.dumps(FIXTURE))
-    r.update(handle=handle, platform=platform,
+    r.update(handle=handle, platform=platform, as_of=iso_ago(0),
              slug="".join(random.choice(string.ascii_letters + string.digits) for _ in range(12)))
     r["aliases"]["declared"] = [handle]
     if handle == "stub-mixed":   # badge coverage: hits live true / false / missing, then the Google results
@@ -431,6 +436,8 @@ class Handler(RangeHandler):
             return self.wfile.write(body)
         if u.path == "/api/_chat-log":
             return self.send_json(200, CHAT_LOG)
+        if u.path == "/api/_scan-log":
+            return self.send_json(200, SCAN_LOG)
         if u.path.startswith("/api/"):
             return self.send_json(404, {"error": "not_found"})
         path = pathlib.Path(self.translate_path(u.path))
@@ -502,6 +509,7 @@ class Handler(RangeHandler):
             req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         except ValueError:
             return self.send_json(400, {"error": "bad_json"})
+        SCAN_LOG.append(req)
         handle, platform = str(req.get("handle", "")), req.get("platform")
         if not HANDLE_RE.match(handle) or platform not in PLATFORMS or req.get("level") != "low":
             return self.send_json(400, {"error": "bad_handle"})
@@ -584,7 +592,10 @@ def main():
                           ("demoPackImg1", {"mega": MEGA, "results": [STALE_PACK_RESULT] + FIXTURE["results"],
                                             "images": [STALE_PACK_RESULT["thumb"]] + FIXTURE["images"]}),
                           ("demoHuge0001", {**huge_result(FIXTURE["handle"]), "mega": []}),
-                          ("demoVideos01", {**videos_result(FIXTURE["handle"]), "mega": []})):
+                          ("demoVideos01", {**videos_result(FIXTURE["handle"]), "mega": []}),
+                          ("demoAged1", {"mega": [], "as_of": iso_ago(2 * 3600 + 60), "hits": FIXTURE["hits"][:3], "results": [], "hit_count": 3,
+                                         "socials": {"instagram": "mira.ig", "x": "mira_x"}}),
+                          ("demoYoung1", {"mega": [], "as_of": iso_ago(240)})):
         seed = {**json.loads(json.dumps(FIXTURE)), **json.loads(json.dumps(overlay)), "slug": slug}
         if OPTS.omit_results:
             seed.pop("results", None)

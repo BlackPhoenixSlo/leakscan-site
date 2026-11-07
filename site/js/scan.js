@@ -34,7 +34,7 @@
     $('scan-lead').textContent = lead;
   }
   function hideAll() {
-    ['scan-form', 'form-error', 'progress', 'error', 'summary', 'empty', 'report', 'scan-aliases'].forEach(function (id) { show(id, false); });
+    ['scan-form', 'form-error', 'progress', 'error', 'summary', 'empty', 'report', 'scan-aliases', 'scan-aged'].forEach(function (id) { show(id, false); });
   }
 
   // ---------- message links ----------
@@ -99,7 +99,7 @@
     $('progress-stage').textContent = 'Starting the scan…';
     setBar(3);
     show('progress', true);
-    E.runScan({ platform: state.platform, handle: state.handle, social: state.social, onProgress: addProgress,
+    E.runScan({ platform: state.platform, handle: state.handle, social: state.social, socials: state.again, fresh: !!state.again, onProgress: addProgress,
       onResult: function (result) { setBar(100); report(result, true); },
       onError: function (e) {
         if (e.kind === 'bad_handle') showForm('The scan server didn’t accept that handle. Check it and try again.');
@@ -168,6 +168,10 @@
     document.title = 'Free scan report · Abolita';   // no handle: gtag.js (js/analytics.js) sends document.title, page_title or not
     $('scan-aliases').textContent = d.discovered.length ? 'Also found as ' + d.discovered.map(function (a) { return '@' + a; }).join(', ') : '';
     show('scan-aliases', d.discovered.length > 0);
+    var aged = E.agedLine(raw.as_of, function () { state.social = null; state.again = E.socialsOf(raw); startScan(); });   // state.retry stays that same scan
+    $('scan-aged').textContent = '';
+    if (aged) $('scan-aged').appendChild(aged);
+    show('scan-aged', !!aged);
     $('summary').querySelector('[data-stat=domains]').textContent = num(d.domain_count);
     $('summary').querySelector('[data-label=domains]').textContent = plural(d.domain_count, 'site with copies found', 'sites with copies found');
     $('summary').querySelector('[data-stat=pages]').textContent = num(d.hit_count);

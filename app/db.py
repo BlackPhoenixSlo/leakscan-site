@@ -113,6 +113,27 @@ def recent_extra(handle, key, value, max_age_s, path=None):
         if ex.get(key) == value:
             return ex
     return None
+
+
+def recent_scan(handle, key, value, max_age_s, path=None):
+    """Newest complete quick scan of `handle` (case-insensitive) younger than max_age_s whose extra[key] == value (a
+    truthy value) -> {slug, created_at, age_s, hits, extra}, else None. One row whatever a handle's other rows hold."""
+    if not value or max_age_s <= 0:
+        return None
+    since = (datetime.now(timezone.utc) - timedelta(seconds=max_age_s)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with _db(path) as c:
+        r = c.execute("SELECT slug, strftime('%s', 'now') - strftime('%s', created_at), result_json, extra_json, created_at "
+                      "FROM scans WHERE handle = ? COLLATE NOCASE "
+                      "AND level = 'low' AND status = 'complete' AND created_at >= ? AND json_extract(extra_json, ?) = ? "
+                      "ORDER BY created_at DESC, rowid DESC LIMIT 1", (handle, since, "$." + key, value)).fetchone()
+    return r and {"slug": r[0], "created_at": r[4], "age_s": r[1], "hits": json.loads(r[2] or "[]"), "extra": json.loads(r[3] or "{}")}
+
+
+def scan_extra(slug, path=None):
+    """A scan's extra_json dict ({} when none / no such row)."""
+    with _db(path) as c:
+        r = c.execute("SELECT extra_json FROM scans WHERE slug = ?", (slug,)).fetchone()
+    return json.loads(r[0] or "{}") if r else {}
 # <<< one-project patch <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 

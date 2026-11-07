@@ -184,6 +184,7 @@ class Stub(ThreadingHTTPServer):
     mode = "valid"
     calls = None
     timeout_sleep = 3.0
+    cse_limit = None           # CSE: plain searches answered before the quota is gone (429); None = never
 
     def __init__(self, port=0, mode="valid"):
         super().__init__(("127.0.0.1", port), _H)
@@ -223,7 +224,10 @@ class _H(BaseHTTPRequestHandler):
             return self._send({"searchInformation": {"totalResults": "9"}, "items": IMAGE_ITEMS})
         with self.server.lock:
             self.server.calls.append(("cse", g("q")))
-        words = [w for w in g("q").split() if not w.startswith("-site:")]
+            over = self.server.cse_limit is not None and sum(c[0] == "cse" for c in self.server.calls) > self.server.cse_limit
+        if over:   # Google's answer once the daily quota is gone
+            return self._send({"error": {"code": 429, "message": "Quota exceeded"}}, 429)
+        words =[w for w in g("q").split() if not w.startswith("-site:")]
         for w in words:
             if w in self.server.alias_items:
                 return self._send({"searchInformation": {"totalResults": "5"}, "items": self.server.alias_items[w]})

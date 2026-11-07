@@ -171,7 +171,8 @@ def cse_search_deep(query, max_calls=15, api_key=None, cx=None, timeout=20,
 
 
 def cse_search_wide(queries, max_calls=15, api_key=None, cx=None, timeout=20,
-                    q_budget=1900, on_progress=None, tags=None, deadline=None):  # one-project: deadline (monotonic) stops before a call that could not finish in time
+                    q_budget=1900, on_progress=None, tags=None, deadline=None,  # one-project: deadline (monotonic) stops before a call that could not finish in time
+                    errors=None):  # one-project: errors (a list: each failed call is appended, the scan is then partial)
     """Multi-seed exclude-reset widening. Same idea as cse_search_deep but CYCLES
     through several seed queries (e.g. the base query + `<h> nude` + `<h> porn`) so
     different phrasings surface different leak sites — while sharing ONE exclusion
@@ -201,6 +202,8 @@ def cse_search_wide(queries, max_calls=15, api_key=None, cx=None, timeout=20,
         try:
             d = _call(q, key, cid, start=1, timeout=timeout if left is None else min(timeout, left))  # one-project: deadline
         except Exception as e:
+            if errors is not None:  # one-project: errors
+                errors.append(type(e).__name__)  # one-project: errors
             if on_progress:
                 on_progress(f"call {call+1}: API error ({e}); stopping")
             break
@@ -391,7 +394,7 @@ def good_images(results, handle="", limit=12, bad_hosts=None):
     return out[:limit] or cse_images(results, limit)
 
 
-def cse_paginate(query, pages=1, start=11, api_key=None, cx=None, timeout=20, on_progress=None):
+def cse_paginate(query, pages=1, start=11, api_key=None, cx=None, timeout=20, on_progress=None, errors=None):  # one-project: errors
     """Fetch extra result pages (start=11, 21, …) of the base query — a shallow
     depth fallback for when the widening pass surfaced too few distinct sites.
     Never raises; returns [] if CSE isn't configured."""
@@ -403,7 +406,9 @@ def cse_paginate(query, pages=1, start=11, api_key=None, cx=None, timeout=20, on
     for _ in range(max(0, pages)):
         try:
             d = _call(query, key, cid, start=s, timeout=timeout)
-        except Exception:
+        except Exception as e:  # one-project: errors
+            if errors is not None:  # one-project: errors
+                errors.append(type(e).__name__)  # one-project: errors
             break
         items = _parse_items(d)
         if on_progress:

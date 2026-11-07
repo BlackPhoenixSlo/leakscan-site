@@ -335,6 +335,19 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 - Media fix (same PR): the Browserbase session opens google.com once (consent + captcha settle, <= 25 s) before the
   web-text query, and retries a raw=0 web-text query once after the Images step.
 
+## Scan reuse (quick scan)
+
+- A quick scan with the same platform, handle, aliases and socials as a recent one makes no external call: it gets its
+  own row + slug (`extra.reused_from` = source slug) and that scan's result, avatar and photos. Any visitor's scan can be
+  the source. `SCAN_REUSE_TTL` s (21600; 0 = off), measured from the fresh scan: reused rows carry no key, so it can't roll
+  forward. `{"fresh": true}` in `POST /api/public-scan` skips it; its result is a new source.
+- `as_of` in the SSE result and `/api/scan-result`: when the data was really scanned (the source's `created_at` on a reuse).
+  Older than 5 min: the hero card and scan page say "Scanned 2 hours ago · Scan again"; the click re-POSTs the same inputs
+  with `fresh: true` (`agedLine` in `site/js/scan-engine.js`).
+- Only whole results are sources (`extra.scan_key`): status complete, no failed CSE call, alias step not skipped, leakshaven
+  answered live, profile from the LLM. Log: `scan reuse hit level=low platform= aliases= hits= age=Ns media=`, and no
+  `scan start` / `scan done` line for a hit. Tests: `app/tests/test_scan_reuse.py`.
+
 ## Replace before launch
 
 - **Jaka's photo**: `site/assets/jaka.webp` (192x192, a frame of his own take) is used in the hero card, #why and
