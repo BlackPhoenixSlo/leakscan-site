@@ -504,7 +504,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     # report page: floating, default on with ?r= (idle mount, no interaction)
     s = ready(pg, "scan/?r=demoR3port01", wake=False)
     lz = pg.evaluate("() => [window.__pipAt, performance.getEntriesByType('navigation')[0].loadEventEnd]")
-    check(f"{tag} vis: no lazy wait: player + iframe created before the page's load event", lz[0] and lz[0] < lz[1], lz)
+    check(f"{tag} vis: no lazy wait: player + iframe created before the page's load event", lz[0] and lz[0] <= lz[1], lz)   # <=: WebKit's clock is whole ms here, ties seen
     check(f"{tag} appear: top-right, {'45% of the screen' if phone else '640 px'} wide, 16:9 picture", float_default(s) and ratio_ok(s), [s["box"], s["pic"]])
     check(f"{tag} bar: on the picture only the close X (top-right, >= 40 px) and the 28 px resize corner (top-left), 40 px bar", s["overPic"] == 1 and x_ok(s)
           and s["box"][3] - s["pic"][3] == 40 and s["grip"] == [0, 0, 28, 28], [s["overPic"], s["xbox"], s["box"], s["pic"], s["grip"]])
@@ -834,7 +834,9 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         check(f"{tag} hd: expanded at once on the 360p master: sound on, playing, nothing shown over it yet", a["w"] == 640 and not a["mu"] and not a["p"] and not (a["hd"] or {}).get("on"), [a["w"], a["mu"], a["p"], a["hd"]])
         ok = hd_on(f)
         pg.wait_for_timeout(1000)
-        a, w = f.evaluate(HD_J), hd_watch(f)
+        w = hd_watch(f)
+        ok = ok and hd_on(f, 8000)   # may be off right now by design: a stalled layer hides, the master plays on (back at +3420 ms after the tap, measured)
+        a = f.evaluate(HD_J)
         H = a["hd"] or {}
         shot(pg, "hd-3-revealed-720")
         check(f"{tag} hd: revealed in sync: 720p (1280 px) at the master's second (first shown within 0.2 s, never more than 0.3 s off), same box as master and stage",
@@ -995,3 +997,184 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     hosts = sorted({urlsplit(x).hostname for x in net["outside"] if x.startswith("http")})   # WebKit routes data: / blob: too
     errs = [x for x in net["errors"] if not x.startswith("Button failed to load, iconName")]
     check(f"{tag} no request left loopback (the demo iframe included: no Google Fonts), no console / JS errors", not hosts and not errs, hosts + errs[:5])
+
+
+MEDIA_J = """window.__mf = []; const __f = window.fetch; window.fetch = function (u) { if (String(u).includes('/api/media/')) { const v = document.querySelector('.vo-video'); window.__mf.push([String(u), v ? v.currentTime : -1, performance.now()]); } return __f.apply(this, arguments); };"""
+OWN_J = """() => { const o = [...document.querySelectorAll('.vo-own')], m = i => i.getAttribute('src').includes('/api/media/'), v = document.querySelector('.vo-video');
+  return {n: o.length, set: o.filter(m).length, ok: o.filter(i => m(i) && i.complete && i.naturalWidth > 0).length, ct: v.currentTime, paused: v.paused, mf: window.__mf}; }"""
+PLAY4 = "() => { const v = document.querySelector('.vo-video'); v.muted = true; v.playbackRate = 4; return v.play(); }"   # the take x 4
+PHOTOS_AT = 5
+
+
+def photos_flow(pw, chromium, vp_name, vp, engine="chromium"):
+    """js/video-overlays.js photosLater: her photos (shown from the Images card's after state, ~16 s) start at PHOTOS_AT s of the take: on every
+    path once, never stuck, nothing before it. WebKit: seeks only (Playwright's WebKit video clock stays at 0, measured: declared)."""
+    if vp_name != "phone":
+        return
+    webkit = engine == "webkit"
+    tag = f"{vp_name}{'-webkit' if webkit else ''} photos:"
+    S = "demoR3port01"
+    browser = pw.webkit.launch() if webkit else chromium
+
+    def page(url, init=""):
+        ctx = browser.new_context(**(dict(pw.devices["iPhone 13"]) if webkit else dict(viewport=vp, device_scale_factor=2, is_mobile=True, has_touch=True)))
+        ctx.add_init_script(MEDIA_J)
+        if init:
+            ctx.add_init_script(init)
+        ctx.route("**/*", lambda r, _q: r.continue_() if urlsplit(r.request.url).hostname in LOOP or r.request.url.startswith(("data:", "blob:")) else r.abort())
+        break_routes(ctx)
+        pg = ctx.new_page()
+        pg.goto(cfg.base + url, wait_until="load")
+        return ctx, pg
+
+    def named(f):
+        f.wait_for_function("() => document.documentElement.dataset.voMode === 'named'", timeout=15000)
+
+    def started(f, what, s=None, past=PHOTOS_AT):   # nothing before `past`, then one chain (the media index's own polls are >= 4 s apart), all photos loaded
+        try:
+            f.wait_for_function("() => window.__mf.length > 0 && [...document.querySelectorAll('.vo-own')].every(i => i.getAttribute('src').includes('/api/media/') && i.complete && i.naturalWidth > 0)", timeout=20000)
+        except Exception:
+            pass
+        f.wait_for_timeout(700)
+        o = f.evaluate(OWN_J)
+        gaps = [b[2] - a[2] for a, b in zip(o["mf"], o["mf"][1:])]
+        check(f"{tag} {what}: all {o['n']} own photos loaded, started at >= {past} s of the take, once",
+              o["n"] >= 4 and o["ok"] == o["n"] and bool(o["mf"]) and o["mf"][0][1] >= past and all(g > 3500 for g in gaps) and (s is None or all(s in x[0] for x in o["mf"])),
+              {"ct_at_start": o["mf"][0][1] if o["mf"] else None, "index_gaps_ms": [round(g) for g in gaps], "ok": o["ok"], "n": o["n"]})
+
+    def none_yet(f, what, ms=1200):
+        f.wait_for_timeout(ms)
+        o = f.evaluate(OWN_J)
+        check(f"{tag} {what}: no photo request yet (video at {o['ct']:.1f} s, paused {o['paused']})", not o["mf"] and o["set"] == 0 and o["ct"] < PHOTOS_AT, o["mf"][:2])
+
+    # a deep link past it: at once, without a single second played
+    ctx, pg = page(f"video/?r={S}&t=20")
+    named(pg.main_frame)
+    started(pg.main_frame, "?t=20")
+    ctx.close()
+
+    # no result, no photos: the generic take past it
+    ctx, pg = page("video/")
+    pg.evaluate("() => { const v = document.querySelector('.vo-video'); v.pause(); v.currentTime = 9; }")
+    pg.wait_for_timeout(1000)
+    o = pg.evaluate(OWN_J)
+    check(f"{tag} generic /video/ past it: no request, default photos", not o["mf"] and o["set"] == 0, o["mf"][:2])
+    ctx.close()
+
+    # /video/ directly: nothing below it, a seek across it starts them
+    ctx, pg = page(f"video/?r={S}")
+    f = pg.main_frame
+    named(f)
+    f.evaluate("() => { const v = document.querySelector('.vo-video'); v.pause(); v.currentTime = 4.5; }")
+    none_yet(f, "/video/ directly, below it")
+    f.evaluate("() => { document.querySelector('.vo-video').currentTime = 5.1; }")
+    started(f, "/video/ directly, a seek past it", S)
+    f.evaluate("() => { document.querySelector('.vo-video').currentTime = 2; }")   # back under it and over it again: no second start
+    f.wait_for_timeout(300)
+    f.evaluate("() => { document.querySelector('.vo-video').currentTime = 9; }")
+    f.wait_for_timeout(600)
+    o = f.evaluate(OWN_J)
+    check(f"{tag} back under it and past it again: no second start", all(b[2] - a[2] > 3500 for a, b in zip(o["mf"], o["mf"][1:])), [round(x[2]) for x in o["mf"]])
+    ctx.close()
+
+    # the demo iframe personalized: still lazy (WebKit starts one at once on a src change, measured): no request until scrolled to, then her photos
+    ctx, pg = page(f"?r={S}")
+    reqs = []
+    ctx.on("request", lambda q: "/showcase/" in q.url and reqs.append(q.url))
+    pg.wait_for_function("() => { const f = document.querySelector('iframe[data-p=demo]'); return (f.getAttribute('src') || f.getAttribute('data-src')).includes('r='); }", timeout=15000)
+    pg.wait_for_timeout(2500)
+    check(f"{tag.replace('photos:', 'demo-lazy:')} personalized: the demo not requested before it is scrolled to", not reqs, reqs[:2])
+    pg.evaluate("() => document.querySelector('#showcase').scrollIntoView()")
+    try:
+        pg.wait_for_function("() => { const d = document.querySelector('iframe[data-p=demo]').contentDocument, i = d && d.querySelector('img.hero__bg'); return i && i.getAttribute('src').includes('/api/media/') && i.complete && i.naturalWidth > 0; }", timeout=20000)
+        ok = True
+    except Exception:
+        ok = False
+    pg.screenshot(path=str(cfg.out / f"{vp_name}{'-webkit' if webkit else ''}-demo-lazy-scrolled.png"))
+    check(f"{tag.replace('photos:', 'demo-lazy:')} scrolled to: loads with her slug, her photo on the hero", ok and any("/showcase/" in x.url and "r=" in x.url for x in pg.frames), reqs[:2])
+    ctx.close()
+    if webkit:
+        browser.close()
+        return
+
+    # really played, paused before it, resumed
+    ctx, pg = page(f"video/?r={S}")
+    f = pg.main_frame
+    named(f)
+    f.evaluate("() => { const v = document.querySelector('.vo-video'); v.pause(); v.currentTime = 2; }")
+    none_yet(f, "paused at 2 s")
+    f.evaluate(PLAY4)
+    started(f, "paused before it, then played on", S)
+    ctx.close()
+
+    # autoplay blocked (play() refused until a tap: a hook, declared): the reader taps, it plays, they come
+    ctx, pg = page(f"video/?r={S}", "window.__block = true; const __p = HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play = function () { return window.__block ? Promise.reject(new DOMException('blocked', 'NotAllowedError')) : __p.apply(this, arguments); };")
+    f = pg.main_frame
+    named(f)
+    none_yet(f, "autoplay blocked")
+    f.evaluate("() => { window.__block = false; }")
+    pg.locator(".vo-stage").tap()
+    f.wait_for_function("() => !document.querySelector('.vo-video').paused", timeout=5000)
+    f.evaluate(PLAY4)
+    started(f, "autoplay blocked, then a tap", S)
+    ctx.close()
+
+    # the shared link in the iPhone theater (Fullscreen API removed, declared: as on iPhone Safari): /video/ has no autoplay, nothing until the reader plays
+    ctx, pg = page(f"video/?r={S}", "Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: () => false }); Element.prototype.requestFullscreen = undefined; Element.prototype.webkitRequestFullscreen = undefined;")
+    f = pg.main_frame
+    named(f)
+    pg.locator(".vo-fs").tap()
+    f.wait_for_function("() => document.documentElement.dataset.voFull === 'theater'", timeout=3000)
+    none_yet(f, "iPhone theater, not played yet")
+    pg.locator(".vo-stage").tap()
+    f.wait_for_function("() => !document.querySelector('.vo-video').paused", timeout=5000)
+    f.evaluate(PLAY4)
+    started(f, "iPhone theater, then a tap", S)
+    ctx.close()
+
+    # the mini player (the landing's real path): tucked, then back; off-screen, then back
+    for what, away, back in (("tucked by its X", lambda pg: pg.click(".pip-x"), lambda pg: pg.click(".pip-tab")),
+                             ("off-screen", lambda pg: pg.evaluate("() => document.querySelector('.pip').style.setProperty('transform', 'translate(-9999px, 0)', 'important')"),
+                              lambda pg: pg.evaluate("() => document.querySelector('.pip').style.removeProperty('transform')"))):
+        ctx, pg = page(f"?r={S}")
+        pg.keyboard.press("Shift")
+        pg.wait_for_function("() => { const p = document.querySelector('.pip'), d = p && p.querySelector('iframe').contentDocument; return p && p.classList.contains('on') && d && d.documentElement && d.documentElement.dataset.voMode === 'named'; }", timeout=20000)
+        f = next(x for x in pg.frames if "/video/" in x.url)
+        away(pg)
+        f.wait_for_function("() => document.querySelector('.vo-video').paused", timeout=5000)
+        none_yet(f, f"mini player {what}")
+        back(pg)
+        f.wait_for_function("() => !document.querySelector('.vo-video').paused", timeout=5000)
+        f.evaluate(PLAY4)
+        started(f, f"mini player {what}, then back", S)
+        ctx.close()
+
+    # the name bar: a result before it waits for it
+    ctx, pg = page("video/")
+    f = pg.main_frame
+    f.fill("#vo-nb-in", "photosone")
+    f.press("#vo-nb-in", "Enter")
+    named(f)
+    f.wait_for_function("() => /[?&]r=/.test(location.search)", timeout=15000)
+    one = pg.url.split("r=")[-1]
+    none_yet(f, "?name= rebuild in place, her result in before it", 300)
+    f.evaluate(PLAY4)
+    started(f, "?name= rebuild in place", one)
+    ctx.close()
+
+    # the name bar: the take holds at its Building beat (past it) until the scan answers: a later result starts them at once
+    held = []
+    ctx, pg = page("video/")
+    ctx.route("**/api/public-scan", lambda r: held.append(r))
+    f = pg.main_frame
+    f.fill("#vo-nb-in", "photostwo")
+    f.press("#vo-nb-in", "Enter")
+    f.wait_for_timeout(300)
+    f.evaluate(PLAY4)
+    f.wait_for_function("() => document.querySelector('.vo-video').currentTime > 6", timeout=15000)
+    o = f.evaluate(OWN_J)
+    check(f"{tag} scan still running past it: nothing to ask for yet", held != [] and not o["mf"], o["mf"][:2])
+    held[0].continue_()
+    named(f)
+    started(f, "her result after it: at once")
+    ctx.close()

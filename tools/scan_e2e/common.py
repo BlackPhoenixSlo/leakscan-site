@@ -17,7 +17,7 @@ from . import reach
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 FX = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())   # the stub's fixture: expected profile / copy
 FLOWS = {"scan": ("scan.scan_flow", "huge.huge_flow"), "personalize": ("personalize.personalize_flow",), "askai": ("askai.askai",),   # scenario → its parts (module.function), in order
-         "inline": ("inline.inline_flow", "inline.thumb_paint"), "tabs": ("tabs.tabs_flow",), "removals": ("removals.removals_flow",), "pip": ("pip.pip_flow",), "sheet": ("sheet.sheet_flow",)}
+         "inline": ("inline.inline_flow", "inline.thumb_paint"), "tabs": ("tabs.tabs_flow",), "removals": ("removals.removals_flow",), "pip": ("pip.pip_flow", "pip.photos_flow"), "sheet": ("sheet.sheet_flow",)}
 SCENARIOS = tuple(FLOWS)
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 LOOP = ("127.0.0.1", "localhost")
@@ -42,6 +42,8 @@ BREAKS = {
     "pull": ("pip.js", "    if (drag.big) { pull(e, my); return; }\n", "    if (drag.big) return;\n"),   # expanded: no drag-down
     "dock": ("pip.js", "card = auto === 'dock' ? document.querySelector('.hero .report-card') : null;", "card = null;"),   # no dock anchor
     "pipload": ("pip.js", "if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });", "go();"),   # the iframe at once: holds the load event
+    "photos8": ("video-overlays.js", "var PHOTOS_AT = 5,", "var PHOTOS_AT = 1e9,"),   # her photos never start
+    "demolazy": ("personalize.js", "(el.getAttribute('src') ? 'src' : 'data-src')", "'src'"),   # her ?r= on src at once: Chromium's wide lazy distance starts the demo
     "still": ("pip.css", ".pip-still { position: fixed;", ".pip-still { display: none; position: fixed;"),   # no still in the first paint
     "pipmini": ("pip.js", "if (innerWidth < 720) u.searchParams.set('mini', '1');", ""),   # the phone's mini asks for no 360p files
     "hdsync": ("pip.js", "    if (lag > 0.15) hdHide();\n", "    hd.classList.add('on');\n"),   # the 720p shown as soon as it has metadata, in sync or not

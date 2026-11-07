@@ -4,7 +4,7 @@
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet]... [--changed [REF]] [--no-reuse]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
-        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine]
+        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]
         [--break-sheet500] [--break-sheetdead] [--break-askstall]
 
 Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
@@ -157,6 +157,10 @@ mini: a phone's mini plays jack-360.* (no 720p request before expand), a compute
 behind, dropped when minimized, the 720p never answering = the mini plays on; the browser pausing the master = the mini alone, no 720p this page view. --break-pipmini
 serves pip.js without ?mini=1: only phone `mini:` / `hd:` checks may go red; --break-hdsync serves it revealing the layer without waiting for sync, --break-hdmin only
 pausing the layer on minimize, --break-hdguard without the guard, --break-hdmine with the guard taking our own pauses for the browser's: only `hd:` checks may go red.
+`photos:` (pip scenario, phone + WebKit iPhone 13): js/video-overlays.js photosLater: her photos start at 5 s of the take: ?t=20, a seek past it, played on
+after a pause / a blocked autoplay / the mini player tucked or off-screen / the iPhone theater, ?name= rebuild, a result after it; never below 5 s, never twice; a generic take never. WebKit: seeks only
+(its video clock stays at 0 here). --break-photos8 serves it with the start never coming: only `photos:` checks may go red.
+`demo-lazy:` (same run): the personalized demo iframe is not requested until scrolled to (phone, WebKit iPhone 13), then shows her photo. --break-demolazy serves personalize.js writing her ?r= to src at once: only the phone `demo-lazy:` not-requested check may go red (Chromium's wide lazy distance; WebKit keeps a first src lazy).
 Declared bypass: the tabs and huge flows put the player away as soon as it mounts, by a script click on its X
 (common.PIP_AWAY, focus kept where it was): floating it
 stays top-right while scrolling (by design) and covers what sits there, e.g. the demo's full-screen button.
