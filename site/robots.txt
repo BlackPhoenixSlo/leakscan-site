@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 # No Disallow for noindex pages (showcase/, scan/, 404): a crawler blocked here never reads their noindex.
 
-Sitemap: https://blackphoenixslo.github.io/leakscan-site/sitemap.xml
+Sitemap: https://abolita.com/sitemap.xml
