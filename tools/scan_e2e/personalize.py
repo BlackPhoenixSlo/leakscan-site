@@ -121,6 +121,8 @@ def no_slug(t):
     check(f"{tag} no slug: showcase hero = a people photo (Pexels series, credited)", hero0[0] in PEOPLE and "Orla" in hero0[1] and hero0[2] > 0, hero0)
     page.wait_for_timeout(500)
     page.locator("#showcase").screenshot(path=str(cfg.out / f"{vp_name}-p0-showcase-default.png"))
+    o = inline_box(page, tag, vp_name, "no slug", "p0b-inline-orla")
+    check(f"{tag} no slug: demolive: inline frame = the demo creator (Orla)", o["logo"].upper() == "ORLA BRENNICK", o["logo"])
     ctx2.close()
     ctx.close()
 
@@ -218,32 +220,50 @@ def landing(t):
           re.fullmatch(re.escape(cfg.api) + r"/api/media/" + FX["slug"] + r"/\d+\.jpg", hsrc) is not None, hsrc)
     page.wait_for_timeout(700)
     page.locator("#showcase").screenshot(path=str(cfg.out / f"{vp_name}-p3-showcase-iframe.png"))
-    if vp_name == "phone":
-        demo_live(page, tag, vp_name)
+    demo_live(page, tag, vp_name)
     ctx.close()
 
 
-# what the phone's inline demo slot paints (not popped): the frame or the still, the frame's content, the label vs its menu button
+# what the inline demo slot paints (not popped): the frame (phone: under its full-screen link), its content, the hero's
+# buttons vs the visible box (the frame clipped by the card), the phone's label vs the demo's nav and hero text (page coords)
 INLINE = """() => { const f = document.querySelector('#showcase .browser-demo'), i = f.querySelector('iframe'), s = f.querySelector('.demo-shot');
-    const r = b => [b.left, b.top, b.right, b.bottom].map(Math.round), o = s.getBoundingClientRect(), d = i.contentDocument;   // o: the slot (the menu button's spot in the still too)
-    const tg = d.querySelector('.nav__toggle').getBoundingClientRect(), l = s.querySelector('.demo-shot-t').getBoundingClientRect();
-    return {pop: f.classList.contains('is-pop'), frame: getComputedStyle(i).visibility, still: getComputedStyle(s.querySelector('img')).visibility,
-      frameBox: r(i.getBoundingClientRect()), shotBox: r(o), href: i.contentWindow.location.href.replace(location.origin, ''),
+    const d = i.contentDocument, o = i.getBoundingClientRect(), c = f.getBoundingClientRect(), r = b => [b.left, b.top, b.right, b.bottom].map(Math.round);
+    const at = e => { const b = e.getBoundingClientRect(); return [b.left + o.left, b.top + o.top, b.right + o.left, b.bottom + o.top].map(Math.round); };
+    const vis = [Math.max(o.left, c.left), Math.max(o.top, c.top), Math.min(o.right, c.right), Math.min(o.bottom, c.bottom)].map(Math.round);
+    const label = getComputedStyle(s).display !== 'none' ? r(s.querySelector('.demo-shot-t').getBoundingClientRect()) : null;
+    const texts = [...d.querySelectorAll('.nav__logo, .nav__toggle, .hero__eyebrow, .hero__title, .hero__subtitle, .hero__actions .btn')].map(e => [e.className.split(' ')[0], at(e)]);
+    const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+    return {pop: f.classList.contains('is-pop'), frame: getComputedStyle(i).visibility, still: getComputedStyle(s.querySelector('img')).display,
+      frameBox: r(o), shotBox: r(s.getBoundingClientRect()), vis, href: i.contentWindow.location.href.replace(location.origin, ''),
       logo: d.querySelector('.nav__logo').innerText.trim(), h1: d.querySelector('h1').innerText.trim(), hero: d.querySelector('img.hero__bg').getAttribute('src'),
-      clear: l.top >= tg.bottom + o.top || l.bottom <= tg.top + o.top || l.left >= tg.right + o.left || l.right <= tg.left + o.left}; }"""
+      btns: [...d.querySelectorAll('.hero__actions .btn')].map(e => [e.innerText.trim(), at(e)]), label,
+      covers: label ? texts.filter(t => hit(label, t[1])).map(t => t[0]) : []}; }"""
 
 
-def demo_live(page, tag, vp_name):
-    """Phone, after a scan with a profile: the inline slot shows her live demo frame (the owner saw the demo's still of Orla
-    under her url bar; only full screen had her), the same content as full screen, its label clear of the demo's menu button."""
+def inline_box(page, tag, vp_name, who, shot):
+    """The inline demo (both viewports): the whole hero shows, both buttons inside the visible box (the owner's phone cut it
+    after the bio); phone: the live frame fills the slot under its link (still not shown), the label covers no nav / hero text."""
     bring(page, "#showcase .browser-demo", "center")
     page.wait_for_timeout(300)
     a = page.evaluate(INLINE)
-    page.locator("#showcase .browser-demo").screenshot(path=str(cfg.out / f"{vp_name}-p3a-inline-live.png"))
-    check(f"{tag} profile: demolive: phone inline slot = her live frame over the still's box (still hidden), her name + API hero, not Orla",
-          not a["pop"] and a["frame"] == "visible" and a["still"] == "hidden" and all(abs(x - y) <= 1 for x, y in zip(a["frameBox"], a["shotBox"]))
-          and a["logo"].upper() == NAME.upper() and NAME.upper() in a["h1"].upper() and "/api/media/" in (a["hero"] or "") and not POTTERY.search(a["logo"] + a["h1"]), a)
-    check(f"{tag} profile: \"Open full screen\" label clear of the demo's menu button", a["clear"], a)
+    page.locator("#showcase .browser-demo").screenshot(path=str(cfg.out / f"{vp_name}-{shot}.png"))
+    inside = len(a["btns"]) == 2 and all(b[1][0] >= a["vis"][0] - 1 and b[1][1] >= a["vis"][1] - 1 and b[1][2] <= a["vis"][2] + 1 and b[1][3] <= a["vis"][3] + 1 for b in a["btns"])
+    check(f"{tag} {who}: demotall: inline demo shows the whole hero: both buttons inside the visible frame box", not a["pop"] and inside, (a["vis"], a["btns"]))
+    if vp_name == "phone":
+        check(f"{tag} {who}: demolive: phone inline slot = the live frame filling the link's box, still not shown",
+              a["frame"] == "visible" and a["still"] == "none" and all(abs(x - y) <= 1 for x, y in zip(a["frameBox"], a["shotBox"])), a)
+        check(f"{tag} {who}: demotall: \"Open full screen\" label covers no nav / hero text / button", a["label"] and not a["covers"], (a["label"], a["covers"]))
+    return a
+
+
+def demo_live(page, tag, vp_name):
+    """After a scan with a profile: the inline slot shows her live demo frame (the owner saw the demo's still of Orla under her
+    url bar; only full screen had her), whole hero inline; phone: full screen = the same content."""
+    a = inline_box(page, tag, vp_name, "profile", "p3a-inline-live")
+    check(f"{tag} profile: demolive: inline frame = her name + API hero, not Orla", a["logo"].upper() == NAME.upper() and NAME.upper() in a["h1"].upper()
+          and "/api/media/" in (a["hero"] or "") and not POTTERY.search(a["logo"] + a["h1"]), a)
+    if vp_name != "phone":
+        return
     page.locator("#showcase .demo-shot").click()
     page.wait_for_timeout(500)
     b = page.evaluate(INLINE)
@@ -412,7 +432,7 @@ def scan_only(t):
     # C25: navigating inside the demo is never undone: its About link carries ?r= (scan-only too) and stays there; a page
     # opened without ?r= (an early click, the API down) is left alone, not sent back to the demo home
     page.evaluate(LOADS)
-    if t.vp_name == "phone":   # phones show a still of the demo: a tap opens the live frame full screen
+    if t.vp_name == "phone":   # phones: the inline frame is not scrollable; a tap on it opens it full screen
         bring(page, "#showcase .demo-shot", "center")
         page.locator("#showcase .demo-shot").click()
         page.wait_for_timeout(400)
@@ -611,8 +631,7 @@ def public_api(t):
         const snap = () => ({search: q('[data-p=search]').map(e => e.textContent), url: q('[data-p=site-url]')[0].textContent,
             ig: vis('[data-p=ig]'), handles: q('[data-p=report-handle],[data-p=scan-handle]').map(e => e.textContent),
             line: vis('[data-p=scanned]'), gone: q('[data-p=gone-1] .m-site')[0].textContent, links: q('.ba a.m-link').length,
-            hints: q('.ba-hint').length, on: document.documentElement.classList.contains('p-on'),
-            live: document.querySelector('#showcase .browser-demo').classList.contains('is-live')});
+            hints: q('.ba-hint').length, on: document.documentElement.classList.contains('p-on')});
         const out = {keys: Object.keys(P).sort(), before: snap()};
         fire({}); fire({slug: '<x>'}); out.junk = snap();
         const full = await get('demoR3port01'), bare = await get('demoNoProf01');
@@ -627,8 +646,6 @@ def public_api(t):
           (a["links"], a["hints"], b2["links"], b2["hints"]) == (8, 1, 6, 1), (a["links"], a["hints"], b2["links"], b2["hints"]))
     check(f"{tag} profile: event personalizes in place, twice = same DOM (one IG row, not two)",
           a["search"] == [NAME + " nude leaks"] and a["url"] == SD and a["ig"] == 1, a)
-    check(f"{tag} profile: demolive: in-page scan with a profile = the live demo frame inline, then one without = the still again",
-          (api_res["before"]["live"], a["live"], b2["live"]) == (False, True, False), (api_res["before"]["live"], a["live"], b2["live"]))
     occ = occurrences(served("demoNoProf01")["hits"])
     check(f"{tag} event again with other data resets the slots first",
           b2["search"] == [H + " nude leaks"] and b2["url"] == "yourname.com" and b2["ig"] == 0

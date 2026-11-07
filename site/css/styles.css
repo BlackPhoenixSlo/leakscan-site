@@ -553,22 +553,22 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 @media (hover: hover) { .m-more:hover { background: #f8fafe; } }
 /* Showcase */
 .browser-demo iframe { width: 100%; height: 440px; border: 0; background: var(--surface-2); }
-/* phone: no nested scroll. A still of the demo's top (with its buttons) opens the full-screen frame (js/main.js; no JS =
-   the demo page). The frame keeps its box, hidden, so it still lazy-loads for the pop-out. */
+/* .demo-shot: phone only (below), a link over the frame that opens it full screen (js/main.js; no JS = the demo page) */
 .demo-shot { display: none; }
 @media (max-width: 559px) {
-  .browser-demo { position: relative; }
-  .browser-demo:not(.is-pop) iframe { position: absolute; left: 0; bottom: 0; height: 324px; visibility: hidden; }
-  .browser-demo:not(.is-pop) .demo-shot { position: relative; display: block; color: #fff; }
-  .demo-shot img { display: block; width: 100%; height: auto; }
-  /* the label sits under the demo's nav (its menu button ends ~58px down), not over it */
-  .demo-shot-t { position: absolute; right: 10px; top: 66px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 6px; background: rgb(20 8 24 / .78); font-size: .85rem; font-weight: 600; }
-  .demo-shot-t .icon { width: 15px; height: 15px; }
+  .browser-demo { position: relative; --demo-h: 600px; }
+  /* phone: the live frame, not scrollable (no nested scroll), 600px = the demo hero's min-height, so its whole hero (name,
+     bio, both buttons) shows; on top, the link that opens it full screen. No JS: the still of Orla's top in the same box. */
+  .browser-demo:not(.is-pop) iframe { position: absolute; left: 0; bottom: 0; height: var(--demo-h); visibility: hidden; pointer-events: none; }
+  .js .browser-demo:not(.is-pop) iframe { visibility: visible; }
+  .browser-demo:not(.is-pop) .demo-shot { position: relative; display: block; height: var(--demo-h); color: #fff; }
+  .demo-shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: left bottom; }
+  .js .demo-shot img { display: none; }
+  /* bottom corner: in the hero's bottom padding, under its buttons; clear of the nav, the text and the photo's caption */
+  .demo-shot-t { position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border-radius: 6px; background: rgb(20 8 24 / .78); font-size: .8rem; font-weight: 600; }
+  .demo-shot-t .icon { width: 14px; height: 14px; }
   .demo-shot:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
-  /* after a scan with a profile (js/personalize.js): her live frame in the still's box, the still's link + label on top */
-  .browser-demo.is-live:not(.is-pop) iframe { height: auto; aspect-ratio: 7 / 8; visibility: visible; pointer-events: none; }
-  .browser-demo.is-live .demo-shot img { visibility: hidden; }
-  .js .browser-demo + .center { display: none; }   /* the still is the way in (full screen); no JS keeps the button */
+  .js .browser-demo + .center { display: none; }   /* the frame's link is the way in (full screen); no JS keeps the button */
 
   .browser-demo + .center { margin-top: 18px; }
 }

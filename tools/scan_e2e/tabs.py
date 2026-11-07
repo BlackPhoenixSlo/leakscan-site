@@ -727,8 +727,8 @@ def order_popout(t):
           (in_frame, by_btn, by_bd["pop"]))
     shot(page, "2-popout-closed")
     st = page.evaluate("""() => { const f = document.querySelector('#showcase .browser-demo'), i = f.querySelector('iframe'), s = f.querySelector('.demo-shot');
-        return {iframe: getComputedStyle(i).visibility, shot: getComputedStyle(s).display, href: s.getAttribute('href'), img: s.querySelector('img').naturalWidth}; }""")
-    if vp_name == "phone":   # no nested scroll: a still of the demo's top; a tap opens the same full-screen layer
+        return {iframe: getComputedStyle(i).visibility, taps: getComputedStyle(i).pointerEvents, shot: getComputedStyle(s).display, href: s.getAttribute('href'), img: getComputedStyle(s.querySelector('img')).display}; }""")
+    if vp_name == "phone":   # no nested scroll: the frame takes no touches, a link over it opens the same full-screen layer
         page.locator("#showcase .demo-shot").click()
         page.wait_for_timeout(400)
         sp = page.evaluate(LAY)
@@ -736,8 +736,8 @@ def order_popout(t):
         page.keyboard.press("Escape")
         page.wait_for_timeout(300)
         se = page.evaluate(LAY)
-        check(f"{tag} popout: phone shows a still (frame hidden, image loaded, no-JS link to showcase/); tapping it opens the full-screen demo, Esc closes, nothing moved",
-              st["iframe"] == "hidden" and st["shot"] == "block" and st["href"] == "showcase/" and st["img"] > 0 and sp["pop"] and sp["role"] == "dialog"
+        check(f"{tag} popout: phone shows the frame under a link (frame takes no touches, still not shown, no-JS link to showcase/); tapping it opens the full-screen demo, Esc closes, nothing moved",
+              st["iframe"] == "visible" and st["taps"] == "none" and st["shot"] == "block" and st["href"] == "showcase/" and st["img"] == "none" and sp["pop"] and sp["role"] == "dialog"
               and not se["pop"] and se["y"] == l0["y"], (st, sp["pop"], se["pop"]))
     else:
         check(f"{tag} popout: desktop shows the live frame, no still", st["iframe"] == "visible" and st["shot"] == "none", st)

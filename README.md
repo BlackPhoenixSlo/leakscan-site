@@ -20,8 +20,8 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   (`data-src` until the page has loaded and it is within 800px of the screen: `js/main.js`; Chrome's own lazy distance started it
   during load and held the video player)
   with a "Full screen" in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button;
-  under 560px a still of the demo's top, `assets/demo/top.webp`, opens the same pop-out (after a scan with a profile her live
-  frame replaces the still in its box, `.is-live`)) · `#pricing` (Monthly on the deep card, One-time outlined, plan-specific Telegram CTAs) · `#faq` · `#removals`
+  under 560px the frame is 600px tall (the demo hero's min-height: name, bio and both buttons show), not scrollable, a link
+  over it opens the same pop-out (no JS: a still of the demo's top, `assets/demo/top.webp`, in the same box)) · `#pricing` (Monthly on the deep card, One-time outlined, plan-specific Telegram CTAs) · `#faq` · `#removals`
   (the deep room; phones: one column, desktop: 2x2) · `#contact`. `tools/check.py` fails if a section
   id is missing here.
 - Look: every colour / radius / face is a token in `css/styles.css` `:root` (paper `--bg`, the `--fold` band under
@@ -158,7 +158,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   it and the run goes on. Break-it flags (each turns only its own checks red): `--break-allowlist`, `--break-drift`,
   `--break-phones`, `--break-thumbs`, `--break-people` (logo tiles kept), `--break-remove`, `--break-incremental` (every explorer step 1e9: only
   `incremental:` checks), `--break-sweep` (removals' ambient sweep never steps: only `sweep:`), `--break-tgcta` (no
-  Telegram sticky bar after a scan: only `tgcta:`), `--break-demolive` (phone keeps the demo's still after a scan: only `demolive:`), `--break-fprow` (leak-site profile head stacked again: only `fp:
+  Telegram sticky bar after a scan: only `tgcta:`), `--break-demolive` (phone's inline frame hidden: only `demolive:`), `--break-demotall` (phone's inline box back to 398px: only `demotall:`), `--break-fprow` (leak-site profile head stacked again: only `fp:
   first tile row`). `personalize` covers the flow above (no-slug text identical to the page without personalize.js / inline-scan.js, phones, demo pages,
   blog: Orla's posts without a profile, starter cards + post pages with one,
   media swap / none / 404, scan-only, malicious fixture, localStorage + Reset, public API). Checks named `profile: …`
