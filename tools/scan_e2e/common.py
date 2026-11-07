@@ -21,6 +21,7 @@ FLOWS = {"scan": ("scan.scan_flow", "huge.huge_flow"), "personalize": ("personal
 SCENARIOS = tuple(FLOWS)
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 LOOP = ("127.0.0.1", "localhost")
+CHROMIUM = {"args": ["--enable-features=OverlayScrollbar"]} if sys.platform == "linux" else {}   # as on a Mac: a hidden classic scrollbar still takes its gutter under html.pop-lock's scrollbar-gutter: stable, an artifact (measured: shown, nothing moves)
 PROD_HOSTS = ("scan.srv1395798.hstgr.cloud", "72.62.92.114", "jackbase.me")
 PROFILE = FX["profile"]
 ACC = {a["platform"]: a for a in PROFILE["accounts"]}
@@ -66,7 +67,7 @@ BREAKS = {
 }
 
 # the run: set once by configure(); scenarios read cfg.out / cfg.base / cfg.api / cfg.broken
-cfg = types.SimpleNamespace(out=None, port=0, base="", api="", omit=False, omit_profile=False, scenarios=SCENARIOS, broken=set(), no_reuse=False, changed=None)
+cfg = types.SimpleNamespace(out=None, port=0, base="", api="", omit=False, omit_profile=False, scenarios=SCENARIOS, broken=set(), no_reuse=False, changed=None, engine=None)
 fails = []
 MEASURED = {}
 
@@ -77,6 +78,7 @@ def configure(argv):
     ap.add_argument("--only", choices=SCENARIOS, action="append")   # repeatable
     ap.add_argument("--no-reuse", action="store_true")   # run even on a hit; a green run still fills (reuse.py)
     ap.add_argument("--changed", nargs="?", const="", metavar="REF")   # only the scenarios the diff reaches; REF default: merge-base with origin/main
+    ap.add_argument("--engine", choices=("chromium", "webkit"))   # only that engine's part of a scenario (CI: pip in two jobs); a part neither reads nor fills the cache
     ap.add_argument("--omit-results", action="store_true")
     ap.add_argument("--omit-profile", action="store_true")
     for k in BREAKS:
@@ -92,8 +94,8 @@ def configure(argv):
     cfg.omit, cfg.omit_profile = a.omit_results, a.omit_profile
     cfg.scenarios = [s for s in SCENARIOS if not a.only or s in a.only]
     cfg.broken = {k for k in BREAKS if getattr(a, "break_" + k)}
-    cfg.no_reuse, cfg.changed = a.no_reuse, a.changed
-    if a.changed is not None and (cfg.broken or cfg.omit or cfg.omit_profile):
+    cfg.no_reuse, cfg.changed, cfg.engine = a.no_reuse, a.changed, a.engine
+    if a.changed is not None and (cfg.broken or cfg.omit or cfg.omit_profile or cfg.engine):
         ap.error("--changed reads the cache: a break run never does")
     return cfg
 
@@ -267,6 +269,30 @@ def hover(page, sel):
     xy = page.eval_on_selector(sel, """e => { e.scrollIntoView({block: 'center', behavior: 'instant'});
         const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }""")
     page.mouse.move(*xy)
+
+
+def touch_scroll(page, cdp, x, y, dx=0, dy=0, speed=800, fling=False):
+    """The finger moves (dx, dy) from (x, y). CDP's synthesized touch gesture scrolls nothing on Linux, whatever the launch flags (measured, CI's Chromium 153), so there:
+    dispatched touches, past the 15 px slop, in strokes that stay on screen; a hold before the lift = no momentum."""
+    if sys.platform != "linux":
+        cdp.send("Input.synthesizeScrollGesture", {"x": x, "y": y, "xDistance": dx, "yDistance": dy, "speed": speed, "gestureSourceType": "touch", "preventFling": not fling})
+        return
+    touch = lambda kind, *at: cdp.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": [{"x": at[0], "y": at[1]}] if at else []})
+    vp, dist = page.viewport_size, max(abs(dx), abs(dy))
+    room = max(40, (x - 20 if dx < 0 else vp["width"] - 20 - x) if abs(dx) > abs(dy) else (y - 20 if dy < 0 else vp["height"] - 20 - y)) - 16
+    ux, uy = dx / dist, dy / dist
+    while dist > 0:
+        stroke, dist = min(room, dist), dist - min(room, dist)
+        touch("touchStart", x, y)
+        touch("touchMove", x + ux * 16, y + uy * 16)
+        n = max(1, round(stroke / speed * 60))
+        for i in range(1, n + 1):
+            page.wait_for_timeout(16)
+            touch("touchMove", x + ux * (16 + stroke * i / n), y + uy * (16 + stroke * i / n))
+        if not fling:
+            page.wait_for_timeout(150)
+        touch("touchEnd")
+        page.wait_for_timeout(16)
 
 
 def swipe(page, sel, extra=()):

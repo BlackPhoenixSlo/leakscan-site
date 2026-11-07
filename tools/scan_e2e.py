@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet|again]... [--changed [REF]] [--no-reuse]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet|again]... [--changed [REF]] [--no-reuse] [--engine chromium|webkit]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-demolive] [--break-demotall] [--break-fprow] [--break-tuck]
         [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]

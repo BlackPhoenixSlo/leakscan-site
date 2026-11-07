@@ -5,7 +5,7 @@ import sys
 import time
 
 from . import reach, reuse
-from .common import MEASURED, VIEWPORTS, cfg, check, configure, fails, start_stub
+from .common import CHROMIUM, MEASURED, VIEWPORTS, cfg, check, configure, fails, start_stub
 
 BEFORE_VP = {"thumb_paint": lambda pw, browser: (pw,), "pip_flow": lambda pw, browser: (pw, browser), "photos_flow": lambda pw, browser: (pw, browser), "sheet_flow": lambda pw, browser: (pw, browser)}   # first args of a part; default (browser,)
 
@@ -27,10 +27,10 @@ def scenario(s, parts, pw, browser, state):
     stub = start_stub(log if measure else None)
     reach.record(seen.add if measure else None)   # the harness's own reads: personalize reads site/index.html
     try:
-        for vp_name, vp in VIEWPORTS:
+        for vp_name, vp in VIEWPORTS if cfg.engine != "webkit" else ():
             for fn in parts:
                 flow(fn, vp_name, *BEFORE_VP.get(fn.__name__, lambda _pw, b: (b,))(pw, browser), vp_name, vp)
-        if s in ("pip", "sheet"):
+        if s in ("pip", "sheet") and cfg.engine != "chromium":
             for fn in parts:
                 flow(fn, "phone-webkit", pw, browser, "phone", None, "webkit")   # iPhone 13 (Playwright device), WebKit
     finally:
@@ -39,7 +39,7 @@ def scenario(s, parts, pw, browser, state):
         stub.wait()   # the next stub binds the same port
         stub.stdout.close()
     if not measure:
-        print(f"{s}: ran {'RED' if fails[n:] else 'green'} {time.time() - t0:.0f} s (break run: no cache)", flush=True)
+        print(f"{s}: ran {'RED' if fails[n:] else 'green'} {time.time() - t0:.0f} s (no cache)", flush=True)
         return {"status": "ran", "secs": round(time.time() - t0, 1), "fails": fails[n:]}
     return reuse.finish(s, code, t0, seen | set(log.read_text().split("\n")) - {""}, fails[n:], state)
 
@@ -62,7 +62,7 @@ def run(argv=None):
         from playwright.sync_api import sync_playwright   # lazily: a full hit needs no browser
         parts = {s: [getattr(importlib.import_module("." + f.split(".")[0], __package__), f.split(".")[1]) for f in reuse.FLOWS[s]] for s in todo}
         with sync_playwright() as pw:
-            browser = pw.chromium.launch()
+            browser = pw.chromium.launch(**CHROMIUM)
             for s in todo:
                 per[s] = scenario(s, parts[s], pw, browser, state)
                 save()   # a green scenario of a run killed later is still reusable

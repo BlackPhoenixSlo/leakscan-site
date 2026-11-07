@@ -409,6 +409,12 @@ def hero_look(run):
         if (t && e.contains(t)) { e.setAttribute('data-hv', ''); return e.textContent.trim().slice(0, 30); } } return null; }""")
     hover(page, ".report-card .live-link[data-hv]")
     page.wait_for_timeout(250)
+    if vp_name == "desktop":   # a loaded runner paints the tint late, a row can move from under the pointer (measured): point again; a phone's stays a fixed wait: there it must not come
+        for _ in range(10):
+            if page.evaluate("getComputedStyle(document.querySelector('.report-card .live-link[data-hv]')).backgroundColor") != "rgba(0, 0, 0, 0)":
+                break
+            page.wait_for_timeout(300)
+            hover(page, ".report-card .live-link[data-hv]")
     hv = page.evaluate("getComputedStyle(document.querySelector('.report-card .live-link[data-hv]')).backgroundColor")
     hov = page.evaluate("matchMedia('(hover: hover)').matches")   # Playwright's screenshots flip a touch context to hover: ask the page
     bare = page.evaluate(BARE_HOVER)

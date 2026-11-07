@@ -2,7 +2,7 @@
 import re
 from urllib.parse import urlsplit
 
-from .common import COUNTS, FX, PIP_AWAY, bring, cfg, check, new_ctx, served, settled_count
+from .common import COUNTS, FX, PIP_AWAY, bring, cfg, check, new_ctx, served, settled_count, touch_scroll
 from .scan import open_all_sites
 
 # [ms, score, hadRecentInput, a shifted node inside #removals] (the Ask AI launcher slides up with the sticky bar elsewhere)
@@ -379,8 +379,7 @@ def removals_flow(browser, vp_name, vp):
                       and all(a[1]["edge"] > b[1]["edge"] for a, b in zip(live, live[1:])) and pos1 == pos0, [pos0, pos1, mids])
                 p0 = page.evaluate(RM_MID, "reddit")["p"]
                 y0 = page.evaluate("scrollY")
-                cdp.send("Input.synthesizeScrollGesture", {"x": int(r["x"] + r["width"] * .5), "y": int(r["y"] + r["height"] * .5), "xDistance": 0, "yDistance": 220,
-                                                           "gestureSourceType": "touch", "speed": 800})
+                touch_scroll(page, cdp, int(r["x"] + r["width"] * .5), int(r["y"] + r["height"] * .5), dy=220, speed=800)
                 page.wait_for_timeout(600)
                 y1, p1 = page.evaluate("scrollY"), page.evaluate(RM_MID, "reddit")["p"]
                 check(f"{tag} touch: a vertical swipe on a stage scrolls the page (up 220 px), the edge stays", y0 - y1 >= 100 and p1 == p0, [y0, y1, p0, p1])

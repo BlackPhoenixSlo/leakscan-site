@@ -118,7 +118,10 @@ def sheet_flow(pw, chromium, vp_name, vp, engine="chromium"):
                 b0 = page.evaluate(blur)
                 page.locator(".report-card").screenshot(path=str(cfg.out / f"sheet-{vp_name}-{engine}-1-blurred.png"))
                 page.locator("#panel-report-images .reveal-btn").click()
-                page.wait_for_timeout(400)
+                try:
+                    page.wait_for_function(f"() => !({blur})().includes('blur')", timeout=3000)   # Linux WebKit: still blurred at 400 ms, sharp in the screenshot right after (measured)
+                except Exception:
+                    pass   # the check says what is still shown
                 b1 = page.evaluate(blur)
                 page.locator(".report-card").screenshot(path=str(cfg.out / f"sheet-{vp_name}-{engine}-2-revealed.png"))
                 check(f"{tag} blur on, Reveal takes it off", "blur" in b0 and "blur" not in b1, [b0, b1])

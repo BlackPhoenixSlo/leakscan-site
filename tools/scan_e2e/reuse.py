@@ -143,7 +143,7 @@ def reaches(s, changed):
 
 
 def cacheable():
-    return not (cfg.broken or cfg.omit or cfg.omit_profile)
+    return not (cfg.broken or cfg.omit or cfg.omit_profile or cfg.engine)
 
 
 def plan():

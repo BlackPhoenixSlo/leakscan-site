@@ -1,0 +1,41 @@
+name: e2e
+on:
+  pull_request:
+    paths-ignore: ["**.md"]
+  push:
+    branches: [main]
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        only: [scan, personalize, askai, inline, tabs, removals, "pip --engine chromium", "pip --engine webkit", sheet, again]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: python3 -m venv "$RUNNER_TEMP/v" && "$RUNNER_TEMP/v/bin/pip" install -q playwright==1.63.0 curl_cffi
+      - run: '"$RUNNER_TEMP/v/bin/playwright" install --with-deps chromium webkit'
+      # stubs only: a network namespace with nothing but loopback and an empty env, so no key is held and no paid API reachable
+      # Declared, each prints SKIP (pip.py), Linux WebKit only: the `hd:` sync flow (GStreamer, no iPhone) and the mouse gestures unmute / drop /
+      # tuck / pull / close (on and off they miss a runner's timing, its mouse stops at the header). Chromium here and WebKit on a Mac run them
+      # No WebKit compositing: 15 % less load on the runner, and its GL path is no iPhone's anyway (measured: 350 s vs 420 s)
+      # One retry, with a warning: drags and flings hang on wall-clock timing a loaded runner can miss; a real fault is red twice
+      - run: |
+          e2e() { sudo unshare -n sh -c "ip link set lo up && exec sudo -u $(id -un) -H env -i HOME=$HOME LANG=C.UTF-8 WEBKIT_DISABLE_COMPOSITING_MODE=1 $RUNNER_TEMP/v/bin/python tools/scan_e2e.py $RUNNER_TEMP/out --no-reuse --only ${{ matrix.only }}"; }
+          e2e || { echo "::warning::${{ matrix.only }} red on the first try, retrying once"; e2e; }
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e2e-${{ matrix.only }}
+          path: ${{ runner.temp }}/out
+          retention-days: 3

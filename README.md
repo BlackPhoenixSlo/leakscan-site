@@ -210,8 +210,8 @@ uv run python <worktree>/tools/scan_e2e.py OUT --no-reuse           # run anyway
 - A hit prints `<scenario>: reused green from <run folder>`, starts no stub and no browser, and takes no machine slot. Misses
   wait for the machine gate on their own (`~/.slop/gate.py`, re-exec at nice 10); invoking through the gate as before still works.
   Unselected: `skip <scenario>: diff doesn't reach it`. Selected scenarios still go through reuse.
-- **Before a deploy: a full `--no-reuse` run.** CI runs only `check.py`, `check_video.py` and `app/tests`, so nothing else
-  catches a stale hit.
+- CI catches a stale hit: `.github/workflows/e2e.yml` runs every scenario `--no-reuse` on Linux (no cache, loopback-only network, no
+  secrets) on each PR and push to main. **Before a deploy: still a full local `--no-reuse` run**, for the Linux WebKit checks it declares SKIP.
 - Key (`tools/scan_e2e/reuse.py`) = env (Playwright's `browsers.json`, its version, Python major.minor, platform) + code (entry,
   `common` / `main` / `reuse` / `reach`, the scenario's modules + their imports, the stub, `tools/fixtures/**`; Python by its ast: no
   comments, no module docstring, no `BREAKS` in `common.py`) + reach: `{path: sha or null}` of everything the scenario read,
