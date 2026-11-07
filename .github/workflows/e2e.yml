@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        only: [scan, personalize, askai, inline, tabs, removals, "pip --engine chromium", "pip --engine webkit", sheet, again]
+        only: [scan, personalize, askai, inline, tabs, removals, "pip --engine chromium", "pip --engine webkit", sheet, again, quota]
     steps:
       - uses: actions/checkout@v7
         with:
