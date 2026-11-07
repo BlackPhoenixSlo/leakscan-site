@@ -17,7 +17,7 @@ from . import reach
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 FX = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())   # the stub's fixture: expected profile / copy
 FLOWS = {"scan": ("scan.scan_flow", "huge.huge_flow"), "personalize": ("personalize.personalize_flow", "expired.personal_flow"), "askai": ("askai.askai",),   # scenario → its parts (module.function), in order
-         "inline": ("inline.inline_flow", "inline.thumb_paint"), "tabs": ("tabs.tabs_flow",), "removals": ("removals.removals_flow",), "pip": ("pip.pip_flow", "pip.photos_flow"), "sheet": ("sheet.sheet_flow",), "again": ("again.again_flow", "expired.expired_flow"), "quota": ("quota.quota_flow",)}
+         "inline": ("inline.inline_flow", "inline.thumb_paint"), "tabs": ("tabs.tabs_flow",), "removals": ("removals.removals_flow",), "pip": ("pip.pip_flow", "pip.photos_flow"), "sheet": ("sheet.sheet_flow",), "again": ("again.again_flow", "expired.expired_flow"), "quota": ("quota.quota_flow", "quota.audit_flow")}
 SCENARIOS = tuple(FLOWS)
 VIEWPORTS = (("phone", {"width": 390, "height": 844}), ("desktop", {"width": 1440, "height": 900}))
 LOOP = ("127.0.0.1", "localhost")
@@ -65,10 +65,11 @@ BREAKS = {
     "expired": ("scan-engine.js", "{ trimmed: 'images', summary: 'details' }[raw && raw.retention]", "null"),   # a retained report reads as a full one
     "again": ("scan-engine.js", "    if (o.fresh) body.fresh = true;\n", "\n"),   # "Scan again" scans without fresh:true
     "quota": ("scan-engine.js", "var SHEET_MS = ", "var SHEET_MS = "),   # no script change: scan_e2e/quota.py starts the app with a scan that found nothing never hearing its calls failed
+    "audit": ("scan-engine.js", "var SHEET_MS = ", "var SHEET_MS = "),   # no script change: scan_e2e/quota.py starts the app with get_scan not passing the audit counts
 }
 
 # the run: set once by configure(); scenarios read cfg.out / cfg.base / cfg.api / cfg.broken
-cfg = types.SimpleNamespace(out=None, port=0, base="", api="", omit=False, omit_profile=False, scenarios=SCENARIOS, broken=set(), no_reuse=False, changed=None, engine=None)
+cfg = types.SimpleNamespace(out=None, port=0, base="", api="", omit=False, omit_profile=False, scenarios=SCENARIOS, broken=set(), no_reuse=False, changed=None, engine=None, keep_all=False)
 fails = []
 MEASURED = {}
 
@@ -78,6 +79,7 @@ def configure(argv):
     ap.add_argument("out")
     ap.add_argument("--only", choices=SCENARIOS, action="append")   # repeatable
     ap.add_argument("--no-reuse", action="store_true")   # run even on a hit; a green run still fills (reuse.py)
+    ap.add_argument("--keep-all", action="store_true")   # every frame of a green run too (thin.py); a hit has no frames to give, so implies --no-reuse
     ap.add_argument("--changed", nargs="?", const="", metavar="REF")   # only the scenarios the diff reaches; REF default: merge-base with origin/main
     ap.add_argument("--engine", choices=("chromium", "webkit"))   # only that engine's part of a scenario (CI: pip in two jobs); a part neither reads nor fills the cache
     ap.add_argument("--omit-results", action="store_true")
@@ -95,7 +97,7 @@ def configure(argv):
     cfg.omit, cfg.omit_profile = a.omit_results, a.omit_profile
     cfg.scenarios = [s for s in SCENARIOS if not a.only or s in a.only]
     cfg.broken = {k for k in BREAKS if getattr(a, "break_" + k)}
-    cfg.no_reuse, cfg.changed, cfg.engine = a.no_reuse, a.changed, a.engine
+    cfg.no_reuse, cfg.changed, cfg.engine, cfg.keep_all = a.no_reuse or a.keep_all, a.changed, a.engine, a.keep_all
     if a.changed is not None and (cfg.broken or cfg.omit or cfg.omit_profile or cfg.engine):
         ap.error("--changed reads the cache: a break run never does")
     return cfg

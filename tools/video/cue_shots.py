@@ -150,7 +150,8 @@ Plus:
 Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--base REF] [--break-gtime] [--break-blur] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--break-intro] [--skip-prod] [--only prod|captions|voice|fill|hers|google|blur]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, json, pathlib, re, socket, subprocess, sys, time, urllib.parse, urllib.request
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+sys.path[:0] = [str(pathlib.Path(__file__).resolve().parent), str(pathlib.Path(__file__).resolve().parent.parent)]
+from scan_e2e import thin
 from serve import serve
 from playwright.sync_api import sync_playwright
 
@@ -1980,6 +1981,9 @@ def blur(b, base, out, raw_file, base_ref):
                   norm(st[0], 5) == norm(st[1], BLUR_PX) and was == ["blur(5px) saturate(0.95)"], was)
 
 
+PROOFS = re.compile(thin.NAMED.pattern + r"|^(?:proof-|full-frame-|frame-1920-(?:generic-google-live|named-mega-removed|generic-cta\.|swap-))")   # the shots the docstring above calls proofs
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
@@ -2005,7 +2009,16 @@ def main():
     ap.add_argument("--base", help="google post: compare the cards after google-images' entrance with this git ref's page / js / css")
     ap.add_argument("--break-gtime", action="store_true")
     ap.add_argument("--break-blur", action="store_true")
+    ap.add_argument("--keep-all", action="store_true", help="every frame of a green run too (scan_e2e/thin.py)")
     a = ap.parse_args()
+    t0, rc = time.time(), run(a)
+    out = pathlib.Path(a.out).expanduser()
+    if not rc and not a.keep_all and not any(v for k, v in vars(a).items() if k.startswith("break_")):
+        print("thinned", thin.thin(out, t0, thin.ends(out, t0), PROOFS), "frames of a green run: --keep-all keeps them")
+    return rc
+
+
+def run(a):
     out = pathlib.Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
     html = (ROOT / "site/video/index.html").read_text(encoding="utf-8")

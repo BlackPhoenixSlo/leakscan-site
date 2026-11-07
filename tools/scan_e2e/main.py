@@ -4,7 +4,7 @@ import json
 import sys
 import time
 
-from . import reach, reuse
+from . import reach, reuse, thin
 from .common import CHROMIUM, MEASURED, VIEWPORTS, cfg, check, configure, fails, start_stub
 
 BEFORE_VP = {"thumb_paint": lambda pw, browser: (pw,), "pip_flow": lambda pw, browser: (pw, browser), "photos_flow": lambda pw, browser: (pw, browser), "sheet_flow": lambda pw, browser: (pw, browser)}   # first args of a part; default (browser,)
@@ -12,27 +12,29 @@ BEFORE_VP = {"thumb_paint": lambda pw, browser: (pw,), "pip_flow": lambda pw, br
 
 def flow(fn, vp_name, *args):
     """One scenario part; an exception in it (a Playwright timeout, a missing element) is a FAIL line for that part
-    and the run goes on with the next one: one stuck page never hides every check after it."""
+    and the run goes on with the next one: one stuck page never hides every check after it. → the part's first and last shot."""
+    t0 = time.time()
     try:
         fn(*args)
     except Exception as e:   # noqa: BLE001 - reported, never swallowed
         check(f"{vp_name} {fn.__name__}: ran to the end", False, f"{type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]}")
+    return thin.ends(cfg.out, t0)
 
 
 def scenario(s, parts, pw, browser, state):
     """One scenario, every viewport, a fresh stub; its reach measured unless it's a break run → its summary row."""
     n, t0, code, measure = len(fails), time.time(), reuse.code_key(s, {}), reuse.cacheable()
-    seen, log = set(), cfg.out / f"reach-{s}.log"
+    seen, log, ends = set(), cfg.out / f"reach-{s}.log", set()
     log.unlink(missing_ok=True)
     stub = start_stub(log if measure else None)
     reach.record(seen.add if measure else None)   # the harness's own reads: personalize reads site/index.html
     try:
         for vp_name, vp in VIEWPORTS if cfg.engine != "webkit" else ():
             for fn in parts:
-                flow(fn, vp_name, *BEFORE_VP.get(fn.__name__, lambda _pw, b: (b,))(pw, browser), vp_name, vp)
+                ends |= flow(fn, vp_name, *BEFORE_VP.get(fn.__name__, lambda _pw, b: (b,))(pw, browser), vp_name, vp)
         if s in ("pip", "sheet") and cfg.engine != "chromium":
             for fn in parts:
-                flow(fn, "phone-webkit", pw, browser, "phone", None, "webkit")   # iPhone 13 (Playwright device), WebKit
+                ends |= flow(fn, "phone-webkit", pw, browser, "phone", None, "webkit")   # iPhone 13 (Playwright device), WebKit
     finally:
         reach.record(None)
         stub.terminate()
@@ -41,7 +43,10 @@ def scenario(s, parts, pw, browser, state):
     if not measure:
         print(f"{s}: ran {'RED' if fails[n:] else 'green'} {time.time() - t0:.0f} s (no cache)", flush=True)
         return {"status": "ran", "secs": round(time.time() - t0, 1), "fails": fails[n:]}
-    return reuse.finish(s, code, t0, seen | set(log.read_text().split("\n")) - {""}, fails[n:], state)
+    row = reuse.finish(s, code, t0, seen | set(log.read_text().split("\n")) - {""}, fails[n:], state)
+    if not row["fails"] and not cfg.keep_all:
+        row["thinned"] = thin.thin(cfg.out, t0, ends)
+    return row
 
 
 def run(argv=None):
