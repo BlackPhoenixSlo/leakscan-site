@@ -117,7 +117,7 @@
     popBtn.hidden = false;
     popBtn.setAttribute('aria-expanded', 'false');
     popBtn.addEventListener('click', function () { setPop(!popOpen()); });
-    var shot = demoFig.querySelector('.demo-shot');   // phone: the still of the demo's top opens the same full screen
+    var shot = demoFig.querySelector('.demo-shot');   // phone: the link over the (not scrollable) frame opens the same full screen
     if (shot) shot.addEventListener('click', function (e) { e.preventDefault(); setPop(true); });
     document.addEventListener('keydown', onKey);
     frame.addEventListener('load', function () {   // a popped frame that navigates keeps Esc
