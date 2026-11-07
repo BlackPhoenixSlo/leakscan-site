@@ -1372,6 +1372,7 @@ def _run_bio_verify(handle, code, platforms):
 import alias_enrich
 import leakshaven
 import site_static
+import thumb_sheet
 
 _API_PREFIXES = ("/api/", "/static/", "/s/")
 _API_PATHS = ("/healthz", "/favicon.ico")
@@ -1742,6 +1743,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/thumb":
             return self.api_thumb()
+        if path.startswith("/api/thumb-sheet/"):  # one-project: thumb sheet
+            return thumb_sheet.serve(self, path[len("/api/thumb-sheet/"):], scan_row, _THUMB_OPENER, THUMB_HOSTS, THUMB_MAX_BYTES)  # one-project: thumb sheet
         if path == "/api/chat-kb":
             return self.api_chat_kb()
         if path.startswith("/static/"):

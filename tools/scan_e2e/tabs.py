@@ -169,7 +169,7 @@ def report_card(t):
         ctx = ctx_()
         page = ctx.new_page()
         held, hold = [], [True]   # held until the tab is up; later requests (spare tiles) pass
-        page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] else r.continue_())
+        page.route(lambda u: "/api/thumb?" in u, lambda r: held.append(r) if hold[0] else r.continue_())
         page.goto(cfg.base + "scan/?r=demoBrokenT1", wait_until="load")
         page.wait_for_selector("#tab-google-images", timeout=8000)
         bring(page, "#g-stage")
@@ -233,7 +233,7 @@ def held_thumbs(t):
     ctx = t.ctx_()
     page = ctx.new_page()
     held, hold, pick = [], [True], []
-    page.route(lambda u: "/api/thumb" in u, lambda r: held.append(r) if hold[0] or any(r.request.url.endswith(x) for x in pick) else r.continue_())
+    page.route(lambda u: "/api/thumb?" in u, lambda r: held.append(r) if hold[0] or any(r.request.url.endswith(x) for x in pick) else r.continue_())
     page.goto(cfg.base + "scan/?r=demoR3port01", wait_until="load")
     page.wait_for_selector("#report:not([hidden])", timeout=8000)
 

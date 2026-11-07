@@ -319,6 +319,7 @@
     }).then(function () {
       if (failed) { var f = new Error(failed); f.kind = 'failed'; f.detail = failed.replace(/[.\s]+$/, ''); o.onError(f); }
       else if (result) {
+        if (result.slug) sheet(result.slug);   // before onResult: its tiles wait for the sheet
         // an API that doesn't echo socials yet: what she typed next to the scan
         if (o.social && !(result.socials && typeof result.socials === 'object')) { result.socials = {}; result.socials[o.social.net] = o.social.handle; }
         o.onResult(result);
@@ -335,12 +336,65 @@
   var results = {}, host = null;
   try { if (window.parent !== window && window.parent.LeakScanEngine) host = window.parent.LeakScanEngine; } catch (e) { host = null; }
   function fetchResult(slug) {
+    sheet(slug);
     if (host) return host.fetchResult(slug);
     if (results[slug]) return results[slug];
     return (results[slug] = fetch(API + '/api/scan-result/' + encodeURIComponent(slug), { credentials: 'omit' }).then(function (res) {
       if (res.ok) return res.json().then(withoutAggregators);
       return res.json().catch(function () { return {}; }).then(function (j) { throw apiError(res.status, j && j.error, 'failed'); });
     }).catch(function (e) { delete results[slug]; if (!e.kind) e.kind = 'network'; throw e; }));
+  }
+  // ---------- one file instead of dozens of /api/thumb requests ----------
+  // GET <API>/api/thumb-sheet/<slug> (app/thumb_sheet.py): 8 digits = the manifest's length, the manifest {cells: [[src, type, bytes]],
+  // dead: [src]}, then the thumbs' original bytes back to back, read as they arrive. A cell becomes a blob URL: a real <img>, readable
+  // pixels (same origin), no further request, no decoding until an <img> asks. put() holds a thumb until its cell is here or the sheet
+  // is over. No sheet (404 / 5xx / an old server / a network error / too slow) or a thumb it does not name: /api/thumb, as always.
+  // A same-origin frame (js/pip.js) uses the page's sheet.
+  var SHEET_MS = 20000, CELL_MS = 16, sheets = {}, opened = {}, cells = {}, sheetsOut = 0, held = new Map();
+  function readSheet(slug, each) {   // each(src, blob URL | null = dead) per thumb: at once for those already read → Promise: the sheet is over; never rejects
+    if (host) return host.readSheet(slug, each);
+    var s = sheets[slug];
+    if (s) { s.got.forEach(function (c) { each(c[0], c[1]); }); s.subs.push(each); return s.end; }
+    s = sheets[slug] = { got: [], subs: [each] };
+    var say = function (src, u) { s.got.push([src, u]); s.subs.forEach(function (fn) { try { fn(src, u); } catch (e) {} }); };   // a frame may be gone
+    var buf = new Uint8Array(0), size = 0, list = null, at = 0, text = function (b) { return new TextDecoder().decode(b); };
+    var chew = function () {   // cuts off buf what is complete
+      for (;;) {
+        var n = !size ? 8 : !list ? size : list[at] ? list[at][2] : Infinity;
+        if (buf.length < n) return;
+        var part = buf.subarray(0, n);
+        buf = buf.subarray(n);
+        if (!size) size = +text(part);
+        else if (!list) { var j = JSON.parse(text(part)); list = j.cells; j.dead.forEach(function (u) { say(u, null); }); }
+        else { say(list[at][0], URL.createObjectURL(new Blob([part], { type: list[at][1] }))); at++; }
+      }
+    };
+    var ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, SHEET_MS);
+    return (s.end = fetch(API + '/api/thumb-sheet/' + encodeURIComponent(slug), { credentials: 'omit', signal: ctl.signal }).then(function (res) {
+      if (!res.ok || !res.body) throw new Error('no sheet');
+      var reader = res.body.getReader(), next = function () {
+        return reader.read().then(function (r) {
+          if (r.done) return;
+          var b = new Uint8Array(buf.length + r.value.length);
+          b.set(buf);
+          b.set(r.value, buf.length);
+          buf = b;
+          chew();
+          return next();
+        });
+      };
+      return next();
+    }).catch(function () {}).then(function () { clearTimeout(timer); }));
+  }
+  function sheet(slug) {
+    if (opened[slug] || !window.fetch || !window.AbortController || !window.TextDecoder) return;
+    opened[slug] = 1;
+    sheetsOut++;
+    var free = function (src, img) { held.delete(img); if (img.isConnected || !img.parentNode) put(img, src); };
+    readSheet(slug, function (src, u) {
+      if (u) cells[src] = u; else verdict(src, false);
+      held.forEach(function (s, img) { if (s === src) free(s, img); });
+    }).then(function () { if (!--sheetsOut) held.forEach(free); });
   }
   // A progress event's text → {pct: 5..95 | null, stage: what to show}.
   function progressInfo(text) {
@@ -352,42 +406,68 @@
   // ---------- thumbs that show: ONE rule everywhere ----------
   // watchThumb(img, onDead, onOk?, photo?): an image that fails or loads blank (< BLANK_PX a side: a hotlink-blocked thumb
   // comes back as a tiny placeholder), or with `photo` (image tiles) is no person photo (isPhoto) → onDead(img); else
-  // onOk(img). Once. A CORS load (XO: crossorigin) that is refused loads once more on fresh()'s URL, then plain (pixels unread: kept). A failed load asks /api/thumb for its status: only a
-  // 429 (the thumb bucket is empty: try later, after RETRY_MS) or a 200 (a hiccup) is retried, once; anything else is dead
-  // at once (the proxy answers 404 / 4xx / 502 for a thumb Google no longer serves). Also right for an image that
-  // finished before it was watched. A tile taken off the page is not retried; a free-standing image (gallery()'s probe) is.
-  var BLANK_PX = 16, RETRY_MS = 2500;
+  // onOk(img). Once. A failed load asks /api/thumb again (askStatus): a 429 (the thumb bucket is empty) is no verdict: it keeps its
+  // turn. A 200 (a hiccup, a bucket since refilled) has the bytes: they become the image, no third request. A CORS load (XO:
+  // crossorigin) refused (no status) loads once more on fresh()'s URL, then plain (pixels unread: kept). Anything else is dead at once
+  // (the proxy answers 404 / 4xx / 502 for a thumb Google no longer serves). Also right for an image that finished before it was
+  // watched. A tile taken off the page is not retried and gets no verdict; a free-standing image (gallery()'s probe) is retried.
+  var BLANK_PX = 16, RETRY_MS = 2500, ASK_MS = 10000, asks = [], asking = false, coolUntil = 0;
+  // One status at a time per page (a frame uses its page's queue): one 429 stops all of them for RETRY_MS, so an empty bucket gets
+  // what it refills, not a retry chain per thumb (each a new 429, each tile it kills pulling in the next): answer(status, response).
+  // No headers in ASK_MS: status 0, the queue goes on.
+  function askStatus(src, answer) {
+    if (host) return host.askStatus(src, answer);
+    asks.push([src, answer]);
+    askNext();
+  }
+  function askNext() {
+    if (asking || !asks.length) return;
+    asking = true;
+    setTimeout(function () {
+      var job = asks.shift(), ctl = window.AbortController ? new AbortController() : null, timer = ctl && setTimeout(function () { ctl.abort(); }, ASK_MS);
+      fetch(job[0], { credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined }).catch(function () { return { status: 0 }; }).then(function (r) {
+        clearTimeout(timer);
+        asking = false;
+        if (r.status === 429) { coolUntil = Date.now() + RETRY_MS; asks.push(job); } else job[1](r.status, r);
+        askNext();
+      });
+    }, Math.max(0, coolUntil - Date.now()));
+  }
   function watchThumb(img, onDead, onOk, photo) {
-    var tried = false, done = false;
-    var finish = function (ok) {
-      if (done) return;
+    var done = false;
+    var stop = function () {
       done = true;
       img.removeEventListener('load', load);
       img.removeEventListener('error', error);
+    };
+    var finish = function (ok) {
+      if (done) return;
+      stop();
       var fn = ok ? onOk : onDead;
       if (fn) fn(img);
     };
-    var load = function () { finish(img.naturalWidth >= BLANK_PX && img.naturalHeight >= BLANK_PX && (!photo || isPhoto(img))); };
+    var load = function () {
+      var end = function () { finish(img.naturalWidth >= BLANK_PX && img.naturalHeight >= BLANK_PX && (!photo || isPhoto(img))); };
+      if (photo && img.decode) img.decode().then(end, end);   // WebKit can draw a decoding=async tile not decoded yet as blank: no photo, a false dead
+      else end();
+    };
     var error = function () {
-      if (img.hasAttribute('crossorigin')) {   // XO refused: once more on E.fresh's URL (a copy cached before ACAO / Vary), then plain
-        var s = img.getAttribute('src');
-        return s && s !== fresh(s) ? img.setAttribute('src', fresh(s)) : img.removeAttribute('crossorigin');
-      }
       var src = img.getAttribute('src');
-      if (tried || !src || !window.fetch) return finish(false);
-      tried = true;
-      fetch(src, { credentials: 'omit', referrerPolicy: 'no-referrer' }).then(function (r) { return r.status; }, function () { return 0; })
-        .then(function (st) {
-          if (st !== 429 && st !== 200) return finish(false);
-          setTimeout(function () {
-            if (done) return;
-            if ((img.isConnected || !img.parentNode) && img.getAttribute('src') === src) img.setAttribute('src', src); else finish(false);
-          }, st === 429 ? RETRY_MS : 0);
-        });
+      if (!src || src.slice(0, 5) === 'blob:' || !window.fetch) return finish(false);   // bytes in hand: asking again gets the same
+      askStatus(src, function (st, res) {
+        if (done) return;
+        if (img.parentNode && !img.isConnected) return stop();   // no verdict: it left while queued, its thumb may be fine (the prober checks it)
+        if (img.getAttribute('src') !== src) return finish(false);
+        if (st === 200) return res.blob().then(function (b) { img.setAttribute('src', URL.createObjectURL(b)); }, function () { finish(false); });
+        if (st === 0 && img.hasAttribute('crossorigin')) {   // XO refused: once more on E.fresh's URL (a copy cached before ACAO / Vary), then plain
+          return src !== fresh(src) ? img.setAttribute('src', fresh(src)) : img.removeAttribute('crossorigin');
+        }
+        finish(false);
+      });
     };
     img.addEventListener('load', load);
     img.addEventListener('error', error);
-    if (img.complete && img.getAttribute('src')) { if (img.naturalWidth) load(); else error(); }
+    if (img.complete && img.getAttribute('src')) setTimeout(function () { if (!done && img.complete) { if (img.naturalWidth) load(); else error(); } });   // not inside a gallery's sync: a verdict syncs again
   }
 
   // ---------- tabs: markup-driven, one convention ----------
@@ -583,25 +663,31 @@
     probing[src] = 1;
     var img = new Image(), end = function (ok) { delete probing[src]; if (ok) passed(src, img); else verdict(src, false); if (done) done(); };
     img.referrerPolicy = 'no-referrer';
-    if (XO) img.crossOrigin = 'anonymous';
     watchThumb(img, function () { end(false); }, function () { end(true); }, true);
-    img.src = thumb(src);
+    put(img, src);
   }
   function photo(src, fn) {
     if (verdicts[src] === false || via[src]) return fn(verdicts[src] !== false);
     (waiting[src] = waiting[src] || []).push(fn);
     if (!probing[src]) probe(src);
   }
+  // While a sheet is on its way a thumb it may name waits (no src: no request, no default image beside her); put(img, null) forgets
+  // img's waiting thumb. A thumb the sheet says is dead fails at once: watchThumb's onDead, no request, no old src left (removals' demo face).
   function put(img, src) {
-    var p = via[src] || { u: thumb(src), cors: XO };
+    if (!src) return held.delete(img);
+    if (verdicts[src] === false) { img.removeAttribute('src'); return setTimeout(function () { img.dispatchEvent(new Event('error')); }); }
+    if (sheetsOut && !via[src] && !cells[src]) { img.removeAttribute('src'); return held.set(img, src); }
+    var p = via[src] || (cells[src] ? { u: cells[src] } : { u: thumb(src), cors: XO });
     if (p.cors) img.crossOrigin = 'anonymous';
     img.src = p.u;
   }
+  // paced(src, ms): the gap after checking src: ms for a request, next to nothing for a thumb already here
+  function paced(src, ms) { return cells[src] ? CELL_MS : ms; }
   function probeNext() {
     var it = null;
     galleries.some(function (g) { return (it = g.unchecked()); });
     if (!it) { lanes--; return; }
-    probe(it.src, function () { setTimeout(probeNext, PROBE_MS); });
+    probe(it.src, function () { setTimeout(probeNext, paced(it.src, PROBE_MS)); });
   }
   // gallery(images, slug): the live list behind the views of one result on one page part. view(box, max, mk, still?)
   // keeps box showing the first `max` images not dead as mk(it) tiles (tile(cap) = the engine's tile, with / without its
@@ -727,6 +813,6 @@
     fetchResult: fetchResult, progressInfo: progressInfo, favColor: favColor, fav: fav, imageItems: imageItems, isVideo: isVideo,
     watchThumb: watchThumb, tablist: tablist, pager: pager, revealButton: revealButton, make: make, icon: icon,
     siteGroups: siteGroups, reportModel: reportModel, gallery: gallery, linked: linked, plural: plural,
-    photoStats: photoStats, isPhoto: isPhoto, photo: photo, put: put, XO: XO
+    photoStats: photoStats, isPhoto: isPhoto, photo: photo, put: put, paced: paced, sheet: sheet, readSheet: readSheet, askStatus: askStatus, XO: XO
   };
 })();

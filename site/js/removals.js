@@ -63,8 +63,8 @@
     return { mg: mg, img: img, vid: vid,
       meta: [bytes(mg.size), img !== null ? img + ' images' : null, vid !== null ? vid + ' videos' : null, ago(mg.age)].filter(Boolean).join(' · ') || null };
   }
-  // her Google thumbs (/api/thumb urls), at most 10
-  function thumbsOf(raw) { return (Array.isArray(raw.images) ? raw.images : []).filter(C.thumbOk).slice(0, 10).map(E.thumb).filter(Boolean); }
+  // her Google thumbs (raw, for E.put), at most 10
+  function thumbsOf(raw) { return (Array.isArray(raw.images) ? raw.images : []).filter(C.thumbOk).slice(0, 10); }
 
   // One row per panel: the hosts it stands for (they never count as "a leak site") and fill(raw, who) → its values by
   // data-rm-k key, or null = the demo. In her panel a key without a value (null) hides its slot: no demo meta next to her.
@@ -257,10 +257,12 @@
       c.imgs.forEach(function (t) {   // the tile goes with its photo: no empty grey box, never a demo face beside her
         var im = t[0], tile = im.parentNode, src = v ? pics.length ? pics[n++ % pics.length] : null : t[1];
         tile.hidden = !src;
-        if (!src || im.getAttribute('src') === src) return;
+        if (!src || (im.__for || t[1]) === src) return;
+        im.__for = src;
         im.referrerPolicy = 'no-referrer';
-        im.setAttribute('src', src);
-        if (v) E.watchThumb(im, function () { if (im.getAttribute('src') === src) tile.hidden = true; });
+        if (!v) { E.put(im, null); im.removeAttribute('crossorigin'); return im.setAttribute('src', src); }
+        E.put(im, src);
+        E.watchThumb(im, function () { if (im.__for === src) tile.hidden = true; });
       });
       c.el.setAttribute('data-rm-for', v ? 'scan' : 'demo');
     });

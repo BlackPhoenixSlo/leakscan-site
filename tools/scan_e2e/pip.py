@@ -123,7 +123,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         ctx.route("**/*", route)
         break_routes(ctx)   # --break-tuck: tuck() emptied; --break-dock: no dock anchor (common.BREAKS)
         ctx.on("page", lambda pg: (pg.on("pageerror", lambda e: net["errors"].append(str(e))),
-                                   pg.on("console", lambda m: m.type == "error" and net["errors"].append(
+                                   pg.on("console", lambda m: m.type == "error" and "/api/thumb-sheet/" not in (m.location or {}).get("url", "") and net["errors"].append(   # no sheet: per-thumb, sheet.py checks it
                                        f"{m.text} @ {(m.location or {}).get('url', '')} on {pg.url}"))))   # which resource / page
         pg = ctx.new_page()
         ctx.on("page", lambda p: net["pages"].append(p.url))   # any page after this one (window.open / target=_blank) = a new tab

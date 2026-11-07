@@ -39,6 +39,11 @@ Serves site/ and the API routes of the contract the scan page talks to:
   DEAD → 404 (a thumb Google no longer serves); BLANK → a 1×1 GIF (what a hotlink-blocked thumb comes back as); LOGO →
   logo_png(): a flat site-logo PNG (no person photo: the image views must drop it). STALE → no ACAO unless the URL has
   ?c=1 (a copy cached before the API sent CORS: the views retry once on E.fresh's URL, then drop the logo).
+- GET /api/thumb-sheet/<slug> → app/thumb_sheet.py's body from the same bytes (DEAD in dead[]; NOCELL in neither list). --sheet / POST
+  /__stub/sheet?mode=off|on|500|slow|cut|first: off (default) = 404, an API without it (every other scenario: the per-thumb path); first = on, the
+  result held 1.5 s (a warm sheet: its manifest is read before the JSON). A STALL thumb: no answer for 16 s, then the connection drops. GET /api/_thumb-log,
+  /api/_sheet-log: what reached the server. --thumb-bucket rate:burst: /api/thumb's bucket (the API's: 120:60); --seed, --thumb-dir: a saved
+  result + real thumb bytes, for local probes only (never committed).
 - demoBrokenT1: the fixture with three page-result thumbs swapped for DEAD / BLANK ones (images[] too), page result #7's
   for a LOGO one, a LOGO thumb no result has third in images[], a video result's still put first in images[] (the
   landing puts it after the real images; the scan page's Images tab badges it) and the 2nd video result's still a LOGO
@@ -71,13 +76,16 @@ from serve import RangeHandler   # static files answer Range (as GitHub Pages do
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "app"))
 from public_app import off_row   # the API's own aggregator rule for a stored row, not a copy
+import ratelimit   # the API's own bucket (--thumb-bucket)
+import thumb_sheet   # the API's own thumb list and body format
 SITE = ROOT / "site"
 FIXTURE = json.loads((ROOT / "tools" / "fixtures" / "scan-sample.json").read_text())
 EVIL = json.loads((ROOT / "tools" / "fixtures" / "scan-evil.json").read_text())
 HANDLE_RE = re.compile(r"^[A-Za-z0-9._-]{1,60}$")
 PLATFORMS = {"onlyfans.com", "instagram.com", "fansly.com", "tiktok.com", "patreon.com"}
 STORE = {}
-OPTS = argparse.Namespace(omit_results=False, omit_profile=False, delay=0.15, media="normal")
+OPTS = argparse.Namespace(omit_results=False, omit_profile=False, delay=0.15, media="normal", thumb_bucket="", thumb_dir="", seed=[], sheet="off")
+THUMB_LIMITER, THUMB_LOG, SHEET_LOG, REAL_THUMBS = None, [], [], {}
 MEDIA_POLLS, MEDIA_MODE = {}, {}
 SCAN_HOST = "https://scan.srv1395798.hstgr.cloud"   # only ever a string in JSON; the stub never contacts it
 CHAT_LOG = []
@@ -288,6 +296,17 @@ def media_answer(slug, origin):
     return {"slug": slug, "status": status, "images": imgs}
 
 
+def thumb_bytes(src):
+    """(content type, body) of one 200 thumb, for /api/thumb and a sheet's cell alike."""
+    if src in REAL_THUMBS:
+        return REAL_THUMBS[src][1], REAL_THUMBS[src][0]
+    if "BLANK" in src:
+        return "image/gif", BLANK_GIF
+    if "LOGO" in src:
+        return "image/png", logo_png(src)
+    return "image/webp", stand_in(src, THUMB_FILES)
+
+
 class Handler(RangeHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(SITE), **kw)
@@ -320,6 +339,8 @@ class Handler(RangeHandler):
         u = urlsplit(self.path)
         if u.path.startswith("/api/scan-result/"):
             slug = u.path.rsplit("/", 1)[1]
+            if OPTS.sheet == "first":
+                time.sleep(1.5)
             return self.send_json(200, STORE[slug]) if slug in STORE else self.send_json(404, {"error": "not_found"})
         if u.path.startswith("/api/profile/"):
             slug = u.path.rsplit("/", 1)[1]
@@ -353,18 +374,57 @@ class Handler(RangeHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if u.path == "/api/_thumb-log":
+            return self.send_json(200, THUMB_LOG)
+        if u.path == "/api/_sheet-log":
+            return self.send_json(200, SHEET_LOG)
+        if u.path.startswith("/api/thumb-sheet/"):
+            slug = u.path.rsplit("/", 1)[1]
+            SHEET_LOG.append([round(time.time(), 3), slug, OPTS.sheet])
+            if OPTS.sheet == "500":
+                return self.send_json(500, {"error": "boom"})
+            if OPTS.sheet == "off" or slug not in STORE:   # off: an API without it (404), the fallback
+                return self.send_json(404, {"error": "not_found"})
+            cells, dead = [], []
+            for src in thumb_sheet.thumbs_of({"level": "low", **STORE[slug]}, ("gstatic.com",)):
+                if "DEAD" in src:
+                    dead.append(src)
+                elif "NOCELL" not in src:   # NOCELL: upstream hiccup, in neither list (/api/thumb still has it)
+                    cells.append((src, *thumb_bytes(src)))
+            body = thumb_sheet.pack(cells, dead)
+            self.send_response(200)
+            self.cors()
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Cache-Control", "max-age=3600")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if OPTS.sheet in ("slow", "cut"):   # slow: half, then 4 s later the rest; cut: half, then 1 s later the connection drops
+                self.wfile.write(body[:len(body) // 2])
+                self.wfile.flush()
+                time.sleep(1 if OPTS.sheet == "cut" else 4)
+                self.close_connection = OPTS.sheet == "cut"
+                if self.close_connection:
+                    return
+                body = body[len(body) // 2:]
+            return self.wfile.write(body)
         if u.path == "/api/thumb":
+            THUMB_LOG.append([round(time.time(), 3), u.query, self.headers.get("Referer") or ""])
+            if THUMB_LIMITER and not THUMB_LIMITER.allow(self.client_address[0], concurrency=False):
+                return self.send_json(429, {"error": "rate_limited"})
             src = parse_qs(u.query).get("u", [""])[0]
             if not src.startswith("https://"):
                 return self.send_json(400, {"error": "bad_url"})
             if "DEAD" in src:
                 return self.send_json(404, {"error": "not_found"})
-            blank, logo = "BLANK" in src, "LOGO" in src
-            body = BLANK_GIF if blank else logo_png(src) if logo else stand_in(src, THUMB_FILES)
+            if "STALL" in src:
+                time.sleep(16)
+                self.close_connection = True
+                return
+            ctype, body = thumb_bytes(src)
             self.send_response(200)
             if "STALE" not in src or "c" in parse_qs(u.query):   # STALE: a copy cached before ACAO (no CORS) unless ?c=1
                 self.cors()
-            self.send_header("Content-Type", "image/gif" if blank else "image/png" if logo else "image/webp")
+            self.send_header("Content-Type", ctype)
             self.send_header("Cache-Control", "max-age=3600")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -431,6 +491,9 @@ class Handler(RangeHandler):
             MEDIA_POLLS.pop(slug, None)
             MEDIA_MODE[slug] = q.get("mode", [OPTS.media])[0]
             return self.send_json(200, {"ok": True})
+        if urlsplit(self.path).path == "/__stub/sheet":
+            OPTS.sheet = parse_qs(urlsplit(self.path).query).get("mode", ["off"])[0]
+            return self.send_json(200, {"ok": True})
         if urlsplit(self.path).path == "/api/chat":
             return self.chat()
         if urlsplit(self.path).path != "/api/public-scan":
@@ -493,12 +556,29 @@ def main():
     ap.add_argument("--omit-profile", action="store_true")
     ap.add_argument("--media", choices=("normal", "relative", "scanhost", "none", "404"), default="normal")
     ap.add_argument("--delay", type=float, default=0.15)
+    ap.add_argument("--sheet", choices=("off", "on", "500"), default="off", help="/api/thumb-sheet: off = 404 (an API without it), on, 500")
+    ap.add_argument("--thumb-bucket", default="", help="rate/min:burst, /api/thumb's per-IP bucket (the API's: 120:60)")
+    ap.add_argument("--seed", action="append", default=[], help="a saved result JSON to serve as its own slug (local probes)")
+    ap.add_argument("--thumb-dir", default="", help="<dir>/index.json {url: {file, type}}, <dir>/<file>.bin: real bytes for those thumbs")
     ap.parse_args(namespace=OPTS)
-    no_ig = {**FIXTURE["aliases"], "socials": [x for x in FIXTURE["aliases"]["socials"] if x["platform"] != "instagram"]}
+    global THUMB_LIMITER
+    if OPTS.thumb_bucket:
+        rate, burst = OPTS.thumb_bucket.split(":")
+        THUMB_LIMITER = ratelimit.Limiter(rate_per_min=int(rate), burst=int(burst), max_concurrent=1000)
+    if OPTS.thumb_dir:
+        d = pathlib.Path(OPTS.thumb_dir).expanduser()
+        for url, v in json.loads((d / "index.json").read_text()).items():
+            if (d / f"{v['file']}.bin").is_file():
+                REAL_THUMBS[url] = ((d / f"{v['file']}.bin").read_bytes(), v["type"])
+    for f in OPTS.seed:
+        r = json.loads(pathlib.Path(f).expanduser().read_text())
+        STORE[r["slug"]] = r
+    no_ig ={**FIXTURE["aliases"], "socials": [x for x in FIXTURE["aliases"]["socials"] if x["platform"] != "instagram"]}
     for slug, overlay in (("demoR3port01", {"mega": MEGA}), ("demoNoProf01", {"profile": None, "aliases": no_ig, "mega": []}),
                           ("demoFoundIG1", {"profile": None, "mega": []}), (EVIL["slug"], {**EVIL, "mega": EVIL_MEGA}),
                           ("demoBrokenT1", {**broken_thumbs(FIXTURE), "mega": []}),
                           ("demoDeadTail1", {**dead_tail(FIXTURE), "mega": []}),
+                          ("demoNoCell01", {"images": ["https://encrypted-tbn0.gstatic.com/images?q=tbn:NOCELL0001placeholder"] + FIXTURE["images"], "mega": []}),
                           ("demoRemove1", {"mega": MEGA, "hits": STALE_PACK_HITS + FIXTURE["hits"] + SOCIAL_HITS,
                                            "results": [STALE_PACK_RESULT] + FIXTURE["results"]}),
                           ("demoPackImg1", {"mega": MEGA, "results": [STALE_PACK_RESULT] + FIXTURE["results"],
