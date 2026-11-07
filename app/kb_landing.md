@@ -39,6 +39,7 @@ One-time clean: €500 one-time ("One big clean-up.")
 - Button: "Ask about the clean-up" (Telegram)
 
 ## How it works: "You do three things. I do the rest."
+- Before / After (#free): two Google phones (Before / After tabs) right above "You do three things". Before = what Google shows for "yourhandle nude leaks" (leak sites in the results, images and videos, blurred; after a scan, your own results, with "Send it to me"). After = the goal: your own pages first.
 You:
 1. Scan and send: run the free scan, send Jaka the report link.
 2. Sign the authorization: one page to sign. Then he removes one page free.
@@ -50,7 +51,6 @@ Jaka:
 ## Your website (official website + blog), "Included in both plans: your website"
 - "An official home for your name": an official website with your name, your links and your style, plus blog posts after removals, so Google keeps finding fresh, real pages about you.
 - Showcase: a live demo site built for a fictional creator ("This is the kind of site you get"). Yours is built around your name, your links and your look. Demo: showcase/
-- Before / After (#free): two Google phones under the demo. Before = what Google shows for "yourhandle nude leaks" (leak sites in the results, images and videos, blurred; after a scan, your own results, with "Send it to me"). After = the goal: your own pages first.
 
 ## Where I remove from (#removals)
 - "Four places leaks sit, and how each looks once it's down." Re-enacted with a fictional creator on Mega, X, Reddit and a leak site; press "Preview removal" or drag the handle; "Show demo images" unblurs the demo photos. Outcomes shown: folders behind aggregator packs disabled (Mega), media disabled after copyright report (X), removed on copyright notice (Reddit), profile 404 after a DMCA notice (leak sites).

@@ -568,7 +568,16 @@ def ba_phones(t):
         page.goto(cfg.base + q, wait_until="load")
         if q:
             page.wait_for_selector("[data-p=scanned]:not([hidden])", timeout=9000)
-        bring(page, "#showcase .ba", "center")
+        bring(page, ".ba", "center")
+        if q:   # her leak photos in the Before (#free) phone: blurred 2 px (owner), the one --leak-blur
+            page.locator("#tab-free-images").click()
+            try:
+                page.wait_for_function("() => [...document.querySelectorAll('.phone-free .gi-img')].some(i => i.complete && i.naturalWidth > 0)", timeout=8000)
+            except Exception:
+                pass
+            bl = page.evaluate("() => [getComputedStyle(document.documentElement).getPropertyValue('--leak-blur').trim(), [...new Set([...document.querySelectorAll('.phone-free .gi-img')].map(i => getComputedStyle(i).filter))]]")
+            check(f"{tag} ba: report: the Before phone's leak photos blurred 2 px (--leak-blur 2px)", bl[0] == "2px" and bl[1] and all(f.startswith("blur(2px)") for f in bl[1]), bl)
+            shot(page, "4-ba-r-free-images-blur-2px", ".phone-free")
         before_h = round(page.locator(".ba .phone-free").bounding_box()["height"])
         page.locator("#ba-tab-after").click()
         page.wait_for_timeout(200)
@@ -630,16 +639,19 @@ def order_popout(t):
     page = ctx.new_page()
     page.goto(cfg.base, wait_until="load")
     order = page.evaluate("""() => { const y = e => e.getBoundingClientRect().top + scrollY, b = e => e.getBoundingClientRect().bottom + scrollY;
-        const w = document.getElementById('website'), sc = document.getElementById('showcase'), fr = sc.querySelector('.browser-demo'), ba = document.querySelector('.ba');
-        return {website: Math.round(y(w)), showcase: Math.round(y(sc)), frameBottom: Math.round(b(fr)), ba: Math.round(y(ba)), inShowcase: sc.contains(ba),
+        const w = document.getElementById('website'), sc = document.getElementById('showcase'), fr = sc.querySelector('.browser-demo'), ba = document.querySelector('.ba'),
+          how = document.getElementById('how'), h2 = document.getElementById('how-title'), tabs = document.querySelector('.ba-tabs');
+        return {why: Math.round(b(document.getElementById('why'))), tabs: Math.round(y(tabs)), ba: Math.round(y(ba)), baBottom: Math.round(b(ba)), h2: Math.round(y(h2)),
+          inHow: how.contains(tabs) && how.contains(ba), next: [tabs.nextElementSibling === ba, (ba.nextElementSibling.matches('.ba-hint') ? ba.nextElementSibling.nextElementSibling : ba.nextElementSibling) === h2],
+          inShowcase: sc.contains(ba), website: Math.round(y(w)), showcase: Math.round(y(sc)), frameBottom: Math.round(b(fr)),
           free: ba.id, beforeIsFree: !!document.querySelector('#ba-before .phone-free'), phones: document.querySelectorAll('.phone').length,
           link: (a => a && a.getAttribute('href'))(sc.querySelector('a.btn[data-p=demo]'))}; }""")
-    # one Google phone block (#free): Before = the scan's phone (.phone-free), After = her own pages; below the demo on phones, beside it on desktop
-    check(f"{tag} order: #website copy → demo (#showcase) → the one Before / After block (#free, Before = the scan phone), "
-          "below the demo (phone) / beside it (desktop); 'Open the demo site' link kept; 2 phones on the page",
-          order["website"] < order["showcase"] < order["frameBottom"] and order["inShowcase"] and order["free"] == "free" and order["beforeIsFree"]
-          and order["phones"] == 2 and (order["frameBottom"] <= order["ba"] if vp_name == "phone" else order["showcase"] < order["ba"] < order["frameBottom"])
-          and order["link"] == "showcase/", order)
+    # one Google phone block (#free): Before = the scan's phone (.phone-free), After = her own pages; it opens #how, directly above "You do three things"
+    check(f"{tag} order: #why → the one Before / After block (#free tabs + phone, Before = the scan phone) → 'You do three things' (#how) → #website copy → demo (#showcase); "
+          "'Open the demo site' link kept; 2 phones on the page",
+          order["why"] <= order["tabs"] < order["ba"] < order["baBottom"] < order["h2"] < order["website"] < order["showcase"] < order["frameBottom"]
+          and order["inHow"] and order["next"] == [True, True] and not order["inShowcase"] and order["free"] == "free" and order["beforeIsFree"]
+          and order["phones"] == 2 and order["link"] == "showcase/", order)
     bring(page, "#free", "center")
     page.wait_for_timeout(900)
     ok, shifts = [], []
