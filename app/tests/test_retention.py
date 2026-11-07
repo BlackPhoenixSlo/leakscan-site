@@ -19,6 +19,8 @@ import db
 import media_gather as mg
 import public_app
 import ratelimit
+import test_thumb_sheet
+import thumb_sheet
 
 MEGA = [{"url": "https://s.leakshaven.com/AAA", "host": "leakshaven.com", "via": "leakshaven.com", "title": "x", "status": "live"}]
 HITS = [{"domain": "a.example", "url": "https://a.example/1", "occurrences": 5, "live": True},
@@ -33,6 +35,7 @@ FOREVER = {"google_total": 1240, "socials": {"instagram": "mira"}, "aliases": {"
            "accepted_urls": ["https://a.example/1"], "links_by_domain": {"a.example": ["u"]}, "removed_urls": ["u2"], "as_of": "2020-01-01T00:00:00Z",
            "a_future_field": {"keep": "me"}}
 PROFILE = {"display_name": "Mira", "avatar": True, "bio": "b"}
+SHEET_THUMB = "https://encrypted-tbn0.gstatic.com/images?q=tbn:"
 
 
 def ago(days):
@@ -281,45 +284,140 @@ class TestServing(Base):
         self.assertTrue(os.path.exists(os.path.join(mg.data_dir(), "media", keep)))
         self.assertEqual(self.get(f"/api/avatar/{keep}")[0], 200)
 
-    def test_media_cache_keeps_its_own_ttl_orphans_go(self):
+    def test_media_cache_and_orphans_go_at_big(self):
+        self.assertEqual(mg.CACHE_TTL, 3 * 86400)
         croot, mroot = os.path.join(mg.data_dir(), "media-cache"), os.path.join(mg.data_dir(), "media")
+        adir = public_app._avatar_dir()
         os.makedirs(croot)
-        os.makedirs(os.path.join(mroot, "orphan000"))
-        os.makedirs(os.path.join(mroot, "young0000"))
-        for name in ("keep", "stale"):
-            open(os.path.join(croot, name), "w").close()
+        os.makedirs(adir, exist_ok=True)
         now = time.time()
-        os.utime(os.path.join(croot, "keep"), (now - 5 * 86400,) * 2)
-        os.utime(os.path.join(croot, "stale"), (now - mg.CACHE_TTL - 60,) * 2)
-        os.utime(os.path.join(mroot, "orphan000"), (now - 5 * 86400,) * 2)
-        os.utime(os.path.join(mroot, "young0000"), (now - 3.5 * 86400,) * 2)   # not past big + 1: its row may not be over the cutoff yet
+        for name, age in (("keep", 2.9), ("stale", 3.1)):
+            open(os.path.join(croot, name), "w").close()
+            os.utime(os.path.join(croot, name), (now - age * 86400,) * 2)
+        for name, age in (("orphan000", 3.1), ("young0000", 2.9)):
+            os.makedirs(os.path.join(mroot, name))
+            os.utime(os.path.join(mroot, name), (now - age * 86400,) * 2)
+            open(os.path.join(adir, name + ".jpg"), "w").close()
+            os.utime(os.path.join(adir, name + ".jpg"), (now - age * 86400,) * 2)
         public_app.run_retention()
         self.assertEqual(sorted(os.listdir(croot)), ["keep"])
         self.assertEqual(sorted(os.listdir(mroot)), ["young0000"])
+        self.assertEqual(sorted(os.listdir(adir)), ["young0000.jpg"])
+
+    def test_row_under_big_keeps_rendering(self):
+        s = self.seed(2.9, extra={**BIG, "profile": PROFILE})
+        self.files(s)
+        d = os.path.join(mg.data_dir(), "media", s)
+        os.utime(d, (time.time() - 2.9 * 86400,) * 2)
+        public_app.run_retention()
+        self.assertEqual(self.get(f"/api/media/{s}/0.jpg")[0], 200)
+        self.assertEqual(self.get(f"/api/avatar/{s}")[0], 200)
 
     def test_live_media_cache_entry_keeps_its_photos_until_its_ttl(self):
-        """The 7 d cache saves Browserbase calls: it reads the photos from the source scan's dir, so big must not end it early."""
-        s = self.seed(5, extra={**BIG, "profile": PROFILE})
+        """The gather ends minutes after its row is stored: a sweep in between keeps the photos for the entry, and the next sweep takes them. Index gone must not restart their clock."""
+        s = self.seed(3.01, extra={**BIG, "profile": PROFILE})
         self.files(s)
         croot, d = os.path.join(mg.data_dir(), "media-cache"), os.path.join(mg.data_dir(), "media", s)
         os.makedirs(croot)
         entry = os.path.join(croot, "onlyfans-mira.json")
         with open(entry, "w") as fh:
-            json.dump({"ts": time.time() - 5 * 86400, "slug": s, "images": [{"n": 0}]}, fh)
+            json.dump({"ts": time.time() - 2.99 * 86400, "slug": s, "images": [{"n": 0}]}, fh)
+        os.utime(entry, (time.time() - 2.99 * 86400,) * 2)
+        born = time.time() - 3.01 * 86400
+        os.utime(d, (born, born))
         public_app.run_retention()
         self.assertEqual(self.get(f"/api/media/{s}")[1]["status"], "none")      # the report: as for any expired row
         self.assertEqual(self.get(f"/api/avatar/{s}")[0], 404)
+        self.assertAlmostEqual(os.path.getmtime(d), born, delta=2)              # the clock: as it was
         g = mg._Gallery("repeat000")
         self.assertTrue(g.from_cache("onlyfans-mira"))                          # the repeat scan: a hit, no gather
         self.assertEqual((g.images, os.path.isfile(os.path.join(g.dir, "0.jpg"))), ([{"n": 0}], True))
         with open(entry, "w") as fh:
             json.dump({"ts": time.time() - mg.CACHE_TTL - 60, "slug": s, "images": [{"n": 0}]}, fh)
         os.utime(entry, (time.time() - mg.CACHE_TTL - 60,) * 2)
-        os.utime(d, (time.time() - 5 * 86400,) * 2)
         public_app.run_retention()
         self.assertFalse(os.path.exists(d))                                     # expired: the next run takes them
         self.assertFalse(os.path.exists(entry))
-        self.assertTrue(os.path.isfile(os.path.join(g.dir, "0.jpg")))           # the repeat's own copy stays
+        self.assertTrue(os.path.isfile(os.path.join(g.dir, "0.jpg")))           # the repeat's own copy stays, from its own scan
+
+    def test_sheets_are_swept_with_no_sheet_written(self):
+        d = thumb_sheet.cache_dir()
+        os.makedirs(d)
+        now = time.time()
+        ages = {"old.full": 3.1 * 86400, "young.full": 2.9 * 86400, "old.gaps": 301, "young.gaps": 200, "x.1.tmp": 301, "y.1.tmp": 200}
+        for name, age in ages.items():
+            open(os.path.join(d, name), "w").close()
+            os.utime(os.path.join(d, name), (now - age,) * 2)
+        with mock.patch.object(public_app, "_event") as log:
+            public_app.run_retention()
+        self.assertEqual(sorted(os.listdir(d)), ["y.1.tmp", "young.full", "young.gaps"])
+        self.assertIn(" files=3 ", log.call_args_list[0].args[0])
+        self.assertEqual(thumb_sheet.sweep(), 0)
+
+    def test_sweep_without_a_dir(self):
+        self.assertEqual(thumb_sheet.sweep(), 0)
+
+    def test_sweep_is_bounded_by_bytes_oldest_first(self):
+        d = thumb_sheet.cache_dir()
+        os.makedirs(d)
+        now = time.time()
+        for name, age in (("a.full", 300), ("b.full", 200), ("c.full", 100)):
+            with open(os.path.join(d, name), "wb") as fh:
+                fh.write(b"x" * 10)
+            os.utime(os.path.join(d, name), (now - age,) * 2)
+        with mock.patch.object(thumb_sheet, "CACHE_MAX_BYTES", 15):
+            self.assertEqual(thumb_sheet.sweep(), 2)
+        self.assertEqual(os.listdir(d), ["c.full"])
+
+    def sheet_row(self, days):
+        return self.seed(days, extra={"images": [SHEET_THUMB], "results": []})
+
+    def test_a_sheet_lives_as_long_as_its_row_and_a_rebuild_adds_nothing(self):
+        """Stamped with the row's age, not the build's: a sheet first asked for at 2.9 d goes with its row."""
+        up = test_thumb_sheet.Up()
+        s = self.sheet_row(2.9)
+        with mock.patch.object(public_app, "_THUMB_OPENER", up), mock.patch.object(thumb_sheet, "LIMITER", ratelimit.Limiter(rate_per_min=6000, burst=1000, max_concurrent=1000)):
+            st, body = self.get(f"/api/thumb-sheet/{s}")
+            self.assertEqual((st, test_thumb_sheet.parse(body)[0]["dead"]), (200, []))
+            self.assertEqual(len(up.calls), 1)
+            f = os.path.join(thumb_sheet.cache_dir(), os.listdir(thumb_sheet.cache_dir())[0])
+            self.assertAlmostEqual(time.time() - os.path.getmtime(f), 2.9 * 86400, delta=60)
+            public_app.run_retention()
+            self.assertTrue(os.path.exists(f))                                  # under big: kept, and served from disk
+            self.assertEqual(self.get(f"/api/thumb-sheet/{s}")[0], 200)
+            self.assertEqual(len(up.calls), 1)
+            late = self.sheet_row(3.01)                                         # not trimmed yet: past big all the same
+            os.remove(f)
+            self.assertEqual(self.get(f"/api/thumb-sheet/{late}")[0], 404)      # the client's per-thumb path
+            self.assertEqual(os.listdir(thumb_sheet.cache_dir()), [])
+
+    def test_a_sweep_racing_builds_never_breaks_a_sheet(self):
+        up, bad, done = test_thumb_sheet.Up(), [], []
+        lists = [[f"{SHEET_THUMB}{i}"] for i in range(8)]
+        stop = threading.Event()
+
+        def sweeper():
+            while not stop.is_set():
+                thumb_sheet.sweep()
+
+        def builder(i):
+            for n in range(40):
+                urls = lists[(i + n) % len(lists)]
+                got = thumb_sheet.sheet(urls, up, 10 ** 6, time.time() - 2 * 86400)
+                if not got or test_thumb_sheet.parse(got[0])[0]["cells"][0][0] != urls[0]:
+                    bad.append(urls)
+            done.append(i)
+        with mock.patch.object(thumb_sheet, "CACHE_MAX_BYTES", 50):    # next to every file over the bound: the sweep is always busy
+            t = threading.Thread(target=sweeper)
+            t.start()
+            ts = [threading.Thread(target=builder, args=(i,)) for i in range(4)]
+            for x in ts:
+                x.start()
+            for x in ts:
+                x.join()
+            stop.set()
+            t.join()
+        self.assertEqual((bad, sorted(done)), ([], [0, 1, 2, 3]))
 
     def test_pre_rule_row_keeps_what_was_served(self):
         """A row stored before the aggregator rule: off_row recounts from mega + results, which go. What was served stays."""

@@ -363,8 +363,10 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   `demoSummary1` with it.
 - `off_row` recounts from `mega` + `results`, which go: leaving `full`, what it serves is baked into the row (`hits`, `hit_count`, `domain_count`, `status`,
   `google_total`), so a served count never moves. Only rows stored before the aggregator rule differ from their stored values.
-- Files: media dirs and avatars by mtime follow at big + 1 day (orphans, a crash mid-run). `media-cache` keeps its own 7 d TTL, and its entries read photos from the
-  source slug's dir: a slug a live entry points at (`media_gather.cache_pins`) loses only `index.json` at big; the mtime sweep takes the photos once the entry is gone. `thumb-sheets/` has its own bounds (7 d, 500 MB, swept on a sheet write) and serves only a row's live `images`.
+- Files: `RETAIN_BIG_DAYS` for all of them, by `run_retention` at startup and every 24 h, so at most big + 1 day. Media dirs and avatars by mtime (orphans, a crash mid-run). `media-cache` entries
+  (`mg.CACHE_TTL`) read photos from the source slug's dir: a slug a live entry points at (`media_gather.cache_pins`) loses only `index.json` at big, its clock kept; the next sweep takes the photos. A
+  repeat scan's copy from the cache counts from that scan (a row under big always renders), and an entry isn't re-saved on a hit: worst case first gather + 2 × big + 1 day. `thumb-sheets/`: a complete
+  sheet's mtime is its row's `created_at` (a rebuild adds nothing), past big it's swept and the row 404s to the client's per-thumb path; also a 500 MB bound, swept at every write too.
 - Serving: `/api/scan-result` stays 200 with `retention`, `top_domains`; `/api/media` answers `none`, `/api/avatar` 404. The site says `Scanned 5 days ago,
   images expired · Scan again` / `..., details expired · Scan again`, never "no images" (`expiredOf`, `expiredNote` in `site/js/scan-engine.js`).
 - A rollback to a build before this one restores upstream's `prune_scans(30)`: it deletes rows past 30 days at startup. Corrupt `extra_json` keeps its bytes.

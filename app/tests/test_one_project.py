@@ -18,7 +18,7 @@ SITES = {
                       "api_thumb Vary": 2, "thumb sheet": 2, "scan reuse": 12, "retention": 3, "scan links": 2, "scan unfinished": 6},
     "cse_scanner.py": {"deadline": 6, "errors": 7},
     "profile_extract.py": {"hints": 8},
-    "media_gather.py": {"NONE_TTL": 3, "warmup": 1, "web retry": 5, "retention": 2},
+    "media_gather.py": {"NONE_TTL": 3, "warmup": 1, "web retry": 5, "retention": 4},
     "db.py": {"domain_count": 4, "get_scan": 1, "retention": 4},
     "chat_proxy.py": {},
 }

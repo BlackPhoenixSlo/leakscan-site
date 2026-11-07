@@ -22,7 +22,7 @@ SFW limitation: there is NO NSFW classifier. Safety relies on Instagram/TikTok/Y
 content policy + Google SafeSearch + official-source-only.
 
 Layout: <DATA_DIR>/media/<slug>/{index.json, web_snippets.json, 0.jpg, 1.jpg..}; per-handle cache
-<DATA_DIR>/media-cache/<platform>-<handle>.json (7 days) points at an earlier slug's files.
+<DATA_DIR>/media-cache/<platform>-<handle>.json (RETAIN_BIG_DAYS) points at an earlier slug's files.  # one-project: retention
 `playwright` and Pillow are imported lazily: the app runs without them (gather -> fewer/no images).
 """
 import base64
@@ -69,7 +69,7 @@ BB_PROXIES = _flag("BROWSERBASE_PROXIES", "1")
 PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "https://scan.srv1395798.hstgr.cloud").rstrip("/")
 BB_API = "https://api.browserbase.com/v1"
 MAX_GATHERS = 2               # concurrent full gathers (Browserbase); when busy -> Google step only
-CACHE_TTL = 7 * 86400
+CACHE_TTL = db.RETAIN_BIG_DAYS * 86400  # one-project: retention (the 3-day promise)
 NONE_TTL = int(os.environ.get("MEDIA_NONE_TTL", "3600"))  # one-project: NONE_TTL (an empty result is retried after an hour, not a week)
 GOOGLE_QUERIES = 2
 MIN_SIDE, MAX_SIDE, MAX_BYTES = 200, 1200, 300 * 1024
@@ -1183,7 +1183,9 @@ def drop_media(slug, pins=()):
         return 0
     if slug in pins:
         if os.path.exists(os.path.join(p, "index.json")):
+            st = os.stat(p)
             os.remove(os.path.join(p, "index.json"))
+            os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns))   # prune's clock: removing a file would restart it
         return 1
     shutil.rmtree(p)
     return 1

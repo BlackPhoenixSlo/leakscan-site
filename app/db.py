@@ -133,6 +133,7 @@ def recent_scan(handle, key, value, max_age_s, path=None):
 
 # Retention, by row age (created_at), a row is never deleted. Default-keep: a key in neither list stays forever (so does
 # every column but RETAIN_NULL), so a future field is never silently lost.
+RETAIN_BIG_DAYS = max(1.0, float(os.environ.get("RETAIN_BIG_DAYS", "3")))           # >= 1 day: a reuse source (6 h) is always whole. Photos and thumbnail sheets follow it
 RETAIN_BIG = ("images", "results", "gallery", "img_meta", "excluded")              # past big_days: gone (+ files, profile.avatar=false)
 RETAIN_SMALL = ("mega", "cse_sites", "mega_key", "scan_key", "reused_from")        # past small_days: gone (+ result_json = [])
 RETAIN_NULL = ("client_ip_hash", "verify_code", "verify_platform")                 # past small_days: NULL

@@ -2,19 +2,20 @@
 """Retention under load: a mass-seeded DB, public_app.run_retention() while real HTTP readers and scan inserts hit the real
 public_app.Handler. This repo has no slop/ harness: this script is its stand-in for this flow (declared).
 
-    python3 tools/retention_proof.py OUT_DIR [--rows 20000] [--readers 16] [--scanners 4] [--break-key] [--break-cutoff] [--break-links]
+    python3 tools/retention_proof.py OUT_DIR [--rows 20000] [--readers 16] [--scanners 4] [--break-key] [--break-cutoff] [--break-links] [--break-files]
 
 Seeded by SQL (real shapes: tools/fixtures/scan-sample.json, deep rows ~1 MB, ages, NULL / corrupt extra, running, pre-aggregator-
 rule rows). Acts only through endpoints. The expected tiers below are written out again, NOT read from db.py: moving a key in
 db.py must turn this red. Declared bypasses: Google CSE + DeepSeek + leakshaven are app/tests wire stubs; profile pages a fake at
-their urlopen; media gathering off; limiters widened. A socket guard refuses any non-loopback connect. All data synthetic.
+their urlopen; the thumbnail upstream a fake at _THUMB_OPENER; media gathering off; limiters widened. A socket guard refuses any non-loopback connect. All data synthetic.
 --break-key moves `gallery` to the small tier, --break-cutoff has big_days back at 30, --break-links reads the audit lists off get_scan
-again (the bug): only their checks may go red.
+again (the bug), --break-files has photos, the media cache and thumbnail sheets on their old clocks (7 d, big + 1, no sweep): only their checks may go red.
 OUT_DIR gets report.json (checks, timings, sizes), run.log. Exit 1 on any red check."""
 import argparse
 import collections
 import concurrent.futures as cf
 import http.client
+import io
 import json
 import os
 import random
@@ -158,6 +159,7 @@ def main():
     ap.add_argument("--break-key", action="store_true")
     ap.add_argument("--break-cutoff", action="store_true")
     ap.add_argument("--break-links", action="store_true")
+    ap.add_argument("--break-files", action="store_true")
     ap.add_argument("--load", nargs=4)
     args = ap.parse_args()
     if args.load:
@@ -185,6 +187,7 @@ def main():
     import profile_extract as pe
     import public_app
     import ratelimit
+    import thumb_sheet
     import upstream_stub as stub
     from test_profile import FakeFetch, ig_routes
 
@@ -195,7 +198,15 @@ def main():
     public_app.SCAN_REUSE_TTL = 21600
     pe.urlopen = FakeFetch(ig_routes())
     wide = lambda: ratelimit.Limiter(rate_per_min=10 ** 7, burst=10 ** 7, max_concurrent=10000)
-    public_app.SCAN_LIMITER, public_app.RESULT_LIMITER, public_app.THUMB_LIMITER = wide(), wide(), wide()
+    public_app.SCAN_LIMITER, public_app.RESULT_LIMITER, public_app.THUMB_LIMITER, thumb_sheet.LIMITER = wide(), wide(), wide(), wide()
+
+    class ThumbWire:
+        """_THUMB_OPENER's upstream: same small image for every thumb."""
+        def open(self, req, timeout=None):
+            r = io.BytesIO(b"\xff\xd8img" + req.full_url.encode())
+            r.headers = {"Content-Type": "image/jpeg"}
+            return r
+    public_app._THUMB_OPENER = ThumbWire()
     db.DB_PATH = os.environ["PUBLIC_DB"]
     db.init_db()
     log = open(os.path.join(args.out, "run.log"), "w", buffering=1)
@@ -206,6 +217,12 @@ def main():
         db.RETAIN_SMALL = db.RETAIN_SMALL + ("gallery",)
     if args.break_cutoff:
         public_app.RETAIN_BIG_DAYS = 30.0
+    if args.break_files:
+        mg.CACHE_TTL = thumb_sheet.FULL_S = 7 * DAY
+        thumb_sheet.sweep = lambda: 0
+        prune, avatars = mg.prune, public_app._prune_avatars
+        mg.prune = lambda days, pins=(): prune(days + 1, pins)
+        public_app._prune_avatars = lambda days: avatars(days + 1)
     if args.break_links:
         public_app._scan_extra = lambda slug, key: db.get_scan(slug).get(key)
 
@@ -248,10 +265,25 @@ def main():
     croot = os.path.join(tmp, "media-cache")
     os.makedirs(croot, exist_ok=True)
     pinned = next(shape(i, now)["slug"] for i in with_files if shape(i, now)["_age"] != "young" and shape(i, now)["_kind"] != "running")
-    for name, age in (("alive", 6 * DAY), ("stale", mg.CACHE_TTL + 60)):
+    for name, age in (("alive", 2.9 * DAY), ("stale", 3 * DAY + 60)):
         with open(os.path.join(croot, name + ".json"), "w") as fh:
             json.dump({"ts": time.time() - age, "slug": pinned, "images": [{"n": 0}]}, fh)
         os.utime(os.path.join(croot, name + ".json"), (time.time() - age,) * 2)
+
+    sheets = os.path.join(tmp, "thumb-sheets")
+    os.makedirs(sheets, exist_ok=True)
+    seeded_sheets = {"old.full": 3.1 * DAY, "young.full": 2.9 * DAY, "old.gaps": 301, "young.gaps": 200, "x.1.tmp": 301, "y.1.tmp": 200}
+    for name, age in seeded_sheets.items():
+        with open(os.path.join(sheets, name), "wb") as fh:
+            fh.write(b"x")
+        os.utime(os.path.join(sheets, name), (time.time() - age,) * 2)
+    # rows under big with a sheet to build: real GETs next to retention's sweep, then under a small bound, where every build's own sweep evicts what the next read wants
+    sheet_rows = [f"sheet{i:07d}" for i in range(40)]
+    with sqlite3.connect(db.DB_PATH) as conn:
+        for i, s in enumerate(sheet_rows):
+            conn.execute("INSERT INTO scans (slug, level, platform, handle, created_at, status, result_json, hit_count, domain_count, extra_json) VALUES (?, 'low', 'onlyfans.com', ?, ?, 'complete', '[]', 0, 0, ?)",
+                         (s, f"sh{i}", iso(2.5, now), json.dumps({"images": [f"https://encrypted-tbn0.gstatic.com/images?q=tbn:{i}-{j}" for j in range(3)], "results": []})))
+    conn.close()
 
     srv = ThreadingHTTPServer(("127.0.0.1", 0), public_app.Handler)
     srv.daemon_threads = True
@@ -280,6 +312,15 @@ def main():
     def snap(slug):
         st, data = get(f"/api/scan-result/{slug}")
         return slug, st, (json.loads(data) if st == 200 else None)
+
+    def sheet_ok(slug):
+        """A real GET of a sheet -> None, or what's wrong: every thumb answered, the body whole."""
+        st, body = get(f"/api/thumb-sheet/{slug}")
+        if st != 200:
+            return (slug, st)
+        n = int(body[:8])
+        m = json.loads(body[8:8 + n])
+        return None if len(m["cells"]) == 3 and 8 + n + sum(c[2] for c in m["cells"]) == len(body) else (slug, "body", len(body))
     with cf.ThreadPoolExecutor(8) as ex:
         for slug, st, d in ex.map(snap, sample):
             assert st == 200, (slug, st)
@@ -310,6 +351,18 @@ def main():
         json.dump(sample, fh)
     visitors = subprocess.Popen([sys.executable, os.path.abspath(__file__), "--load", str(port), sample_file, stop, req_log, "--readers", str(args.readers),
                                  "--scanners", str(args.scanners), "--handle", stub.HANDLE], stdout=log, stderr=log)
+    sheet_stop, sheet_bad, sheet_gets = threading.Event(), [], [0]
+
+    def sheet_reader():   # next to retention's sweep and every build's own sweep; a bad body must never reach a visitor
+        rng = random.Random(11)
+        while not sheet_stop.is_set():
+            bad = sheet_ok(rng.choice(sheet_rows))
+            sheet_gets[0] += 1
+            if bad:
+                sheet_bad.append(bad)
+            time.sleep(0.2)   # 5 reads/s: inside RATE
+    sheet_thread = threading.Thread(target=sheet_reader, daemon=True)
+    sheet_thread.start()
     time.sleep(10)
     # the worst VACUUM: nothing trimmed yet, every byte live, visitors on. Scans overlapping it must wait it out, not fail.
     vac_full = {"bytes": public_app._db_bytes(), "t0": time.time()}
@@ -331,6 +384,12 @@ def main():
     db.vacuum = real_vacuum
     bytes_after = public_app._db_bytes()
     time.sleep(5)
+    left_sheets = {n for n in seeded_sheets if os.path.exists(os.path.join(sheets, n))}
+    thumb_sheet.CACHE_MAX_BYTES = 2000
+    time.sleep(5)
+    thumb_sheet.CACHE_MAX_BYTES = 500000000
+    sheet_stop.set()
+    sheet_thread.join()
     with open(stop, "w"):
         pass
     visitors.wait(timeout=240)
@@ -342,6 +401,7 @@ def main():
     d1 = dump()
     n3 = public_app.run_retention()
     d2 = dump()
+    run_events = list(events)
 
     # ---------- invariants
     checks = {}
@@ -356,7 +416,7 @@ def main():
     c = sqlite3.connect(db.DB_PATH)
     c.row_factory = sqlite3.Row
     total = c.execute("SELECT COUNT(*) FROM scans").fetchone()[0]
-    check("rows: count = seeded + scans answered, nothing deleted", total == args.rows + len(inserted), (total, args.rows, len(inserted)))
+    check("rows: count = seeded + scans answered, nothing deleted", total == args.rows + len(sheet_rows) + len(inserted), (total, args.rows, len(inserted)))
     missing = [s for s in inserted if not c.execute("SELECT 1 FROM scans WHERE slug=?", (s,)).fetchone()]
     check("rows: every scan answered during the run is stored (no lost insert)", inserted and not missing, missing[:5])
     bad_new = c.execute("SELECT COUNT(*) FROM scans WHERE slug NOT LIKE 'seed%' AND retention != 'full'").fetchone()[0]
@@ -436,14 +496,33 @@ def main():
         if s["slug"] == pinned:
             continue
         should = s["_kind"] == "running" or s["_age"] == "young"
-        if there != (should, should) and not (s["_kind"] == "running" and s["_days"] > 4):   # a running row's old files: the mtime sweep, as on main at 30 d
+        if there != (should, should) and not (s["_kind"] == "running" and s["_days"] > 3):   # a running row's old files: the mtime sweep, as on main at 30 d
             (kept if should else gone).append((s["slug"], s["_kind"], s["_age"], there))
     check("files: rows past big lost media + avatar", not gone, (len(gone), gone[:3]))
     check("files: rows under big kept them", not kept, (len(kept), kept[:3]))
-    check("files: media-cache keeps its own TTL", sorted(os.listdir(croot)) == ["alive.json"], os.listdir(croot))
+    check("files: media-cache is gone past big, a younger entry stays", sorted(os.listdir(croot)) == ["alive.json"], os.listdir(croot))
+    pinned_dir = os.path.join(mdir, pinned)
+    check("files: photos held for a live entry lose only the index, their clock kept", os.path.isfile(os.path.join(pinned_dir, "0.jpg")) and not os.path.exists(os.path.join(pinned_dir, "index.json"))
+          and time.time() - os.path.getmtime(pinned_dir) > 3 * DAY, pinned)
+    check("sheets: swept by retention, no sheet of theirs written: past big and stale partials gone, the rest stays", left_sheets >= {"young.full"} and not left_sheets & {"old.full", "old.gaps", "x.1.tmp"}, left_sheets)
+    check("sheets: every read during the sweeps got a whole sheet", sheet_gets[0] > 20 and not sheet_bad, (sheet_gets[0], sheet_bad[:3]))
     g = mg._Gallery("cachehit0")
     check("files: a live entry still hits past big, its row's report says none",
           g.from_cache("alive") and g.images == [{"n": 0}] and os.path.isfile(os.path.join(g.dir, "0.jpg")) and mg.public_view(pinned)["status"] == "none", pinned)
+    fresh = sheet_ok(sheet_rows[0])
+    built = [n for n in os.listdir(sheets) if n.endswith(".full") and n != "young.full"]
+    born_ok = [n for n in built if abs(time.time() - os.path.getmtime(os.path.join(sheets, n)) - 2.5 * DAY) < 1800]
+    check("sheets: built under big: its row's age, not the build's", not fresh and built and len(born_ok) == len(built), (fresh, len(built), len(born_ok)))
+    for n in os.listdir(sheets):
+        os.utime(os.path.join(sheets, n), (time.time() - 3.1 * DAY,) * 2)
+    public_app.run_retention()
+    check("sheets: re-aged past big, no request: gone at the next run", not os.listdir(sheets), os.listdir(sheets)[:3])
+    entry = os.path.join(croot, "alive.json")
+    with open(entry, "w") as fh:
+        json.dump({"ts": time.time() - 3 * DAY - 60, "slug": pinned, "images": [{"n": 0}]}, fh)
+    os.utime(entry, (time.time() - 3 * DAY - 60,) * 2)
+    public_app.run_retention()
+    check("files: the entry past big: the next run takes the photos it held", not os.path.exists(pinned_dir), pinned)
     fives = [r for r in reqs if r["s"] >= 500 or r["s"] == 0]
     check("load: no 5xx, no connection error", reqs and not fives, (len(fives), fives[:3]))
     during = [r for r in reqs if run_t0 <= r["t0"] <= run_t1]
@@ -458,7 +537,7 @@ def main():
     check("idempotent: a second run touches 0 rows", (n2["trimmed"], n2["summary"], n2["corrupt"], n2["errors"], n3["trimmed"], n3["summary"]) == (0, 0, 0, 0, 0, 0), (n2, n3))
     check("idempotent: the table is identical", d1 == d2)
     check("run: no row raised", n1 and not n1["errors"], n1 and n1["errors"])
-    check("run: one log line, no handle", sum(e.startswith("retention ") for e in events) == 3 and not any(f"h{i}" in e.split() for e in events for i in (0, 1)), events)
+    check("run: one log line, no handle", sum(e.startswith("retention ") for e in run_events) == 3 and not any(f"h{i}" in e.split() for e in run_events for i in (0, 1)), run_events)
     check("nothing left loopback", not outside, outside[:3])
 
     pct = lambda kind, a, b: p95([r["t1"] - r["t0"] for r in reqs if r["k"] == kind and a <= r["t0"] <= b])
@@ -469,7 +548,7 @@ def main():
               "worst_vacuum": {"secs": round(vac_full["t1"] - vac_full["t0"], 2), "bytes_before": vac_full["bytes"], "bytes_after": vac_full["after"], "scans_overlapping": len(vac_full_scans),
                                "their_max_s": round(max((r["t1"] - r["t0"] for r in vac_full_scans), default=0), 2)}, "first_run": {k: v for k, v in (n1 or {}).items() if k != "slugs"},
               "files_slugs": len((n1 or {}).get("slugs") or []), "second_run": {k: v for k, v in n2.items() if k != "slugs"},
-              "second_run_s": events[-2].split("secs=")[-1] if len(events) > 1 else None, "p95_s": {
+              "second_run_s": run_events[-2].split("secs=")[-1] if len(run_events) > 1 else None, "p95_s": {
                   k: {"before": pct(k, first, run_t0), "during": pct(k, run_t0, run_t1), "after": pct(k, run_t1, 1e12)} for k in ("result", "profile", "media", "avatar", "scan")},
               "max_s_during": max((r["t1"] - r["t0"] for r in during), default=None), "statuses": collections.Counter(str(r["s"]) for r in reqs),
               "events": events, "checks": checks, "bypasses": "CSE, DeepSeek, leakshaven: app/tests wire stubs; profile pages: fake urlopen; media gathering off; limiters widened"}

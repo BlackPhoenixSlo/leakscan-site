@@ -6,7 +6,9 @@ makes one blob URL per cell, so what E.isPhoto reads is what /api/thumb would ha
 
 dead: what /api/thumb would refuse for good (upstream 4xx or redirect, not an image). A thumb in neither list (upstream 5xx / timeout,
 too big for a cell, past the caps) goes through /api/thumb in the client. Own bucket; upstream fetches share one bounded pool; one build
-per list at a time, the rest wait for it; built sheets sit on disk under a size and age bound (one with gaps only briefly)."""
+per list at a time, the rest wait for it; built sheets sit on disk under a size and age bound (one with gaps only briefly): sweep(),
+from every write and public_app.run_retention. A complete sheet's mtime is its row's created_at, so it goes with the row's photos."""
+import calendar
 import concurrent.futures as cf
 import hashlib
 import json
@@ -26,7 +28,7 @@ MAX_CELL_BYTES = int(os.environ.get("THUMB_SHEET_MAX_CELL_BYTES", "500000"))
 MAX_BYTES = int(os.environ.get("THUMB_SHEET_MAX_BYTES", "4000000"))
 POOL = int(os.environ.get("THUMB_SHEET_POOL", "8"))
 BUILD_S = float(os.environ.get("THUMB_SHEET_BUILD_S", "12"))   # then what came is the sheet; the rest stays per-thumb
-FULL_S, GAPS_S = 7 * 86400, 300                                # how long a sheet is served: complete, with gaps
+FULL_S, GAPS_S = db.RETAIN_BIG_DAYS * 86400, 300               # how long a sheet is served: complete (by its row's age), with gaps
 CACHE_MAX_BYTES = int(os.environ.get("THUMB_SHEET_CACHE_BYTES", "500000000"))
 
 LIMITER = ratelimit.Limiter(rate_per_min=30, burst=20, max_concurrent=1000)
@@ -105,30 +107,52 @@ def _read(key):
     return None
 
 
-def _write(key, body, complete):
+def _write(key, body, complete, born=None):
     d = cache_dir()
     try:
         os.makedirs(d, exist_ok=True)
         tmp = os.path.join(d, f"{key}.{threading.get_ident()}.tmp")
         with open(tmp, "wb") as f:
             f.write(body)
-        os.replace(tmp, os.path.join(d, key + (".full" if complete else ".gaps")))
-        files = []
-        for n in os.listdir(d):
-            p = os.path.join(d, n)
-            st = os.stat(p)
-            if time.time() - st.st_mtime > (GAPS_S if n.endswith((".gaps", ".tmp")) else FULL_S):
-                os.remove(p)
-            else:
-                files.append((st.st_mtime, st.st_size, p))
-        over = sum(f[1] for f in files) - CACHE_MAX_BYTES
-        for _, size, p in sorted(files):   # oldest first
-            if over <= 0:
-                break
-            os.remove(p)
-            over -= size
+        final = os.path.join(d, key + (".full" if complete else ".gaps"))
+        os.replace(tmp, final)
+        if complete and born:
+            os.utime(final, (born, born))
     except OSError:
         pass   # a full or read-only disk: served from memory, built again next time
+    sweep()
+
+
+def sweep():
+    """Past its age: gone; then the oldest down to the size bound -> files removed. Never raises: a file another thread replaced or
+    removed meanwhile is skipped (a build's body is in its memory: that request still gets it, the next one builds again)."""
+    d, now, n, files = cache_dir(), time.time(), 0, []
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return 0
+    for name in names:
+        p = os.path.join(d, name)
+        try:
+            st = os.stat(p)
+            if now - st.st_mtime > (GAPS_S if name.endswith((".gaps", ".tmp")) else FULL_S):
+                os.remove(p)
+                n += 1
+            else:
+                files.append((st.st_mtime, st.st_size, p))
+        except OSError:
+            pass
+    over = sum(f[1] for f in files) - CACHE_MAX_BYTES
+    for _, size, p in sorted(files):   # oldest first
+        if over <= 0:
+            break
+        try:
+            os.remove(p)
+            n += 1
+        except OSError:
+            pass
+        over -= size
+    return n
 
 
 class _Flight:
@@ -136,8 +160,8 @@ class _Flight:
         self.done, self.result = threading.Event(), None
 
 
-def sheet(urls, opener, max_bytes):
-    """→ (body, complete), or None: another request's build did not end in time. One build per list at a time."""
+def sheet(urls, opener, max_bytes, born=None):
+    """→ (body, complete), or None: another request's build did not end in time. One build per list at a time. born: its row's created_at, epoch."""
     key = hashlib.sha256("\n".join(urls).encode()).hexdigest()
     hit = _read(key)
     if hit:
@@ -154,12 +178,20 @@ def sheet(urls, opener, max_bytes):
         fl.result = _read(key)   # a build that ended between the read and the lock
         if not fl.result:
             fl.result = _build(urls, opener, max_bytes)
-            _write(key, *fl.result)
+            _write(key, *fl.result, born)
         return fl.result
     finally:
         with _lock:
             del _flights[key]
         fl.done.set()
+
+
+def _born(row):
+    """A row's created_at → epoch, None if it has none."""
+    try:
+        return calendar.timegm(time.strptime(row["created_at"], "%Y-%m-%dT%H:%M:%SZ"))
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def serve(h, slug, scan_row, opener, hosts, max_bytes):
@@ -168,9 +200,10 @@ def serve(h, slug, scan_row, opener, hosts, max_bytes):
         return h._json({"error": "rate_limited"}, 429)
     row = scan_row(slug) if db.SLUG_RE.match(slug) else None
     urls = thumbs_of(row, hosts) if row and row["status"] != "running" else []
-    if not urls:
+    born = _born(row) if row else None
+    if not urls or (born and time.time() - born >= FULL_S):   # past big, its retention run still to come: no new file for it
         return h._json({"error": "not_found"}, 404)
-    got = sheet(urls, opener, max_bytes)
+    got = sheet(urls, opener, max_bytes, born)
     if not got:
         return h._json({"error": "busy"}, 503)
     body, complete = got

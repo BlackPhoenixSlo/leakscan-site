@@ -1616,8 +1616,8 @@ SCAN_REUSE_TTL = int(os.environ.get("SCAN_REUSE_TTL", str(leakshaven.CACHE_TTL))
 SCAN_REUSE_FIELD = "scan_key"                                                       # scans.extra_json, never served
 
 
-# Retention (db.retain_scans has the tiers). >= 1 day: a reuse source (6 h) is always whole; small never under big.
-RETAIN_BIG_DAYS = max(1.0, float(os.environ.get("RETAIN_BIG_DAYS", "3")))
+# Retention (db.retain_scans has the tiers). Small never under big.
+RETAIN_BIG_DAYS = db.RETAIN_BIG_DAYS
 RETAIN_SMALL_DAYS = max(RETAIN_BIG_DAYS, float(os.environ.get("RETAIN_SMALL_DAYS", "30")))
 RETAIN_EVERY_S = 86400
 
@@ -1637,9 +1637,9 @@ def _drop_files(slug, pins=()):
 
 
 def run_retention():
-    """One pass, never raises: the tiers, their files, the orphans (files whose row is gone or that crashed mid-run, a day
-    past big so a scan's own file can't go before its row; media-cache keeps its own TTL), VACUUM if rows changed. One
-    log line, no handles."""
+    """One pass, never raises: the tiers, their files, what's left past big whatever its row (orphans, a crash mid-run, photos a
+    cache entry held; files are written after their row, so one can't go before it), media-cache entries and thumbnail sheets past
+    big, VACUUM if rows changed. One log line, no handles."""
     t0, before = time.time(), _db_bytes()
     n, files = None, 0
     try:
@@ -1650,7 +1650,7 @@ def run_retention():
                 files += _drop_files(slug, pins)
             except OSError:
                 pass
-        files += _prune_avatars(RETAIN_BIG_DAYS + 1) + media_gather.prune(RETAIN_BIG_DAYS + 1, pins)
+        files += _prune_avatars(RETAIN_BIG_DAYS) + media_gather.prune(RETAIN_BIG_DAYS, pins) + thumb_sheet.sweep()
         if n["trimmed"] or n["summary"]:
             db.vacuum()
         _event(f"retention trimmed={n['trimmed']} summary={n['summary']} corrupt={n['corrupt']} errors={n['errors']} "
