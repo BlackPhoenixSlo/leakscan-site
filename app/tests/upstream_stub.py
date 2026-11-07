@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 import os
+import socket
 import sys
 import threading
 import time
@@ -185,6 +186,7 @@ class Stub(ThreadingHTTPServer):
     calls = None
     timeout_sleep = 3.0
     cse_limit = None           # CSE: plain searches answered before the quota is gone (429); None = never
+    cse_fault = None           # CSE: every call answered with 429 | 403 (dailyLimitExceeded) | reset (socket closed, no answer) | empty (200, no items)
 
     def __init__(self, port=0, mode="valid"):
         super().__init__(("127.0.0.1", port), _H)
@@ -215,16 +217,34 @@ class _H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def _cse_fault(self):
+        """Answers this CSE call with the set fault -> True, else False. Bodies: Google's wire shape."""
+        fault = self.server.cse_fault
+        if fault == "429":
+            self._send({"error": {"code": 429, "message": "Quota exceeded for quota metric 'Queries'", "status": "RESOURCE_EXHAUSTED"}}, 429)
+        elif fault == "403":
+            self._send({"error": {"code": 403, "message": "Daily Limit Exceeded", "errors": [{"domain": "usageLimits", "reason": "dailyLimitExceeded"}]}}, 403)
+        elif fault == "reset":
+            self.close_connection = True
+            self.connection.shutdown(socket.SHUT_RDWR)
+        elif fault == "empty":
+            self._send({"searchInformation": {"totalResults": "0"}})
+        return bool(fault)
+
     def do_GET(self):  # Google CSE
         q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         g = lambda k: q.get(k, [""])[0]
         if g("searchType") == "image":
             with self.server.lock:
                 self.server.calls.append(("cse_image", g("q"), g("safe"), g("cx")))
+            if self._cse_fault():
+                return None
             return self._send({"searchInformation": {"totalResults": "9"}, "items": IMAGE_ITEMS})
         with self.server.lock:
             self.server.calls.append(("cse", g("q")))
             over = self.server.cse_limit is not None and sum(c[0] == "cse" for c in self.server.calls) > self.server.cse_limit
+        if self._cse_fault():
+            return None
         if over:   # Google's answer once the daily quota is gone
             return self._send({"error": {"code": 429, "message": "Quota exceeded"}}, 429)
         words =[w for w in g("q").split() if not w.startswith("-site:")]
@@ -253,6 +273,15 @@ class _H(BaseHTTPRequestHandler):
         self.close_connection = True
 
     def do_POST(self):  # DeepSeek chat/completions
+        if self.path.startswith("/__cse"):   # the proof's control: POST /__cse?fault=&limit= sets the faults, -> plain searches so far
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            self.server.cse_fault = q.get("fault", [None])[0]
+            self.server.cse_limit = int(q["limit"][0]) if "limit" in q else None
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            with self.server.lock:
+                if self.server.cse_limit is not None:   # the limit counts from now
+                    self.server.calls[:] = [c for c in self.server.calls if c[0] != "cse"]
+                return self._send({"cse_calls": sum(c[0] == "cse" for c in self.server.calls)})
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         with self.server.lock:
             self.server.calls.append(("llm", body))

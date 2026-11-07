@@ -1296,8 +1296,9 @@ def _deep_worker(slug, handle, platform, aliases_raw, ip, plus=False):
         # clean" when the network was down). rc==0 with no rows is a true 'empty'.
         if rows:
             status = "complete"
-        elif rc1 is None or rc1 != 0:
+        elif rc1 is None or rc1 != 0 or cse.get("errors"):  # one-project: scan unfinished
             status = "failed"
+            SCAN_LIMITER.refund(ip)  # one-project: scan unfinished
         else:
             status = "empty"
         db.finish_scan(slug, rows, status=status, extra=extra)
@@ -1524,6 +1525,14 @@ def merge_items(results, extra):
     return out
 
 
+def scan_unfinished(h, ip, errors):
+    """A Google call failed and nothing was found: that says nothing about the handle. No row (so no report, reuse
+    source or conversion), the visitor gets the failed state, the scan isn't counted."""
+    SCAN_LIMITER.refund(ip)
+    _event(f"scan unfinished level=low errors={','.join(sorted(set(errors)))}")
+    wc.sse_fail(h, "Google’s search didn’t answer, so I couldn’t finish checking this handle")
+
+
 def scan_begin(handle, platform, aliases, socials, rows, results, prog, started, fresh=False, errors=None):
     """_scan_cse after its first CSE pass: alias enrichment (its items merged into results / rows), then the
     leakshaven step starts (it runs next to the profile step) -> (op, rows, results); op feeds the other hooks."""
@@ -1607,8 +1616,8 @@ SCAN_REUSE_TTL = int(os.environ.get("SCAN_REUSE_TTL", str(leakshaven.CACHE_TTL))
 SCAN_REUSE_FIELD = "scan_key"                                                       # scans.extra_json, never served
 
 
-# Retention (db.retain_scans has the tiers). >= 1 day: a reuse source (6 h) is always whole; small never under big.
-RETAIN_BIG_DAYS = max(1.0, float(os.environ.get("RETAIN_BIG_DAYS", "3")))
+# Retention (db.retain_scans has the tiers). Small never under big.
+RETAIN_BIG_DAYS = db.RETAIN_BIG_DAYS
 RETAIN_SMALL_DAYS = max(RETAIN_BIG_DAYS, float(os.environ.get("RETAIN_SMALL_DAYS", "30")))
 RETAIN_EVERY_S = 86400
 
@@ -1628,9 +1637,9 @@ def _drop_files(slug, pins=()):
 
 
 def run_retention():
-    """One pass, never raises: the tiers, their files, the orphans (files whose row is gone or that crashed mid-run, a day
-    past big so a scan's own file can't go before its row; media-cache keeps its own TTL), VACUUM if rows changed. One
-    log line, no handles."""
+    """One pass, never raises: the tiers, their files, what's left past big whatever its row (orphans, a crash mid-run, photos a
+    cache entry held; files are written after their row, so one can't go before it), media-cache entries and thumbnail sheets past
+    big, VACUUM if rows changed. One log line, no handles."""
     t0, before = time.time(), _db_bytes()
     n, files = None, 0
     try:
@@ -1641,7 +1650,7 @@ def run_retention():
                 files += _drop_files(slug, pins)
             except OSError:
                 pass
-        files += _prune_avatars(RETAIN_BIG_DAYS + 1) + media_gather.prune(RETAIN_BIG_DAYS + 1, pins)
+        files += _prune_avatars(RETAIN_BIG_DAYS) + media_gather.prune(RETAIN_BIG_DAYS, pins) + thumb_sheet.sweep()
         if n["trimmed"] or n["summary"]:
             db.vacuum()
         _event(f"retention trimmed={n['trimmed']} summary={n['summary']} corrupt={n['corrupt']} errors={n['errors']} "
@@ -2146,7 +2155,7 @@ class Handler(BaseHTTPRequestHandler):
         One URL per line, so a human can eyeball the full triage — including the long
         'removed' tail (sometimes thousands) — and confirm nothing real was cut."""
         noindex = {"X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer"}
-        if not RESULT_LIMITER.allow(wc.client_ip(self)):
+        if not RESULT_LIMITER.allow(wc.client_ip(self), concurrency=False):  # one-project: scan links (nothing releases a slot here)
             return self._json({"error": "rate_limited"}, 429, extra=noindex)
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         which = (qs.get("set") or ["accepted"])[0]
@@ -2155,7 +2164,7 @@ class Handler(BaseHTTPRequestHandler):
         row = db.get_scan(slug)
         if not row:
             return self._json({"error": "not_found"}, 404, extra=noindex)
-        urls = row.get("accepted_urls" if which == "accepted" else "removed_urls") or []
+        urls = _scan_extra(slug, "accepted_urls" if which == "accepted" else "removed_urls") or []  # one-project: scan links (not on get_scan: it feeds /api/scan-result, the lists stay here)
         handle = re.sub(r"[^A-Za-z0-9._-]", "", row.get("handle") or "scan") or "scan"
         header = ("# %s leaks for @%s — %d URL(s)\n"
                   "# %s\n\n") % (
@@ -2270,6 +2279,8 @@ class Handler(BaseHTTPRequestHandler):
                     pass
         except Exception:
             return wc.sse_fail(self, "Quick search is temporarily unavailable. Please try again.")
+        if errors and not rows:  # one-project: scan unfinished
+            return scan_unfinished(self, ip, errors)  # one-project: scan unfinished
         op, rows, results = scan_begin(handle, platform, aliases, socials, rows, results, prog, started, fresh, errors)  # one-project: scan_begin
         # images / status / shaped below: upstream's, dead here (scan_end's pub replaces them, pack hosts dropped)  # one-project: scan_end
         images = cse_scanner.good_images(results, handle, CSE_IMAGES)
@@ -2291,6 +2302,8 @@ class Handler(BaseHTTPRequestHandler):
             profile, avatar, sources = _quick_profile(handle, platform, results, socials, hints=op["hints"])  # one-project: hints
             profile = profile_extract.merge_found_accounts(profile, op["aliases"]["socials"], socials, platform)  # one-project: hints
         rows, results, status, pub, mega_key = scan_end(op, handle, rows, results, google_total)  # one-project: scan_end
+        if errors and not rows:  # one-project: scan unfinished (all it found was on an aggregator's host)
+            return scan_unfinished(self, ip, errors)  # one-project: scan unfinished
         slug = db.insert_scan(rows, handle=handle, level="low", platform=platform,
                               status=status, client_ip_hash=_ip_hash(ip),
                               extra={"images": images, "google_total": google_total,

@@ -65,6 +65,7 @@ class Base(unittest.TestCase):
 
     def setUp(self):
         self.up.mode, self.up.cse_limit, self.up.calls, self.up.alias_items = "valid", None, [], {}
+        self.up.cse_fault = None
         self.up.timeout_sleep = 0
         self.ls.mode, self.ls.calls = "ok", []
         tiles = mg.parse_embed(stub.embed_page().decode())[:3]
@@ -304,6 +305,106 @@ class TestReuse(Base):
         self.assertIn("scan reuse failed: OSError", [c.args[0] for c in ev.call_args_list])
 
 
+class TestGoogleFailedNothingFound(Base):
+    """A failed Google call and no hit says nothing about the handle: never a clean result, never stored, never charged."""
+
+    def assertUnfinished(self, ev, why):
+        self.assertNotIn("result", ev, why)
+        said = ev["failed"][0]
+        self.assertIn("couldn’t finish", said, why)
+        self.assertNotIn("leak", said.lower(), why)
+        self.assertEqual(ev["done"], ["end"], why)
+        with db._db() as c:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM scans").fetchone()[0], 0, why)
+
+    def test_quota_and_network_failures_are_not_a_clean_result(self):
+        for fault in ("429", "403", "reset"):
+            self.up.cse_fault, self.up.calls = fault, []
+            with mock.patch.object(public_app, "_event") as log:
+                ev = self.stream()
+            self.assertUnfinished(ev, fault)
+            said = [c.args[0] for c in log.call_args_list]
+            self.assertTrue(any(m.startswith("scan unfinished level=low errors=") for m in said), said)
+            self.assertFalse(any(m.startswith("scan done") for m in said), said)
+            got = self.calls()
+            self.assertGreater(got["cse"], 0, fault)
+            self.assertEqual((got["llm"], got["leakshaven"]), (0, 0), fault)   # no paid call for a scan that can't report
+
+    def test_not_a_reuse_source_the_retry_scans(self):
+        self.up.cse_fault = "429"
+        self.assertUnfinished(self.stream(), "first")
+        n = self.calls()["cse"]
+        self.assertUnfinished(self.stream(), "still down")
+        self.assertGreater(self.calls()["cse"], n)
+        self.up.cse_fault = None
+        ok = self.scan()
+        self.assertFresh(ok)
+        self.assertGreater(ok["hit_count"], 0)
+
+    def test_only_aggregator_hits_and_a_failed_call(self):
+        """What the first pass found is all on a pack's host, the rule takes it out: nothing found again, past the first check."""
+        self.up.alias_items, self.up.cse_limit = {H: [{"title": "pack", "link": "https://s.leakshaven.com/AAA", "snippet": "x"}]}, 1
+        with mock.patch.object(public_app, "off_aggregators", lambda mega, hits, results, total: ([], [], total)):
+            self.assertUnfinished(self.stream(), "aggregator")
+
+    def test_a_visitor_is_not_charged(self):
+        limiter = ratelimit.Limiter(rate_per_min=1, burst=5, max_concurrent=2)   # 5 scans; next to no refill during the test
+        with mock.patch.object(public_app, "SCAN_LIMITER", limiter):
+            self.up.cse_fault = "429"
+            for _ in range(8):
+                self.assertUnfinished(self.stream(), "charged")
+            self.up.cse_fault = None
+            for i in range(5):
+                self.assertEqual(self.stream(f"mira{i}.example")["result"] != [], True)
+            r, _ = self.req("POST", "/api/public-scan", {"handle": "mira9.example", "platform": "onlyfans.com"})
+            self.assertEqual(r.status, 429)                           # the control: a scan that finished does count
+
+    def test_no_hits_and_no_failure_stays_empty(self):
+        self.up.cse_fault = "empty"
+        e = self.scan()
+        self.assertEqual((e["status"], e["hit_count"]), ("empty", 0))
+
+
+class TestDeepGoogleFailed(Base):
+    """The deep path runs the same search in build_cse.py, a subprocess. Declared bypass: the pipeline is wc.run_subprocess's fake here, it writes
+    what build_cse really builds (stub Google); the real pipeline needs the crawler stack."""
+
+    def deep(self, fault, rc=0):
+        import build_cse
+        import web_common as wc
+        self.up.cse_fault = fault
+        built = {}
+
+        def run(argv, timeout, cwd=None, on_line=None, env=None):
+            if "build_cse.py" in argv:
+                built.update(build_cse.build(H, [H], max_calls=2, image_calls=1, drop=set())[0])
+                with open(os.path.join(cwd, argv[argv.index("--out") + 1]), "w", encoding="utf-8") as fh:
+                    json.dump(built, fh)
+                return 0
+            return rc
+        limiter = ratelimit.Limiter(rate_per_min=1, burst=5, max_concurrent=2)
+        self.assertTrue(limiter.allow("1.2.3.4"))
+        self.assertTrue(public_app.GLOBAL_SCANS.acquire())
+        slug = db.create_pending(handle=H, level="deep", platform="onlyfans.com", client_ip_hash="x")
+        public_app._job_new(slug, H, "onlyfans.com", "deep")
+        with mock.patch.object(wc, "run_subprocess", run), mock.patch.object(public_app, "SCAN_LIMITER", limiter):
+            public_app._deep_worker(slug, H, "onlyfans.com", "", "1.2.3.4")
+        return db.get_scan(slug), built, limiter._b["1.2.3.4"]["tokens"]
+
+    def test_failed_google_call_and_no_hit_is_failed_uncharged(self):
+        for fault in ("429", "403", "reset"):
+            row, built, tokens = self.deep(fault)
+            self.assertTrue(built["errors"], fault)
+            self.assertEqual(row["status"], "failed", fault)
+            self.assertGreaterEqual(tokens, 4.99, fault)
+
+    def test_no_hit_and_no_failure_stays_empty_charged(self):
+        row, built, tokens = self.deep("empty")
+        self.assertEqual(built["errors"], [])
+        self.assertEqual(row["status"], "empty")
+        self.assertLess(tokens, 4.5)
+
+
 def db_first_slug():
     with db._db() as c:
         return c.execute("SELECT slug FROM scans ORDER BY rowid LIMIT 1").fetchone()[0]
@@ -324,15 +425,6 @@ class TestOnlyWholeResultsAreSources(Base):
         n = self.calls()["cse"]
         self.assertFresh(self.scan())
         self.assertGreater(self.calls()["cse"], n)
-
-    def test_quota_gone_is_not_a_false_no_leaks_for_6h(self):
-        self.up.cse_limit = 0
-        e = self.scan()
-        self.assertEqual((e["status"], e["hit_count"]), ("empty", 0))
-        self.up.cse_limit = None
-        ok = self.scan()
-        self.assertFresh(ok)
-        self.assertGreater(ok["hit_count"], 0)
 
     def test_quota_gone_midway_is_partial(self):
         self.up.cse_limit = 1
@@ -362,8 +454,9 @@ class TestOnlyWholeResultsAreSources(Base):
         # a partial scan fetched the packs; the next scan takes them from the leakshaven cache: their age would add to the TTL
         with db._db() as c:
             c.execute("DELETE FROM scans")
-        self.up.cse_limit = 1
+        self.up.calls, self.up.cse_limit = [], 1                      # the limit counts every call so far
         p = self.scan()
+        self.assertGreater(p["hit_count"], 0)
         self.assertIsNone(self.stored_key(p))
         self.assertTrue(self.extra(p["slug"]).get(leakshaven.CACHE_FIELD))
         self.up.cse_limit, n = None, len(self.ls.calls)

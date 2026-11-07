@@ -60,9 +60,10 @@ def build(name, tokens, max_calls=15, img_limit=40, top_n=12, drop=None, image_c
         f'{handle} leaked', f'{handle} nude', f'{handle} onlyfans',
         f'leaks {handle}', f'porn {handle}', f'"{name}" leaked nude',
     ]
+    errors = []   # failed Google calls: public_app._deep_worker reads them, no hit + a failed call is no clean result
     results, total = cse_scanner.cse_search_wide(
         queries, max_calls=max_calls,
-        on_progress=lambda m: print(f"  [cse] {m}", file=sys.stderr))
+        on_progress=lambda m: print(f"  [cse] {m}", file=sys.stderr), errors=errors)
 
     sites = [{"domain": s["domain"], "url": s.get("url", ""), "occ": s.get("occurrences", 0)}
              for s in cse_scanner.summarize_cse(results)]
@@ -127,6 +128,7 @@ def build(name, tokens, max_calls=15, img_limit=40, top_n=12, drop=None, image_c
         "sites": sites,
         "top_leaks": top,
         "query": queries[0],
+        "errors": errors,
     }, results
 
 

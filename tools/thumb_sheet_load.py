@@ -70,7 +70,7 @@ def serve(args):
             return real.open(urllib.request.Request(f"{base}/images?{q}", headers=dict(req.header_items())), timeout=timeout)
     public_app._THUMB_OPENER = WireOpener()
     if args.break_singleflight:
-        thumb_sheet.sheet = lambda urls, o, m: thumb_sheet._build(urls, o, m)
+        thumb_sheet.sheet = lambda urls, o, m, born=None: thumb_sheet._build(urls, o, m)
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), public_app.Handler)
     srv.request_queue_size = 512
     print(json.dumps({"port": srv.server_address[1], "up": up.server_address[1]}), flush=True)
