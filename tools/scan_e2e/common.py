@@ -36,6 +36,7 @@ BREAKS = {
     "remove": ("removals.js", "card.querySelector('.rm-btn').addEventListener('click',", "(function () {})("),
     "sweep": ("removals.js", "  function step(c) {\n    c.t = 0;\n", "  function step(c) {\n    c.t = 0;\n    return;\n"),   # the sweep never steps
     "fprow": ("removals.css", ".fp-head { display: flex; align-items: center;", ".fp-head { display: flex; flex-direction: column; align-items: center;"),   # old centred head
+    "demolive": ("personalize.js", "fig.classList.toggle('is-live', !!m.profile)", "fig.classList.toggle('is-live', false)"),   # phone: the still of Orla stays inline after a scan
     "tgcta": ("personalize.js", "    if (bar) {\n", "    if (false) {\n"),   # no Telegram sticky bar after a scan
     "allowlist": ("chat.js", "return HOSTS.indexOf(h) >= 0;", "return true;"),
     "tuck": ("pip.js", "  function tuck(side) {\n", "  function tuck(side) {\n    return;\n"),
