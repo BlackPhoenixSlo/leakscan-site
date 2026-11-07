@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """End-to-end proof of the on-site free scan against the local stub (never the production API or jackbase.me).
 
-    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet|again]... [--changed [REF]] [--no-reuse] [--engine chromium|webkit]
+    cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet|again|quota]... [--changed [REF]] [--no-reuse] [--engine chromium|webkit]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-demolive] [--break-demotall] [--break-fprow] [--break-tuck]
         [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]
-        [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again] [--break-expired]
+        [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again] [--break-expired] [--break-quota]
 
 Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
 `reused green from <run folder>` and skips the browser; --no-reuse forces a run; --changed runs only what the diff reaches; break runs never touch it.
@@ -178,6 +178,11 @@ expired (part of again; personal_flow part of personalize): a report retention t
 db.retain_row): the line says "..., images expired" / "..., details expired" on hero and scan page, stored counts stand, nothing reads as "no images / no
 leaks" (hero, #free phone, scan page), Scan again replaces it; ?r= personalization and the showcase demo still fill from the kept profile and hosts, no
 broken image. --break-expired has the client ignore `retention`: only `expired:` checks may go red. Screenshots: <vp>-expired-*.png.
+
+quota (scan_e2e/quota.py; the REAL public_app.Handler serving site/, not the stub: wire stubs for Google, DeepSeek, leakshaven, profile pages): Google answering 429, 403
+dailyLimitExceeded, or closing the socket, with nothing found: hero and scan page say the scan didn't finish, try again; nothing reads as no leaks; no row, no ?r=, no leakscan.last,
+no leakscan:result; the real rate limiter never fires over 14 failures. `quota control:` checks: Google back = retry gets a whole report and a row; hits + a failed call stay a partial
+report; Google answering with nothing is still "No leaks found". --break-quota: only `quota:` checks may go red. Screenshots: <vp>-quota-*.png, <vp>-quota-side-effects.json.
 
 A scenario part that raises (a Playwright timeout, a missing element) prints one FAIL line for it and the run goes on.
 """

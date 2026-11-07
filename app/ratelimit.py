@@ -69,6 +69,13 @@ class Limiter:
             if b and b["inflight"] > 0:
                 b["inflight"] -= 1
 
+    def refund(self, ip):
+        """Hands back the token of an allow() that gave the caller nothing."""
+        with self._lock:
+            b = self._b.get(ip)
+            if b:
+                b["tokens"] = min(self.burst, b["tokens"] + 1.0)
+
 
 class GlobalCap:
     """Process-wide cap on concurrent long-running jobs (scan subprocesses),

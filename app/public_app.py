@@ -1296,8 +1296,9 @@ def _deep_worker(slug, handle, platform, aliases_raw, ip, plus=False):
         # clean" when the network was down). rc==0 with no rows is a true 'empty'.
         if rows:
             status = "complete"
-        elif rc1 is None or rc1 != 0:
+        elif rc1 is None or rc1 != 0 or cse.get("errors"):  # one-project: scan unfinished
             status = "failed"
+            SCAN_LIMITER.refund(ip)  # one-project: scan unfinished
         else:
             status = "empty"
         db.finish_scan(slug, rows, status=status, extra=extra)
@@ -1522,6 +1523,14 @@ def merge_items(results, extra):
             seen.add(it["link"])
             out.append(it)
     return out
+
+
+def scan_unfinished(h, ip, errors):
+    """A Google call failed and nothing was found: that says nothing about the handle. No row (so no report, reuse
+    source or conversion), the visitor gets the failed state, the scan isn't counted."""
+    SCAN_LIMITER.refund(ip)
+    _event(f"scan unfinished level=low errors={','.join(sorted(set(errors)))}")
+    wc.sse_fail(h, "Google’s search didn’t answer, so I couldn’t finish checking this handle")
 
 
 def scan_begin(handle, platform, aliases, socials, rows, results, prog, started, fresh=False, errors=None):
@@ -2270,6 +2279,8 @@ class Handler(BaseHTTPRequestHandler):
                     pass
         except Exception:
             return wc.sse_fail(self, "Quick search is temporarily unavailable. Please try again.")
+        if errors and not rows:  # one-project: scan unfinished
+            return scan_unfinished(self, ip, errors)  # one-project: scan unfinished
         op, rows, results = scan_begin(handle, platform, aliases, socials, rows, results, prog, started, fresh, errors)  # one-project: scan_begin
         # images / status / shaped below: upstream's, dead here (scan_end's pub replaces them, pack hosts dropped)  # one-project: scan_end
         images = cse_scanner.good_images(results, handle, CSE_IMAGES)
@@ -2291,6 +2302,8 @@ class Handler(BaseHTTPRequestHandler):
             profile, avatar, sources = _quick_profile(handle, platform, results, socials, hints=op["hints"])  # one-project: hints
             profile = profile_extract.merge_found_accounts(profile, op["aliases"]["socials"], socials, platform)  # one-project: hints
         rows, results, status, pub, mega_key = scan_end(op, handle, rows, results, google_total)  # one-project: scan_end
+        if errors and not rows:  # one-project: scan unfinished (all it found was on an aggregator's host)
+            return scan_unfinished(self, ip, errors)  # one-project: scan unfinished
         slug = db.insert_scan(rows, handle=handle, level="low", platform=platform,
                               status=status, client_ip_hash=_ip_hash(ip),
                               extra={"images": images, "google_total": google_total,

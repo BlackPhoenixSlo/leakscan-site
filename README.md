@@ -347,6 +347,9 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 - Only whole results are sources (`extra.scan_key`): status complete, no failed CSE call, alias step not skipped, leakshaven
   answered live, profile from the LLM. Log: `scan reuse hit level=low platform= aliases= hits= age=Ns media=`, and no
   `scan start` / `scan done` line for a hit. Tests: `app/tests/test_scan_reuse.py`.
+- A failed Google call and no hit is no result (`scan_unfinished`, deep: `_deep_worker` reading build_cse's `errors`): the visitor gets the failed state, no row,
+  no `leakscan:result`, no charge on `SCAN_LIMITER`. Log: `scan unfinished level=low errors=`. Hits + a failed call stay a report (complete, no `scan_key`), with no notice
+  that the count may be low. E2E: `quota` (the real app, not the stub).
 
 ## Scan retention
 
