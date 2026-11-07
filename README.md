@@ -22,7 +22,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   scan's phone `.phone-free` (All / Images / Videos tabs, lists scroll inside the screen + Show more; after a scan her
   real results, `js/inline-scan.js` + `js/free-phone.js`, "Send it to me" link), After = her own pages first (search "<name> nude leaks", each tab scrolling inside the
   screen with "Show more" for its next `.m-batch`, `js/main.js`); no JS = both) · `#pricing` (Monthly on the deep card, One-time outlined, plan-specific Telegram CTAs) · `#faq` · `#removals`
-  (the deep room; phones: a swipe row, arrows + dots, `js/swipe.js`) · `#contact`. `tools/check.py` fails if a section
+  (the deep room; phones: one column, desktop: 2x2) · `#contact`. `tools/check.py` fails if a section
   id is missing here.
 - Look: every colour / radius / face is a token in `css/styles.css` `:root` (paper `--bg`, the `--fold` band under
   `#how` and `#pricing`, the `--deep` mulberry room for `#removals` and the Monthly card, `--accent` mulberry; dark via
@@ -31,9 +31,9 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
 - `#removals` "Where I remove from" (`js/removals.js` + `css/removals.css`, own files): four mock panels (Mega, X,
   Reddit, a leak site drawn after fapello.com's profile page: light shell, ring avatar, name + aliases, pills, counters,
   photo grid cropped like a screenshot; removed = same shell + DMCA 404), each a live leak vs. its removed state (the
-  removed layer's chrome is cloned from the live one, `data-rm-copy`). On screen each edge glides by itself (1-2 s CSS
-  transition) to a random 55-85 % (the leak side: the button keeps reading Preview removal) and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
-  reduced motion; a card's first input (Preview removal press, stage tap, handle key) stops its sweep for good. Preview removal / Show again animates the compare edge; idle, the knob sits in the stage's bottom corner with
+  removed layer's chrome is cloned from the live one, `data-rm-copy`, same geometry). Each edge starts mid-stage (50 % ± 8 px, per card); on
+  screen it glides by itself (1-2 s CSS transition) to a random 42-58 % and holds 1-3 s, per card, never in step; paused off screen / tab hidden, none under
+  reduced motion; a card's first input (Preview removal press, stage tap, handle key) stops its sweep for good. Preview removal / Show again animates the edge to all removed / all live; all live, the knob sits in the stage's bottom corner with
   no edge line. The edge drags from the knob at once, from elsewhere on the stage only after a sideways move (a tap or a
   vertical swipe leaves it); arrow / PageUp / PageDown / Home / End on the handle. "Show demo images" (`data-reveal-t` labels) unblurs the
   `img/removals/` thumbs. Personalized from the same shared scan result as the hero card (`?r=` or last scan, and after

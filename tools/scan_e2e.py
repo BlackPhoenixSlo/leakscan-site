@@ -74,9 +74,11 @@ Screenshots: <vp>-t*.png. --break-thumbs serves scan-engine.js with the gallery 
 
 removals (js/removals.js, the #removals "Where I remove from" panels): section placed after #faq and directly before
 #contact; demo defaults (Orla Brennick), neutral mock copy (no onlyfans / leaked / leaks; the Before phone's Google query aside); leak-side images blurred by
-default (+ Show demo images); idle, the handle covers nothing and no edge line shows; Preview removal flips all 4 panels (Mega / X / Reddit /
-leak site; phones: a swipe row) to their removed state and Show again back, with zero layout shift; a sideways drag on the stage moves the
-compare edge + clip, a tap does not; arrow keys on the handle; reduced motion = no transition; no horizontal overflow
+default (+ Show demo images); each edge starts mid-stage (50 % ± 10 px), clip at the edge; removed layer aligned with the live one;
+no CSS filter on a stage, touch-action pan-y; idle, the handle covers nothing and no edge line shows; Preview removal flips all 4 panels (Mega / X / Reddit /
+leak site; phones: one column, desktop: 2x2) to their removed state and Show again back, with zero layout shift; a sideways drag on the stage moves the
+compare edge + clip, a tap does not; phone: a CDP touch drag moves edge + clip on every move before the finger lifts, a vertical
+touch swipe on a stage scrolls the page; arrow keys on the handle; reduced motion = no transition; no horizontal overflow
 (390); ?r=demoRemove1 personalizes each panel all-or-nothing from the backend's top-level `mega` list + x.com /
 reddit.com / top other host hits (leak words skipped, no third-party title), thumbs via /api/thumb, still blurred, no URL
 rendered, her Mega panel without the demo's own file row; no aggregator host / pack url anywhere on the landing, scan

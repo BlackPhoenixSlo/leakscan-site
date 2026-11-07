@@ -40,7 +40,6 @@
 <script src="js/personalize.js" defer></script>
 <script src="js/chat.js" defer></script>
 <script src="js/removals.js" defer></script>
-<script src="js/swipe.js" defer></script>
 <script src="js/pip.js" data-pip-auto="dock" defer></script>
 <script src="js/analytics.js" defer></script>
 <script type="application/ld+json">
@@ -504,7 +503,7 @@
     <div class="rm-grid">
       <article class="rm-card" data-rm="mega" aria-labelledby="rm-h-mega">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-mega"><span class="rm-ico rm-ico-mega" aria-hidden="true">M</span>Mega</h3><p class="rm-out">Folders behind aggregator packs disabled</p></div>
-        <div class="rm-stage" style="--p:100" data-end="idle">
+        <div class="rm-stage" data-end="idle">
           <div class="rm-layer rm-live mg" aria-hidden="true">
             <div class="agg">
               <span class="agg-th"><img class="rm-img" src="img/removals/portrait.webp" alt="" width="240" height="240" loading="lazy" decoding="async"></span>
@@ -532,7 +531,7 @@
       </article>
       <article class="rm-card" data-rm="x" aria-labelledby="rm-h-x">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-x"><span class="rm-ico rm-ico-x" aria-hidden="true">X</span>X</h3><p class="rm-out">Media disabled after copyright report</p></div>
-        <div class="rm-stage" style="--p:100" data-end="idle">
+        <div class="rm-stage" data-end="idle">
           <div class="rm-layer rm-live xp" aria-hidden="true">
             <div class="xp-head"><span class="xp-av" data-rm-k="x-av">L</span><span class="xp-who"><b data-rm-k="x-name">Leak Mirror</b><span><span data-rm-k="x-at">@leak.mirror</span><span data-rm-k="x-age"> · 2h</span></span></span><span class="xp-logo">X</span></div>
             <p class="xp-text"><span data-rm-k="x-l1">Orla Brennick full set</span><span data-rm-k="x-l2">Orla Brennick new photos</span></p>
@@ -550,7 +549,7 @@
       </article>
       <article class="rm-card" data-rm="reddit" aria-labelledby="rm-h-reddit">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-reddit"><span class="rm-ico rm-ico-rd" aria-hidden="true">r/</span>Reddit</h3><p class="rm-out">Removed on copyright notice</p></div>
-        <div class="rm-stage" style="--p:100" data-end="idle">
+        <div class="rm-stage" data-end="idle">
           <div class="rm-layer rm-live rd" aria-hidden="true">
             <p class="rd-head"><span class="rd-ic">r/</span><b data-rm-k="sub">r/brennickclay_pics</b><span data-rm-k="rd-age">· 5h</span></p>
             <p class="rd-title" data-rm-k="rd-title">Orla Brennick full pack, link in comments</p>
@@ -559,8 +558,7 @@
           </div>
           <div class="rm-layer rm-gone rd rd-gone" aria-hidden="true">
             <span data-rm-copy=".rd-head"></span><span data-rm-copy=".rd-title"></span>
-            <p class="rd-note">[ Removed by Reddit in response to a copyright notice. ]</p>
-            <div class="rd-media rd-off"></div>
+            <div class="rd-media rd-off"><p class="rd-note">[ Removed by Reddit in response to a copyright notice. ]</p></div>
             <span data-rm-copy=".rd-acts"></span>
           </div>
           <span class="rm-handle" role="slider" tabindex="0" aria-label="Compare the Reddit post (left) with it removed (right)" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-valuetext="Leak live"><span class="rm-knob"></span></span>
@@ -569,7 +567,7 @@
       </article>
       <article class="rm-card" data-rm="site" aria-labelledby="rm-h-site">
         <div class="rm-top"><h3 class="rm-h" id="rm-h-site"><span class="rm-ico rm-ico-site" aria-hidden="true"><svg class="icon"><use href="#i-globe"/></svg></span>Leak sites</h3><p class="rm-out">Profile 404 after a DMCA notice</p></div>
-        <div class="rm-stage" style="--p:100" data-end="idle">
+        <div class="rm-stage" data-end="idle">
           <div class="rm-layer rm-live fp" aria-hidden="true">
             <div class="fp-bar"><svg class="icon fp-menu"><use href="#i-menu"/></svg><span class="fp-logo" data-rm-k="host">leak-mirror</span><span class="fp-pill fp-p1">Trending</span><span class="fp-pill fp-p2">Random</span><span class="fp-pill fp-p3">New</span></div>
             <p class="fp-search"><svg class="icon"><use href="#i-search"/></svg>Search</p>
@@ -598,7 +596,6 @@
         <p class="rm-act"><button class="btn btn-ghost btn-sm rm-btn" type="button" aria-pressed="false">Preview removal</button></p>
       </article>
     </div>
-    <div class="swipe-nav" data-swipe="rm"><button type="button" class="swipe-prev" aria-label="Previous" disabled><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button><span class="swipe-dots"><button type="button" class="swipe-dot" aria-label="Mega" aria-current="true"></button><button type="button" class="swipe-dot" aria-label="X"></button><button type="button" class="swipe-dot" aria-label="Reddit"></button><button type="button" class="swipe-dot" aria-label="Leak sites"></button></span><button type="button" class="swipe-next" aria-label="Next"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button></div>
   </div>
 </section>
 
