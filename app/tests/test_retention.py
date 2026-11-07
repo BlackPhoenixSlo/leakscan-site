@@ -233,6 +233,38 @@ class TestServing(Base):
         self.assertEqual(old_r["top_domains"][0], {"domain": "a.example", "n": 11})
         self.assertFalse(old_r["profile"]["avatar"])
 
+    def test_deep_audit_lists_download_at_every_tier(self):
+        """retain_row keeps a deep row's lists for good, so the download must find them at each tier: real row shape on prod."""
+        lists = {"accepted_urls": [f"https://a.example/{i}" for i in range(202)], "removed_urls": [f"https://r.example/{i}" for i in range(83)],
+                 "n_accepted": 202, "n_removed": 83, "links_by_domain": {"a.example": ["https://a.example/0"]}}
+        rows = {s: tier for s, tier in ((self.seed(1, level="deep", extra={**BIG, **SMALL, **lists}), "full"),
+                                        (self.seed(10, level="deep", extra={**BIG, **SMALL, **lists}), "trimmed"),
+                                        (self.seed(40, level="deep", extra={**BIG, **SMALL, **lists}), "summary"))}
+        public_app.run_retention()
+        for s, tier in rows.items():
+            for which, key in (("accepted", "accepted_urls"), ("removed", "removed_urls")):
+                st, body = self.get(f"/api/scan-links/{s}?set={which}")
+                text = body.decode()
+                self.assertEqual(st, 200, tier)
+                self.assertIn(f"{len(lists[key])} URL(s)", text.splitlines()[0], tier)
+                self.assertEqual([x for x in text.splitlines() if x.startswith("https://")], lists[key], tier)
+            st, r = self.get(f"/api/scan-result/{s}")
+            self.assertEqual((st, r["retention"], r["n_accepted"], r["n_removed"]), (200, tier, 202, 83))   # the report's buttons
+            self.assertNotIn("accepted_urls", r)                                                            # counts only: the lists stay behind /api/scan-links
+            self.assertNotIn("removed_urls", r)
+
+    def test_audit_download_of_a_row_without_lists(self):
+        st, body = self.get(f"/api/scan-links/{self.seed(1, extra={'google_total': 1})}?set=accepted")
+        self.assertEqual(st, 200)
+        self.assertIn("0 URL(s)", body.decode().splitlines()[0])
+        self.assertEqual(self.get("/api/scan-links/nosuchslug1?set=accepted")[0], 404)
+
+    def test_audit_download_holds_no_concurrency_slot(self):
+        """It answered 429 for good after max_concurrent downloads from one address: allow() took a slot no one released."""
+        s = self.seed(1, level="deep", extra={"accepted_urls": ["https://a.example/1"], "n_accepted": 1})
+        with mock.patch.object(public_app, "RESULT_LIMITER", ratelimit.Limiter(rate_per_min=10000, burst=1000, max_concurrent=2)):
+            self.assertEqual([self.get(f"/api/scan-links/{s}?set=accepted")[0] for _ in range(4)], [200] * 4)
+
     def test_files_and_answers_as_for_none(self):
         s, keep = self.seed(10), self.seed(1)
         self.files(s)

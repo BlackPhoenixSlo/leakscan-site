@@ -2146,7 +2146,7 @@ class Handler(BaseHTTPRequestHandler):
         One URL per line, so a human can eyeball the full triage — including the long
         'removed' tail (sometimes thousands) — and confirm nothing real was cut."""
         noindex = {"X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer"}
-        if not RESULT_LIMITER.allow(wc.client_ip(self)):
+        if not RESULT_LIMITER.allow(wc.client_ip(self), concurrency=False):  # one-project: scan links (nothing releases a slot here)
             return self._json({"error": "rate_limited"}, 429, extra=noindex)
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         which = (qs.get("set") or ["accepted"])[0]
@@ -2155,7 +2155,7 @@ class Handler(BaseHTTPRequestHandler):
         row = db.get_scan(slug)
         if not row:
             return self._json({"error": "not_found"}, 404, extra=noindex)
-        urls = row.get("accepted_urls" if which == "accepted" else "removed_urls") or []
+        urls = _scan_extra(slug, "accepted_urls" if which == "accepted" else "removed_urls") or []  # one-project: scan links (not on get_scan: it feeds /api/scan-result, the lists stay here)
         handle = re.sub(r"[^A-Za-z0-9._-]", "", row.get("handle") or "scan") or "scan"
         header = ("# %s leaks for @%s — %d URL(s)\n"
                   "# %s\n\n") % (

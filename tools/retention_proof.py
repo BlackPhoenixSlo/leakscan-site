@@ -2,13 +2,14 @@
 """Retention under load: a mass-seeded DB, public_app.run_retention() while real HTTP readers and scan inserts hit the real
 public_app.Handler. This repo has no slop/ harness: this script is its stand-in for this flow (declared).
 
-    python3 tools/retention_proof.py OUT_DIR [--rows 20000] [--readers 16] [--scanners 4] [--break-key] [--break-cutoff]
+    python3 tools/retention_proof.py OUT_DIR [--rows 20000] [--readers 16] [--scanners 4] [--break-key] [--break-cutoff] [--break-links]
 
 Seeded by SQL (real shapes: tools/fixtures/scan-sample.json, deep rows ~1 MB, ages, NULL / corrupt extra, running, pre-aggregator-
 rule rows). Acts only through endpoints. The expected tiers below are written out again, NOT read from db.py: moving a key in
 db.py must turn this red. Declared bypasses: Google CSE + DeepSeek + leakshaven are app/tests wire stubs; profile pages a fake at
 their urlopen; media gathering off; limiters widened. A socket guard refuses any non-loopback connect. All data synthetic.
---break-key moves `gallery` to the small tier, --break-cutoff has big_days back at 30: only their checks may go red.
+--break-key moves `gallery` to the small tier, --break-cutoff has big_days back at 30, --break-links reads the audit lists off get_scan
+again (the bug): only their checks may go red.
 OUT_DIR gets report.json (checks, timings, sizes), run.log. Exit 1 on any red check."""
 import argparse
 import collections
@@ -58,7 +59,7 @@ def shape(i, now):
     if kind == "deep":
         ex.update(gallery=[{"u": f"https://g.example/{j}", "w": 1} for j in range(9000)], img_meta={f"u{j}": {"w": 1} for j in range(5000)},
                   accepted_urls=[f"https://a.example/{j}" for j in range(8000)], links_by_domain={"a.example": [f"https://a.example/{j}" for j in range(8000)]},
-                  removed_urls=["https://r.example/1"], cse_sites=[{"d": "a.example"}], top_leaks=[{"u": "x"}], n_leaks=3, n_media=1, n_hosting=1, n_sites=2,
+                  removed_urls=["https://r.example/1"], n_accepted=8000, n_removed=1, cse_sites=[{"d": "a.example"}], top_leaks=[{"u": "x"}], n_leaks=3, n_media=1, n_hosting=1, n_sites=2,
                   quote={"p": 1}, slugs=["s"], excluded=["e"], mega_ok=True)
     elif kind == "reused":
         ex.pop("scan_key")
@@ -156,6 +157,7 @@ def main():
     ap.add_argument("--handle", default="")
     ap.add_argument("--break-key", action="store_true")
     ap.add_argument("--break-cutoff", action="store_true")
+    ap.add_argument("--break-links", action="store_true")
     ap.add_argument("--load", nargs=4)
     args = ap.parse_args()
     if args.load:
@@ -204,6 +206,8 @@ def main():
         db.RETAIN_SMALL = db.RETAIN_SMALL + ("gallery",)
     if args.break_cutoff:
         public_app.RETAIN_BIG_DAYS = 30.0
+    if args.break_links:
+        public_app._scan_extra = lambda slug, key: db.get_scan(slug).get(key)
 
     # ---------- seed by SQL, files for a sample
     now = datetime.now(timezone.utc)
@@ -281,6 +285,23 @@ def main():
             assert st == 200, (slug, st)
             if d["status"] != "failed":
                 served[slug] = {k: d.get(k) for k in keep}
+
+    # ---------- the audit download of deep rows of each age: real GET, the lists retention keeps
+    deep_rows = collections.defaultdict(list)
+    for i in range(args.rows):
+        r = shape(i, now)
+        if r["_kind"] == "deep" and len(deep_rows[r["_age"]]) < 20:
+            deep_rows[r["_age"]].append(r["slug"])
+
+    def audit(slug):
+        out = []
+        for which in ("accepted", "removed"):
+            st, data = get(f"/api/scan-links/{slug}?set={which}")
+            lines = data.decode().splitlines()
+            out.append((st, lines[0].rsplit("— ", 1)[-1] if lines else "", sum(x.startswith("https://") for x in lines)))
+        return out
+    want_audit = [(200, "8000 URL(s)", 8000), (200, "1 URL(s)", 1)]
+    audit_before = {s: audit(s) for v in deep_rows.values() for s in v}
 
     # ---------- visitors on, baseline, retention under them, a tail
     stop = os.path.join(tmp, "stop")
@@ -400,6 +421,14 @@ def main():
     check("served: counts and forever fields stable, before = after", not moved, (len(moved), moved[:3]))
     prerule_served = [s for s in sample_prerule if s in served]
     check("served: pre-rule rows in the sample", args.rows < 500 or prerule_served, len(prerule_served))
+    wrong = [(s, a) for s, a in audit_before.items() if a != want_audit]
+    check("links: deep rows download their lists before retention", (audit_before or args.rows < 500) and not wrong, (len(wrong), wrong[:2]))
+    wrong = [(age, s, a) for age, v in deep_rows.items() for s in v for a in [audit(s)] if a != want_audit]
+    check("links: deep rows download them at every tier after", (len(deep_rows) == 3 or args.rows < 500) and not wrong, (len(wrong), wrong[:2]))
+    counts = [(after[s][1].get("n_accepted"), after[s][1].get("n_removed")) for v in deep_rows.values() for s in v if s in after]
+    check("links: the report serves the counts, its buttons need them", (counts or args.rows < 500) and set(counts) <= {(8000, 1)}, counts[:3])
+    leaked = [s for s in after if after[s][0] == 200 and ("accepted_urls" in after[s][1] or "removed_urls" in after[s][1])]
+    check("links: the lists stay out of /api/scan-result", not leaked, leaked[:3])
     gone, kept = [], []
     for i in with_files:
         s = shape(i, now)

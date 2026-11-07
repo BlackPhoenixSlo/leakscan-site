@@ -405,7 +405,7 @@ def get_scan(slug, path=None):
     # whatever the worker stored so a share/reload renders the full report.
     for key in ("img_meta", "gallery", "cse_sites", "top_leaks", "n_leaks",
                 "n_media", "n_hosting", "n_sites", "quote", "links_by_domain",
-                "excluded", "mega", "results", "top_domains"):  # one-project: get_scan
+                "excluded", "mega", "results", "top_domains", "n_accepted", "n_removed"):  # one-project: get_scan
         if key in extra:
             d[key] = extra[key]
     return d
