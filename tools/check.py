@@ -314,6 +314,8 @@ def main():
                     and not value.strip().startswith(SITE_URL):
                 demo_hosts.add(u.netloc)
     privacy = (SITE / "privacy.html").read_text(encoding="utf-8")
+    # visible text, for the hosting item: the page's own canonical/og URLs must not count as naming the host
+    privacy_text = re.sub(r"<[^>]+>", " ", privacy.split("</head>", 1)[-1])
     for host in sorted(demo_hosts):
         if host not in DISCLOSED:
             bad(f"showcase loads third-party host {host}: disclose it in privacy.html and add it to DISCLOSED")
@@ -329,13 +331,13 @@ def main():
             if host not in privacy:
                 bad(f"js/{js.name} talks to {host} but privacy.html does not name it")
 
-    if site_host not in privacy:
+    if site_host not in privacy_text:
         bad(f"site's canonical host is {site_host} (SITE_URL) but privacy.html does not name it")
     env = (ROOT / "deploy" / ".env.example").read_text(encoding="utf-8")
     vps = re.search(r"^SITE_HOST=(\S+)", env, re.M)
     if not vps:
         bad("deploy/.env.example has no SITE_HOST= line: can't check privacy.html names the VPS host")
-    elif vps[1] not in privacy:
+    elif vps[1] not in privacy_text:
         bad(f"site is served from {vps[1]} but privacy.html does not name it")
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
