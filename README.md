@@ -12,17 +12,16 @@ Card photos ship 720 px `srcset` copies in `showcase/imgs/720/` (`make_images.py
 the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB copy and any full-size photo > 200 KB).
 
 - Landing page (`site/index.html`), top to bottom: `#top` hero (scan form, live report card; the mini player docks
-  by `.hero .report-card`) · `#why` (Jaka's letter with his photo `assets/jaka.webp`, three rules, the record) · `#how`
-  (You 1-3, Me 4-5) · `#website` (its two points, then `#showcase` inside it: a demo preview card, live iframe 440px tall
+  by `.hero .report-card`) · `#why` (Jaka's letter with his photo `assets/jaka.webp`, three rules, the record) · `#how` (opens with `#free`, the page's one
+  Google phone block `.ba`: Before / After one at a time via real ARIA tabs `.ba-tabs`, `js/main.js`; Before = the
+  scan's phone `.phone-free` (All / Images / Videos tabs, lists scroll inside the screen + Show more; after a scan her
+  real results, `js/inline-scan.js` + `js/free-phone.js`, "Send it to me" link), After = her own pages first (search "<name> nude leaks", each tab scrolling inside the
+  screen with "Show more" for its next `.m-batch`, `js/main.js`); no JS = both); then the heading, You 1-3, Me 4-5) · `#website` (its two points, then `#showcase` inside it: a demo preview card, live iframe 440px tall
   (`data-src` until the page has loaded and it is within 800px of the screen: `js/main.js`; Chrome's own lazy distance started it
   during load and held the video player)
   with a "Full screen" in-page pop-out: Esc / button / backdrop close, page behind inert, focus back to the button;
   under 560px a still of the demo's top, `assets/demo/top.webp`, opens the same pop-out (after a scan with a profile her live
-  frame replaces the still in its box, `.is-live`); then `#free`, the page's one
-  Google phone block `.ba`: Before / After one at a time via real ARIA tabs `.ba-tabs`, `js/main.js`; Before = the
-  scan's phone `.phone-free` (All / Images / Videos tabs, lists scroll inside the screen + Show more; after a scan her
-  real results, `js/inline-scan.js` + `js/free-phone.js`, "Send it to me" link), After = her own pages first (search "<name> nude leaks", each tab scrolling inside the
-  screen with "Show more" for its next `.m-batch`, `js/main.js`); no JS = both) · `#pricing` (Monthly on the deep card, One-time outlined, plan-specific Telegram CTAs) · `#faq` · `#removals`
+  frame replaces the still in its box, `.is-live`)) · `#pricing` (Monthly on the deep card, One-time outlined, plan-specific Telegram CTAs) · `#faq` · `#removals`
   (the deep room; phones: one column, desktop: 2x2) · `#contact`. `tools/check.py` fails if a section
   id is missing here.
 - Look: every colour / radius / face is a token in `css/styles.css` `:root` (paper `--bg`, the `--fold` band under

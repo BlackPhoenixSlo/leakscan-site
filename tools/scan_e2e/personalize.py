@@ -167,7 +167,7 @@ def landing(t):
     lav = page.eval_on_selector_all('.ba [data-p^="gone-"] .fav', "els => els.map(e => [e.textContent, getComputedStyle(e).backgroundColor])")
     check(f"{tag} after phone: Removed rows get letter avatars like the hero card", [l[0] for l in lav] == [g[0].upper() for g in gone]
           and all(l[1] != "rgb(215, 210, 204)" for l in lav), lav)
-    page.locator("#showcase .ba").screenshot(path=str(cfg.out / f"{vp_name}-p2-before-after.png"))
+    page.locator(".ba").screenshot(path=str(cfg.out / f"{vp_name}-p2-before-after.png"))
     ph = page.evaluate("""() => {
         const r = k => [...document.querySelectorAll(`.ba [data-p="${k}"] > a.m-link`)].map(a => [a.getAttribute('href'), a.target, a.rel]);
         return {rows: Object.fromEntries(['ig', 'tt', 'own', 'blog', 'gone-1', 'gone-2', 'gone-3', 'gone-4'].map(k => [k, r(k)])),
@@ -192,7 +192,7 @@ def landing(t):
         hov = page.eval_on_selector('.ba [data-p="own"] a', "a => [getComputedStyle(a).backgroundColor, getComputedStyle(a.querySelector('.m-title')).textDecorationLine, getComputedStyle(a).cursor]")
     check(f"{tag} phones: row hover = tint + underlined title + pointer (desktop; touch: no sticky tint)", bool(hov) and hov[2] == "pointer" and (
           (hov[0] != "rgba(0, 0, 0, 0)" and hov[1] == "underline") if page.evaluate("matchMedia('(hover: hover)').matches") else (hov[0] == "rgba(0, 0, 0, 0)" and hov[1] == "none")), hov)
-    page.locator("#website").screenshot(path=str(cfg.out / f"{vp_name}-p2b-phones-hover.png"))
+    page.locator("#how").screenshot(path=str(cfg.out / f"{vp_name}-p2b-phones-hover.png"))
     page.mouse.move(0, 0)
     check(f"{tag} profile: showcase url bar = site_domain", page.locator("[data-p=site-url]").inner_text() == SD)
     check(f"{tag} showcase iframe + button carry the slug", page.locator("iframe[data-p=demo]").evaluate("f => f.getAttribute('src') || f.getAttribute('data-src')") == "showcase/?r=" + FX["slug"]

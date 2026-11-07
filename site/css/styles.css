@@ -8,7 +8,7 @@
 @font-face { font-family: "Young Serif fallback"; src: local("Georgia Bold"), local("Georgia-Bold"), local("Georgia"); size-adjust: 98.5%; ascent-override: 106.2%; descent-override: 37.2%; line-gap-override: 0%; }
 
 :root {
-  --leak-blur: 9px;   /* leak-side photos, blurred by CSS before any JS; a [data-reveal] button lifts it per scope */
+  --leak-blur: 2px;   /* leak-side photos (owner: 2px), blurred by CSS before any JS; a [data-reveal] button lifts it per scope */
   --live-grid-cols: 4; --live-grid-rows: 4;   /* hero card Images grid; read by js/inline-scan.js */
   --bg: #edeff2;          /* paper: the page, every section */
   --fold: #e1e4e9;        /* only #how and the showcase band */
@@ -528,16 +528,10 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
 .showcase-head p { margin: 0; max-width: 34em; color: var(--muted); }
 .showcase-head .showcase-k { margin-bottom: 4px; color: var(--ink); font: 650 1.05rem/1.35 var(--sans); }
 .showcase .browser { margin-top: 18px; }
-.showcase .ba-item figcaption { min-height: 32px; }
-/* desktop: the demo as a preview card (live frame, 440 px tall, full screen on demand) on the left, the one Google phone beside it */
-@media (min-width: 960px) {
-  .js .showcase { display: grid; grid-template-columns: minmax(0, 620px) 320px; justify-content: space-between; grid-template-areas: "head tabs" "demo ba" "btn ba"; column-gap: 64px; align-items: start; }
-  .js .showcase-head { grid-area: head; align-self: end; }
-  .js .showcase .browser-demo, .js .showcase .demo-hold { grid-area: demo; }   /* popped out: its placeholder keeps the cell */
-  .js .showcase .browser-demo + .center { grid-area: btn; margin-top: 20px; text-align: left; }
-  .js .ba-tabs { grid-area: tabs; margin-top: 0; align-self: end; justify-self: center; }
-  .js .showcase .ba { grid-area: ba; }
-}
+/* #how opens with the Before / After Google phone (#free): a picture between #why's text and the steps */
+.how .ba-item figcaption { min-height: 32px; }
+.js .how .ba-tabs { margin-top: 0; }
+.how .ba ~ h2 { margin-top: clamp(40px, 6vw, 64px); }
 
 /* phones (main #86 / #91): more favicons; tabs scroll inside the fixed screen, "Show more" under each list */
 .fav.yt { background: #f00; }
