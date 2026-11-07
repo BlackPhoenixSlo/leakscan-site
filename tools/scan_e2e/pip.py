@@ -180,11 +180,17 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     def drop(pg, cdp, s, x1, y1):   # slow drag of the picture's centre to (x1, y1) + hold: no fling
         x0, y0 = pic_c(s)
         drag(pg, cdp, [(x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12) for i in range(13)], 30, 200)
-        return st(pg)
+        s = st(pg)
+        for _ in range(12):   # Linux WebKit can still be gliding into its spot 600 ms after the drop (measured)
+            pg.wait_for_timeout(150)
+            s, s0 = st(pg), s
+            if s["box"] == s0["box"]:
+                break
+        return s
 
     def fling(pg, cdp, s, dx):
         x0, y0 = pic_c(s)
-        drag(pg, cdp, [(x0 + dx * i / 6, y0) for i in range(7)], 10, 0)
+        drag(pg, cdp, [(x0 + dx * i / 6, y0) for i in range(7)], 0, 0)   # no wait: pip.js wants > 0.87 px/ms here; 25 px / (10 ms + a Linux round trip) is on that line (measured: tucked 3 of 8)
         return st(pg)
 
     def grip(pg, cdp, s, dx, dy):

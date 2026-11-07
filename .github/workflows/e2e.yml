@@ -20,7 +20,7 @@ jobs:
       matrix:
         only: [scan, personalize, askai, inline, tabs, removals, "pip --engine chromium", "pip --engine webkit", sheet, again]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - run: python3 -m venv "$RUNNER_TEMP/v" && "$RUNNER_TEMP/v/bin/pip" install -q playwright==1.63.0 curl_cffi
@@ -31,7 +31,7 @@ jobs:
       - run: |
           e2e() { sudo unshare -n sh -c "ip link set lo up && exec sudo -u $(id -un) -H env -i HOME=$HOME LANG=C.UTF-8 $RUNNER_TEMP/v/bin/python tools/scan_e2e.py $RUNNER_TEMP/out --no-reuse --only ${{ matrix.only }}"; }
           e2e || { echo "::warning::${{ matrix.only }} red on the first try, retrying once"; e2e; }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-${{ matrix.only }}

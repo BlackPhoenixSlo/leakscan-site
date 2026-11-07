@@ -39,7 +39,7 @@ def scenario(s, parts, pw, browser, state):
         stub.wait()   # the next stub binds the same port
         stub.stdout.close()
     if not measure:
-        print(f"{s}: ran {'RED' if fails[n:] else 'green'} {time.time() - t0:.0f} s (break run: no cache)", flush=True)
+        print(f"{s}: ran {'RED' if fails[n:] else 'green'} {time.time() - t0:.0f} s (no cache)", flush=True)
         return {"status": "ran", "secs": round(time.time() - t0, 1), "fails": fails[n:]}
     return reuse.finish(s, code, t0, seen | set(log.read_text().split("\n")) - {""}, fails[n:], state)
 
