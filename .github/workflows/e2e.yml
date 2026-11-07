@@ -27,9 +27,10 @@ jobs:
       - run: '"$RUNNER_TEMP/v/bin/playwright" install --with-deps chromium webkit'
       # stubs only: a network namespace with nothing but loopback and an empty env, so no key is held and no paid API reachable
       # Declared: pip's WebKit `hd:` sync flow prints SKIP on Linux (pip.py: GStreamer, no iPhone); every other check runs
+      # No WebKit compositing: 15 % less load on the runner, and its GL path is no iPhone's anyway (measured: 350 s vs 420 s)
       # One retry, with a warning: drags and flings hang on wall-clock timing a loaded runner can miss; a real fault is red twice
       - run: |
-          e2e() { sudo unshare -n sh -c "ip link set lo up && exec sudo -u $(id -un) -H env -i HOME=$HOME LANG=C.UTF-8 $RUNNER_TEMP/v/bin/python tools/scan_e2e.py $RUNNER_TEMP/out --no-reuse --only ${{ matrix.only }}"; }
+          e2e() { sudo unshare -n sh -c "ip link set lo up && exec sudo -u $(id -un) -H env -i HOME=$HOME LANG=C.UTF-8 WEBKIT_DISABLE_COMPOSITING_MODE=1 $RUNNER_TEMP/v/bin/python tools/scan_e2e.py $RUNNER_TEMP/out --no-reuse --only ${{ matrix.only }}"; }
           e2e || { echo "::warning::${{ matrix.only }} red on the first try, retrying once"; e2e; }
       - uses: actions/upload-artifact@v7
         if: failure()

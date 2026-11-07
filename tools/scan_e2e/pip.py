@@ -131,7 +131,13 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         return ctx, pg, (ctx.new_cdp_session(pg) if engine == "chromium" and phone else None)
 
     def st(pg):
-        return pg.evaluate(PIP_J)
+        s = pg.evaluate(PIP_J)
+        for _ in range(8 if engine == "webkit" and sys.platform == "linux" else 0):   # Linux WebKit can still be gliding to its spot after this file's fixed waits (measured): read it once still
+            pg.wait_for_timeout(120)
+            s, s0 = pg.evaluate(PIP_J), s
+            if (s or {}).get("box") == (s0 or {}).get("box"):
+                break
+        return s
 
     def ready(pg, url, wake=True, card=False):
         pg.goto(cfg.base + url, wait_until="load")
@@ -180,13 +186,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     def drop(pg, cdp, s, x1, y1):   # slow drag of the picture's centre to (x1, y1) + hold: no fling
         x0, y0 = pic_c(s)
         drag(pg, cdp, [(x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12) for i in range(13)], 30, 200)
-        s = st(pg)
-        for _ in range(12):   # Linux WebKit can still be gliding into its spot 600 ms after the drop (measured)
-            pg.wait_for_timeout(150)
-            s, s0 = st(pg), s
-            if s["box"] == s0["box"]:
-                break
-        return s
+        return st(pg)
 
     def fling(pg, cdp, s, dx):
         x0, y0 = pic_c(s)
@@ -1006,7 +1006,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     # allowed: Playwright's WebKit build has no native media-control icons ("Button failed to load", the /video/ page's own
     # <video controls>, also without the player)
     hosts = sorted({urlsplit(x).hostname for x in net["outside"] if x.startswith("http")})   # WebKit routes data: / blob: too
-    errs = [x for x in net["errors"] if not x.startswith("Button failed to load, iconName")]
+    errs = [x for x in net["errors"] if not x.startswith("Button failed to load, iconName") and not (engine == "webkit" and "/api/thumb" in x and "access control checks" in x)]   # WebKit says this of a thumb a closing page cut off (as sheet.py)
     check(f"{tag} no request left loopback (the demo iframe included: no Google Fonts), no console / JS errors", not hosts and not errs, hosts + errs[:5])
 
 
