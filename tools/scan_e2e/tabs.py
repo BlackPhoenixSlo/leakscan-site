@@ -642,7 +642,7 @@ def order_popout(t):
         const w = document.getElementById('website'), sc = document.getElementById('showcase'), fr = sc.querySelector('.browser-demo'), ba = document.querySelector('.ba'),
           how = document.getElementById('how'), h2 = document.getElementById('how-title'), tabs = document.querySelector('.ba-tabs');
         return {why: Math.round(b(document.getElementById('why'))), tabs: Math.round(y(tabs)), ba: Math.round(y(ba)), baBottom: Math.round(b(ba)), h2: Math.round(y(h2)),
-          inHow: how.contains(tabs) && how.contains(ba), next: [tabs.nextElementSibling === ba, (ba.nextElementSibling.matches('.ba-hint') ? ba.nextElementSibling.nextElementSibling : ba.nextElementSibling) === h2],
+          inHow: how.contains(tabs) && how.contains(ba), next: [tabs.nextElementSibling === ba, (n => n && n.matches('.ba-hint') ? n.nextElementSibling : n)(ba.nextElementSibling) === h2],
           inShowcase: sc.contains(ba), website: Math.round(y(w)), showcase: Math.round(y(sc)), frameBottom: Math.round(b(fr)),
           free: ba.id, beforeIsFree: !!document.querySelector('#ba-before .phone-free'), phones: document.querySelectorAll('.phone').length,
           link: (a => a && a.getAttribute('href'))(sc.querySelector('a.btn[data-p=demo]'))}; }""")
