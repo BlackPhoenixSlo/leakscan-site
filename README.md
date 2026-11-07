@@ -205,7 +205,10 @@ uv run python <worktree>/tools/scan_e2e.py OUT                      # every scen
 uv run python <worktree>/tools/scan_e2e.py OUT --only pip --only askai
 uv run python <worktree>/tools/scan_e2e.py OUT --changed [REF]      # only what the diff reaches; REF default: merge-base with origin/main
 uv run python <worktree>/tools/scan_e2e.py OUT --no-reuse           # run anyway; a green run still fills
+uv run python <worktree>/tools/scan_e2e.py OUT --keep-all           # every frame of a green run too (implies --no-reuse: a hit has no frames)
 ```
+
+- A green scenario keeps its summary, logs, JSON and proof shots (`-trigger` / `-settled` / `-proof` names, each part's first and last shot, the pip strip); its other PNGs go (`tools/scan_e2e/thin.py`; `tools/video/cue_shots.py` too, plus the shots its docstring calls proofs). A red, `--break-*` or `--keep-all` run keeps every frame.
 
 - A hit prints `<scenario>: reused green from <run folder>`, starts no stub and no browser, and takes no machine slot. Misses
   wait for the machine gate on their own (`~/.slop/gate.py`, re-exec at nice 10); invoking through the gate as before still works.

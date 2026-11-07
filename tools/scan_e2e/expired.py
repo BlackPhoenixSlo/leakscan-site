@@ -75,7 +75,7 @@ def scan_page(ctx, vp_name):
     page.wait_for_selector("#scan-aged .aged-again", timeout=15000)
     check("expired: scan summary: the line", page.locator("#scan-aged .aged").inner_text().strip() == LINES[SUMMARY], page.locator("#scan-aged .aged").inner_text())
     check("expired: scan summary: counts as scanned", stats() == (r["domain_count"], r["hit_count"], r["google_total"]), stats())
-    note = page.locator("#expired").inner_text()
+    note = page.locator("#expired").inner_text() if page.locator("#expired").count() else ""   # built only for an expired report: --break-expired has none
     check("expired: scan summary: says expired, where", page.locator("#expired").is_visible() and "expired" in note and r["top_domains"][0]["domain"] in note, note)
     check("expired: scan summary: no empty lists", page.locator("#google").is_hidden() and page.locator("#sites").is_hidden() and page.locator("#empty").is_hidden())
     no_false_claim("scan summary", page.locator("body").inner_text())
