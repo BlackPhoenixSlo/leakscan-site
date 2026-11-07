@@ -371,7 +371,8 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   repeat scan's copy from the cache counts from that scan (a row under big always renders), and an entry isn't re-saved on a hit: worst case first gather + 2 × big + 1 day. `thumb-sheets/`: a complete
   sheet's mtime is its row's `created_at` (a rebuild adds nothing), past big it's swept and the row 404s to the client's per-thumb path; also a 500 MB bound, swept at every write too.
 - Serving: `/api/scan-result` stays 200 with `retention`, `top_domains`; `/api/media` answers `none`, `/api/avatar` 404. The site says `Scanned 5 days ago,
-  images expired · Scan again` / `..., details expired · Scan again`, never "no images" (`expiredOf`, `expiredNote` in `site/js/scan-engine.js`).
+  images expired · Scan again` / `..., details expired · Scan again`, never "no images" (`expiredOf`, `expiredNote` in `site/js/scan-engine.js`); `/s/` and `/app/` the same (`expiredOf`, `renderExpired` in
+  `app/public_static/app.js`, which doesn't load the engine), a deep row keeps its download buttons there (its lists stay). A row reads as clean only with `status='empty'` (or no hits at `full`), no count and no `google_total`; a count with no hits to show says expired at any tier.
 - A rollback to a build before this one restores upstream's `prune_scans(30)`: it deletes rows past 30 days at startup. Corrupt `extra_json` keeps its bytes.
 - Tests: `app/tests/test_retention.py`; under load: `python3 tools/retention_proof.py OUT [--rows 20000]` (mass seed, real endpoints over wire stubs).
 

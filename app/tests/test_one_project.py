@@ -20,7 +20,7 @@ SITES = {
     "profile_extract.py": {"hints": 8},
     "media_gather.py": {"NONE_TTL": 3, "warmup": 1, "web retry": 5, "retention": 4},
     "db.py": {"domain_count": 4, "get_scan": 1, "retention": 4},
-    "chat_proxy.py": {},
+    "chat_proxy.py": {"retention": 2},
 }
 BLOCK = {"public_app.py": 1, "cse_scanner.py": 0, "profile_extract.py": 1, "media_gather.py": 1, "db.py": 1,
          "chat_proxy.py": 1}

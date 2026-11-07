@@ -5,7 +5,7 @@
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-demolive] [--break-demotall] [--break-fprow] [--break-tuck]
         [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]
-        [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again] [--break-expired] [--break-quota] [--break-audit]
+        [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again] [--break-expired] [--break-quota] [--break-audit] [--break-allclear]
 
 Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
 `reused green from <run folder>` and skips the browser; --no-reuse forces a run; --changed runs only what the diff reaches; break runs never touch it.
@@ -183,8 +183,11 @@ quota (scan_e2e/quota.py; the REAL public_app.Handler serving site/, not the stu
 dailyLimitExceeded, or closing the socket, with nothing found: hero and scan page say the scan didn't finish, try again; nothing reads as no leaks; no row, no ?r=, no leakscan.last,
 no leakscan:result; the real rate limiter never fires over 14 failures. `quota control:` checks: Google back = retry gets a whole report and a row; hits + a failed call stay a partial
 report; Google answering with nothing is still "No leaks found". --break-quota: only `quota:` checks may go red. Screenshots: <vp>-quota-*.png, <vp>-quota-side-effects.json.
-`audit:` (same scenario, the real app): deep rows seeded by SQL, aged by the real run_retention (full, trimmed): /s/<slug> and /app/#s=<slug> show both download buttons with the row's counts, each click
-downloads the row's list; a summary row is only noted. --break-audit serves the report without n_accepted / n_removed (#110's bug): only `audit:` checks may go red. <vp>-audit-*-{trigger,settled}.png, -{accepted,removed}.txt, <vp>-audit-side-effects.json.
+`audit:` (same scenario, the real app): deep rows seeded by SQL, aged by the real run_retention (full, trimmed, summary): /s/<slug> and /app/#s=<slug> show both download buttons with the row's counts, each click
+downloads the row's list. --break-audit serves the report without n_accepted / n_removed (#110's bug): only `audit:` checks may go red. <vp>-audit-*-{trigger,settled}.png, -{accepted,removed}.txt, <vp>-audit-side-effects.json.
+`allclear:` (same scenario, the real app): rows of every tier, and whose hit_count and hits disagree, read on /s/, /app/, ?r= and scan/?r= and in the chat's context: a row we hold counts for says expired, how many links on how many
+sites, its top sites, Scan again (a deep one keeps its download buttons), never clean; no result or analytics event. `allclear control:` a clean row still says it; tiers as run_retention set them, no row deleted, Scan again = a real quick scan.
+--break-allclear (the client ignores retention, the chat's old context): only `allclear:` and `audit: <vp> summary` checks may go red. <vp>-allclear-*-{trigger,settled}.png, <vp>-allclear-side-effects.json.
 
 A scenario part that raises (a Playwright timeout, a missing element) prints one FAIL line for it and the run goes on.
 """

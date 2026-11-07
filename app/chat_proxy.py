@@ -142,6 +142,8 @@ def scan_summary(scan):
         if extra > 0:
             lines.append(f"...and {extra} more sites")
         lines.append("status: all matches were confirmed live at scan time")
+    elif scan.get("hit_count") or (scan.get("retention") in ("trimmed", "summary") and (scan.get("status") != "empty" or scan.get("google_total"))):  # one-project: retention
+        lines.append("this scan found matches; its details have expired, a new scan lists them")  # one-project: retention
     else:
         lines.append("no public leaks were found in this scan")
     return "\n".join(lines)

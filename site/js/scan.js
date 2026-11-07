@@ -167,7 +167,7 @@
     var lead = $('scan-lead');   // the report header is a new view: a fresh lead node, so its new text is not a layout shift
     lead.replaceWith(lead.cloneNode(false));
     var name = PLATFORMS[state.platform] || state.platform;
-    var empty = d.status === 'empty' && !d.expired;
+    var empty = d.status === 'empty' && !d.expired && !d.hits.length;
     var noList = d.expired && !d.hits.length;   // retention took what #google shows at 'images', the hits behind #sites at 'details'
     setTitle('Free scan report', '@' + d.handle,
       empty || (d.expired && !d.domain_count) ? 'Scan of what Google shows for your ' + name + ' handle.'

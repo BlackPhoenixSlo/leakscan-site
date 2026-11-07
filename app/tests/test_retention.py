@@ -453,6 +453,12 @@ class TestServing(Base):
         self.assertNotIn("no public leaks", ctx)
         self.assertIn("a.example (11 matches)", ctx)
 
+    def test_chat_context_never_says_clean_of_a_row_with_a_count(self):
+        for scan, clean in (({"hit_count": 4, "hits": [], "retention": "full"}, False), ({"hit_count": 4, "hits": [], "retention": "summary", "status": "empty"}, False),
+                            ({"hit_count": 0, "hits": [], "retention": "summary", "status": "complete"}, False), ({"hit_count": 0, "hits": [], "retention": "summary", "status": "empty", "google_total": 300}, False),
+                            ({"hit_count": 0, "hits": [], "retention": "summary", "status": "empty"}, True), ({"hit_count": 0, "hits": [], "retention": "full", "status": "empty"}, True)):
+            self.assertEqual("no public leaks" in chat_proxy.scan_summary(scan), clean, scan)
+
     def test_run_never_raises_and_logs_one_line_without_handles(self):
         self.seed(10)
         lines = []

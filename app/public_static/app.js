@@ -376,7 +376,17 @@ function hostOf(url) {
 // older row with no evidence tag — is a real hosting site.
 function isRealHit(h) { return !h || h.evidence !== "search-echo"; }
 
+// What a stored report has lost (README "Scan retention"): "images" | "details" | null. A view must say so, never "no leaks
+// found". expiredOf in site/js/scan-engine.js, the same rule (these pages don't load it).
+function expiredOf(res) {
+  const what = { trimmed: "images", summary: "details" }[res.retention];
+  const counted = Number(res.hit_count) > 0 || Number(res.n_leaks) > 0;
+  if (what) return res.status !== "empty" || res.google_total > 0 || counted ? what : null;
+  return counted && !(res.hits || []).length ? "details" : null;
+}
+
 function renderResults(res) {
+  const expired = expiredOf(res);
   const hits = (res.hits || []).filter(isRealHit);
   res = Object.assign({}, res, { hits: hits });
   currentScan = res;
@@ -394,7 +404,7 @@ function renderResults(res) {
   const audit = $("report-audit"); if (audit) audit.style.display = "none";  // deep-only; shown below
 
   if (hits.length === 0) {
-    renderEmpty(res);
+    if (expired) renderExpired(res, expired); else renderEmpty(res);
     if (disc) disc.style.display = "none";
     if (gAlso) { gAlso.style.display = "none"; gAlso.innerHTML = ""; }
     const gs = $("report-gshot"); if (gs) { gs.style.display = "none"; gs.innerHTML = ""; }
@@ -433,6 +443,7 @@ function renderResults(res) {
     renderCovers(res);
     if (disc) disc.style.display = "";
   }
+  if (expired && hits.length) $("results-head").insertAdjacentHTML("beforeend", agedLine(res, expired));
   renderFoot(res);
 
   const showDeep = isLow && hits.length;   // "run a deep scan" upsell — only on a quick result
@@ -454,7 +465,7 @@ function renderResults(res) {
   const sh = $("share-hint"); if (sh) sh.textContent = "";
   wireVerify(res);
   wireCTA();
-  const greet = hits.length
+  const greet = hits.length || expired
     ? "I can explain what we found and walk you through getting it removed. Ask me anything."
     : "No public leaks turned up this time. Ask me anything about staying protected or filing takedowns.";
   if (resultsChat) resultsChat.reset(greet);
@@ -928,6 +939,38 @@ function renderEmpty(res) {
     '<div class="big">No public leaks found</div>' +
     '<p class="muted">We didn\'t find copies of <strong>@' + escapeHtml(res.handle) +
     "</strong> on the sites we checked. New leaks appear over time — rescan periodically.</p>";
+  hideReport();
+}
+
+// "Scanned 2 months ago, details expired · Scan again" (agedLine in site/js/scan-engine.js). Scan again = the quick scan the
+// site's scan page runs, whatever the row's level; a quick result offers the deep scan.
+function agedLine(res, expired) {
+  const ms = Date.now() - Date.parse(res.as_of || res.created_at);
+  const u = [["month", 30 * 864e5], ["day", 864e5], ["hour", 36e5], ["minute", 6e4]].find((x) => ms >= x[1]);
+  const n = u ? Math.floor(ms / u[1]) : 0;
+  const q = new URLSearchParams({ p: res.platform || "", h: res.handle || "", go: "1" });
+  return '<p class="muted aged">' + (u ? "Scanned " + n + " " + u[0] + (n === 1 ? "" : "s") + " ago, " + expired : expired[0].toUpperCase() + expired.slice(1)) +
+    ' expired · <a class="aged-again" href="/app/?' + escapeHtml(q.toString()) + '">Scan again</a></p>';
+}
+
+// The note that stands in for a report's lists once they expired (expiredNote in site/js/scan-engine.js). A deep row's audit
+// lists stay: its download buttons do too.
+function renderExpired(res, expired) {
+  const links = Number(res.n_leaks) || Number(res.hit_count) || 0, sites = Number(res.domain_count) || 0;
+  const hosts = (res.top_domains || []).slice(0, 5).map((t) => t.domain).filter(Boolean).join(", ");
+  const head = $("results-head");
+  head.className = "results-head report-hero found";
+  head.innerHTML =
+    '<div class="big">This report’s details have expired.</div>' +
+    '<p class="muted">' + (links ? "The scan found <strong>" + fmtNum(links) + "</strong> link" + (links === 1 ? "" : "s") +
+      (sites ? " on <strong>" + fmtNum(sites) + "</strong> site" + (sites === 1 ? "" : "s") : "") +
+      (hosts ? ", most on " + escapeHtml(hosts) : "") + ". " : "") + "Scan again for today’s list.</p>" +
+    agedLine(res, expired);
+  hideReport();
+  renderAuditDownloads(res);
+}
+
+function hideReport() {
   ["report-chips", "report-stats", "report-bars", "report-links", "report-covers",
    "report-gshot", "report-googlealso", "report-disclaimer", "report-media", "report-audit"].forEach((id) => {
     const e = $(id); if (e) e.style.display = "none";

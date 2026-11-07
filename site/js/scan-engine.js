@@ -419,17 +419,20 @@
     return n + ' ' + plural(n, u[0], u[0] + 's') + ' ago';
   }
   // What a stored report has lost to retention (the API's `retention`, README "Scan retention"): 'images' | 'details' | null.
-  // A scan that found nothing lost nothing. A view must say so, never "0 images" / "no leaks found".
+  // A scan that found nothing lost nothing. A view must say so, never "0 images" / "no leaks found". A count with no list to
+  // show (hit_count and hits disagree, at any tier) has lost its details too. expiredOf in app/public_static/app.js, the same rule.
   function expiredOf(raw) {
     var what = { trimmed: 'images', summary: 'details' }[raw && raw.retention];
-    return what && (raw.status !== 'empty' || raw.google_total > 0) ? what : null;
+    var counted = raw && (+raw.hit_count > 0 || +raw.n_leaks > 0);
+    if (what) return raw.status !== 'empty' || raw.google_total > 0 || counted ? what : null;
+    return counted && !linked(raw.hits, 'url').length && !linked(raw.results, 'link').length ? 'details' : null;
   }
   // The note that stands in for a report's lists once they expired: what the scan found, as far as it is kept.
   function expiredNote(cls, raw) {
-    var hits = +raw.hit_count || 0, sites = +raw.domain_count || 0;
+    var hits = +raw.n_leaks || +raw.hit_count || 0, sites = +raw.domain_count || 0;   // a deep row's hit_count is its sites, n_leaks its links
     var hosts = rankHosts(raw).slice(0, 5).map(function (h) { return h.domain; }).join(', ');
     return make('p', cls, [make('strong', '', ['This report’s details have expired.']),
-      ' ' + (hits ? 'The scan found ' + hits + ' ' + plural(hits, 'link', 'links') + ' on ' + sites + ' ' + plural(sites, 'site', 'sites') + (hosts ? ', most on ' + hosts : '') + '. ' : '') +
+      ' ' + (hits ? 'The scan found ' + hits + ' ' + plural(hits, 'link', 'links') + (sites ? ' on ' + sites + ' ' + plural(sites, 'site', 'sites') : '') + (hosts ? ', most on ' + hosts : '') + '. ' : '') +
       'Scan again for today’s list.']);
   }
   // agedLine(asOf, expired, again): "Scanned 2 hours ago · Scan again" (a <p>; expired, E.expiredOf: "Scanned 5 days ago,
@@ -657,7 +660,7 @@
     m.asOf = raw.as_of;
     m.raw = raw;
     m.expired = expiredOf(raw);
-    m.hitCount = +raw.hit_count || 0;
+    m.hitCount = +raw.n_leaks || +raw.hit_count || 0;
     var al = raw.aliases && typeof raw.aliases === 'object' && Array.isArray(raw.aliases.discovered) ? raw.aliases.discovered : [];
     m.discovered = al.slice(0, 4).filter(function (a) { return clean.handle(a) === a && a !== m.handle; });
     var seen = {}, thumbOf = {}, sr = [], res = [];
