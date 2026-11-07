@@ -26,8 +26,8 @@ jobs:
       - run: python3 -m venv "$RUNNER_TEMP/v" && "$RUNNER_TEMP/v/bin/pip" install -q playwright==1.63.0 curl_cffi
       - run: '"$RUNNER_TEMP/v/bin/playwright" install --with-deps chromium webkit'
       # stubs only: a network namespace with nothing but loopback and an empty env, so no key is held and no paid API reachable
-      # Declared, each prints SKIP (pip.py): on Linux WebKit only, the `hd:` sync flow (GStreamer, no iPhone) and the 2 checks of a drag
-      # into the header (its mouse stops there); Chromium here and WebKit on a Mac run them. Every other check runs
+      # Declared, each prints SKIP (pip.py), Linux WebKit only: the `hd:` sync flow (GStreamer, no iPhone) and the mouse gestures unmute / drop /
+      # tuck / pull / close (on and off they miss a runner's timing, its mouse stops at the header). Chromium here and WebKit on a Mac run them
       # No WebKit compositing: 15 % less load on the runner, and its GL path is no iPhone's anyway (measured: 350 s vs 420 s)
       # One retry, with a warning: drags and flings hang on wall-clock timing a loaded runner can miss; a real fault is red twice
       - run: |
