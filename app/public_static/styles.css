@@ -106,6 +106,8 @@ h1 { font-size: clamp(30px, 7vw, 46px); line-height: 1.1; margin: 6px 0 14px; le
 /* results */
 .results-head { text-align: center; padding: 24px 0 10px; }
 .results-head .big { font-size: clamp(26px, 6vw, 38px); font-weight: 800; margin: 4px 0; }
+.results-head .aged { margin-top: 10px; }
+.results-head .aged-again { color: inherit; text-decoration: underline; }
 .results-head .found .big { color: var(--danger); }
 .results-head .clear .big { color: var(--ok); }
 .results-list { display: grid; gap: 10px; margin: 10px 0 22px; }
