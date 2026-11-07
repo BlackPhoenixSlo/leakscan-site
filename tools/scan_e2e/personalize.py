@@ -225,10 +225,10 @@ def landing(t):
 
 # what the phone's inline demo slot paints (not popped): the frame or the still, the frame's content, the label vs its menu button
 INLINE = """() => { const f = document.querySelector('#showcase .browser-demo'), i = f.querySelector('iframe'), s = f.querySelector('.demo-shot');
-    const r = b => [b.left, b.top, b.right, b.bottom].map(Math.round), o = i.getBoundingClientRect(), d = i.contentDocument;
+    const r = b => [b.left, b.top, b.right, b.bottom].map(Math.round), o = s.getBoundingClientRect(), d = i.contentDocument;   // o: the slot (the menu button's spot in the still too)
     const tg = d.querySelector('.nav__toggle').getBoundingClientRect(), l = s.querySelector('.demo-shot-t').getBoundingClientRect();
     return {pop: f.classList.contains('is-pop'), frame: getComputedStyle(i).visibility, still: getComputedStyle(s.querySelector('img')).visibility,
-      frameBox: r(o), shotBox: r(s.getBoundingClientRect()), href: i.contentWindow.location.href.replace(location.origin, ''),
+      frameBox: r(i.getBoundingClientRect()), shotBox: r(o), href: i.contentWindow.location.href.replace(location.origin, ''),
       logo: d.querySelector('.nav__logo').innerText.trim(), h1: d.querySelector('h1').innerText.trim(), hero: d.querySelector('img.hero__bg').getAttribute('src'),
       clear: l.top >= tg.bottom + o.top || l.bottom <= tg.top + o.top || l.left >= tg.right + o.left || l.right <= tg.left + o.left}; }"""
 
