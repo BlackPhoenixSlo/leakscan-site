@@ -3,7 +3,7 @@
 
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet|again]... [--changed [REF]] [--no-reuse]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
-        [--break-incremental] [--break-sweep] [--break-tgcta] [--break-fprow] [--break-tuck]
+        [--break-incremental] [--break-sweep] [--break-tgcta] [--break-demolive] [--break-fprow] [--break-tuck]
         [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]
         [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again] [--break-expired]
 
@@ -111,6 +111,8 @@ tap …` is both (--break-remove drops the Remove handler, which also stops the 
 personalize also proves the phone sticky bar (`tgcta:`): no slug = "Free scan: type your handle" → #scan; ?r=<slug> =
 "DM me on Telegram" → t.me/jakabasej with the #contact prefill + her absolute report link + @handle; Reset = the original
 bar. --break-tgcta serves personalize.js without the bar swap: only `tgcta:` checks may go red.
+personalize also proves the phone's inline demo (`demolive:`): after a scan with a profile its slot shows her live frame (not the
+demo's still of Orla), the same page / name / hero as full screen; --break-demolive keeps the still: only `demolive:` checks may go red.
 
 pip (js/pip.js, the mini player of site/video/): ?pip=0 and scan/ without ?r= show none and load no /video/. vis (always on
 screen, Jack's iPhone report): landing with no interaction, dark + light, fresh / after a stored scan of sophieraiin

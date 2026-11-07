@@ -567,9 +567,13 @@ html.pop-lock { overflow: hidden; scrollbar-gutter: stable; }
   .browser-demo:not(.is-pop) iframe { position: absolute; left: 0; bottom: 0; height: 324px; visibility: hidden; }
   .browser-demo:not(.is-pop) .demo-shot { position: relative; display: block; color: #fff; }
   .demo-shot img { display: block; width: 100%; height: auto; }
-  .demo-shot-t { position: absolute; right: 10px; top: 10px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 6px; background: rgb(20 8 24 / .78); font-size: .85rem; font-weight: 600; }
+  /* the label sits under the demo's nav (its menu button ends ~58px down), not over it */
+  .demo-shot-t { position: absolute; right: 10px; top: 66px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 6px; background: rgb(20 8 24 / .78); font-size: .85rem; font-weight: 600; }
   .demo-shot-t .icon { width: 15px; height: 15px; }
   .demo-shot:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+  /* after a scan with a profile (js/personalize.js): her live frame in the still's box, the still's link + label on top */
+  .browser-demo.is-live:not(.is-pop) iframe { height: auto; aspect-ratio: 7 / 8; visibility: visible; pointer-events: none; }
+  .browser-demo.is-live .demo-shot img { visibility: hidden; }
   .js .browser-demo + .center { display: none; }   /* the still is the way in (full screen); no JS keeps the button */
 
   .browser-demo + .center { margin-top: 18px; }

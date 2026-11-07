@@ -218,7 +218,41 @@ def landing(t):
           re.fullmatch(re.escape(cfg.api) + r"/api/media/" + FX["slug"] + r"/\d+\.jpg", hsrc) is not None, hsrc)
     page.wait_for_timeout(700)
     page.locator("#showcase").screenshot(path=str(cfg.out / f"{vp_name}-p3-showcase-iframe.png"))
+    if vp_name == "phone":
+        demo_live(page, tag, vp_name)
     ctx.close()
+
+
+# what the phone's inline demo slot paints (not popped): the frame or the still, the frame's content, the label vs its menu button
+INLINE = """() => { const f = document.querySelector('#showcase .browser-demo'), i = f.querySelector('iframe'), s = f.querySelector('.demo-shot');
+    const r = b => [b.left, b.top, b.right, b.bottom].map(Math.round), o = s.getBoundingClientRect(), d = i.contentDocument;   // o: the slot (the menu button's spot in the still too)
+    const tg = d.querySelector('.nav__toggle').getBoundingClientRect(), l = s.querySelector('.demo-shot-t').getBoundingClientRect();
+    return {pop: f.classList.contains('is-pop'), frame: getComputedStyle(i).visibility, still: getComputedStyle(s.querySelector('img')).visibility,
+      frameBox: r(i.getBoundingClientRect()), shotBox: r(o), href: i.contentWindow.location.href.replace(location.origin, ''),
+      logo: d.querySelector('.nav__logo').innerText.trim(), h1: d.querySelector('h1').innerText.trim(), hero: d.querySelector('img.hero__bg').getAttribute('src'),
+      clear: l.top >= tg.bottom + o.top || l.bottom <= tg.top + o.top || l.left >= tg.right + o.left || l.right <= tg.left + o.left}; }"""
+
+
+def demo_live(page, tag, vp_name):
+    """Phone, after a scan with a profile: the inline slot shows her live demo frame (the owner saw the demo's still of Orla
+    under her url bar; only full screen had her), the same content as full screen, its label clear of the demo's menu button."""
+    bring(page, "#showcase .browser-demo", "center")
+    page.wait_for_timeout(300)
+    a = page.evaluate(INLINE)
+    page.locator("#showcase .browser-demo").screenshot(path=str(cfg.out / f"{vp_name}-p3a-inline-live.png"))
+    check(f"{tag} profile: demolive: phone inline slot = her live frame over the still's box (still hidden), her name + API hero, not Orla",
+          not a["pop"] and a["frame"] == "visible" and a["still"] == "hidden" and all(abs(x - y) <= 1 for x, y in zip(a["frameBox"], a["shotBox"]))
+          and a["logo"].upper() == NAME.upper() and NAME.upper() in a["h1"].upper() and "/api/media/" in (a["hero"] or "") and not POTTERY.search(a["logo"] + a["h1"]), a)
+    check(f"{tag} profile: \"Open full screen\" label clear of the demo's menu button", a["clear"], a)
+    page.locator("#showcase .demo-shot").click()
+    page.wait_for_timeout(500)
+    b = page.evaluate(INLINE)
+    page.screenshot(path=str(cfg.out / f"{vp_name}-p3b-fullscreen.png"))
+    keys = ("href", "logo", "h1", "hero")
+    check(f"{tag} profile: demolive: full screen = the inline frame's content (same page, name, title, hero)",
+          b["pop"] and [b[k] for k in keys] == [a[k] for k in keys], ([a[k] for k in keys], [b[k] for k in keys], b["pop"]))
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(300)
 
 
 def demo_media(t):
@@ -577,7 +611,8 @@ def public_api(t):
         const snap = () => ({search: q('[data-p=search]').map(e => e.textContent), url: q('[data-p=site-url]')[0].textContent,
             ig: vis('[data-p=ig]'), handles: q('[data-p=report-handle],[data-p=scan-handle]').map(e => e.textContent),
             line: vis('[data-p=scanned]'), gone: q('[data-p=gone-1] .m-site')[0].textContent, links: q('.ba a.m-link').length,
-            hints: q('.ba-hint').length, on: document.documentElement.classList.contains('p-on')});
+            hints: q('.ba-hint').length, on: document.documentElement.classList.contains('p-on'),
+            live: document.querySelector('#showcase .browser-demo').classList.contains('is-live')});
         const out = {keys: Object.keys(P).sort(), before: snap()};
         fire({}); fire({slug: '<x>'}); out.junk = snap();
         const full = await get('demoR3port01'), bare = await get('demoNoProf01');
@@ -592,6 +627,8 @@ def public_api(t):
           (a["links"], a["hints"], b2["links"], b2["hints"]) == (8, 1, 6, 1), (a["links"], a["hints"], b2["links"], b2["hints"]))
     check(f"{tag} profile: event personalizes in place, twice = same DOM (one IG row, not two)",
           a["search"] == [NAME + " nude leaks"] and a["url"] == SD and a["ig"] == 1, a)
+    check(f"{tag} profile: demolive: in-page scan with a profile = the live demo frame inline, then one without = the still again",
+          (api_res["before"]["live"], a["live"], b2["live"]) == (False, True, False), (api_res["before"]["live"], a["live"], b2["live"]))
     occ = occurrences(served("demoNoProf01")["hits"])
     check(f"{tag} event again with other data resets the slots first",
           b2["search"] == [H + " nude leaks"] and b2["url"] == "yourname.com" and b2["ig"] == 0

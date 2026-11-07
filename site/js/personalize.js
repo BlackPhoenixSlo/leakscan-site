@@ -250,6 +250,8 @@
     row('own', d.site, name + ': Official site');
     row('blog', d.site + ' \u203a blog');
     phones(m, d);
+    var fig = document.querySelector('#showcase .browser-demo');
+    if (fig) fig.classList.toggle('is-live', !!m.profile);   // phone: her live frame instead of the demo's still (CSS)
     if (m.profile) {
       text(q('site-url'), d.site);
       text(q('demo-intro'), 'A preview built from your scan: your name and links, your photos as they arrive. The real one we make together.');
