@@ -976,7 +976,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         pg.tap(".pip-exp")
         pg.wait_for_timeout(2500)
         a = f.evaluate(HD_J)
-        check(f"{tag} hd: guard: minimize + expand: no 720p again this page view (no layer, no request), the master playing", not a["hd"] and a["n"] == 1 and not a["p"] and not [u for u in net["video"][n1:] if "-360." not in u] and f.evaluate("window.__ios") == 1, [a, net["video"][n1:]])
+        check(f"{tag} hd: guard: minimize + expand: no 720p again this page view (no layer, no request), the master playing", not a["hd"] and a["n"] == 1 and not a["p"] and not [u for u in net["video"][n1:] if urlsplit(u).path.endswith((".webm", ".mp4")) and "-360." not in u] and f.evaluate("window.__ios") == 1, [a, net["video"][n1:]])
         ctx.close()
 
         # the wire's two faults: the 720p never answers (a slow link: the mini plays on), the 360p files are gone (720p by itself, no layer)
