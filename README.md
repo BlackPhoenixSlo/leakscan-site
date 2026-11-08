@@ -192,7 +192,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `apple-touch-icon.png` and `favicon-32.png` (from `site/assets/favicon.svg`).
 - Deploy: VPS = `deploy/push.sh` (see "One project, one origin" below). Push to `main` →
   `.github/workflows/pages.yml` runs the gate and deploys `site/` to GitHub Pages
-  (https://blackphoenixslo.github.io/leakscan-site/), the fallback during the DNS transition. `netlify.toml` publishes `site/` if connected to Netlify.
+  (https://blackphoenixslo.github.io/leakscan-site/), a fallback copy (canonicals point at https://abolita.com/). `netlify.toml` publishes `site/` if connected to Netlify.
 - Improvement loop: `LOOP.md`.
 
 ## E2E result reuse
@@ -237,8 +237,8 @@ uv run python <worktree>/tools/scan_e2e.py OUT --keep-all           # every fram
 
 ## One project, one origin (VPS)
 
-One container serves everything from the same origin (test host https://abolita.srv1395798.hstgr.cloud, later
-https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the same container):
+One container serves everything from the same origin (https://abolita.com, `www` 301 → apex; the API host
+https://scan.srv1395798.hstgr.cloud is the same container):
 
 | Path | Served by |
 | --- | --- |
@@ -276,9 +276,11 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
   --build` with `LEAKSCAN_PORT=8081` → health wait → `deploy/smoke.sh` on the VPS and over https). Idempotent.
   After the first push the old root-level `/root/leakscan/*.py`, `public_static/`, `Dockerfile` and
   `docker-compose.yml` are dead (the image builds from `app/` + `site/`) and can be deleted.
-- GitHub Pages (`pages.yml`) keeps deploying `site/` as the fallback during the DNS transition.
+- GitHub Pages (`pages.yml`) keeps deploying `site/` as a fallback copy.
 
 ### DNS cut-over to abolita.com
+
+Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.com). Steps, for the record:
 
 1. At the registrar: `A @ → 72.62.92.114`; `CNAME www → abolita.com` (or `A www → 72.62.92.114`).
 2. In `/root/leakscan/.env`: `SITE_HOST=abolita.com` and `SITE_HOST_WWW=www.abolita.com`; keep
@@ -385,13 +387,15 @@ https://abolita.com; the API host https://scan.srv1395798.hstgr.cloud is the sam
 
 ## Move to a custom domain
 
-1. `echo leakscan.example > site/CNAME` (your domain), and set it in repo Settings → Pages; point DNS at GitHub Pages.
+Current base: `https://abolita.com/` (was `https://blackphoenixslo.github.io/leakscan-site/`, now the Pages fallback).
+
+1. Pages-only: `echo leakscan.example > site/CNAME`, set it in repo Settings → Pages; point DNS at GitHub Pages.
 2. Change `SITE_URL` at the top of `tools/check.py` to `https://leakscan.example/`.
-3. Rewrite absolute URLs (canonicals, OG, JSON-LD, sitemap, robots, 404):
-   `grep -rl 'https://blackphoenixslo.github.io/leakscan-site/' site tools | xargs sed -i '' 's#https://blackphoenixslo.github.io/leakscan-site/#https://leakscan.example/#g'`
+3. Rewrite absolute URLs (canonicals, OG, JSON-LD, sitemap, robots, 404, `app/kb_landing.md`):
+   `grep -rl 'https://abolita.com/' site app/kb_landing.md tools/check.py | xargs sed -i '' 's#https://abolita.com/#https://leakscan.example/#g'`
 4. `python3 tools/check.py` must stay silent. Internal links are relative, so nothing else changes.
-5. VPS host change (`SITE_HOST` in `deploy/.env.example`, e.g. abolita.com): name the new host in `site/privacy.html`
-   (hosting item); `tools/check.py` fails until it does.
+5. Name the new host in `site/privacy.html` (hosting item); `tools/check.py` fails until it names both the
+   `SITE_URL` host and `SITE_HOST` from `deploy/.env.example`.
 
 Note: noindex pages (`showcase/**`, `scan/`, `video/`, `404.html`) are kept out of search by their own
 `<meta name="robots" content="noindex…">`, never by `robots.txt`: a Disallow stops crawlers from reading the noindex, so

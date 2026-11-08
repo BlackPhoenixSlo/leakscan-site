@@ -6,7 +6,7 @@ Checks every HTML file under site/ (except site/showcase/**):
 - absolute URLs under SITE_URL resolve to local files too; no leading-slash internal links
 - no third-party resource loads (scripts, styles, images, frames, icons)
 - no resource load by absolute SITE_URL either: the same files are served from the VPS origin too, where it would be
-  a cross-origin request to github.io (404.html inlines its icon instead)
+  a cross-origin request from the Pages copy (404.html inlines its icon instead)
 - #fragment links point at an existing id
 - <html lang>, viewport meta, <title>, meta description, og:title/description/image, twitter:card
 - <title> <= 65 chars, meta description <= 160 chars (longer gets cut in Google results)
@@ -25,8 +25,8 @@ Checks every HTML file under site/ (except site/showcase/**):
   demo, so its loads are the landing site's too); privacy.html names no host the demo no longer loads
 - every outside host named in site/js/*.js (scan API, deep-scan link, chat links) is named in privacy.html, so moving
   the scan server can't leave the policy pointing at the old one
-- privacy.html names the VPS host the site is also served from (SITE_HOST in deploy/.env.example), so the
-  abolita.com cut-over can't leave the policy naming only the old host
+- privacy.html names the host of SITE_URL and the VPS host the site is served from (SITE_HOST in
+  deploy/.env.example), so a host move can't leave the policy naming only the old host
 - README.md names every <section id> of index.html as `#id` (its landing-page map can't silently go stale), and
   CREDITS.md names every directory outside showcase/ that ships .jpg/.jpeg/.webp photos or .webm/.mp4/.mov video
 - index.html states the track-record stat ("570 of the 633") at most once: it sat in the hero proof box and again in
@@ -36,7 +36,7 @@ import json, pathlib, re, sys
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, unquote
 
-SITE_URL = "https://blackphoenixslo.github.io/leakscan-site/"
+SITE_URL = "https://abolita.com/"
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
@@ -314,6 +314,8 @@ def main():
                     and not value.strip().startswith(SITE_URL):
                 demo_hosts.add(u.netloc)
     privacy = (SITE / "privacy.html").read_text(encoding="utf-8")
+    # visible text, for the hosting item: the page's own canonical/og URLs must not count as naming the host
+    privacy_text = re.sub(r"<[^>]+>", " ", privacy.split("</head>", 1)[-1])
     for host in sorted(demo_hosts):
         if host not in DISCLOSED:
             bad(f"showcase loads third-party host {host}: disclose it in privacy.html and add it to DISCLOSED")
@@ -329,11 +331,13 @@ def main():
             if host not in privacy:
                 bad(f"js/{js.name} talks to {host} but privacy.html does not name it")
 
+    if site_host not in privacy_text:
+        bad(f"site's canonical host is {site_host} (SITE_URL) but privacy.html does not name it")
     env = (ROOT / "deploy" / ".env.example").read_text(encoding="utf-8")
     vps = re.search(r"^SITE_HOST=(\S+)", env, re.M)
     if not vps:
         bad("deploy/.env.example has no SITE_HOST= line: can't check privacy.html names the VPS host")
-    elif vps[1] not in privacy:
+    elif vps[1] not in privacy_text:
         bad(f"site is served from {vps[1]} but privacy.html does not name it")
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

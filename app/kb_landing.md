@@ -1,5 +1,5 @@
 <!-- kb_landing.md: knowledge base for the "Ask AI before you DM me" popup on the Abolita
-     landing site (https://blackphoenixslo.github.io/leakscan-site/). It MIRRORS that page
+     landing site (https://abolita.com/). It MIRRORS that page
      (index.html + privacy.html, as live on 2026-11-06) and MUST be updated whenever the page
      changes (prices, plans, FAQ, contacts, section ids). No facts beyond the page. Served via
      POST /api/chat {"kb":"landing"}; deploy it next to public_app.py on the VPS. -->
