@@ -633,13 +633,14 @@ def ba_phones(t):
                     bm = page.evaluate(BA_MARKS, pid)
                     check(f"{tag} ba: {how}: after all: brand favicons (Instagram / TikTok / YouTube / X / Threads) = svg <use> of their symbol, drawn white, no letter",
                           {"yt", "x", "th"} <= {m[0] for m in bm} and all(m[1] == BA_MARK[m[0]] and m[2] and not m[3] and min(m[4]) >= 12 and m[5] == "rgb(255, 255, 255)" for m in bm), bm)
-                    if not q:   # proof: the list's top (IG / TikTok / YouTube / X) and end (Threads), light + dark
+                    if not q:   # proof: the list's top (IG / TikTok / YouTube), the X row, the end (Threads), light + dark
                         for scheme in ("light", "dark"):
                             page.emulate_media(color_scheme=scheme)
-                            for end in (0, 1):
-                                page.evaluate("([id, e]) => { const p = document.getElementById(id); p.scrollTop = e ? p.scrollHeight : 0; }", [pid, end])
+                            for at in ("top", "x", "end"):
+                                page.evaluate("""([id, at]) => { const p = document.getElementById(id), x = p.querySelector('.fav.x');
+                                    p.scrollTop = at === 'top' ? 0 : at === 'end' ? p.scrollHeight : p.scrollTop + x.getBoundingClientRect().top - p.getBoundingClientRect().top - p.clientHeight / 2; }""", [pid, at])
                                 page.wait_for_timeout(200)
-                                shot(page, f"4-ba-after-marks-{scheme}-{'end' if end else 'top'}-proof", fig)
+                                shot(page, f"4-ba-after-marks-{scheme}-{at}-proof", fig)
                         page.emulate_media(color_scheme="light")
         if q:   # the after phone's Removed rows (the later ones under "Show more") = her top 4 leak sites
             page.locator("#tab-after-all").click()
