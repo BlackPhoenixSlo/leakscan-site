@@ -55,7 +55,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   cards show her production images: real Google domains / titles / counts, `/api/thumb` thumbs blurred in every card,
   `/api/media/<slug>` own photos in the after states, text only on failure): one take `jack.webm` for both modes
   (the name bar runs the landing's `/api/public-scan`, holding the take before the first card while it runs), never speaks (no AI overvoice: Jack's voice only), "for
-  <name>" pill at the start + from `data-cue-say`; generic = "SophieStar", no pill, end card `cta-steps` at `data-cue-cta` (default `-say`):
+  <name>" pill at the start + from `data-cue-say`; generic = "JakaBasej", no pill, end card `cta-steps` at `data-cue-cta` (default `-say`):
   a phone replica of the landing, one 10 s take (hero, camera zooms onto the onlyfans.com/ field and types the name
   as a handle → scan card → report card → "Rewatch this video with YOUR content" + name flip; keeps looping after the
   take ends) over a name form. Name bar under the stage (theater / full screen: a pill opens it; pulsing "type your

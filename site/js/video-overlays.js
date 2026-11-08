@@ -3,10 +3,10 @@
 // each .vo-pf (site/video/CUES.md, SCRIPT.md). draw(t) is a pure function of t (no CSS transitions): seeking and ?t= show
 // the exact frame. URL: ?name=<1-40 letters/digits/space . - _> (texts only) · ?r=<slug> (else the last scan) = a stored scan
 // result · ?t=<sec> seek · ?sfx=0 no sound.
-// Two modes (html[data-vo-mode]): "generic" (demo persona "SophieStar": sophiestar.com, @sophiestar; default blurred thumbs, no pill; at data-cue-cta the cta-steps
+// Two modes (html[data-vo-mode]): "generic" (demo persona "JakaBasej": jakabasej.com, @jakabasej; default blurred thumbs, no pill; at data-cue-cta the cta-steps
 // end card: a phone replica of the landing, one 10 s take: zoom onto the onlyfans.com/ field, types "Jaka Basej" (or the
 // viewer's typed name in its form) as a handle, "Scan now" → "Searching Google, step N of 9…" → the report "87 links found" + tabs + rows →
-// "Rewatch this video with YOUR content" + SophieStar flipping to the typed name (else stays), looping after the video ends) and "named" (?name=, ?r=, the
+// "Rewatch this video with YOUR content" + JakaBasej flipping to the typed name (else stays), looping after the video ends) and "named" (?name=, ?r=, the
 // last scan or the name bar: her texts, the "for <name>" pill 0 .. 2 s and from data-cue-say (after his last word); nothing is ever spoken (Jack's
 // voice only, no speech synthesis); at data-cue-cta the same take typing HER handle (herHandle(): her result's, else a slug of her name),
 // "@<her handle>", the report = her result (Links / Sites = the landing's E.reportModel counts, Images = her kept people photos, her top
@@ -59,7 +59,7 @@
   var TAP = 0.6, SWAP = 0.3;                // google-images: tap at data-cue-tap (default live + 0.6), grid 0.3 s later
   var SLID_IN = ['google', 'google-images'];   // these slide in from the right (no scale pop)
   var OVERT = [' OnlyFans leaks', ' nude photos', ' leaked videos', ' nudes: full leak'];   // Google rows' titles: <name> + these (= index.html's)
-  var GENERIC = 'SophieStar', WAIT_MAX = 45, HOLD_LEAD = 0.4;   // the scan hold: at most 45 s, 0.4 s before the first card
+  var GENERIC = 'JakaBasej', WAIT_MAX = 45, HOLD_LEAD = 0.4;   // the scan hold: at most 45 s, 0.4 s before the first card
   // cta-steps: one 10 s take (s into its loop) in a phone replica of the landing: the hero, the camera zooms onto the
   // onlyfans.com/ field, types the name as a handle (DEMO, or what the viewer typed in the form; named: herHandle()), "Scan now"; the scan card
   // ("Searching <place>, step N of 9…", js/scan-engine.js progressInfo); the report card (LEAKS links rolling, tabs, rows)
@@ -190,7 +190,7 @@
     bs.setProperty('--eo', eo.toFixed(3));
     bs.setProperty('--es', (0.9 + 0.1 * back(clamp((u - 8.75) / 0.35))).toFixed(4));
     bs.setProperty('--fl', ((f < 0.5 ? f : f - 1) * 180).toFixed(1));   // 0 → 90deg, swap the text, -90 → 0
-    setText(q1('.vo-mini-n'), f < 0.5 ? GENERIC : typedName() || GENERIC);   // generic: SophieStar → the typed name, else stays (named: hidden)
+    setText(q1('.vo-mini-n'), f < 0.5 ? GENERIC : typedName() || GENERIC);   // generic: JakaBasej → the typed name, else stays (named: hidden)
     bs.setProperty('--fp', (1 + 0.3 * bump((u - 9.3) / 0.3)).toFixed(3));
   }
   function build(c, t) {   // the intro's "Building YOUR video…" beat: pops in over the phone, its bar fills
@@ -548,7 +548,7 @@
     if (forEl) forc = { el: forEl, removed: Infinity, tap: Infinity };
     if (nb) { nb.removeAttribute('data-edit'); setText(nb.querySelector('.vo-nb-n'), n); }
   }
-  function generic() {   // back to the SophieStar persona: the end card, no pill
+  function generic() {   // back to the JakaBasej persona: the end card, no pill
     who = null;
     mode('generic');
     forc = null;
