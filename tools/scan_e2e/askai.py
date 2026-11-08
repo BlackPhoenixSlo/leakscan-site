@@ -105,7 +105,7 @@ def askai(browser, vp_name, vp):
     note = page.locator(".askai-note")
     check(f"{v} disclaimer + 3 contacts", "Answers come from this page. For your case, message Jaka" in note.inner_text()
           and note.locator("a[href='https://t.me/jakabasej']").count() == 1 and note.locator("a[href='https://wa.me/38640703992']").count() == 1
-          and note.locator("a[href='mailto:me@jackbase.dev']").count() == 1)
+          and note.locator("a[href='mailto:dmca@jackbase.dev']").count() == 1)
     faq_q = page.eval_on_selector_all("#faq details summary", "els => els.map(e => e.textContent.trim())")
     chips = page.eval_on_selector_all(".askai-chip", "els => els.map(e => e.textContent)")
     check(f"{v} greeting + chips from page FAQ", bot.first.is_visible() and chips[:1] == ["What does it cost?"]
@@ -231,7 +231,7 @@ def askai(browser, vp_name, vp):
         hs = e.evaluate("b => [...b.querySelectorAll('a')].map(a => a.href)")
         check(f"{v} {kind} → message + 3 contact links + retry", text in e.inner_text() and len(hs) == 3
               and hs[0].startswith("https://t.me/jakabasej") and hs[1].startswith("https://wa.me/38640703992")
-              and hs[2].startswith("mailto:me@jackbase.dev") and e.locator("button", has_text="Try again").count() == 1, hs)
+              and hs[2].startswith("mailto:dmca@jackbase.dev") and e.locator("button", has_text="Try again").count() == 1, hs)
         settle()
     shot("4-fallback")
     k = len(chat_log())

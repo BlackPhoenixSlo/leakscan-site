@@ -169,7 +169,7 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   `POST <API>/api/chat` (`{kb:"landing", messages (last 8), slug?}` → SSE `token`/`done`/`failed`; API origin =
   `<body data-api>`, else the scan server on github.io, else same origin; from file:// or on any error → contacts). Answers are built as DOM nodes;
   links are live only for existing `#ids` and `https://` t.me, wa.me, blackphoenixslo.github.io, abolita.com, jackbase.me,
-  the scan server, plus `mailto:me@jackbase.dev`. Chat lives in sessionStorage only. Stub: `/api/chat` with magic words
+  the scan server, plus `mailto:dmca@jackbase.dev`. Chat lives in sessionStorage only. Stub: `/api/chat` with magic words
   `stub-fail` / `stub-429`. E2E: `scan_e2e.py OUT_DIR --only askai` (`--break-allowlist` for the break-it run).
 - Google Ads + consent banner: `js/analytics.js` only (one `defer` script per page, `data-cookie-settings` = reopen link,
   shipped `hidden`; `showcase/` and `404.html` have neither: a client's demo, and no relative paths). Paste `ADS_ID`, `LABEL_SCAN`, `LABEL_CONTACT` at

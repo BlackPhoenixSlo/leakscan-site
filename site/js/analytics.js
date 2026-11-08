@@ -16,7 +16,7 @@
 
   const KEY = 'leakscan.consent';   // 'granted' | 'denied'
   const TYPES = ['ad_storage', 'ad_user_data', 'ad_personalization', 'analytics_storage'];
-  const CONTACT = /^(https:\/\/t\.me\/jakabasej|https:\/\/wa\.me\/38640703992|mailto:me@jackbase\.dev)\b/i;   // not any t.me: leak links are listed too
+  const CONTACT = /^(https:\/\/t\.me\/jakabasej|https:\/\/wa\.me\/38640703992|mailto:dmca@jackbase\.dev)\b/i;   // not any t.me: leak links are listed too
   const AD_CLICK = ['gclid', 'gbraid', 'wbraid', 'dclid', 'gclsrc', 'gad_source', 'gad_campaignid', '_gl'];   // Google's own click ids: all a URL keeps
   const SELF = document.currentScript.src;
 

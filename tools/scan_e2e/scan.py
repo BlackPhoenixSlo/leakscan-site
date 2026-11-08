@@ -196,7 +196,7 @@ def scan_flow(browser, vp_name, vp):
     check(f"{vp_name} CTA hrefs carry report link + handle", len(hrefs) == 3 and all(
         (quote(link, safe="") in h or quote(link, safe="").replace("%20", "+") in h) and "demo.creator" in h for h in hrefs)
           and hrefs[0].startswith("https://t.me/jakabasej?text=") and hrefs[1].startswith("https://wa.me/38640703992?text=")
-          and hrefs[2].startswith("mailto:me@jackbase.dev?") and "body=" in hrefs[2], hrefs)
+          and hrefs[2].startswith("mailto:dmca@jackbase.dev?") and "body=" in hrefs[2], hrefs)
     deep = page.locator("#deep-link").get_attribute("href")
     check(f"{vp_name} deep-scan link", deep == "https://jackbase.me/scan?p=fansly.com&h=demo.creator&l=deep&go=1", deep)
     listed = open_all_sites(page)

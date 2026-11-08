@@ -15,7 +15,7 @@
   var CONTACTS = [
     ['Telegram', 'https://t.me/jakabasej?text=' + encodeURIComponent('Hi Jaka, I have a question about Abolita: ')],
     ['WhatsApp', 'https://wa.me/38640703992?text=' + encodeURIComponent('Hi Jaka, I have a question about Abolita: ')],
-    ['Email', 'mailto:me@jackbase.dev?subject=' + encodeURIComponent('Question about Abolita') + '&body=' +
+    ['Email', 'mailto:dmca@jackbase.dev?subject=' + encodeURIComponent('Question about Abolita') + '&body=' +
       encodeURIComponent('Hi Jaka,\n\nI have a question about Abolita: ')]
   ];
   var MAX_SEND = 8;           // messages sent to the API per request
@@ -124,7 +124,7 @@
       a.textContent = !text || text === href || text === id ? anchorLabel(id) : text;
       return a;
     }
-    if (/^mailto:me@jackbase\.dev(\?[^\s]*)?$/i.test(href)) {
+    if (/^mailto:dmca@jackbase\.dev(\?[^\s]*)?$/i.test(href)) {
       a.href = href;
     } else {
       var u;
