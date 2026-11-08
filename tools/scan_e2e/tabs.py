@@ -552,6 +552,13 @@ def free_phone(t):
     ctx.close()
 
 
+# the After list's brand favicons: [brand, use href, symbol has a path, own text, svg box, svg fill]; only the rows on screen
+BA_MARKS = """(id) => [...document.getElementById(id).querySelectorAll('.fav:is(.ig, .tt, .yt, .x, .th)')].filter(e => e.getClientRects().length).map(e => {
+  const u = e.querySelector('svg > use'), h = u && u.getAttribute('href'), r = u ? u.parentNode.getBoundingClientRect() : {width: 0, height: 0};
+  return [[...e.classList].find(c => c !== 'fav'), h, !!(h && document.querySelector(h + ' path')), e.textContent.trim(), [Math.round(r.width), Math.round(r.height)], u && getComputedStyle(u.parentNode).fill]; })"""
+BA_MARK = {"ig": "#i-logo-instagram", "tt": "#i-logo-tiktok", "yt": "#i-logo-youtube", "x": "#i-logo-x", "th": "#i-logo-threads"}
+
+
 def ba_phones(t):
     """(4) The After phone (#91; the Before one is #free's, part 3): '<name> nude leaks', the Before phone's size; each tab
     fills the screen, scrolls inside it and its "Show more" adds the next group up to the last, then goes. Without a scan
@@ -622,6 +629,19 @@ def ba_phones(t):
                 page.evaluate("id => { const p = document.getElementById(id); p.scrollTop = p.scrollHeight; }", pid)
                 page.wait_for_timeout(500)
                 shot(page, f"4-ba-{'r-' if q else ''}{side}-{k}-end", fig)   # settled: every item, no button
+                if k == "all":   # every row shown now: each brand favicon = an svg <use> of its brand symbol, drawn, no letter
+                    bm = page.evaluate(BA_MARKS, pid)
+                    check(f"{tag} ba: {how}: after all: brand favicons (Instagram / TikTok / YouTube / X / Threads) = svg <use> of their symbol, drawn white, no letter",
+                          {"yt", "x", "th"} <= {m[0] for m in bm} and all(m[1] == BA_MARK[m[0]] and m[2] and not m[3] and min(m[4]) >= 12 and m[5] == "rgb(255, 255, 255)" for m in bm), bm)
+                    if not q:   # proof: the list's top (IG / TikTok / YouTube), the X row, the end (Threads), light + dark
+                        for scheme in ("light", "dark"):
+                            page.emulate_media(color_scheme=scheme)
+                            for at in ("top", "x", "end"):
+                                page.evaluate("""([id, at]) => { const p = document.getElementById(id), x = p.querySelector('.fav.x');
+                                    p.scrollTop = at === 'top' ? 0 : at === 'end' ? p.scrollHeight : p.scrollTop + x.getBoundingClientRect().top - p.getBoundingClientRect().top - p.clientHeight / 2; }""", [pid, at])
+                                page.wait_for_timeout(200)
+                                shot(page, f"4-ba-after-marks-{scheme}-{at}-proof", fig)
+                        page.emulate_media(color_scheme="light")
         if q:   # the after phone's Removed rows (the later ones under "Show more") = her top 4 leak sites
             page.locator("#tab-after-all").click()
             g = page.evaluate("""() => [1, 2, 3, 4].map(i => [(document.querySelector(`.ba [data-p=gone-${i}] .m-site`) || {}).textContent,

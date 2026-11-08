@@ -3,8 +3,10 @@
 - **Icons**: [Lucide](https://lucide.dev) v0.546.0, ISC License. Copyright (c) for portions of Lucide are held by
   Cole Bemis 2013-2023 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2025.
   Used as an inline SVG sprite in `site/*.html`; the logo/favicon shield is Lucide `shield-check`.
-- **Brand marks**: [Simple Icons](https://simpleicons.org) v16.36.0, CC0 1.0: the X, MEGA and Reddit glyphs (`i-logo-*` in the
-  sprites of `site/index.html`, `site/video/index.html`), shown only in the illustrative `#removals` / `/video/` mockups.
+- **Brand marks**: [Simple Icons](https://simpleicons.org) v16.36.0, CC0 1.0: the X, MEGA, Reddit, Instagram, TikTok, YouTube and
+  Threads glyphs (`i-logo-*` in the sprites of `site/index.html`, `site/video/index.html`); the 4-colour Google G (`i-logo-google`) is
+  `logos:google-icon` from [`@iconify-json/logos`](https://github.com/iconify/icon-sets) v1.2.19 (Gil Barbara's SVG Logos), CC0 1.0.
+  Shown only in the illustrative `#removals`, Google phone and `/video/` mockups.
   The marks and names are trademarks of their owners; no endorsement implied.
 - **Fonts** (self-hosted in `site/fonts/`, subset to Latin + punctuation with fontTools; no font CDN at runtime):
   - Young Serif, by Jack Halten Fahnestock. SIL Open Font License 1.1. `young-serif.woff2` (23 KB).

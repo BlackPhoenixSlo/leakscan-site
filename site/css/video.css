@@ -94,8 +94,9 @@ html[data-vo-full="theater"], html[data-vo-full="theater"] body { overflow: hidd
 .vo-pf[data-off] { visibility: hidden; }
 .vo-cap { display: inline-flex; align-items: center; gap: 10px; margin: 0; padding: 8px 18px 8px 8px; border-radius: 999px; background: #fff; color: #1f1a15;
   box-shadow: 0 6px 22px rgb(0 0 0 / .22); font: 600 1.05rem/1.2 var(--sans); white-space: nowrap; }
-.vo-ico { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; font: 800 .9rem/1 var(--sans); }
-.vo-ico-g { color: #fff; background: conic-gradient(#ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0); }
+.vo-ico { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; }
+.vo-ico-g { background: #fff; }   /* the 4-colour Google G (its own fills) */
+.vo-ico-g .mark { width: 20px; height: 20px; }
 .vo-cap .rm-ico-x { background: #0f1419; color: #fff; }
 .vo-st { display: grid; color: #5c5248; font-weight: 500; }
 .vo-st > span { grid-area: 1 / 1; }
