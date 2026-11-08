@@ -9,11 +9,14 @@
 .rm-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
 .rm-h { display: inline-flex; align-items: center; gap: 9px; margin: 0; font: 700 1.1rem/1.3 var(--sans); }
 .rm-out { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.4; }
-.rm-ico { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; font: 800 .8rem/1 var(--sans); }
+.rm-ico { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; }
 .rm-ico .icon { width: 16px; height: 16px; }
-.rm-ico-mega { background: #d90007; }
+/* brand marks (Simple Icons, CC0): Mega + Reddit glyphs are the whole disc, their M / Snoo a cut-out kept white by a disc behind */
+.mark { display: block; width: 100%; height: 100%; fill: currentColor; }
+.rm-ico-mega, .mg-logo { background: radial-gradient(closest-side, #fff 80%, transparent 0); color: #d90007; }
 .rm-ico-x { background: #0f1419; }
-.rm-ico-rd { background: #d93a00; font-size: .72rem; }   /* Reddit orange, a step darker: white text >= 4.5:1 */
+.rm-ico-x .mark { width: 50%; height: 50%; }
+.rm-ico-rd, .rd-ic { background: #fff; color: #ff4500; }
 .rm-ico-site { background: var(--muted); }
 @media (prefers-color-scheme: dark) { .rm-ico-x { background: #e7e9ea; color: #0f1419; } }
 
@@ -93,11 +96,11 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .agg-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agg-meta { color: #a9adb6; font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agg-open { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 6px; border-radius: 8px; background: #e0262f; color: #fff; font: 700 .78rem/1 var(--sans); }
-.mg-m, .mg-logo { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #fff; color: #d90007; font: 900 .66rem/1 var(--sans); }
+.mg-m, .mg-logo { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; }   /* .mg-m: white disc (the button's ink), M cut through to its red */
 .mg-win { margin-top: 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--mg-line); overflow: hidden; }
 @media (prefers-color-scheme: dark) { .mg-win { background: #232325; } }
 .mg-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--mg-line); font-weight: 700; }
-.mg-logo { width: 24px; height: 24px; background: #d90007; color: #fff; font-size: .8rem; flex: none; }
+.mg-logo { width: 24px; height: 24px; flex: none; }
 .mg-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mg-list { list-style: none; padding: 4px 0; }
 /* the window runs to the stage's foot (one height for all four panels): the rows share the room, no empty grey band */
@@ -129,7 +132,7 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 .xp-who { display: grid; min-width: 0; flex: 1; line-height: 1.25; }
 .xp-who > span { color: var(--xp-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xp-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.xp-logo { font: 800 1.1rem/1 var(--sans); }
+.xp-logo { flex: none; width: 18px; height: 18px; }
 .xp-text { display: grid; margin: 10px 0; }
 .xp-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xp-media { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; height: 196px; overflow: hidden; border-radius: 16px; border: 1px solid var(--xp-line); }
@@ -148,7 +151,7 @@ html:not(.js) .rm-handle, html:not(.js) .rm-act, html:not(.js) .rm-tools { displ
 @media (prefers-color-scheme: dark) { .rd { --rd-bg: #0e1113; --rd-ink: #eef1f3; --rd-mut: #8ba2ad; --rd-off: #1a1f22; } }
 .rd-head { display: flex; align-items: center; gap: 6px; color: var(--rd-mut); font-size: .8rem; white-space: nowrap; overflow: hidden; }
 .rd-head b { color: var(--rd-ink); overflow: hidden; text-overflow: ellipsis; }
-.rd-ic { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; background: #d93a00; color: #fff; font: 800 .62rem/1 var(--sans); }
+.rd-ic { flex: none; width: 24px; height: 24px; border-radius: 50%; }
 .rd-title { margin: 8px 0 10px; font: 700 1.05rem/1.3 var(--sans); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .rd-media { height: 200px; overflow: hidden; border-radius: 14px; background: var(--rd-off); }
 /* the post runs to the stage's foot like the other panels: the image takes the spare height, no empty band */

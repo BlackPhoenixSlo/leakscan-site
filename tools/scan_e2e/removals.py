@@ -43,6 +43,11 @@ RM_IDLE = """() => [...document.querySelectorAll('#removals .rm-card')].map(c =>
 DOM_ALL = """() => { const out = [], walk = d => { if (!d || !d.documentElement) return; out.push(d.documentElement.outerHTML);
   for (const f of d.querySelectorAll('iframe')) { try { walk(f.contentDocument); } catch (e) { out.push('<cross-origin frame>'); } } };
   walk(document); return out.join(' '); }"""
+# per card, each logo (header .rm-ico first, then the mock UI's): [class, use href, symbol has a path, own text, svg box, svg fill]
+RM_LOGOS = """() => [...document.querySelectorAll('#removals .rm-card')].map(c => [c.dataset.rm, [...c.querySelectorAll('.rm-ico, .mg-m, .mg-logo, .xp-logo, .rd-ic')].map(e => {
+  const u = e.querySelector('svg > use'), h = u && u.getAttribute('href'), s = h && document.querySelector(h + ' path'), r = u ? u.parentNode.getBoundingClientRect() : {width: 0, height: 0};
+  return [e.className, h, !!s, e.textContent.trim(), [Math.round(r.width), Math.round(r.height)], u && getComputedStyle(u.parentNode).fill]; })])"""
+RM_MARK = {"mega": "#i-logo-mega", "x": "#i-logo-x", "reddit": "#i-logo-reddit", "site": "#i-globe"}
 NEUTRAL_RE = re.compile(r"\b(onlyfans|leaked|leaks)\b", re.I)   # L11: Ads policy, the mock panels' own copy
 UNSAFE_RE = re.compile(r"onlyfan|fansly|leak|nud[ei]|naked|porn|xxx|sex|fap", re.I)   # words no panel may show (a sample, not removals.js's list)
 
@@ -299,7 +304,11 @@ def removals_flow(browser, vp_name, vp):
         cols = page.evaluate("() => { const cs = [...document.querySelectorAll('#removals .rm-card')].map(c => c.getBoundingClientRect()); return [new Set(cs.map(r => Math.round(r.x))).size, new Set(cs.map(r => Math.round(r.y + scrollY))).size, cs.length, cs.every(r => r.width > 0 && r.height > 0 && r.left >= 0 && r.right <= innerWidth), document.querySelectorAll('.swipe-nav').length]; }")
         check(f"{tag} {scheme}: layout {'one column (4 rows)' if vp_name == 'phone' else '2x2'}, all 4 cards on the page within its width, no carousel nav",
               cols == ([1, 4, 4, True, 0] if vp_name == "phone" else [2, 2, 4, True, 0]), cols)
-        page.locator("#removals .rm-grid").screenshot(path=str(cfg.out / f"removals-{vp_name}-{scheme}-0-layout.png"))
+        lg = page.evaluate(RM_LOGOS)
+        check(f"{tag} {scheme}: brand marks: every logo in a card (header, mock UI) = an svg <use> of its brand symbol (Mega / X / Reddit; leak site: globe), drawn, no letter; Mega red, Reddit orange",
+              all({e[1] for e in es} == {RM_MARK[k]} and all(e[2] and not e[3] and min(e[4]) >= 14 for e in es) for k, es in lg)
+              and [es[0][5] for k, es in lg if k in ("mega", "reddit")] == ["rgb(217, 0, 7)", "rgb(255, 69, 0)"], lg)
+        page.locator("#removals .rm-grid").screenshot(path=str(cfg.out / f"removals-{vp_name}-{scheme}-0-layout-proof.png"))   # proof: kept on green (the brand marks)
         if scheme == "light":
             fp_checks(tag, vp_name, page.evaluate(FP_STATE), "Orla Brennick", "brennickclay, orlabrennick", vp["width"])
         before = page.evaluate(RM_STATE)
