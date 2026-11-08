@@ -7,9 +7,9 @@
   'use strict';
   // OWNER: paste the 3 values from Google Ads (conversion's event snippet: send_to = 'AW-123456789/AbCdEfG').
   // While ADS_ID is '' this file does nothing: no network, no banner, no cookies, no storage.
-  const ADS_ID = '';          // 'AW-123456789'
-  const LABEL_SCAN = '';      // label of "free scan finished"
-  const LABEL_CONTACT = '';   // label of "DM/contact clicked"
+  const ADS_ID = 'AW-18562652989';
+  const LABEL_SCAN = '2mDtCPnflrQdEL22rpNF';      // "Free scan finished"
+  const LABEL_CONTACT = 'MddqCPzflrQdEL22rpNF';   // "Contact"
 
   // In a frame (the mini player's video/) the top page does the counting and the asking.
   if (!ADS_ID || window.top !== window) return;
