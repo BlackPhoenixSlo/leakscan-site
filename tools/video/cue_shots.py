@@ -2181,6 +2181,10 @@ def run(a):
                             check(f"{vp} {mode} t={t:g}: {pid} after state = {who}'s site + Instagram"
                                   + (", >= 4 unblurred own photos" if pid == "google-images" else "") + ", no leak host",
                                   after_ok(pid, who if mode == "named" else None, txt, imgs), (txt[:160], imgs[:2]))
+                        if state == "removed" and pid == "google-images":   # generic persona JakaBasej = he; a named creator = her
+                            cap = pg.locator(".vo-gi .vo-st-gone").inner_text().strip()
+                            want = "No leaks: only " + ("his" if mode == "generic" else "her") + " own photos"
+                            check(f"{vp} {mode} t={t:g}: google-images after caption reads {want!r}", cap == want, cap)
                 # the end card / pill
                 t = round(cta + 0.6, 2)
                 goto(pg, base, query, t)

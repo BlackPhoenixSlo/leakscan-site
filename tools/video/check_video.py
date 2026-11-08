@@ -18,6 +18,7 @@
 - after state (the .rm-gone layer) = the landing after-phone: google lists her site (data-vo=site) + instagram.com, no
   leak host (*.example, data-vo=host); google-images shows >= 4 of her own photos (<img>, not the blurred .rm-img) and no
   "No results" / copyright notice
+- google-images after caption: generic "only his own photos" (.vo-gen), named "her" (.vo-nm)
 - default photos: every .rm-img / .vo-own src is a file in site/video/img/ (the video's own set, not the landing's crops)
 - both modes: .vo-stage has numeric data-cue-say (named: the "for <name>" pill from there, after the last prefab's out;
   its first 2 s pill at the take's start ends before the first prefab); the page never speaks (no speechSynthesis /
@@ -102,6 +103,8 @@ def after_state(html):
         bad.append("video/index.html: google after state must list her site (data-vo=site) + instagram.com and no leak host")
     gi = gone_layer(html, "google-images")
     own = [i for i in re.findall(r"<img\b[^>]*>", gi) if "rm-img" not in i]
+    if 'only <span class="vo-gen">his</span><span class="vo-nm">her</span> own photos' not in html:   # generic persona JakaBasej = he; named = her
+        bad.append("video/index.html: google-images after caption must read 'his' in generic (.vo-gen), 'her' in named (.vo-nm)")
     if len(own) < 4 or re.search(r"No results|Digital Millennium", gi):
         bad.append(f"video/index.html: google-images after state needs >= 4 unblurred photos (got {len(own)}), no 'No results' / notice")
     return bad
