@@ -48,14 +48,14 @@ the full-size files; `check_pages.py` fails on a stale, missing or over-60 KB co
   Images (tap "Images" → grid), X, Reddit, Mega: pop in + word card → his "they get removed" = shake + flash + "GONE." → the
   #removals compare wipe with rolling counters → "Removed" slam + CSS confetti → slide out; reduced motion = fades;
   WebAudio-synthesized pop / whoosh + thud after the play gesture, `?sfx=0` off; Google / Images after = the landing
-  after-phone: her `<name>.com` + Instagram + TikTok, her own unblurred photos), driven by `video.currentTime`
+  after-phone: her `<name>.com` + Instagram + TikTok, her own unblurred photos; default photos = the video's own `video/img/`: leak-* men in swimsuits (blurred), own-* men in suits, CREDITS.md), driven by `video.currentTime`
   against `data-cue-live / -removed / -out` (+ google-images `-tap`) on each `.vo-pf`. Two modes: named = `?name=`
   (1-40 letters / digits / space . - _) or the shared scan result (`?r=` / last scan, via `LeakScanRemovals.model`
   from `js/removals.js`, the same validators: texts; site / Instagram / TikTok from its profile, as personalize.js; with a scan result the
   cards show her production images: real Google domains / titles / counts, `/api/thumb` thumbs blurred in every card,
   `/api/media/<slug>` own photos in the after states, text only on failure): one take `jack.webm` for both modes
   (the name bar runs the landing's `/api/public-scan`, holding the take before the first card while it runs), never speaks (no AI overvoice: Jack's voice only), "for
-  <name>" pill at the start + from `data-cue-say`; generic = "SophieStar", no pill, end card `cta-steps` at `data-cue-cta` (default `-say`):
+  <name>" pill at the start + from `data-cue-say`; generic = "JakaBasej", no pill, end card `cta-steps` at `data-cue-cta` (default `-say`):
   a phone replica of the landing, one 10 s take (hero, camera zooms onto the onlyfans.com/ field and types the name
   as a handle → scan card → report card → "Rewatch this video with YOUR content" + name flip; keeps looping after the
   take ends) over a name form. Name bar under the stage (theater / full screen: a pill opens it; pulsing "type your

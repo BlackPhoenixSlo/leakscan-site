@@ -2,7 +2,7 @@
 """Real-path proof for site/video/: serve site/ (Range-capable, tools/video/serve.py), open video/?t=<cue> in BOTH modes,
 generic (no name, no scan) and named (?name=NAME), at phone 390x844 and desktop 1440x900, wait until the <video> has
 seeked there, screenshot, and assert: only the cue's prefab is on screen, in the right state (wipe --p 100 live / 0
-removed), the mode's name in it ("SophieStar" / NAME), html[data-vo-mode], at both widths (phone too: no stacking) it
+removed), the mode's name in it ("JakaBasej" / NAME), html[data-vo-mode], at both widths (phone too: no stacking) it
 sits inside the stage's right half, vertically centred (left >= 50 %, centre within 5 % of the middle: Jack on the left stays uncovered), the rolling
 counters (google "About 4,120 results" → "About 3 results", mega "52 GB · 318 videos" → "0 GB · 0 videos"), no request
 leaves 127.0.0.1, no console error, jack.webm is the playing source. Each prefab
@@ -26,7 +26,7 @@ Plus:
   no API), so a rebuild stays text only
 - personalized (tools/scan_stub.py, ?r=demoRemove1): named mode, texts from the scan result in every prefab; every
   .rm-img = the scan's thumbs via <API>/api/thumb, loaded, still blurred; the after photos = the stub's /api/media ones,
-  unblurred; shots drawn with the pure draw(t) (the stub has no Range); and ?name= keeps the default photos (img/removals)
+  unblurred; shots drawn with the pure draw(t) (the stub has no Range); and ?name= keeps the default photos (video/img/leak-*)
 - prod (production images, PROD_HANDLE's already-scanned result PROD_SLUG, no new scan): declared bypasses at the wire
   boundary (Playwright routes, outside service code): GET /api/scan-result|thumb|media on 127.0.0.1 → proxied read-only to
   the production API (thumb: gstatic u= only, else a local 404); POST /api/public-scan → an SSE built from that same saved
@@ -87,18 +87,18 @@ Plus:
   the same thumbs (its Images tab = the video's kept count, every landing tile in the video's kept set, none dropped by
   the video); per card a trigger (live + 0.15) + settled (live settled, removed + 2) shot: prod-<label>-<card>-<state>.png
 - no "Tessa" in the DOM text (generic + named; the test name is Jaka Basej)
-- persona (generic = the demo persona "SophieStar"), 1920x1080 + phone 390x844 + iPhone theater: at every card's live +
-  removed cue the card's text has "SophieStar", no "Your name" / "Tessa"; google / google-images after state = sophiestar.com
-  + instagram.com › sophiestar; the end card (cta + 0.6) and its flip (cta + 9.65, + the post-roll) stay "SophieStar", a name
+- persona (generic = the demo persona "JakaBasej"), 1920x1080 + phone 390x844 + iPhone theater: at every card's live +
+  removed cue the card's text has "JakaBasej", no "Your name" / "Tessa"; google / google-images after state = jakabasej.com
+  + instagram.com › jakabasej; the end card (cta + 0.6) and its flip (cta + 9.65, + the post-roll) stay "JakaBasej", a name
   typed in the end card form (not submitted) flips in instead; named ?name=Jaka%20Basej: every card has "Jaka Basej", no
-  "SophieStar" -> persona-<view>-<mode>-<card>-<state>.png
+  "JakaBasej" -> persona-<view>-<mode>-<card>-<state>.png
 --break-persona serves video-overlays.js with GENERIC = 'Your name' (the old placeholder): only the "persona:" checks go red.
 --skip-prod skips the production-image part (break runs: no production GETs); hers() then runs only with --hers-raw (thumbs / media 404).
 - hers (hers(), checks "hers …"): her result (PROD_SLUG, --hers-raw = its saved JSON, else one read-only production GET; declared: served
   locally for /api/scan-result, thumb / media proxied read-only, POST /api/public-scan = an SSE of that same result) via ?r= AND via the
   last scan (the landing's in-page scan → leakscan.last → /video/ with no query), 1920 + phone 390x844 + iPhone theater; pure draw(t)
   (declared) + shots at 5 / 12 / 16.5 / 19 / 23 / 26 / 31 / 40 / 47 s (hers-<r|last>-<view>-t<t>.png): every card 10-34.6 s shows >= 1
-  field of her result (host / title / count / her thumb loaded), the wall = her top sites first, no SophieStar / Your name / Orla Brennick
+  field of her result (host / title / count / her thumb loaded), the wall = her top sites first, no JakaBasej / Your name / Orla Brennick
   on screen or in a slot, the "for <name>" pill at 1 s; "hers handle": the intro (3 / 3.5 / 6 / 9.5 s) and the end card (36 / 37.85 /
   40 s) type onlyfans.com/<her handle> + "@<her handle>"; "hers end" (47 s): her report: '@<handle>', Images = her kept people
   photos, rows = her hosts + titles (no *.example, no URL), "+N more", 9 of her photos blurred exactly 2px, the contact footer <= 20 %
@@ -131,7 +131,7 @@ Plus:
   checks go red. --only fill = this part.
 - google anim (gsearch(), checks "google …"; 1920x1080 + phone 390x844, generic + ?r=PROD_SLUG = her saved result, declared:
   served locally, thumb / media 404, no production): real seeks + shots at 10.1 / 10.2 / 11 / 12 / 12.36 / 12.9 / 13.6 / 14.9 /
-  15.4 s (ganim-<vp>-<mode>-t<t>.png). "google query": both search boxes read "<name> nude leaks" (SophieStar / her display
+  15.4 s (ganim-<vp>-<mode>-t<t>.png). "google query": both search boxes read "<name> nude leaks" (JakaBasej / her display
   name); "google titles": the 4 Google rows (+ the 2 Google Images ones) = "<name> OnlyFans leaks / nude photos / leaked videos /
   nudes: full leak", hosts only (?r=: her top hosts, no URL); "google slide": google + google-images enter by translateX
   only (pure draw: offset > 100 px at live + 0.02 → 0 by live + 0.45, scale 1 throughout; x still pops; reduced motion: no
@@ -167,8 +167,8 @@ def take_len():   # the take's length (s): the end-of-take checks seek just befo
 
 
 END = take_len()
-GENERIC = "SophieStar"   # the generic demo persona (js/video-overlays.js GENERIC)
-GENERIC_SITE, GENERIC_IG = "sophiestar.com", "sophiestar"
+GENERIC = "JakaBasej"   # the generic demo persona (js/video-overlays.js GENERIC)
+GENERIC_SITE, GENERIC_IG = "jakabasej.com", "jakabasej"
 CTA_TEXT = "Type your name in the link → this video rebuilds with YOUR leaks"
 VIEWPORTS = {"phone": dict(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True),
              "desktop": dict(viewport={"width": 1440, "height": 900})}
@@ -511,7 +511,7 @@ def prod(b, base, out, cues, cta):
             pg.goto(f"{base}video/")
             pg.wait_for_function("() => document.querySelector('video').readyState >= 3", timeout=15000)
             gen = pg.evaluate(IMGS)
-            check(f"prod ({label}): generic before the submit: default photos (img/removals)", len(gen) == 13 and all(x[0].startswith("../img/removals/") for x in gen), gen[:2])
+            check(f"prod ({label}): generic before the submit: default photos (video/img/leak-*)", len(gen) == 13 and all(x[0].startswith("img/leak-") for x in gen), gen[:2])
             pg.fill("#vo-nb-in", PROD_HANDLE)
             pg.press("#vo-nb-in", "Enter")
             t0 = time.monotonic()
@@ -634,7 +634,7 @@ HERS_TS = (1, 3, 3.5, 6, 9.5, 12, 16.5, 19, 23, 26, 31, 36, 37.85, 40, 47)   # 1
 HERS_END = (3, 3.5, 6, 9.5, 36, 37.85, 40, 47)
 PIP_TS = (3, 6, 9.5, 36, 40, 47)   # the pip iframe's shots   # her handle / her end-card report checks (chk_end)
 HERS_CARD = {12: "google", 16.5: "google-images", 19: "x", 23: "reddit", 26: "mega", 31: "sites"}
-PERSONA_RE = re.compile(r"SophieStar|sophiestar|Your name|Orla|Brennick|brennick")   # case-sensitive: the hero copy says "in your name"
+PERSONA_RE = re.compile(r"JakaBasej|jakabasej\.com|Your name|Orla|Brennick|brennick")   # case-sensitive: the hero copy says "in your name"
 HERS_JS = """t => { const v = document.querySelector('video'); v.pause(); window.VideoOverlays.draw(t);
   const on = [...document.querySelectorAll('.vo-pf')].filter(e => !e.hasAttribute('data-off')), c = document.querySelector('.vo-cta');
   const s = c.querySelector('.vo-steps').getBoundingClientRect(), e = c.querySelector('.vo-end').getBoundingClientRect();
@@ -785,7 +785,7 @@ def hers(b, base, out, raw_file, no_prod):
                 f = out / f"hers-{label}-t{t:g}.png"
                 (pg if theater else pg.locator(".vo-stage")).screenshot(path=str(f))
             bad = PERSONA_RE.findall(s["over"]) + PERSONA_RE.findall(s["slots"])
-            check(f"hers ({label}) t={t:g}: named, no placeholder persona text (SophieStar / Your name / Orla Brennick) on screen or in a slot",
+            check(f"hers ({label}) t={t:g}: named, no placeholder persona text (JakaBasej / Your name / Orla Brennick) on screen or in a slot",
                   s["mode"] == "named" and not bad, (s["mode"], bad[:3]))
             if t == 1:
                 check(f"hers ({label}) t=1: the 'for {X['name']}' pill (her result's name)", "for" in s["text"] and X["name"] in s["text"], s["text"][:80])
@@ -2181,6 +2181,10 @@ def run(a):
                             check(f"{vp} {mode} t={t:g}: {pid} after state = {who}'s site + Instagram"
                                   + (", >= 4 unblurred own photos" if pid == "google-images" else "") + ", no leak host",
                                   after_ok(pid, who if mode == "named" else None, txt, imgs), (txt[:160], imgs[:2]))
+                        if state == "removed" and pid == "google-images":   # generic persona JakaBasej = he; a named creator = her
+                            cap = pg.locator(".vo-gi .vo-st-gone").inner_text().strip()
+                            want = "No leaks: only " + ("his" if mode == "generic" else "her") + " own photos"
+                            check(f"{vp} {mode} t={t:g}: google-images after caption reads {want!r}", cap == want, cap)
                 # the end card / pill
                 t = round(cta + 0.6, 2)
                 goto(pg, base, query, t)
@@ -2205,9 +2209,18 @@ def run(a):
                 check(f"{vp} {mode}: jack.webm is the playing source", (src or "").endswith("/video/jack.webm"), src)
                 if vp == "desktop" and mode == "named":   # defaults stay for ?name= (no scan photos without a scan)
                     im = pg.evaluate(IMGS)
-                    check(f"?name={a.name}: all {len(im)} .rm-img keep the default photos (img/removals), blurred",
-                          len(im) == 13 and all(s.startswith("../img/removals/") and "blur(" in f for s, w, f in im), im[:3])
-                if vp == "desktop" and mode == "generic":
+                    check(f"?name={a.name}: all {len(im)} .rm-img keep the default photos (video/img/leak-*), blurred",
+                          len(im) == 13 and all(s.startswith("img/leak-") and "blur(" in f for s, w, f in im), im[:3])
+                if vp == "desktop" and mode == "generic":   # the video's own default photos (site/video/img/): leak-* blurred, own-* not
+                    im, own = pg.evaluate(IMGS), pg.evaluate(OWN)
+                    check(f"generic: {len(im)} .rm-img = video/img/leak-*, loaded, blurred; {len(own)} .vo-own = video/img/own-*, loaded, unblurred",
+                          len(im) == 13 and len(own) == 6 and all(s.startswith("img/leak-") and w > 0 and "blur(" in f for s, w, f in im)
+                          and all(s.startswith("img/own-") and w > 0 and "blur" not in f for s, w, f in own), (im[:2], own[:2]))
+                    vimg = sorted({u for u in seen if "/video/img/" in u})
+                    st = {u.rsplit("/", 1)[1]: pg.request.get(u).status for u in vimg}
+                    old = sorted({u for u in seen if "/img/removals/" in u or "/assets/phone/" in u})
+                    check(f"generic: requests: {len(vimg)} video/img files, all 200 {st}; none of the landing's img/removals / assets/phone",
+                          len(vimg) == 12 and set(st.values()) == {200} and not old, (st, old[:3]))
                     # the form: trimmed + collapsed name → ?name=; an invalid one stays
                     if check("end card form: #vo-name present", pg.locator("#vo-name").count() == 1):
                         pg.fill("#vo-name", "<b>")

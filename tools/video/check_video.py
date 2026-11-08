@@ -18,11 +18,13 @@
 - after state (the .rm-gone layer) = the landing after-phone: google lists her site (data-vo=site) + instagram.com, no
   leak host (*.example, data-vo=host); google-images shows >= 4 of her own photos (<img>, not the blurred .rm-img) and no
   "No results" / copyright notice
+- google-images after caption: generic "only his own photos" (.vo-gen), named "her" (.vo-nm)
+- default photos: every .rm-img / .vo-own src is a file in site/video/img/ (the video's own set, not the landing's crops)
 - both modes: .vo-stage has numeric data-cue-say (named: the "for <name>" pill from there, after the last prefab's out;
   its first 2 s pill at the take's start ends before the first prefab); the page never speaks (no speechSynthesis /
   SpeechSynthesisUtterance / data-cue-say-start in the page, js or css: Jack talks from the first second); the generic end card (.vo-cta) exists with the exact ask + a form (input name=name) and its cue (data-cue-cta, default
   data-cue-say) is after the last out; the "for <name>" pill (.vo-for) exists; js/video-overlays.js keeps the generic name
-  "SophieStar" (generic persona), the ?sfx=0 switch and the production images (the landing's runScan / fetchResult + /api/media/)
+  "JakaBasej" (generic persona), the ?sfx=0 switch and the production images (the landing's runScan / fetchResult + /api/media/)
 - one take: the <video> plays jack.webm (an mp4 <source> only next to an existing file); no second take (jack-named), no
   ?prefab= / CapCut clip mode (vo-solo, bg=green) left in the page, js, css or tools/video/
 - name bar (.vo-nb) under the stage, outside it: label "Your name", input name=name maxlength=40, button "Rebuild this
@@ -101,8 +103,20 @@ def after_state(html):
         bad.append("video/index.html: google after state must list her site (data-vo=site) + instagram.com and no leak host")
     gi = gone_layer(html, "google-images")
     own = [i for i in re.findall(r"<img\b[^>]*>", gi) if "rm-img" not in i]
+    if 'only <span class="vo-gen">his</span><span class="vo-nm">her</span> own photos' not in html:   # generic persona JakaBasej = he; named = her
+        bad.append("video/index.html: google-images after caption must read 'his' in generic (.vo-gen), 'her' in named (.vo-nm)")
     if len(own) < 4 or re.search(r"No results|Digital Millennium", gi):
         bad.append(f"video/index.html: google-images after state needs >= 4 unblurred photos (got {len(own)}), no 'No results' / notice")
+    return bad
+
+
+def default_photos(html):
+    """every default .rm-img / .vo-own src = an existing file in the video's own site/video/img/ (never the landing's crops)"""
+    bad = []
+    for tag in re.findall(r"<img\b[^>]*\b(?:rm-img|vo-own)\b[^>]*>", html):
+        src = (re.search(r'\bsrc="([^"]*)"', tag) or [None, ""])[1]
+        if not (src.startswith("img/") and (PAGE.parent / src).is_file()):
+            bad.append(f"video/index.html: default photo {src!r} must be a file in site/video/img/")
     return bad
 
 
@@ -143,7 +157,7 @@ def modes(html, p, last_out):
         if not g:
             bad.append(f"video/index.html: prefab {pf.get('data-prefab')} has no .vo-kw (live + gone word card)")
     js = (SITE / "js" / "video-overlays.js").read_text(encoding="utf-8")
-    for need, what in (("'SophieStar'", "the generic persona"), ("q.get('sfx') !== '0'", "the ?sfx=0 switch"), ("E.runScan({", "the name bar's scan (landing runScan)"),
+    for need, what in (("'JakaBasej'", "the generic persona"), ("q.get('sfx') !== '0'", "the ?sfx=0 switch"), ("E.runScan({", "the name bar's scan (landing runScan)"),
                        ("E.fetchResult(s)", "the ?r= / last scan result read"), ("'/api/media/'", "her own photos (/api/media/)")):
         if need not in js:
             bad.append(f"js/video-overlays.js: {what} ({need}) missing")
@@ -253,6 +267,7 @@ def main():
     html = PAGE.read_text(encoding="utf-8")
     p.feed(html)
     bad += after_state(html)
+    bad += default_photos(html)
     bad += steps_and_player(html, p)
     bad += name_bar(html)
     cued = [a for a in p.prefabs if "data-cue-live" in a]
