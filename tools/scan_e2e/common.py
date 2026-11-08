@@ -168,6 +168,10 @@ PIP_AWAY = """if (window.top === window) { const o = new MutationObserver(() => 
   o.observe(document, {childList: true, subtree: true}); }"""
 
 
+INERT_ANALYTICS = re.sub(r"const (ADS_ID|LABEL_SCAN|LABEL_CONTACT) = '[^']*'", r"const \1 = ''",
+                         (ROOT / "site" / "js" / "analytics.js").read_text(encoding="utf-8"))
+
+
 def new_ctx(browser, vp_name, vp, net=None, *, route=None, console_ok=None, init=(), **opts):
     """A browser context for one viewport (phone: touch, 2x) → (ctx, net). Every non-loopback request is aborted and
     recorded in net["outside"]; page errors → net["errors"], console errors → net["console"] (unless console_ok(msg):
@@ -193,6 +197,8 @@ def new_ctx(browser, vp_name, vp, net=None, *, route=None, console_ok=None, init
             net["outside"].append(u)
             r.abort()
     ctx.route("**/*", _route)
+    # declared bypass: analytics.js with its Google Ads ids emptied (inert, as scan_stub.py serves it); covers public_app and file://
+    ctx.route("**/js/analytics.js", lambda r, _q=None: r.fulfill(body=INERT_ANALYTICS, content_type="text/javascript"))
     break_routes(ctx)
 
     def on_page(pg):

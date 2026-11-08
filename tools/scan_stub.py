@@ -4,7 +4,7 @@
     python3 tools/scan_stub.py [--port 8930] [--omit-results] [--omit-profile] [--media normal|relative|scanhost|none|404] [--delay 0.15]
     → open http://127.0.0.1:8930/  (or http://127.0.0.1:8930/scan/?r=demoR3port01, /?r=demoR3port01, /showcase/?r=demoR3port01)
 
-Serves site/ and the API routes of the contract the scan page talks to:
+Serves site/ (js/analytics.js with its Google Ads ids emptied: inert, no beacon from tests or previews) and the API routes of the contract the scan page talks to:
 - POST /api/public-scan  {platform, handle, level, instagram?, x?, fresh?} (each body kept: GET /api/_scan-log, test hook) → SSE over the response body: several `progress`, one
   `result` (tools/fixtures/scan-sample.json with handle/platform/slug swapped in, `as_of` now, plus `socials: {instagram?, x?}` echoed
   when sent; a bad instagram / x value → 400 bad_handle), `done`. Magic handles drive the error paths:
@@ -454,6 +454,14 @@ class Handler(RangeHandler):
             path = path / "index.html"
         if REACH and not path.exists():
             REACH.note(path)   # a 404 now: adding that file is a different page
+        if path == SITE / "js" / "analytics.js":   # Google Ads ids emptied: inert, nothing leaves loopback (tools/analytics_e2e.py proves the tag)
+            body = re.sub(r"const (ADS_ID|LABEL_SCAN|LABEL_CONTACT) = '[^']*'", r"const \1 = ''", path.read_text(encoding="utf-8")).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return self.wfile.write(body)
         if path.suffix == ".html" and path.is_file():
             host = (self.headers.get("Host") or "").split(":")[0]
             port = self.server.server_address[1]

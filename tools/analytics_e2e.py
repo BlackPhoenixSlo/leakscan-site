@@ -3,12 +3,13 @@
 
     nice -n 10 python3 tools/analytics_e2e.py OUT_DIR [--break-order]
 
-Run A = the repo as committed (ADS_ID empty): inert, compared to the same page with analytics.js blanked.
+Run A = the committed file with ADS_ID emptied: inert, compared to the same page with analytics.js blanked.
 Run B = configured with fake values: order, banner, reject / accept / reopen, both conversions, nothing sensitive sent.
 --break-order moves the denied default after `config`: only the `order:` check may go red.
 
 Bypasses (declared):
-- B's analytics.js is a Playwright-routed copy with AW-000000000 + fake labels (no such values in the repo).
+- A's and B's analytics.js are Playwright-routed copies: A with the ids emptied, B with AW-000000000 + fake labels (the
+  real ids never reach Google from here).
 - gtag.js is Google's real file (fetched once, then replayed); every other non-loopback request is recorded, then
   aborted, so no beacon reaches Google. t.me / wa.me get a local stub page.
 - /api/* goes to tools/scan_stub.py (synthetic scan) through a Playwright route: the real backend needs paid API keys.
@@ -29,7 +30,8 @@ GOOGLE = re.compile(r"google|gstatic|doubleclick|ggpht|youtube", re.I)
 TYPES = ("ad_storage", "ad_user_data", "ad_personalization", "analytics_storage")
 DEFAULT_LINE = "  gtag('consent', 'default', Object.assign(consent('denied'), { wait_for_update: 500 }));\n"
 CONFIG_RE = re.compile(r"  gtag\('config', ADS_ID.*\n")
-FOOT_TG = '.footer-contact a[href^="https://t.me/jakabasej"]'
+IDS_RE = re.compile(r"const (ADS_ID|LABEL_SCAN|LABEL_CONTACT) = '[^']*'")
+FOOT_TG = 'a.channel[href^="https://t.me/jakabasej"]'
 # test hook: what dataLayer held at the moment the gtag.js <script> went into the page
 INIT = """
 const add = Node.prototype.appendChild;
@@ -60,12 +62,16 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
-def routed_copy(broken):
+def with_ids(ads="", scan="", contact=""):
     src = (ROOT / "site/js/analytics.js").read_text(encoding="utf-8")
-    for old, new in (("const ADS_ID = ''", f"const ADS_ID = '{ADS}'"), ("const LABEL_SCAN = ''", f"const LABEL_SCAN = '{L_SCAN}'"),
-                     ("const LABEL_CONTACT = ''", f"const LABEL_CONTACT = '{L_CONTACT}'")):
-        assert src.count(old) == 1, old
-        src = src.replace(old, new)
+    val = {"ADS_ID": ads, "LABEL_SCAN": scan, "LABEL_CONTACT": contact}
+    src, n = IDS_RE.subn(lambda m: f"const {m[1]} = '{val[m[1]]}'", src)
+    assert n == 3, n
+    return src
+
+
+def routed_copy(broken):
+    src = with_ids(ADS, L_SCAN, L_CONTACT)
     if broken:
         assert src.count(DEFAULT_LINE) == 1 and CONFIG_RE.search(src)
         src = src.replace(DEFAULT_LINE, "")
@@ -153,10 +159,11 @@ def params(hit):
 
 
 def run_a(run):
-    print("--- Run A: committed, ADS_ID empty", flush=True)
+    print("--- Run A: ADS_ID empty", flush=True)
+    inert = with_ids()
     for path in PAGES:
         snap = {}
-        for mode, script in (("blanked", "// blanked"), ("committed", "committed")):
+        for mode, script in (("blanked", "// blanked"), ("committed", inert)):
             tag = f"A-{mode}-{path}"
             ctx, page = run.ctx(tag, script=script)
             run.open(page, path)
@@ -179,7 +186,7 @@ def run_a(run):
         check(f"A {p}: storage same as with analytics.js blanked", c["storage"] == b["storage"], (c["storage"], b["storage"]))
         check(f"A {p}: no console errors", not c["errs"], c["errs"])
     # the flows too: a finished scan and a contact click still send nothing
-    ctx, page = run.ctx("A-flow", script="committed")
+    ctx, page = run.ctx("A-flow", script=inert)
     run.open(page)
     run.scan(page)
     page.wait_for_timeout(800)
@@ -351,8 +358,8 @@ def run_b(run):
     page.wait_for_timeout(300)
     check("contact: a t.me leak link does not count", not run.conv(page, L_CONTACT))
     page.locator(FOOT_TG).click()
-    page.locator('.footer-contact a[href^="https://wa.me/"]').click()
-    page.locator('.footer-contact a[href^="mailto:"]').click()
+    page.locator('a.channel[href^="https://wa.me/"]').click()
+    page.locator('a.channel[href^="mailto:"]').click()
     hits = run.wait_hits(page, "B-once", L_CONTACT)
     check("contact: 3 contact clicks, one page load, one conversion", len(run.conv(page, L_CONTACT)) == 1 and len(hits) == 1, [h["url"] for h in hits])
     ctx.close()
