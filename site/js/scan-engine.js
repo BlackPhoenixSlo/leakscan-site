@@ -138,7 +138,7 @@
   function messageLinks(text, subject, body) {
     var q = encodeURIComponent(text);
     return { tg: 'https://t.me/jakabasej?text=' + q, wa: 'https://wa.me/38640703992?text=' + q,
-      mail: 'mailto:me@jackbase.dev?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body) };
+      mail: 'mailto:dmca@jackbase.dev?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body) };
   }
   // every [data-msg=tg|wa|mail] link in scope gets its channel's href
   function applyLinks(scope, l) {

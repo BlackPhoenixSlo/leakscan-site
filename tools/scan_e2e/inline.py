@@ -50,7 +50,7 @@ ill = lambda page: page.evaluate(ILL)
 strip = lambda page: page.evaluate(STRIP)
 lcol = lambda page: page.evaluate("() => ['.scan-alt', '.assurances'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return Math.round(r.top + scrollY); })")
 msgs_ok = lambda m, *need: len(m) == 3 and m[0].startswith("https://t.me/jakabasej?text=") and m[1].startswith(
-    "https://wa.me/38640703992?text=") and m[2].startswith("mailto:me@jackbase.dev?") and all(all(x in u for x in need) for u in m)
+    "https://wa.me/38640703992?text=") and m[2].startswith("mailto:dmca@jackbase.dev?") and all(all(x in u for x in need) for u in m)
 report_url = lambda slug: cfg.base + "scan/?r=" + slug   # E.reportUrl(slug): absolute, from the page's own site root
 
 

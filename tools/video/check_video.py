@@ -191,7 +191,7 @@ def steps_and_player(html, p):
     pers = re.search(r"function personal\(n\) \{(.*?)\n  \}", js, re.S)
     if not pers or "ctac = cta(true)" not in pers[1]:
         bad.append("js/video-overlays.js: personal() must play cta-steps with her name (ctac = cta(true))")
-    for s in ("Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"):
+    for s in ("Telegram @jakabasej", "WhatsApp +386 40 703 992", "dmca@jackbase.dev"):
         if s not in html:
             bad.append(f"video/index.html: the named end toast lacks {s!r}")
     if "This is what I'd clear for" in html or "vo-end-who" in html:

@@ -46,7 +46,7 @@ Plus:
   iPhone theater: every phase shot (phone-{portrait,theater}-generic-cta-<n>-<phase>.png), typed handle on screen >= 11 px
   portrait / >= 20 px theater, the toast's letters >= 11 px portrait
 - named flow (?name=NAME, data-cue-cta): the same take with handle(NAME) typed (no scan result: the placeholder rows), '@<handle(NAME)>' on the scan / report cards, the toast
-  = only the compact contact row (Telegram @jakabasej / WhatsApp +386 40 703 992 / me@jackbase.dev), never NAME, no
+  = only the compact contact row (Telegram @jakabasej / WhatsApp +386 40 703 992 / dmca@jackbase.dev), never NAME, no
   title / form / flip / pill; held to cta + 14.6 (named loop 15 s), looping after the take ends; 1920 + phone portrait + iPhone
   theater phases (frame-1920-named-cta-*.png, phone-{portrait,theater}-named-cta-*.png), contacts >= 8 px portrait
 - no half-width UI (phone portrait, iPhone theater, 1920): touch play bar = the full stage width at its bottom, thin (<= 34 px),
@@ -229,7 +229,7 @@ STEPS = """() => { const c = document.querySelector('.vo-cta'), s = c && c.query
           chrome: [...c.querySelectorAll(':scope > .vo-cta-t, :scope > .vo-cta-f')].map(e => getComputedStyle(e).display)}; }"""
 DEMO, LEAKS = "Jaka Basej", 87
 TABS = [LEAKS, 12, 31]   # = js TABS: the placeholder report's Links / Images / Sites
-CONTACTS = ["Telegram @jakabasej", "WhatsApp +386 40 703 992", "me@jackbase.dev"]   # = site/imprint.html
+CONTACTS = ["Telegram @jakabasej", "WhatsApp +386 40 703 992", "dmca@jackbase.dev"]   # = site/imprint.html
 def named_end(s, nm):   # the named toast: only the compact contact row (never NAME), nothing generic, no title / form
     return (s and s["shown"] == ["".join(CONTACTS)] and s["contacts"] == CONTACTS and s["inbox"] and nm not in "".join(s["shown"])
             and s["chrome"] == ["none", "none"])

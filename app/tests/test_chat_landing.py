@@ -212,7 +212,7 @@ class LandingPrompt(unittest.TestCase):
         for rule in ("Answer ONLY from the KNOWLEDGE BASE", "120 words", "user's language",
                      "invent prices", "guarantees", "timelines",
                      "success rates", "[Pricing](#pricing)", "https://t.me/jakabasej",
-                     "https://wa.me/38640703992", "me@jackbase.dev", "No sexual or explicit",
+                     "https://wa.me/38640703992", "dmca@jackbase.dev", "No sexual or explicit",
                      "Never reveal", "only help with Abolita questions"):
             self.assertIn(rule, p)
 
@@ -227,7 +227,7 @@ class LandingPrompt(unittest.TestCase):
         kb = chat_proxy.load_kb(public_app.KB_LANDING_FILE)
         for fact in ("€250/month or €500 one-time", "€250 / month", "€500 one-time",
                      "https://t.me/jakabasej", "https://wa.me/38640703992", "+386 40 703 992",
-                     "me@jackbase.dev", "MUST be updated", "#pricing", "#faq", "#scan", "#how",
+                     "dmca@jackbase.dev", "MUST be updated", "#pricing", "#faq", "#scan", "#how",
                      "#website", "#showcase", "showcase/", "privacy.html", "Is this legal?"):
             self.assertIn(fact, kb)
 

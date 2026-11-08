@@ -92,7 +92,7 @@ A: No. There's no account, no app and no card. The free scan runs right here fro
 ## Contact (talk to Jaka directly)
 - Telegram: https://t.me/jakabasej (@jakabasej)
 - WhatsApp: https://wa.me/38640703992 (+386 40 703 992)
-- Email: me@jackbase.dev (mailto:me@jackbase.dev)
+- Email: dmca@jackbase.dev (mailto:dmca@jackbase.dev)
 - "Ran the scan? Send me the report link." Paste the report link and your handle. You'll be talking to Jaka, not a bot and not a team.
 - Suggested first message: "Hi Jaka, I ran the free scan. My report link and handle: …"
 
