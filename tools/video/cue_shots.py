@@ -147,7 +147,9 @@ Plus:
   .vo-real scale(1.2) kept, the after state's own photos (.vo-own) unblurred; shots at 11 / 15.5 / 47 s (blur-<vp>-<mode>-t<t>.png).
   With --base REF: the same images' computed filters == REF's but blur(5px) → blur(2px). --only blur = this part.
 --break-blur serves css/video.css with blur(5px) back: only the "blur" checks go red.
-Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--base REF] [--break-gtime] [--break-blur] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--break-intro] [--skip-prod] [--only prod|captions|voice|fill|hers|google|blur]
+- logos (desktop, light + dark): every brand spot (captions, mock UIs, "for" pill) = an svg <use> of its brand symbol, drawn, no
+  letter; Google = the 4-colour G (logos-<scheme>-<pid>-<state>-proof.png). --only logos = this part.
+Usage: cd ~/leakhunt && uv run python ~/leakscan-site/tools/video/cue_shots.py OUT_DIR [--name "Jaka Basej"] [--base REF] [--break-gtime] [--break-blur] [--break-thumbs] [--break-steps] [--break-swap] [--break-demo] [--break-full] [--break-named] [--break-img] [--break-logos] [--break-persona] [--break-captions] [--break-voice] [--break-intro] [--skip-prod] [--only prod|captions|voice|fill|hers|google|blur|logos]
 Prints one line per shot / check + 'FAIL …' lines; exit 1 on any failure."""
 import argparse, json, pathlib, re, socket, subprocess, sys, time, urllib.parse, urllib.request
 sys.path[:0] = [str(pathlib.Path(__file__).resolve().parent), str(pathlib.Path(__file__).resolve().parent.parent)]
@@ -270,6 +272,39 @@ def after_ok(pid, name, txt, imgs):   # name None (generic): the site is persona
         return site in txt and "instagram.com" in txt and not LEAK_HOSTS.search(txt)
     own = [i for i in imgs if i[1] > 0 and i[2] == "none" and not i[3]]
     return len(own) >= 4 and "No results" not in txt and site in txt and "Instagram" in txt and not LEAK_HOSTS.search(txt)
+
+
+# a prefab's brand marks (caption icon + the mock UI's): [class, use href, the symbol's path fills, own text, svg box]
+LOGOS = """pid => [...document.querySelectorAll(`.vo-pf[data-prefab="${pid}"], .vo-for`)].filter(e => pid === 'for' ? e.matches('.vo-for') : !e.matches('.vo-for'))
+  .flatMap(e => [...e.querySelectorAll('.vo-ico, .xp-logo, .rd-ic, .mg-m, .mg-logo, .fav:is(.ig, .tt)')]).map(e => {
+  const u = e.querySelector('svg > use'), h = u && u.getAttribute('href'), r = u ? u.parentNode.getBoundingClientRect() : {width: 0, height: 0};
+  return [e.className, h, h ? [...document.querySelectorAll(h + ' path')].map(p => p.getAttribute('fill')) : [], e.textContent.trim(), [Math.round(r.width), Math.round(r.height)]]; })"""
+LOGO_MARK = {"vo-ico-g": "#i-logo-google", "rm-ico-x": "#i-logo-x", "xp-logo": "#i-logo-x", "rm-ico-rd": "#i-logo-reddit", "rd-ic": "#i-logo-reddit",
+             "rm-ico-mega": "#i-logo-mega", "mg-m": "#i-logo-mega", "mg-logo": "#i-logo-mega", "ig": "#i-logo-instagram", "tt": "#i-logo-tiktok"}
+
+
+def logos(b, base, out, name_q, cues, tap):
+    """brand marks (desktop, light + dark): each caption icon + mock-UI logo of the google / google-images / x / reddit / mega prefabs
+    and the "for NAME" pill = an svg <use> of its brand symbol (Google: the 4-colour G), drawn (>= 12 px in the state it shows), no
+    letter; shot live + removed (logos-<scheme>-<pid>-<state>-proof.png)"""
+    for scheme in ("light", "dark"):
+        ctx = ctx_new(b, color_scheme=scheme, **VIEWPORTS["desktop"])
+        pg = ctx.new_page()
+        seen = {}
+        for pid, t, state in [("for", 1.0, "named")] + [(p, t, st) for p in ("google", "google-images", "x", "reddit", "mega")
+                                                      for st, t in (("live", round(min(cues[p][1] - 0.1, max(cues[p][0] + 1.3, (tap + 1.0) if p == "google-images" and tap else 0)), 2)),
+                                                                    ("removed", round(min(cues[p][1] + 2.0, cues[p][2] - 0.45), 2)))]:
+            goto(pg, base, name_q, t)
+            pg.screenshot(path=str(out / f"logos-{scheme}-{pid}-{state}-proof.png"))
+            for i, e in enumerate(pg.evaluate(LOGOS, pid)):
+                k = (pid, i)
+                seen[k] = e if k not in seen or min(e[4]) > min(seen[k][4]) else seen[k]   # its biggest box over the two states
+        bad = [v for v in seen.values() if v[1] != next((m for c, m in LOGO_MARK.items() if c in v[0].split()), None)
+               or not v[2] or v[3] or min(v[4]) < 12 or ("vo-ico-g" in v[0]) != (len(set(v[2])) == 4)]
+        pids = {k[0] for k in seen}
+        check(f"logos {scheme}: every brand spot (google / google-images / x / reddit / mega captions + mock UIs, 'for' pill) = svg <use> of its symbol, drawn, no letter; Google G 4-colour",
+              not bad and pids == {"for", "google", "google-images", "x", "reddit", "mega"} and len(seen) >= 14, bad or sorted(seen.items()))
+        ctx.close()
 
 
 def guard(ctx, base_ok, seen=None):
@@ -2005,7 +2040,7 @@ def main():
     ap.add_argument("--break-herend", action="store_true")
     ap.add_argument("--break-burst", action="store_true")
     ap.add_argument("--hers-raw", help="her saved scan result (JSON) instead of the read-only production GET")
-    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers", "google", "blur"], help="run only this part (iteration)")
+    ap.add_argument("--only", choices=["prod", "captions", "voice", "fill", "hers", "google", "blur", "logos"], help="run only this part (iteration)")
     ap.add_argument("--base", help="google post: compare the cards after google-images' entrance with this git ref's page / js / css")
     ap.add_argument("--break-gtime", action="store_true")
     ap.add_argument("--break-blur", action="store_true")
@@ -2139,11 +2174,17 @@ def run(a):
             for f in fails:
                 print("FAIL", f)
             return 1 if fails else 0
+        if a.only == "logos":
+            logos(b, base, out, name_q, cues, float(tap[1]) if tap else None)
+            for f in fails:
+                print("FAIL", f)
+            return 1 if fails else 0
         if a.only == "prod":
             prod(b, base, out, cues, cta)
             for f in fails:
                 print("FAIL", f)
             return 1 if fails else 0
+        logos(b, base, out, name_q, cues, float(tap[1]) if tap else None)
         for mode, query, who in (("generic", "", GENERIC), ("named", name_q, a.name)):
             for vp, opts in VIEWPORTS.items():
                 ctx = ctx_new(b, **opts)
