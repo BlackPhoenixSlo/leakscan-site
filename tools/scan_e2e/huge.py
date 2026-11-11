@@ -115,7 +115,7 @@ def huge_flow(browser, vp_name, vp):
     ms = page.evaluate("performance.getEntriesByName('leakscan:report')[0].duration")
     check(f"{tag} report painted < 1500 ms after the result event (CPU x4)", ms < 1500, f"{ms:.0f} ms")
     nodes, pipn = page.evaluate("""() => [document.getElementsByTagName('*').length,   // the mini player (fixed, same size on every page) not the report's
-        [...document.querySelectorAll('.pip, .pip-tab')].reduce((n, e) => n + 1 + e.getElementsByTagName('*').length, 0)]""")
+        [...document.querySelectorAll('.pip, .pip-tab, .pip-card, .pip-push')].reduce((n, e) => n + 1 + e.getElementsByTagName('*').length, 0)]""")
     check(f"{tag} incremental: page DOM <= {NODE_BUDGET} elements after render (the mini player's own elements aside)", nodes - pipn <= NODE_BUDGET, [nodes, pipn])
     check(f"{tag} summary + section nav say 100 sites / 1,000 pages", (digits(page.locator("[data-stat=domains]").inner_text()),
           digits(page.locator("[data-stat=pages]").inner_text()), page.locator("#rnav-n").inner_text()) == (100, 1000, "100"))
