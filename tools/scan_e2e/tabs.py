@@ -602,6 +602,8 @@ def ba_phones(t):
                 bring(page, fig, "center")
                 page.locator(f"#tab-{side}-{k}").click()
                 page.wait_for_timeout(300)
+                # its .reveal slide-in (14 px, .6 s) starts when brought into view: measured once it's done
+                page.wait_for_function("s => !document.querySelector(s).getAnimations().length", arg=fig, polling=100, timeout=5000)
                 p0 = page.evaluate(ITEMS, pid)
                 bx = page.locator(f"#{pid}").bounding_box()
                 page.mouse.move(bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2)
