@@ -294,6 +294,8 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
   The network comes only from a pasted URL (`instagram.com/<h>` → instagram, `x.com|twitter.com/<h>` → x); a bare name
   is sent as `instagram`. Body: `{platform: "onlyfans.com", handle, level: "low", instagram? | x?}`. Same two fields on
   `scan/`, which also reads `h=`, `ig=`, `x=` (and old `p=`).
+- `/?h=<handle>&ig=<social>` = that scan runs in the hero at once (as a submit; `h` / `ig` then dropped from the URL, so a
+  reload doesn't re-scan). The scan form on `removals/leaked-onlyfans-fansly-content.html` (Ads landing) GETs there, not `scan/`.
 - `js/scan-engine.js` (`window.LeakScanEngine`, loaded first on every page that uses it): the one SSE / fetch
   transport, API origin rule, error mapping, message links and `leakscan.last` writer; the shared validators
   (`E.clean`), `E.currentSlug()`, the report model, the image gallery, `E.watchThumb` (one broken-thumb rule: 404 /
