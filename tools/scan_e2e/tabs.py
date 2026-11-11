@@ -610,7 +610,7 @@ def ba_phones(t):
                 p1 = page.evaluate(ITEMS, pid)
                 check(f"{tag} ba: {how}: {side} {k}: the first items overflow the screen, a wheel scrolls the list inside the phone, not the page",
                       p0["scroll"][1] > p0["scroll"][2] + 40 and p1["scroll"][0] > p0["scroll"][0] and p1["y"] == p0["y"] and p1["phone"] == p0["phone"],
-                      (p0["scroll"], p1["scroll"], p0["y"], p1["y"]))
+                      (p0["scroll"], p1["scroll"], p0["y"], p1["y"], p0["phone"], p1["phone"]))
                 page.evaluate("id => { const p = document.getElementById(id); p.scrollTop = p.scrollHeight; }", pid)
                 page.wait_for_timeout(300)
                 shot(page, f"4-ba-{'r-' if q else ''}{side}-{k}-more", fig)   # the trigger: the list's end, "Show more"
@@ -625,7 +625,7 @@ def ba_phones(t):
                 check(f"{tag} ba: {how}: {side} {k}: Show more adds the next items per click (earlier ones kept, no repeat) until it goes; the page / phone never move",
                       len(n) >= 3 and all(b > a for a, b in zip(n, n[1:])) and kept and len(set(last["ids"])) == len(last["ids"]) and not last["more"]
                       and {x["y"] for x in seen} == {p0["y"]} and {tuple(x["phone"]) for x in seen} == {tuple(p0["phone"])},
-                      (n, kept, [x["y"] for x in seen]))
+                      (n, kept, [x["y"] for x in seen], [x["phone"] for x in seen]))
                 page.evaluate("id => { const p = document.getElementById(id); p.scrollTop = p.scrollHeight; }", pid)
                 page.wait_for_timeout(500)
                 shot(page, f"4-ba-{'r-' if q else ''}{side}-{k}-end", fig)   # settled: every item, no button
