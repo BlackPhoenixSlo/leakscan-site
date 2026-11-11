@@ -157,7 +157,7 @@ serves it with #79's floating spot (re-computed off the form at the current scro
 --break-pipload serves it with the iframe started at once (before the load event): only the `vis:` load-event checks may go red.
 --break-still serves pip.css with the first-paint still hidden: only `still:` checks may go red.
 expand also: the floating-player button (bar, bottom-right, expanded only) → the floating mini; wide = the scan card on the player's right (landing: its hero form's
-in-page scan + the mini; guide page: GET scan/?h=), phone = the page pushed down by the player's height; X on the expanded player = 1 s: 0.5 s down to the floating
+in-page scan + the mini; any other page: GET /?scan=&ig=, the landing runs it), phone = the page pushed down by the player's height; X on the expanded player = 1 s: 0.5 s down to the floating
 mini, 0.5 s off the right edge. --break-pipclose serves pip.js with no drop (straight off-screen): only the `close:` 0.3 s check may go red.
 mini: a phone's mini plays jack-360.* (no 720p request before expand), a computer's and /video/ directly 720p only, 360p 404 = 720p by itself. hd: (phone) expand = the
 720p layer at the master's second, same box, muted, under the overlays; the master's clock never stops; follows pause / seek / end / ?name= rebuild, hidden at once when

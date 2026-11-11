@@ -766,21 +766,25 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         ctx, pg, cdp = new_ctx()
         ready(pg, "", card=True)
         pg.click(".pip-exp"); pg.wait_for_timeout(700)
-        pg.fill(".pip-card [name=h]", "sophieraiin"); pg.fill(".pip-card [name=ig]", "sophie")
+        pg.fill(".pip-card [name=scan]", "sophieraiin"); pg.fill(".pip-card [name=ig]", "sophie")
         shot(pg, "9a-card-trigger")
         with pg.expect_request("**/api/public-scan", timeout=8000) as rq:
             pg.click(".pip-card button")
         pg.wait_for_timeout(700); s = st(pg)
         hv = pg.evaluate("() => [document.querySelector('#scan [name=h]').value, document.querySelector('#scan [name=ig]').value]")
         check(f"{tag} card: landing, Scan now in the card → the hero form's in-page scan (POST public-scan, same page), the player back to the mini, card gone",
-              hv == ["sophieraiin", "sophie"] and rq.value.method == "POST" and not s["big"] and s["sc"] is None and pg.url == cfg.base, [hv, s["cls"], s["sc"], pg.url])
+              hv == ["sophieraiin", "sophie"] and rq.value.method == "POST" and not s["big"] and s["sc"] is None and urlsplit(pg.url).path == "/", [hv, s["cls"], s["sc"], pg.url])
         shot(pg, "9b-card-settled")
-        ready(pg, "faq/")
-        pg.click(".pip-exp"); pg.wait_for_timeout(700)
-        pg.fill(".pip-card [name=h]", "sophieraiin"); pg.click(".pip-card button")
-        pg.wait_for_url("**/scan/?*", timeout=8000)
-        u = urlsplit(pg.url)
-        check(f"{tag} card: guide page, Scan now → the scan page with ?h=sophieraiin", u.path == "/scan/" and parse_qs(u.query).get("h") == ["sophieraiin"], pg.url)
+        for g in ("faq/", "removals/leaked-onlyfans-fansly-content.html"):   # the second has its own #scan form (name=scan): the card still GETs the landing
+            ready(pg, g)
+            pg.click(".pip-exp"); pg.wait_for_timeout(700)
+            pg.fill(".pip-card [name=scan]", "sophieraiin"); pg.fill(".pip-card [name=ig]", "sophie")
+            with pg.expect_request("**/api/public-scan", timeout=12000) as rq:
+                with pg.expect_request(lambda r: "/?scan=" in r.url and r.resource_type == "document", timeout=8000) as nav:
+                    pg.click(".pip-card button")
+            u = urlsplit(nav.value.url)
+            check(f"{tag} card: {g}, Scan now → GET the landing /?scan=sophieraiin&ig=sophie, which runs that scan in its hero", u.path == "/" and parse_qs(u.query).get("scan") == ["sophieraiin"]
+                  and parse_qs(u.query).get("ig") == ["sophie"] and rq.value.method == "POST", nav.value.url)
         ctx.close()
 
     # landing after a scan (the hero card is her report): same docking rule

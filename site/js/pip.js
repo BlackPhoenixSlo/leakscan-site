@@ -446,20 +446,20 @@
   }
 
   // ---------- the scan card (expanded, wide screens): OnlyFans + Instagram / X, Scan now. The landing = its own hero form
-  // (in-page scan, then the mini so the live report shows; the video turns hers when it lands); elsewhere = GET <site>/scan/?h=&ig= ----------
+  // (in-page scan, then the mini so the live report shows; the video turns hers when it lands); elsewhere = GET <site>/?scan=&ig= (the landing runs it in the hero) ----------
   function scanCard() {
     sc = document.createElement('form');
-    sc.className = 'pip-card'; sc.method = 'get'; sc.action = new URL('../scan/', me.src).href;
+    sc.className = 'pip-card'; sc.method = 'get'; sc.action = new URL('../', me.src).href;
     sc.setAttribute('aria-label', 'Free scan'); sc.setAttribute('inert', '');
     sc.innerHTML = '<p class="pip-card-k">Free scan</p><p class="pip-card-t">Type your name <span>→ get YOUR video</span></p>' +
-      '<label class="pip-card-f"><span aria-hidden="true">onlyfans.com/</span><input name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="username" aria-label="OnlyFans username"></label>' +
+      '<label class="pip-card-f"><span aria-hidden="true">onlyfans.com/</span><input name="scan" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="username" aria-label="OnlyFans username"></label>' +
       '<label class="pip-card-f"><span aria-hidden="true">@</span><input name="ig" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Instagram or X (optional)" aria-label="Instagram or X username (optional)"></label>' +
       '<button type="submit">Scan now</button><p class="pip-card-n">Free. No account. You see every link it finds.</p>';
     sc.addEventListener('submit', function (e) {
-      var f = document.getElementById('scan');
-      if (!f || !f.requestSubmit) return;   // no in-page scanner: the scan page
+      var f = auto === 'dock' && document.getElementById('scan');
+      if (!f || !f.requestSubmit || !f.elements.h) return;   // not the landing: GET it
       e.preventDefault();
-      f.elements.h.value = sc.elements.h.value; f.elements.ig.value = sc.elements.ig.value; f.elements.ig.removeAttribute('data-net');
+      f.elements.h.value = sc.elements.scan.value; f.elements.ig.value = sc.elements.ig.value; f.elements.ig.removeAttribute('data-net');
       minimize();
       f.requestSubmit();
     });
