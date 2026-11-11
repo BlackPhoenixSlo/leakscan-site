@@ -351,6 +351,8 @@ class Handler(RangeHandler):
 
     def do_GET(self):
         u = urlsplit(self.path)
+        if u.path == "/" and {"p", "h", "go", "l"} & set(parse_qs(u.query)):   # as app/public_app.py: legacy deep links → /app/
+            self.send_response(302); self.send_header("Location", "/app/?" + u.query); self.send_header("Content-Length", "0"); self.end_headers(); return
         if u.path.startswith("/api/scan-result/"):
             slug = u.path.rsplit("/", 1)[1]
             if OPTS.sheet == "first":
