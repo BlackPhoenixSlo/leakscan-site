@@ -667,7 +667,11 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     check(f"{tag} expand: the page scrolls under the expanded player (no scroll lock): scrollY moved, the player stays under the header, page content right below it",
           y1 - y0 > 200 and big_ok(s) and below[0] and below[1], [y0, y1, s["box"], s["hdr"], below])
     shot(pg, "7c-expanded-scrolled")
+    under = pg.evaluate("() => { const r = document.querySelector('.pip').getBoundingClientRect(), e = document.elementFromPoint(innerWidth / 2, Math.min(innerHeight - 4, r.bottom + 20)); e.setAttribute('data-under', ''); return e.getBoundingClientRect().top; }")
     pg.click(".pip-exp"); pg.wait_for_timeout(600); s = st(pg)
+    if phone:
+        top2 = pg.evaluate("() => document.querySelector('[data-under]').getBoundingClientRect().top")
+        check(f"{tag} minimize: scrolled, the page un-pushed without a jump (what was below the player stays put, ±2 px)", abs(top2 - under) <= 2 and not s["push"], [under, top2, s["push"]])
     check(f"{tag} minimize: the chevron → back to the mini player top-right", not s["big"] and float_default(s) and s["exp"] == ["Expand video", "false", "expand"], [s["box"], s["exp"]])
     pg.click(".pip-exp"); pg.wait_for_timeout(600)
     pg.focus(".pip-exp"); pg.keyboard.press("Escape"); pg.wait_for_timeout(600); s = st(pg)
@@ -681,9 +685,9 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
         x0, y0 = pic_c(s)
         dy = max(120, mini[1] - s["box"][1]) * frac
         return drag(pg, cdp, [(x0, y0 + dy * i / steps) for i in range(steps + 1)], step, hold, mid=(lambda: st(pg)) if sample else None)
-    m = pull(s, 0.15, 8, 30, 200); s = st(pg)
+    b1 = s["box"]; m = pull(s, 0.15, 8, 30, 200); s = st(pg)
     check(f"{tag} pull: dragged down 15% → follows the finger (lower, scaled down), released → snaps back expanded",
-          m["box"][1] > big0[1] + 10 and m["box"][2] < bw - 10 and big_ok(s), [m["box"], s["box"]])
+          m["box"][1] >= b1[1] + min(10, (mini[1] - b1[1]) * 0.15 - 1) and m["box"][2] < bw - 10 and big_ok(s), [m["box"], s["box"], b1, mini])   # lower by its share of the way to the mini spot
     m = pull(s, 0.5, 12, 30, 200); s = st(pg)
     check(f"{tag} pull: dragged down 50% → mini player top-right, still playing with sound",
           m["box"][2] < bw * 0.85 and not s["big"] and float_default(s) and isinstance(s["v"], dict) and not s["v"]["paused"] and not s["v"]["muted"], [m["box"], s["box"], s["v"]])
@@ -711,7 +715,7 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     pg.click(".pip-x"); pg.wait_for_timeout(300); s1 = st(pg)   # owner: 1 s: 0.5 s down to the floating mini, then 0.5 s off the right edge
     pg.wait_for_timeout(900); s = st(pg)
     check(f"{tag} close: X on the expanded player, 0.3 s in: dropping to the floating mini, not yet off-screen, no tab, page un-pushed",
-          not s1["big"] and s1["mode"] == "float" and not s1["tucked"] and not s1["tab"] and s1["box"][0] < s1["vw"] and not s1["push"] and s1["sc"] is None, [s1["cls"], s1["box"], s1["tab"], s1["push"]])
+          not s1["big"] and s1["mode"] == "float" and not s1["tucked"] and not s1["tab"] and s1["box"][0] < s1["vw"] and not s1["push"] and s1["sc"] is None, [s1["cls"], s1["mode"], s1["box"], s1["tab"], s1["push"], s1["sc"]])
     check(f"{tag} close: X on the expanded player, 1.2 s in → hidden behind the right edge tab, not expanded", s["tucked"] and not s["big"] and bool(s["tab"]) and s["box"][0] >= s["vw"], [s["cls"], s["tab"], s["box"]])
     check(f"{tag} expand: no new page / tab, no window.open, same URL throughout", not net["pages"] and s["opens"] == 0 and pg.url == url0, [net["pages"], s["opens"], pg.url])
     ctx.close()

@@ -62,7 +62,7 @@
 .pip-card { position: fixed; left: 0; top: 0; z-index: 44; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: 320px;
   margin: 0; padding: 20px; border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 14px 40px rgb(0 0 0 / .4), 0 0 0 1px var(--line);
   opacity: 0; visibility: hidden; transform: translate3d(calc(var(--x, 0px) + 24px), var(--y, 0px), 0);
-  transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease, visibility 0s linear .3s; }
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .15s ease, visibility 0s linear .15s; }
 .pip-card.on { opacity: 1; visibility: visible; transform: translate3d(var(--x, 0px), var(--y, 0px), 0); transition: transform .35s cubic-bezier(.2, .8, .2, 1) .1s, opacity .25s ease .1s, visibility 0s; }
 .pip-card p { margin: 0; }
 .pip-card-k { color: var(--accent); font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }

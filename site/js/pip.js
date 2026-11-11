@@ -55,7 +55,7 @@
     dn: SVG('<path d="m6 9 6 6 6-6"/>'), fl: SVG('<rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor"/>'), rs: SVG('<path d="M5 15V5h10"/>'), l: SVG('<path d="m9 6 6 6-6 6"/>'), r: SVG('<path d="m15 6-6 6 6 6"/>') };
   var S = { p: null, w: 0, t: '', u: 0, c: 0 };   // this page view only: spot, size, tucked side, closed by X, moved
   var pip, pic, tab, frame, snd, pp, exp, xb, grip, video = null, wasPlaying = true, offPaused = false, mounted = false, pos = { x: 0, y: 0 };
-  var card = null, mode = '', big = false, home = null, closing = 0, sc = null, push = null;   // closing: X's drop timer; sc: the scan card; push: the phone spacer
+  var card = null, mode = '', big = false, home = null, closing = 0, sc = null, push = null, pushH = 0, backAt = 0;   // closing: X's drop timer; sc: the scan card; push: the phone spacer
 
   function slug() { var r = new URLSearchParams(location.search).get('r'); return r && /^[A-Za-z0-9_-]{1,64}$/.test(r) ? r : ''; }
   function src() {
@@ -184,7 +184,12 @@
     sc.classList.toggle('on', !!wide);
     if (wide) { sc.style.setProperty('--x', (b.x + b.w + GAP) + 'px'); sc.style.setProperty('--y', b.y + 'px'); }
     if (wide) sc.removeAttribute('inert'); else sc.setAttribute('inert', '');
-    if (push) push.style.height = h + 'px';
+    if (push && h !== pushH) {   // un-pushed while scrolled: scrolled back by as much, so what's on screen doesn't jump up
+      var up = !h && scrollY > 0 ? Math.min(pushH, scrollY) : 0;
+      if (up) push.style.transition = 'none';
+      push.style.height = h + 'px'; pushH = h;
+      if (up) { scrollBy({ top: -up, behavior: 'instant' }); void push.offsetHeight; push.style.transition = ''; }
+    }
     document.documentElement.style.overflowAnchor = h ? 'none' : '';   // the push moves what's under the player into view, even scrolled (no anchoring back)
   }
   var raf = 0;   // scroll (desktop dock in / out), card / viewport resize: re-placed once per frame
@@ -297,13 +302,13 @@
   }
   function untuck() {
     if (closing) { clearTimeout(closing); closing = 0; pip.classList.remove('closing'); }
-    S.t = ''; S.c = 0; place();
+    S.t = ''; S.c = 0; backAt = Date.now(); place();
     if (video && wasPlaying) play();
     sync();
   }
   function close() {   // X: hidden behind a tab at the top-right corner (never gone); the tab = back to the same spot / dock.
     // Animated, 1 s from expanded: 0.5 s down to the floating spot (never the dock), then 0.5 s off the right edge; from the mini: just the slide
-    if (closing || S.t) return;
+    if (closing || S.t || Date.now() - backAt < 500) return;   // the tab's tap: its click lands where the X comes back
     if (video) { wasPlaying = !video.paused; video.pause(); }
     pip.classList.add('closing');
     var off = function () {
