@@ -16,13 +16,15 @@
 // them only if even that covers them). Never re-placed by a scroll (so it stays put while the page scrolls under it); a
 // width / orientation change recomputes it; a height-only change (iOS URL bar, visualViewport resize) moves nothing unless
 // the box would leave the screen (keep()). The viewport meta has no viewport-fit=cover: no safe-area insets to add.
-// Bar under the picture (40 px targets): play / pause, sound, expand / minimize; the close X (40 px) on the picture's
+// Bar under the picture (40 px targets): play / pause, sound, expand / minimize (+ expanded: floating mini, bottom-right); the close X (40 px) on the picture's
 // top-right corner. X = hidden behind a tab at the top-right corner (the home spot's top, right edge; fixed, so it stays
 // there while scrolling); the tab = back to the same spot (home, dropped, or docked). Never gone, never a new page / tab.
 // Expanded (YouTube style, .big, not kept): a tap on the picture or the expand button = sound on, full width (phone) or
 // min(960px, 70vw) centred, fixed right under the sticky header; the page keeps scrolling under it (no lock, nothing over
 // the rest). There a tap on the picture = play / pause; drag it down (follows the finger: translate + scale toward the mini
 // spot; released past 30% or flung down = mini, else snaps back), the chevron button or Esc = back to the mini player.
+// Expanded, wide (>= 1024 px): a scan card (OnlyFans + Instagram / X, Scan now) on the player's right (scanCard()); narrower: the page
+// pushed down by the player's height (.pip-push spacer under the header: the title never covered). X while expanded: 1 s (0.5 s down to the floating spot, 0.5 s off the right).
 // 360p mini, 720p expanded (phones, < 720 px wide; a computer's mini is 476-640 px, 720p all along): src() adds ?mini=1, video/index.html then
 // plays jack-360.*. That <video> stays the master for the clock, the sound (iPhone: unmute only inside the tap) and the overlays; expanding adds
 // a muted 720p <video> (.pip-hd) over it, under the overlays (no request before that), seeked ahead, revealed once it plays within 0.15 s of the
@@ -50,10 +52,10 @@
   var I = { x: SVG('<path d="M18 6 6 18M6 6l12 12"/>'), exp: SVG('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>'),
     off: SVG('<path d="M11 5 6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6"/>'), on: SVG('<path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>'),
     pp: SVG('<path d="M7 4v16l13-8z" fill="currentColor"/>', 'pip-i-play') + SVG('<path d="M8 5v14M16 5v14"/>', 'pip-i-pause'),
-    dn: SVG('<path d="m6 9 6 6 6-6"/>'), rs: SVG('<path d="M5 15V5h10"/>'), l: SVG('<path d="m9 6 6 6-6 6"/>'), r: SVG('<path d="m15 6-6 6 6 6"/>') };
+    dn: SVG('<path d="m6 9 6 6 6-6"/>'), fl: SVG('<rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor"/>'), rs: SVG('<path d="M5 15V5h10"/>'), l: SVG('<path d="m9 6 6 6-6 6"/>'), r: SVG('<path d="m15 6-6 6 6 6"/>') };
   var S = { p: null, w: 0, t: '', u: 0, c: 0 };   // this page view only: spot, size, tucked side, closed by X, moved
   var pip, pic, tab, frame, snd, pp, exp, xb, grip, video = null, wasPlaying = true, offPaused = false, mounted = false, pos = { x: 0, y: 0 };
-  var card = null, mode = '', big = false, home = null;
+  var card = null, mode = '', big = false, home = null, closing = 0, sc = null, push = null;   // closing: X's drop timer; sc: the scan card; push: the phone spacer
 
   function slug() { var r = new URLSearchParams(location.search).get('r'); return r && /^[A-Za-z0-9_-]{1,64}$/.test(r) ? r : ''; }
   function src() {
@@ -89,10 +91,12 @@
     return b;
   }
   function topInset() { var h = hdr(); return Math.max(innerWidth < 720 ? 12 : 24, h ? h + 8 : 0); }
-  function bigAt() {   // expanded: full width (phone) / min(960, 70vw) centred, right under the header
-    var W = vw(), ph = innerWidth < 720, t = Math.round(hdr()) + (ph ? 0 : 12);
-    var w = Math.round(ph ? W : Math.min(960, W * 0.7, (innerHeight - t - 16 - BAR) * 16 / 9));
-    return { x: Math.round((W - w) / 2), y: t, w: w };
+  var CARD = 320, GAP = 16;   // the scan card beside the expanded player (wide screens)
+  function side() { return vw() >= 1024; }
+  function bigAt() {   // expanded: full width (phone) / min(960, 70vw) centred, right under the header; wide: + the scan card on its right
+    var W = vw(), ph = innerWidth < 720, t = Math.round(hdr()) + (ph ? 0 : 12), c = side() ? CARD + GAP : 0;
+    var w = Math.round(ph ? W : Math.min(960, W * 0.7, W - 48 - c, (innerHeight - t - 16 - BAR) * 16 / 9));
+    return { x: Math.round((W - w - c) / 2), y: t, w: w };
   }
   function miniAt() {   // where minimize lands (viewport): the dock spot, else the floating spot
     var d = docking() ? dockAt() : null;
@@ -103,7 +107,7 @@
   function keep(x, y, w, h) {   // fully on-screen, under the header, above the phone's toolbar
     return [Math.max(8, Math.min(x, vw() - w - 8)), Math.max(topInset(), Math.min(y, vh() - h - bot()))];
   }
-  function docking() { return auto === 'dock' && card && !S.u && !S.t && innerWidth >= 720; }
+  function docking() { return auto === 'dock' && card && !S.u && !S.t && !closing && innerWidth >= 720; }
   function inView(d) {   // a dock spot is used only on a wide screen and while all of it is on screen under the header
     return innerWidth >= 720 && d.y >= topInset() && d.y + Math.round(d.w * 9 / 16) + BAR <= vh() - 8;
   }
@@ -163,6 +167,7 @@
       move(t.x, t.y);
     }
     pip.setAttribute('data-mode', mode);
+    aside();
     exp.innerHTML = big ? I.dn : I.exp;
     exp.setAttribute('aria-label', big ? 'Minimize video' : 'Expand video');
     exp.setAttribute('aria-expanded', big ? 'true' : 'false');
@@ -173,6 +178,14 @@
       var ty = S.c ? keep(0, homeAt().y, 0, 64)[1] : pos.y + pip.offsetHeight / 2 - 32;
       tab.setAttribute('data-side', S.t); tab.innerHTML = I[S.t]; tab.style.setProperty('--ty', Math.round(ty) + 'px');
     }
+  }
+  function aside() {   // expanded: the scan card on the player's right (wide), else (phone / tablet) the page pushed down under it
+    var on = big && !closing && !S.t, b = on && bigAt(), wide = on && side(), h = on && !wide ? Math.round(b.w * 9 / 16) + BAR : 0;
+    sc.classList.toggle('on', !!wide);
+    if (wide) { sc.style.setProperty('--x', (b.x + b.w + GAP) + 'px'); sc.style.setProperty('--y', b.y + 'px'); }
+    if (wide) sc.removeAttribute('inert'); else sc.setAttribute('inert', '');
+    if (push) push.style.height = h + 'px';
+    document.documentElement.style.overflowAnchor = h ? 'none' : '';   // the push moves what's under the player into view, even scrolled (no anchoring back)
   }
   var raf = 0;   // scroll (desktop dock in / out), card / viewport resize: re-placed once per frame
   function soon() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; place(); }); }
@@ -263,7 +276,7 @@
     if (lag <= 0.15 && !hd.classList.contains('on')) { hd.classList.add('on'); hdTries = 0; }
   }
   function expand() {
-    if (big || S.t) return;
+    if (big || S.t || closing) return;
     big = true;
     flip(place);
     if (video) { video.muted = false; play(); }
@@ -283,15 +296,25 @@
     S.t = side; S.c = 0; S.u = 1; place(); sync();
   }
   function untuck() {
+    if (closing) { clearTimeout(closing); closing = 0; pip.classList.remove('closing'); }
     S.t = ''; S.c = 0; place();
     if (video && wasPlaying) play();
     sync();
   }
-  function close() {   // X: hidden behind a tab at the top-right corner (never gone); the tab = back to the same spot / dock
-    if (big) { big = false; pip.classList.remove('drag'); pip.style.setProperty('--s', '1'); place(); }
+  function close() {   // X: hidden behind a tab at the top-right corner (never gone); the tab = back to the same spot / dock.
+    // Animated, 1 s from expanded: 0.5 s down to the floating spot (never the dock), then 0.5 s off the right edge; from the mini: just the slide
+    if (closing || S.t) return;
     if (video) { wasPlaying = !video.paused; video.pause(); }
-    S.t = 'r'; S.c = 1; place(); sync();
-    tab.focus();
+    pip.classList.add('closing');
+    var off = function () {
+      S.t = 'r'; S.c = 1; place(); sync();
+      tab.focus();
+      closing = setTimeout(function () { closing = 0; pip.classList.remove('closing'); }, 500);
+    };
+    if (!big && mode !== 'dock') return off();
+    big = false; pip.classList.remove('drag');
+    closing = setTimeout(off, 500);
+    flip(place); sync();
   }
 
   // ---------- drag: free drop, fling / past the edge = tuck; pinch / grip = resize (any of them ends docking);
@@ -415,6 +438,27 @@
     }
   }
 
+  // ---------- the scan card (expanded, wide screens): OnlyFans + Instagram / X, Scan now. The landing = its own hero form
+  // (in-page scan, then the mini so the live report shows; the video turns hers when it lands); elsewhere = GET <site>/scan/?h=&ig= ----------
+  function scanCard() {
+    sc = document.createElement('form');
+    sc.className = 'pip-card'; sc.method = 'get'; sc.action = new URL('../scan/', me.src).href;
+    sc.setAttribute('aria-label', 'Free scan'); sc.setAttribute('inert', '');
+    sc.innerHTML = '<p class="pip-card-k">Free scan</p><p class="pip-card-t">Type your name <span>→ get YOUR video</span></p>' +
+      '<label class="pip-card-f"><span aria-hidden="true">onlyfans.com/</span><input name="h" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="username" aria-label="OnlyFans username"></label>' +
+      '<label class="pip-card-f"><span aria-hidden="true">@</span><input name="ig" type="text" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Instagram or X (optional)" aria-label="Instagram or X username (optional)"></label>' +
+      '<button type="submit">Scan now</button><p class="pip-card-n">Free. No account. You see every link it finds.</p>';
+    sc.addEventListener('submit', function (e) {
+      var f = document.getElementById('scan');
+      if (!f || !f.requestSubmit) return;   // no in-page scanner: the scan page
+      e.preventDefault();
+      f.elements.h.value = sc.elements.h.value; f.elements.ig.value = sc.elements.ig.value; f.elements.ig.removeAttribute('data-net');
+      minimize();
+      f.requestSubmit();
+    });
+    document.body.appendChild(sc);
+  }
+
   function mount() {
     if (mounted) return;
     if (auto === 'r' && !forced && !slug()) return;   // the report page before its result: wait (the URL gets ?r= once it renders)
@@ -427,7 +471,7 @@
     pip.setAttribute('aria-label', "Jack's video");
     pip.innerHTML = '<div class="pip-pic"><div class="pip-hit"></div><div class="pip-rs" role="button" tabindex="0" aria-label="Resize video (arrow keys)">' + I.rs +
       '</div><button class="pip-x" type="button" aria-label="Close video">' + I.x + '</button></div><div class="pip-bar"><button class="pip-pp" type="button">' + I.pp +
-      '</button><button class="pip-snd" type="button"></button><i></i><button class="pip-exp" type="button"></button></div>';
+      '</button><button class="pip-snd" type="button"></button><i></i><button class="pip-exp" type="button"></button><button class="pip-fl" type="button" aria-label="Floating player">' + I.fl + '</button></div>';
     pic = pip.querySelector('.pip-pic');
     // the poster by fetch(), shown from a blob: a CSS / <img> load would hold the page's load event (and a later load event
     // lets the landing's own report thumbs hold it seconds more: measured 1.0 s -> 5.0 s with a stored scan)
@@ -451,6 +495,9 @@
     tab.setAttribute('aria-label', "Show Jack's video");
     document.body.appendChild(pip);
     document.body.appendChild(tab);
+    scanCard();
+    var sh = document.querySelector('.site-header');
+    if (sh) { push = document.createElement('div'); push.className = 'pip-push'; push.setAttribute('aria-hidden', 'true'); sh.parentNode.insertBefore(push, sh.nextSibling); }
     if (card && 'ResizeObserver' in window) new ResizeObserver(soon).observe(card);
     if (window.visualViewport) visualViewport.addEventListener('resize', soon);   // height only (URL bar): the box stays (keep() clamps)
     pip.classList.add('on');   // the box + poster at once
@@ -472,6 +519,7 @@
     pp.addEventListener('click', function () { if (!video) return; if (video.paused) play(); else video.pause(); sync(); });
     xb.addEventListener('click', close);
     exp.addEventListener('click', function () { if (big) minimize(); else expand(); });
+    pip.querySelector('.pip-fl').addEventListener('click', function () { S.u = 1; minimize(); });   // the floating mini (top-right, follows the scroll), never the dock
     tab.addEventListener('pointerdown', tabDown);
     tab.addEventListener('pointerup', tabUp);
     tab.addEventListener('click', function () { if (tmoved) { tmoved = false; return; } untuck(); setTimeout(function () { snd.focus(); }, 0); });

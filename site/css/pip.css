@@ -50,3 +50,30 @@
 .pip-rs svg { width: 16px; height: 16px; margin: 5px; stroke-width: 2.6; filter: drop-shadow(0 0 2px rgb(0 0 0 / .8)); opacity: .85; }
 @media (hover: hover) and (pointer: fine) { .pip-rs svg { opacity: 0; transition: opacity .15s; } .pip:hover .pip-rs svg, .pip-rs:focus-visible svg { opacity: .9; } }
 .pip.big .pip-rs { display: none; }
+/* X: 1 s from expanded (.closing): 0.5 s down to the floating spot, then 0.5 s off the right edge (pip.js close()) */
+.pip.on.closing { transition: transform .5s cubic-bezier(.3, .7, .2, 1), opacity .2s ease, visibility 0s; }
+.pip.on.closing.tucked { transition: transform .5s cubic-bezier(.5, 0, .9, .4), visibility 0s linear .5s; }
+/* floating-player button: expanded only, the bar's bottom-right */
+.pip-bar .pip-fl { display: none; }
+.pip.big .pip-bar .pip-fl { display: inline-flex; }
+/* phone / tablet, expanded: the page pushed down under the player (its title not covered) */
+.pip-push { height: 0; transition: height .3s cubic-bezier(.2, .8, .2, 1); }
+/* the scan card on the expanded player's right (>= 1024 px): fixed, its top = the player's */
+.pip-card { position: fixed; left: 0; top: 0; z-index: 44; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: 320px;
+  margin: 0; padding: 20px; border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 14px 40px rgb(0 0 0 / .4), 0 0 0 1px var(--line);
+  opacity: 0; visibility: hidden; transform: translate3d(calc(var(--x, 0px) + 24px), var(--y, 0px), 0);
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease, visibility 0s linear .3s; }
+.pip-card.on { opacity: 1; visibility: visible; transform: translate3d(var(--x, 0px), var(--y, 0px), 0); transition: transform .35s cubic-bezier(.2, .8, .2, 1) .1s, opacity .25s ease .1s, visibility 0s; }
+.pip-card p { margin: 0; }
+.pip-card-k { color: var(--accent); font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.pip-card-t { margin-bottom: 4px !important; font-family: var(--serif); font-size: 1.45rem; line-height: 1.15; }
+.pip-card-t span { display: block; color: var(--accent); }
+.pip-card-f { display: flex; align-items: center; height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); font-size: .95rem; cursor: text; }
+.pip-card-f:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.pip-card-f span { color: var(--muted); white-space: nowrap; }
+.pip-card-f input { flex: 1; min-width: 0; height: 100%; padding: 0 0 0 2px; border: 0; background: transparent; color: var(--ink); font: inherit; outline: 0; }
+.pip-card button { height: 48px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 700 1rem var(--sans); cursor: pointer; }
+@media (hover: hover) { .pip-card button:hover { background: var(--accent-hover); } }
+.pip-card button:focus-visible { outline: 3px solid #2f80ff; outline-offset: 2px; }
+.pip-card-n { color: var(--muted); font-size: .82rem; }
+@media (prefers-reduced-motion: reduce) { .pip.on.closing, .pip.on.closing.tucked, .pip-card, .pip-card.on, .pip-push { transition: none; } }
