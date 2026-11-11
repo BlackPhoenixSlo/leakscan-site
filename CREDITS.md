@@ -18,6 +18,8 @@
   `tools/showcase/CREDITS.md`. The landing page reuses small crops of those same photos (the fictional demo creator's
   "own" pictures) in two places: `site/assets/phone/` (After phone, Images / Videos tabs) and `site/img/removals/`
   (blurred thumbnails in the `#removals` mock-ups).
+  `site/img/guides/` = screenshots of the landing's own mock-ups (the `#removals` leak-site panel before / after, the hero
+  weekly-report card), light + dark, shown on `removals/leaked-onlyfans-fansly-content.html`: same blurred demo crops, nothing new.
   The `/video/` demo's default cards use their own Pexels photos (Pexels License), square WebP crops in `site/video/img/`:
   blurred "leak" thumbs = men in swimsuits, the after state's own photos = men in suits. None of them is affiliated with LeakScan.
   - `leak-1.webp`: [Portrait of a Shirtless Man Standing on a Beach](https://www.pexels.com/photo/18126932/), Maksim Darling
