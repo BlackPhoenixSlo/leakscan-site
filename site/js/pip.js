@@ -185,10 +185,10 @@
     if (wide) { sc.style.setProperty('--x', (b.x + b.w + GAP) + 'px'); sc.style.setProperty('--y', b.y + 'px'); }
     if (wide) sc.removeAttribute('inert'); else sc.setAttribute('inert', '');
     if (push && h !== pushH) {   // un-pushed while scrolled: scrolled back by as much, so what's on screen doesn't jump up
-      var up = !h && scrollY > 0 ? Math.min(pushH, scrollY) : 0;
+      var up = !h && scrollY > 0 ? Math.min(pushH, scrollY) : 0, to = scrollY - up;   // absolute: a short page clamps scrollY as it shrinks
       if (up) push.style.transition = 'none';
       push.style.height = h + 'px'; pushH = h;
-      if (up) { scrollBy({ top: -up, behavior: 'instant' }); void push.offsetHeight; push.style.transition = ''; }
+      if (up) { scrollTo({ top: to, behavior: 'instant' }); void push.offsetHeight; push.style.transition = ''; }
     }
     // no scroll anchoring while pushed / un-pushing (Chrome would undo the push, or double the scroll-back): back on a frame later
     if (h) document.documentElement.style.overflowAnchor = 'none';
