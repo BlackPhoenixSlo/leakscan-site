@@ -1,6 +1,7 @@
 // Mini player of site/video/ (picture-in-picture style). The script tag says where it is on by default:
 //   data-pip-auto="dock" (landing): fixed top-right; on a wide screen docked on the hero card while that spot is fully in view;
 //   data-pip-auto="r" (scan report): fixed top-right, once the URL has ?r=<slug> (the video personalizes itself with that scan).
+//   data-pip-auto="float" (faq / removals / compare / privacy / imprint: Google Ads lands there too): fixed top-right at once (last scan or generic video).
 // ?pip=1 forces it on, ?pip=0 off. Same-origin iframe of ../video/ (?r= / ?name= passed through) in embed form: this script
 // injects a style into it (no name bar, no player UI: the stage fills the picture) and drives its <video> (starts muted).
 // On screen at once: a phone's first paint already has a tiny still on the home spot (.pip-still, an inline script at the top of
