@@ -190,7 +190,9 @@
       push.style.height = h + 'px'; pushH = h;
       if (up) { scrollBy({ top: -up, behavior: 'instant' }); void push.offsetHeight; push.style.transition = ''; }
     }
-    document.documentElement.style.overflowAnchor = h ? 'none' : '';   // the push moves what's under the player into view, even scrolled (no anchoring back)
+    // no scroll anchoring while pushed / un-pushing (Chrome would undo the push, or double the scroll-back): back on a frame later
+    if (h) document.documentElement.style.overflowAnchor = 'none';
+    else if (document.documentElement.style.overflowAnchor) requestAnimationFrame(function () { requestAnimationFrame(function () { if (!pushH) document.documentElement.style.overflowAnchor = ''; }); });
   }
   var raf = 0;   // scroll (desktop dock in / out), card / viewport resize: re-placed once per frame
   function soon() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; place(); }); }
