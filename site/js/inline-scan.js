@@ -3,7 +3,7 @@
 // the #free phone shows her real results (js/free-phone.js), and the `leakscan:result` event lets js/personalize.js and
 // js/removals.js re-personalize the rest. Without JS the form still opens scan/. The page's report (E.currentSlug():
 // ?r=, else the last scan) re-renders the hero card on load. Every API value is validated (E.reportModel); rendering is
-// textContent / createElement only. Own elements only (never personalize's data-p slots).
+// textContent / createElement only. Own elements only (never personalize's data-p slots). ?h=&ig= (guide pages' form) = scan at once.
 (function () {
   'use strict';
   var E = window.LeakScanEngine, form = document.getElementById('scan'), card = document.querySelector('.report-card');
@@ -398,8 +398,17 @@
       } });
   }
 
-  // ---------- boot: the page's report re-renders the hero card (personalize.js / removals.js do the rest themselves) ----------
-  var slug = E.currentSlug(), shared = /[?&]r=/.test(location.search);
+  // ---------- boot ----------
+  // ?h=<handle>&ig=<social> (a guide page's scan form GETs here): run that scan right away, in the hero, like a submit
+  var qs = new URLSearchParams(location.search), qh = qs.get('h');
+  if (qh) {
+    form.elements.h.value = qh.slice(0, 200);
+    form.elements.ig.value = (qs.get('ig') || '').slice(0, 200);
+    if (history.replaceState) history.replaceState(null, '', location.pathname + location.hash);   // a reload doesn't scan again
+    if (form.requestSubmit) form.requestSubmit(); else form.dispatchEvent(new Event('submit', { cancelable: true }));
+  }
+  // else the page's report re-renders the hero card (personalize.js / removals.js do the rest themselves)
+  var slug = !qh && E.currentSlug(), shared = /[?&]r=/.test(location.search);
   if (slug) {
     var tok0 = token;
     asked = Date.now();
