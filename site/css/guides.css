@@ -25,3 +25,25 @@
 .guide-cta .channels { margin-bottom: 0; }
 .guide-cta .channel { color: var(--ink); }
 .guide-cta .channel-primary { color: var(--on-accent); }
+/* leaked-onlyfans-fansly-content.html (Ads landing): Jaka intro, scan form card, before / after pair, weekly report */
+.g-intro { display: flex; gap: 16px; align-items: flex-start; margin: 4px 0 8px; }
+.g-intro .lead { margin: 0 0 .4em; }
+.g-intro p:last-child { margin-top: 0; }
+.g-face { flex: none; width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line); }
+.g-scan { margin: 1.4em 0 2em; }
+.g-scan h2 { max-width: none; }
+.g-scan p { margin-bottom: 0; }
+.g-scan .scan-form { margin: 18px 0 10px; }
+.g-scan .scan-note { margin: 0; font-size: .92rem; color: var(--muted); }
+.g-ba, .g-report { margin: 1.6em 0; }
+.g-ba-row { display: grid; gap: 12px; }
+@media (min-width: 560px) { .g-ba-row { grid-template-columns: 1fr 1fr; } }
+.g-ba-cell { position: relative; }
+.g-ba img, .g-report img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); }
+.g-tag { position: absolute; left: 10px; bottom: 10px; z-index: 1; padding: 3px 10px; border-radius: 999px; font-size: .82rem; font-weight: 650; background: #b3261e; color: #fff; }
+.g-tag-done { background: #1e7a46; }
+.g-ba figcaption, .g-report figcaption { margin-top: 8px; font-size: .9rem; color: var(--muted); text-align: center; }
+.g-report { max-width: 420px; margin-inline: auto; }
+.guide .g-plans { padding-left: 1.2em; }
+.guide .g-plans li { margin-bottom: .4em; color: var(--muted); }
+.guide .g-plans strong { color: var(--ink); }
