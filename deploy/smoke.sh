@@ -29,7 +29,7 @@ check scan-page      "$B/scan/"                           200 'Free leak scan'
 check legacy-ui      "$B/app/"                            200 'Find Your Leaks'
 check legacy-js      "$B/static/app.js"                   200 'prefillFromUrl'
 check api-404-json   "$B/api/scan-result/nonexistent"     404 '"error"'
-check prefill-302    "$B/?p=instagram&h=x"                302
+check landing-h      "$B/?h=x"                            200 '!id="app-config"'
 check trav-dotdot    "$B/../.env"                         "404|400" '' --path-as-is
 check trav-encoded   "$B/..%2f.env"                       "404|400"
 check trav-app       "$B/app/../public_app.py"            "404|400" '' --path-as-is

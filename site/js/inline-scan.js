@@ -399,9 +399,9 @@
   }
 
   // ---------- boot ----------
-  // ?scan=<handle>&ig=<social> (a guide page's scan form GETs here): run that scan right away, in the hero, like a submit.
-  // Not ?h=: the server 302s /?h= (and p / go / l) to the legacy /app/ (app/public_app.py _PREFILL_KEYS).
-  var qs = new URLSearchParams(location.search), qh = qs.get('scan');
+  // ?scan=<handle>&ig=<social> (a guide page's scan form GETs here) or an old ?h= deep link: run that scan right away, in the
+  // hero, like a submit (the server never sends / to the legacy /app/)
+  var qs = new URLSearchParams(location.search), qh = qs.get('scan') || qs.get('h');
   if (qh) {
     form.elements.h.value = qh.slice(0, 200);
     form.elements.ig.value = (qs.get('ig') || '').slice(0, 200);

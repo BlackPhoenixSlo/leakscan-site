@@ -1377,7 +1377,6 @@ import thumb_sheet
 
 _API_PREFIXES = ("/api/", "/static/", "/s/")
 _API_PATHS = ("/healthz", "/favicon.ico")
-_PREFILL_KEYS = ("p", "h", "go", "l")
 
 
 def _one_project_get(h, path):
@@ -1394,8 +1393,6 @@ def _one_project_get(h, path):
         return True
     if path.startswith(_API_PREFIXES) or path in _API_PATHS:
         return False
-    if path == "/" and any(k in urllib.parse.parse_qs(query) for k in _PREFILL_KEYS):
-        return _redirect(h, 302, "/app/?" + query)  # jackbase.me/scan?p=&h=&go= deep links
     return site_static.serve(h, path)
 
 

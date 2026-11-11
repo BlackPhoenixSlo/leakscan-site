@@ -124,11 +124,11 @@ class TestSiteRoutes(unittest.TestCase):
         r, b = self.req("/app/styles.css")
         self.assertEqual(r.status, 200)
 
-    def test_prefill_redirect(self):
-        r, _ = self.req("/?p=instagram&h=jane&go=1")
-        self.assertEqual((r.status, r.getheader("Location")), (302, "/app/?p=instagram&h=jane&go=1"))
-        r, _ = self.req("/?utm_source=x")
-        self.assertEqual(r.status, 200)                 # other queries stay on the landing
+    def test_no_prefill_redirect(self):
+        for q in ("/?p=instagram&h=jane&go=1", "/?h=jane", "/?scan=jane&ig=x", "/?utm_source=x"):
+            r, b = self.req(q)
+            self.assertEqual(r.status, 200, q)          # always the landing, never the legacy /app/ (its hero scans ?h= / ?scan=)
+            self.assertNotIn(b'id="app-config"', b)
 
     def test_api_paths_unchanged(self):
         r, b = self.req("/healthz")

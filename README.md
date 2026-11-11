@@ -244,8 +244,7 @@ https://scan.srv1395798.hstgr.cloud is the same container):
 | --- | --- |
 | `/api/*`, `/static/*`, `/s/<slug>`, `/healthz` | scan backend `app/public_app.py` (unchanged behaviour) |
 | `/app/` | legacy scan UI (`app/public_static/`, was `/`) |
-| `/?p=&h=&go=&l=` | 302 → `/app/?<same query>` (old jackbase.me/scan deep links) |
-| everything else (`/`, `/scan/`, `/showcase/…`, `/privacy.html`) | landing site `site/` via `app/site_static.py` |
+| everything else (`/` with any query: never redirected to `/app/`, `/scan/`, `/showcase/…`, `/privacy.html`) | landing site `site/` via `app/site_static.py` |
 
 - `app/` = the backend, flat like prod (`HERE`-relative paths): `public_app.py` + its import closure + every script
   it spawns for deep scans + data files (`kb.json`, `bruqi_detection_map.json`, `aliases.txt`, `fake_aggregators.txt`,
@@ -295,7 +294,7 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
   is sent as `instagram`. Body: `{platform: "onlyfans.com", handle, level: "low", instagram? | x?}`. Same two fields on
   `scan/`, which also reads `h=`, `ig=`, `x=` (and old `p=`).
 - `/?scan=<handle>&ig=<social>` = that scan runs in the hero at once (as a submit; `scan` / `ig` then dropped from the URL, so a
-  reload doesn't re-scan). Not `h=`: the server 302s `/?h=` / `p=` / `go=` / `l=` to the legacy `/app/`. The scan form on `removals/leaked-onlyfans-fansly-content.html` (Ads landing) GETs there, not `scan/`.
+  reload doesn't re-scan). Old `/?h=` deep links do the same; the server never redirects `/` to the legacy `/app/`. The scan form on `removals/leaked-onlyfans-fansly-content.html` (Ads landing) GETs there, not `scan/`.
 - `js/scan-engine.js` (`window.LeakScanEngine`, loaded first on every page that uses it): the one SSE / fetch
   transport, API origin rule, error mapping, message links and `leakscan.last` writer; the shared validators
   (`E.clean`), `E.currentSlug()`, the report model, the image gallery, `E.watchThumb` (one broken-thumb rule: 404 /
