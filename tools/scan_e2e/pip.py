@@ -19,11 +19,12 @@ PIP_J = """() => { const p = document.querySelector('.pip'), t = document.queryS
   const pic = p.querySelector('.pip-pic').getBoundingClientRect(), ctl = [...p.querySelectorAll('button, a')].map(b => b.getBoundingClientRect()),
     g = p.querySelector('.pip-rs'), gr = g.getBoundingClientRect(), x = p.querySelector('.pip-exp'), xb = p.querySelector('.pip-x'), xr = xb && xb.getBoundingClientRect();
   return {cls: p.className, mode: p.dataset.mode, big: p.classList.contains('big'), url: location.href, opens: window.__opens || 0,
-    bar: [...p.querySelectorAll('.pip-bar button')].map(b => { const r = b.getBoundingClientRect(); return [b.className, b.getAttribute('aria-label'), Math.round(r.width), Math.round(r.height)]; }),
+    bar: [...p.querySelectorAll('.pip-bar button')].filter(b => getComputedStyle(b).display !== 'none').map(b => { const r = b.getBoundingClientRect(); return [b.className, b.getAttribute('aria-label'), Math.round(r.width), Math.round(r.height)]; }),
     exp: x && [x.getAttribute('aria-label'), x.getAttribute('aria-expanded'), x.innerHTML.includes('m6 9') ? 'v' : 'expand'],
     xbox: xr ? [xr.left - pic.left, xr.top - pic.top, pic.right - xr.right, xr.width, xr.height].map(Math.round) : null,
     vvh: Math.round(window.visualViewport ? visualViewport.height : innerHeight), live: p.classList.contains('live'),
     grip: getComputedStyle(g).display === 'none' ? null : [gr.left - pic.left, gr.top - pic.top, gr.width, gr.height].map(Math.round), box: R(p), pic: R(p.querySelector('.pip-pic')), card: c ? R(c) : null,
+    sc: (k => k && getComputedStyle(k).visibility === 'visible' ? R(k) : null)(document.querySelector('.pip-card')), push: (k => k ? k.offsetHeight : null)(document.querySelector('.pip-push')),
     on: p.classList.contains('on') && !p.classList.contains('tucked'), tucked: p.classList.contains('tucked'),
     overPic: ctl.filter(b => b.right > pic.left && b.left < pic.right && b.bottom > pic.top && b.top < pic.bottom).length,
     tab: t && !t.hidden ? {box: R(t), side: t.dataset.side, chev: t.innerHTML.includes('m9 6') ? '>' : t.innerHTML.includes('m15 6') ? '<' : '?'} : null,
@@ -638,11 +639,18 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     tap(pg, *pic_c(s)); pg.wait_for_timeout(300); s = st(pg)
     bw = s["vw"] if phone else min(960, round(s["vw"] * 0.7))
     big_ok = lambda s: s["big"] and s["mode"] == "big" and abs(s["box"][1] - (s["hdr"] + (0 if phone else 12))) <= 1 and abs(s["box"][2] - bw) <= 1 \
-        and abs(s["box"][0] - (s["vw"] - bw) / 2) <= 1 and ratio_ok(s)
+        and abs(s["box"][0] - (s["vw"] - bw - (336 if s["vw"] >= 1024 else 0)) / 2) <= 1 and ratio_ok(s)   # wide: centred with the scan card (320 + 16) on its right
     check(f"{tag} expand: tap on the picture → expanded in place: {'full width' if phone else f'{bw} px centred'}, right under the header, sound on, playing",
           big_ok(s) and isinstance(s["v"], dict) and not s["v"]["muted"] and not s["v"]["paused"] and s["url"] == url0, [s["box"], s["hdr"], s["vw"], s["v"]])
     check(f"{tag} expand: the toggle is now a chevron-down 'Minimize video' (aria-expanded), no resize corner", s["exp"] == ["Minimize video", "true", "v"] and s["grip"] is None, [s["exp"], s["grip"]])
     shot(pg, "7b-expanded")
+    check(f"{tag} expand: bar = play / sound / chevron + the floating-player button at the bottom-right, each >= 40x40", [b[0] for b in s["bar"]] == ["pip-pp", "pip-snd", "pip-exp", "pip-fl"]
+          and all(b[2] >= 40 and b[3] >= 40 for b in s["bar"]), s["bar"])
+    if phone:   # owner: the expanded player never covers the page's title: the page is pushed down by its height
+        check(f"{tag} expand: phone, the page pushed down by the player's height (spacer under the header), no scan card", s["push"] == s["box"][3] and s["sc"] is None, [s["push"], s["box"], s["sc"]])
+    else:
+        check(f"{tag} expand: wide, the scan card on the player's right (16 px gap, same top, 320 px), on screen, nothing pushed", bool(s["sc"]) and s["sc"][0] == s["box"][0] + s["box"][2] + 16
+              and s["sc"][1] == s["box"][1] and s["sc"][2] == 320 and s["sc"][0] + 320 <= s["vw"] and s["push"] == 0, [s["sc"], s["box"], s["push"]])
     y0, big0 = pg.evaluate("scrollY"), s["box"]
     sx, sy = s["vw"] / 2, min(s["vh"] - 60, big0[1] + big0[3] + 120)   # a finger / the wheel on the page below the player
     if cdp:
@@ -659,20 +667,27 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     check(f"{tag} expand: the page scrolls under the expanded player (no scroll lock): scrollY moved, the player stays under the header, page content right below it",
           y1 - y0 > 200 and big_ok(s) and below[0] and below[1], [y0, y1, s["box"], s["hdr"], below])
     shot(pg, "7c-expanded-scrolled")
+    under = pg.evaluate("() => { const r = document.querySelector('.pip').getBoundingClientRect(), e = document.elementFromPoint(innerWidth / 2, Math.min(innerHeight - 4, r.bottom + 20)); e.setAttribute('data-under', ''); return e.getBoundingClientRect().top; }")
     pg.click(".pip-exp"); pg.wait_for_timeout(600); s = st(pg)
+    if phone:
+        top2 = pg.evaluate("() => document.querySelector('[data-under]').getBoundingClientRect().top")
+        check(f"{tag} minimize: scrolled, the page un-pushed without a jump (what was below the player stays put, ±2 px)", abs(top2 - under) <= 2 and not s["push"], [under, top2, s["push"]])
     check(f"{tag} minimize: the chevron → back to the mini player top-right", not s["big"] and float_default(s) and s["exp"] == ["Expand video", "false", "expand"], [s["box"], s["exp"]])
     pg.click(".pip-exp"); pg.wait_for_timeout(600)
     pg.focus(".pip-exp"); pg.keyboard.press("Escape"); pg.wait_for_timeout(600); s = st(pg)
     check(f"{tag} minimize: Esc (focus inside) → mini again, focus kept on the toggle", not s["big"] and float_default(s) and s["focus"] == "pip-exp", [s["box"], s["focus"]])
+    pg.click(".pip-exp"); pg.wait_for_timeout(600); pg.click(".pip-fl"); pg.wait_for_timeout(600); s = st(pg)
+    check(f"{tag} minimize: the floating-player button → the floating mini top-right, page no longer pushed, card gone", not s["big"] and s["mode"] == "float" and float_default(s)
+          and not s["push"] and s["sc"] is None and [b[0] for b in s["bar"]] == ["pip-pp", "pip-snd", "pip-exp"], [s["box"], s["push"], s["sc"], s["bar"]])
     tap(pg, *pic_c(s)); pg.wait_for_timeout(300); s = st(pg)
 
     def pull(s, frac, steps, step, hold, sample=True):   # finger on the expanded picture, down by frac of the way to the mini spot
         x0, y0 = pic_c(s)
         dy = max(120, mini[1] - s["box"][1]) * frac
         return drag(pg, cdp, [(x0, y0 + dy * i / steps) for i in range(steps + 1)], step, hold, mid=(lambda: st(pg)) if sample else None)
-    m = pull(s, 0.15, 8, 30, 200); s = st(pg)
+    b1 = s["box"]; m = pull(s, 0.15, 8, 30, 200); s = st(pg)
     check(f"{tag} pull: dragged down 15% → follows the finger (lower, scaled down), released → snaps back expanded",
-          m["box"][1] > big0[1] + 10 and m["box"][2] < bw - 10 and big_ok(s), [m["box"], s["box"]])
+          m["box"][1] >= b1[1] + min(10, (mini[1] - b1[1]) * 0.15 - 1) and m["box"][2] < bw - 10 and big_ok(s), [m["box"], s["box"], b1, mini])   # lower by its share of the way to the mini spot
     m = pull(s, 0.5, 12, 30, 200); s = st(pg)
     check(f"{tag} pull: dragged down 50% → mini player top-right, still playing with sound",
           m["box"][2] < bw * 0.85 and not s["big"] and float_default(s) and isinstance(s["v"], dict) and not s["v"]["paused"] and not s["v"]["muted"], [m["box"], s["box"], s["v"]])
@@ -697,8 +712,11 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
           and abs(s["box"][1] - flung[1]) <= 2 and isinstance(s["v"], dict) and not s["v"]["paused"], [s["box"], flung])
     shot(pg, "7f-back")
     tap(pg, *pic_c(s)); pg.wait_for_timeout(300)
-    pg.click(".pip-x"); pg.wait_for_timeout(500); s = st(pg)
-    check(f"{tag} close: X on the expanded player → hidden behind the right edge tab, not expanded", s["tucked"] and not s["big"] and bool(s["tab"]), [s["cls"], s["tab"]])
+    pg.click(".pip-x"); pg.wait_for_timeout(300); s1 = st(pg)   # owner: 1 s: 0.5 s down to the floating mini, then 0.5 s off the right edge
+    pg.wait_for_timeout(900); s = st(pg)
+    check(f"{tag} close: X on the expanded player, 0.3 s in: dropping to the floating mini, not yet off-screen, no tab, page un-pushed",
+          not s1["big"] and s1["mode"] == "float" and not s1["tucked"] and not s1["tab"] and s1["box"][0] < s1["vw"] and not s1["push"] and s1["sc"] is None, [s1["cls"], s1["mode"], s1["box"], s1["tab"], s1["push"], s1["sc"]])
+    check(f"{tag} close: X on the expanded player, 1.2 s in → hidden behind the right edge tab, not expanded", s["tucked"] and not s["big"] and bool(s["tab"]) and s["box"][0] >= s["vw"], [s["cls"], s["tab"], s["box"]])
     check(f"{tag} expand: no new page / tab, no window.open, same URL throughout", not net["pages"] and s["opens"] == 0 and pg.url == url0, [net["pages"], s["opens"], pg.url])
     ctx.close()
 
@@ -742,6 +760,32 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
     check(f"{tag} moved: once dragged it stays where it was dropped, hero in or out (no re-dock)",
           s1["mode"] == s2["mode"] == "float" and abs(s1["box"][0] - moved[0]) <= 2 and abs(s1["box"][1] - moved[1]) <= 2 and abs(s2["box"][1] - moved[1]) <= 2, [moved, s1["box"], s2["box"]])
     ctx.close()
+
+    # the scan card beside the expanded player (wide): landing = its hero form's in-page scan + back to the mini; a guide page = GET scan/?h=&ig=
+    if not phone:
+        ctx, pg, cdp = new_ctx()
+        ready(pg, "", card=True)
+        pg.click(".pip-exp"); pg.wait_for_timeout(700)
+        pg.fill(".pip-card [name=scan]", "sophieraiin"); pg.fill(".pip-card [name=ig]", "sophie")
+        shot(pg, "9a-card-trigger")
+        with pg.expect_request("**/api/public-scan", timeout=8000) as rq:
+            pg.click(".pip-card button")
+        pg.wait_for_timeout(700); s = st(pg)
+        hv = pg.evaluate("() => [document.querySelector('#scan [name=h]').value, document.querySelector('#scan [name=ig]').value]")
+        check(f"{tag} card: landing, Scan now in the card → the hero form's in-page scan (POST public-scan, same page), the player back to the mini, card gone",
+              hv == ["sophieraiin", "sophie"] and rq.value.method == "POST" and not s["big"] and s["sc"] is None and urlsplit(pg.url).path == "/", [hv, s["cls"], s["sc"], pg.url])
+        shot(pg, "9b-card-settled")
+        for g in ("faq/", "removals/leaked-onlyfans-fansly-content.html"):   # the second has its own #scan form (name=scan): the card still GETs the landing
+            ready(pg, g)
+            pg.click(".pip-exp"); pg.wait_for_timeout(700)
+            pg.fill(".pip-card [name=scan]", "sophieraiin"); pg.fill(".pip-card [name=ig]", "sophie")
+            with pg.expect_request("**/api/public-scan", timeout=12000) as rq:
+                with pg.expect_request(lambda r: "/?scan=" in r.url and r.resource_type == "document", timeout=8000) as nav:
+                    pg.click(".pip-card button")
+            u = urlsplit(nav.value.url)
+            check(f"{tag} card: {g}, Scan now → GET the landing /?scan=sophieraiin&ig=sophie, which runs that scan in its hero", u.path == "/" and parse_qs(u.query).get("scan") == ["sophieraiin"]
+                  and parse_qs(u.query).get("ig") == ["sophie"] and rq.value.method == "POST", nav.value.url)
+        ctx.close()
 
     # landing after a scan (the hero card is her report): same docking rule
     ctx, pg, cdp = new_ctx()

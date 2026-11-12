@@ -30,6 +30,7 @@ ALSO = "Also found as " + ", ".join("@" + a for a in FX["aliases"]["discovered"]
 # ---------- break-it registry: --break-<name> serves ONE script with ONE feature disabled, at the wire boundary (same
 # bytes otherwise); only the checks named after that feature may go red. name -> (script or .css, marker, replacement)
 BREAKS = {
+    "pipclose": ("pip.js", "    closing = setTimeout(off, 500);\n", "    off();\n"),
     "drift": ("strip-drift.js", "DRIFT_SPEED = 24", "DRIFT_SPEED = 0"),
     "phones": ("personalize.js", "    phones(m, d);\n", "\n"),
     "thumbs": ("scan-engine.js", "    if (verdicts[src] === false || verdicts[src] === ok) return;\n", "    if (!ok || verdicts[src] === ok) return;\n"),

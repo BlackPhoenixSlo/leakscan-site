@@ -4,7 +4,7 @@
     cd ~/leakhunt && uv run python ~/leakscan-site/tools/scan_e2e.py OUT_DIR [--only scan|personalize|askai|inline|tabs|removals|pip|sheet|again|quota]... [--changed [REF]] [--no-reuse] [--keep-all] [--engine chromium|webkit]
         [--omit-results] [--omit-profile] [--break-allowlist] [--break-drift] [--break-phones] [--break-thumbs] [--break-people] [--break-remove]
         [--break-incremental] [--break-sweep] [--break-tgcta] [--break-demolive] [--break-demotall] [--break-fprow] [--break-tuck]
-        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]
+        [--break-dock] [--break-pull] [--break-pipvis] [--break-pipfollow] [--break-pipload] [--break-still] [--break-pipclose] [--break-pipmini] [--break-hdsync] [--break-hdmin] [--break-hdguard] [--break-hdmine] [--break-photos8] [--break-demolazy]
         [--break-sheet500] [--break-sheetdead] [--break-askstall] [--break-again] [--break-expired] [--break-quota] [--break-audit] [--break-allclear]
 
 Result reuse (scan_e2e/reuse.py, README "E2E result reuse"): a scenario whose code and everything it read last time are unchanged prints
@@ -156,6 +156,9 @@ card whatever the screen: off-screen on a phone): only `vis:` / `follow:` / phon
 serves it with #79's floating spot (re-computed off the form at the current scroll, every scroll): only `follow:` checks may go red.
 --break-pipload serves it with the iframe started at once (before the load event): only the `vis:` load-event checks may go red.
 --break-still serves pip.css with the first-paint still hidden: only `still:` checks may go red.
+expand also: the floating-player button (bar, bottom-right, expanded only) → the floating mini; wide = the scan card on the player's right (landing: its hero form's
+in-page scan + the mini; any other page: GET /?scan=&ig=, the landing runs it), phone = the page pushed down by the player's height; X on the expanded player = 1 s: 0.5 s down to the floating
+mini, 0.5 s off the right edge. --break-pipclose serves pip.js with no drop (straight off-screen): only the `close:` 0.3 s check may go red.
 mini: a phone's mini plays jack-360.* (no 720p request before expand), a computer's and /video/ directly 720p only, 360p 404 = 720p by itself. hd: (phone) expand = the
 720p layer at the master's second, same box, muted, under the overlays; the master's clock never stops; follows pause / seek / end / ?name= rebuild, hidden at once when
 behind, dropped when minimized, the 720p never answering = the mini plays on; the browser pausing the master = the mini alone, no 720p this page view. --break-pipmini
