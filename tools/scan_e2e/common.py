@@ -49,6 +49,7 @@ BREAKS = {
     "photos8": ("video-overlays.js", "var PHOTOS_AT = 5,", "var PHOTOS_AT = 1e9,"),   # her photos never start
     "demolazy": ("personalize.js", "(el.getAttribute('src') ? 'src' : 'data-src')", "'src'"),   # her ?r= on src at once: Chromium's wide lazy distance starts the demo
     "still": ("pip.css", ".pip-still { position: fixed;", ".pip-still { display: none; position: fixed;"),   # no still in the first paint
+    "pipplay": ("pip.js", "if (!big && innerWidth < 720 && (!video || video.paused)) return expand();", ""),   # phone Play on the mini only plays it (no expand)
     "pipmini": ("pip.js", "if (innerWidth < 720) u.searchParams.set('mini', '1');", ""),   # the phone's mini asks for no 360p files
     "hdsync": ("pip.js", "    if (lag > 0.15) hdHide();\n", "    hd.classList.add('on');\n"),   # the 720p shown as soon as it has metadata, in sync or not
     "hdmin": ("pip.js", "if (!big) { hdStop(); hdDrop(); return; }", "if (!big) { hdStop(); if (hd) { hd.pause(); hdHide(); } return; }"),   # minimize only pauses the layer: its download goes on
