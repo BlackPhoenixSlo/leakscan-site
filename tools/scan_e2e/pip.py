@@ -630,6 +630,28 @@ def pip_flow(pw, chromium, vp_name, vp, engine="chromium"):
           and isinstance(s["v"], dict) and s["v"]["paused"], [s["cls"], s["tab"]])
     ctx.close()
 
+    # an Ads guide page (owner, 2026-11-11): Play on the paused mini. Phone = expanded with sound, the text that was in view pushed below it
+    # (at the top and mid-page); computer = plays in the mini
+    ctx, pg, cdp = new_ctx()
+    for at in (0, 700):
+        s = ready(pg, "removals/leaked-onlyfans-fansly-content.html"); pg.evaluate(f"scrollTo(0, {at})"); pg.wait_for_timeout(400)
+        if isinstance(s["v"], dict) and not s["v"]["paused"]:
+            pg.click(".pip-pp"); pg.wait_for_timeout(300)
+        ref = pg.evaluate("""() => { const y = document.querySelector('.site-header').getBoundingClientRect().bottom,   // the first text block starting in view under the header
+          e = [...document.querySelectorAll('main h1, main h2, main h3, main p, main li')].find(e => e.getBoundingClientRect().top >= y);
+          window.__ref = e; return [e.tagName + ':' + e.textContent.trim().slice(0, 30), Math.round(e.getBoundingClientRect().top)]; }""")
+        pg.click(".pip-pp"); pg.wait_for_timeout(800); s = st(pg)
+        moved = pg.evaluate("() => Math.round(window.__ref.getBoundingClientRect().top)")
+        if phone:
+            check(f"{tag} guide@{at}: Play on the paused mini → expanded full width, sound on, playing",
+                  s["big"] and abs(s["box"][2] - s["vw"]) <= 1 and isinstance(s["v"], dict) and not s["v"]["muted"] and not s["v"]["paused"], [s["box"], s["v"]])
+            check(f"{tag} guide@{at}: the text that was under the header moved down by the player's height, now below it (not hidden)",
+                  abs(moved - ref[1] - s["box"][3]) <= 2 and moved >= s["box"][1] + s["box"][3] - 1, [ref, moved, s["box"], s["push"]])
+            shot(pg, f"7-guide-play-{at}-proof")
+        else:
+            check(f"{tag} guide@{at}: Play on the mini (computer) = plays in the mini, not expanded", not s["big"] and isinstance(s["v"], dict) and not s["v"]["paused"], [s["box"], s["v"]])
+    ctx.close()
+
     # expanded (YouTube style): tap → big under the header, the page scrolls under it, pull down → mini, fling the mini
     # down → hidden with a tab, tab → back; never a new page / tab. Fresh session: the mini player at its default spot.
     ctx, pg, cdp = new_ctx()

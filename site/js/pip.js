@@ -19,7 +19,7 @@
 // Bar under the picture (40 px targets): play / pause, sound, expand / minimize (+ expanded: floating mini, bottom-right); the close X (40 px) on the picture's
 // top-right corner. X = hidden behind a tab at the top-right corner (the home spot's top, right edge; fixed, so it stays
 // there while scrolling); the tab = back to the same spot (home, dropped, or docked). Never gone, never a new page / tab.
-// Expanded (YouTube style, .big, not kept): a tap on the picture or the expand button = sound on, full width (phone) or
+// Expanded (YouTube style, .big, not kept): a tap on the picture, the expand button or (phone) Play on the mini = sound on, full width (phone) or
 // min(960px, 70vw) centred, fixed right under the sticky header; the page keeps scrolling under it (no lock, nothing over
 // the rest). There a tap on the picture = play / pause; drag it down (follows the finger: translate + scale toward the mini
 // spot; released past 30% or flung down = mini, else snaps back), the chevron button or Esc = back to the mini player.
@@ -523,7 +523,11 @@
       toFloat(); setW(pip.offsetWidth * k, 1, 1); settle();
     });
     snd.addEventListener('click', function () { if (video) { video.muted = !video.muted; if (!video.muted) play(); sync(); } });
-    pp.addEventListener('click', function () { if (!video) return; if (video.paused) play(); else video.pause(); sync(); });
+    pp.addEventListener('click', function () {
+      if (!big && innerWidth < 720 && (!video || video.paused)) return expand();   // phone: Play = the expanded player, sound on
+      if (!video) return;
+      if (video.paused) play(); else video.pause(); sync();
+    });
     xb.addEventListener('click', close);
     exp.addEventListener('click', function () { if (big) minimize(); else expand(); });
     pip.querySelector('.pip-fl').addEventListener('click', function () { S.u = 1; minimize(); });   // the floating mini (top-right, follows the scroll), never the dock
