@@ -2568,14 +2568,14 @@
   "hotleak.vip": {
     "method": "profile",
     "check_url": "https://hotleak.vip/{name}/",
-    "content_url": "https://hotleak.vip/bigtittygothegg/photo/{idx}/",
+    "content_url": "https://hotleak.vip/{name}/photo/{idx}/",
     "idx_type": "numeric",
     "verified": true,
     "source": "sniff",
     "stages": {
       "search": "https://hotleak.vip/search?search={name}",
       "profile": "https://hotleak.vip/{name}/",
-      "image_id": "https://hotleak.vip/bigtittygothegg/photo/{idx}/",
+      "image_id": "https://hotleak.vip/{name}/photo/{idx}/",
       "scroll": "https://hotleak.vip/{name}/?page={n}"
     }
   },
@@ -2596,14 +2596,14 @@
   "hotleaks.tv": {
     "method": "profile",
     "check_url": "https://hotleaks.tv/{name}/",
-    "content_url": "https://hotleaks.tv/therealpinuppixie/video/{idx}/",
+    "content_url": "https://hotleaks.tv/{name}/video/{idx}/",
     "idx_type": "numeric",
     "verified": true,
     "source": "sniff",
     "stages": {
       "search": "https://hotleaks.tv/search?search={name}",
       "profile": "https://hotleaks.tv/{name}/",
-      "image_id": "https://hotleaks.tv/therealpinuppixie/video/{idx}/",
+      "image_id": "https://hotleaks.tv/{name}/video/{idx}/",
       "scroll": "https://hotleaks.tv/{name}/?page={n}"
     }
   },
@@ -2851,14 +2851,14 @@
   "leakedzone.com": {
     "method": "profile",
     "check_url": "https://leakedzone.com/{name}/",
-    "content_url": "https://leakedzone.com/saradoesscience/video/{idx}/",
+    "content_url": "https://leakedzone.com/{name}/video/{idx}/",
     "idx_type": "numeric",
     "verified": true,
     "source": "sniff",
     "stages": {
       "search": "https://leakedzone.com/search?search={name}",
       "profile": "https://leakedzone.com/{name}/",
-      "image_id": "https://leakedzone.com/saradoesscience/video/{idx}/",
+      "image_id": "https://leakedzone.com/{name}/video/{idx}/",
       "scroll": "https://leakedzone.com/{name}/?page={n}"
     }
   },
@@ -4262,14 +4262,14 @@
   "thotporn.tv": {
     "method": "profile",
     "check_url": "https://thotporn.tv/{name}/",
-    "content_url": "https://thotporn.tv/therealpinuppixie/video/{idx}/",
+    "content_url": "https://thotporn.tv/{name}/video/{idx}/",
     "idx_type": "numeric",
     "verified": true,
     "source": "sniff",
     "stages": {
       "search": "https://thotporn.tv/search?search={name}",
       "profile": "https://thotporn.tv/{name}/",
-      "image_id": "https://thotporn.tv/therealpinuppixie/video/{idx}/",
+      "image_id": "https://thotporn.tv/{name}/video/{idx}/",
       "scroll": "https://thotporn.tv/{name}/?page={n}"
     }
   },
@@ -4304,14 +4304,14 @@
   "thotsbay.tv": {
     "method": "profile",
     "check_url": "https://thotsbay.tv/{name}/",
-    "content_url": "https://thotsbay.tv/therealpinuppixie/video/{idx}/",
+    "content_url": "https://thotsbay.tv/{name}/video/{idx}/",
     "idx_type": "numeric",
     "verified": true,
     "source": "sniff",
     "stages": {
       "search": "https://thotsbay.tv/search?search={name}",
       "profile": "https://thotsbay.tv/{name}/",
-      "image_id": "https://thotsbay.tv/therealpinuppixie/video/{idx}/",
+      "image_id": "https://thotsbay.tv/{name}/video/{idx}/",
       "scroll": "https://thotsbay.tv/{name}/?page={n}"
     }
   },
@@ -4332,14 +4332,14 @@
   "topfaps.com": {
     "method": "profile",
     "check_url": "https://topfaps.com/model/{name}/",
-    "content_url": "https://topfaps.com/video/{idx}/",
+    "content_url": "https://topfaps.com/photo/{idx}/",
     "idx_type": "numeric",
     "verified": true,
     "source": "sniff",
     "stages": {
       "search": "https://topfaps.com/search?search={name}",
       "profile": "https://topfaps.com/model/{name}/",
-      "image_id": "https://topfaps.com/video/{idx}/",
+      "image_id": "https://topfaps.com/photo/{idx}/",
       "scroll": "https://topfaps.com/model/{name}/?page={n}"
     }
   },
@@ -5024,5 +5024,262 @@
     "leaks_found": 297,
     "added": "site_probe 2026-08-16",
     "note": "UNVERIFIED: per-post WordPress leaks on www1.beartai.com (/{name}-leaks-nude-onlyfans-content-{id}/); no profile page. Hard Cloudflare block from probe IP — could not confirm search control-name rejection. Gated off (verified:false) until live-confirmed from a clean IP."
+  },
+  "zenporn.com": {
+    "method": "profile",
+    "check_url": "https://zenporn.com/pornstar/{name}/",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/pornstar/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "smfans.com": {
+    "method": "search",
+    "check_url": "https://smfans.com/?q={name}",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/?q={name}",
+    "added": "site_probe 2026-11-23",
+    "note": "creator search; profile is /account/onlyfans/<id>/<name>"
+  },
+  "onlyfapello.com": {
+    "method": "search",
+    "check_url": "https://onlyfapello.com/?q={name}",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/?q={name}",
+    "added": "site_probe 2026-11-23",
+    "note": "creator search; profile is /u/onlyfans/<id>/<name>"
+  },
+  "xvview.video": {
+    "method": "search",
+    "check_url": "https://xvview.video/tags/{name}/",
+    "content_url": "https://xvview.video/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23",
+    "note": "mirror network with xxxplay.video, xxx-videos.video, x-tube.video (same video ids)"
+  },
+  "xxxplay.video": {
+    "method": "search",
+    "check_url": "https://xxxplay.video/tags/{name}/",
+    "content_url": "https://xxxplay.video/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "xxx-videos.video": {
+    "method": "search",
+    "check_url": "https://xxx-videos.video/tags/{name}/",
+    "content_url": "https://xxx-videos.video/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "x-tube.video": {
+    "method": "search",
+    "check_url": "https://x-tube.video/tag/{name}/",
+    "content_url": "https://x-tube.video/tag/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tag/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "extreme.adult": {
+    "method": "search",
+    "check_url": "https://extreme.adult/tags/{name}/",
+    "content_url": "https://extreme.adult/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "pxp.farm": {
+    "method": "search",
+    "check_url": "https://pxp.farm/tags/{name}/",
+    "content_url": "https://pxp.farm/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23",
+    "note": "/?q= is not query-reflective (same grid for any query)"
+  },
+  "xxthots.com": {
+    "method": "profile",
+    "check_url": "https://xxthots.com/models/{name}/",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/models/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "onlyzy.com": {
+    "method": "search",
+    "check_url": "https://onlyzy.com/tag/{name}/",
+    "content_url": "https://onlyzy.com/tag/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tag/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "not.fans": {
+    "method": "search",
+    "check_url": "https://not.fans/tags/{name}/",
+    "content_url": "https://not.fans/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23",
+    "note": "notfans.com mirror"
+  },
+  "notfans.org": {
+    "method": "search",
+    "check_url": "https://notfans.org/tags/{name}/",
+    "content_url": "https://notfans.org/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23",
+    "note": "notfans.com mirror"
+  },
+  "notfans.to": {
+    "method": "search",
+    "check_url": "https://notfans.to/tags/{name}/",
+    "content_url": "https://notfans.to/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23",
+    "note": "notfans.com mirror"
+  },
+  "neki188cm.com": {
+    "method": "search",
+    "check_url": "https://neki188cm.com/tags/{name}/",
+    "content_url": "https://neki188cm.com/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "onlyleakers.net": {
+    "method": "search",
+    "check_url": "https://onlyleakers.net/tags/{name}/",
+    "content_url": "https://onlyleakers.net/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "recugay.me": {
+    "method": "profile",
+    "check_url": "https://recugay.me/performer/{name}",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/performer/{name}",
+    "added": "manual-verify 2026-11-23"
+  },
+  "sexy-egirls.tv": {
+    "method": "profile",
+    "check_url": "https://sexy-egirls.tv/models/{name}/",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/models/{name}/",
+    "added": "manual-verify 2026-11-23"
+  },
+  "indoporn.mobi": {
+    "method": "search",
+    "check_url": "https://indoporn.mobi/tags/{name}/",
+    "content_url": "https://indoporn.mobi/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "hdthot.com": {
+    "method": "profile",
+    "check_url": "https://hdthot.com/models/{name}",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/models/{name}",
+    "added": "manual-verify 2026-11-23"
+  },
+  "thepornjoy.org": {
+    "method": "search",
+    "check_url": "https://thepornjoy.org/tags/{name}/",
+    "content_url": "https://thepornjoy.org/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "guywh.com": {
+    "method": "search",
+    "check_url": "https://guywh.com/tags/{name}/",
+    "content_url": "https://guywh.com/tags/{name}/",
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/tags/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "leakfans.vip": {
+    "method": "profile",
+    "check_url": "https://leakfans.vip/model/{name}/",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/model/{name}/",
+    "added": "site_probe 2026-11-23"
+  },
+  "severeporn.com": {
+    "method": "search",
+    "check_url": "https://severeporn.com/search/{name}/",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/search/{name}/",
+    "added": "manual-verify 2026-11-23"
+  },
+  "xgays.me": {
+    "method": "profile",
+    "check_url": "https://xgays.me/model/{name}/",
+    "content_url": null,
+    "idx_type": null,
+    "verified": true,
+    "discovered": true,
+    "via": "/model/{name}/",
+    "added": "site_probe 2026-11-23"
   }
 }
