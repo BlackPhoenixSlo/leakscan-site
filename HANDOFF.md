@@ -4,6 +4,7 @@ For a developer (or their coding agent) who wants the free-scan feature inside t
 this repo: `app/` (backend, Python stdlib + 3 packages) and `site/` (frontend, plain JS, no build). The backend files
 in `app/` originally came from a private repo; `app/` is self-contained and nothing here needs that repo.
 Checked against the code at `main` 9b85dfe (2026-11-23). If this file and the code disagree, the code wins.
+The deep "ultra scan" (live streaming report, full 8-step pipeline) is a separate server in `ultra/`: section 7.
 
 ## 1. The feature
 
@@ -242,3 +243,119 @@ last. (a) only for a demo, after the owner has added your origin.
   people who didn't ask. Show your own privacy notice (`site/privacy.html` is the owner's).
 - The results contain links to pirated adult content: never render leak pages or unblurred thumbs by default (the
   site blurs until Reveal).
+
+## 7. Ultra scan (`ultra/`, the live deep scan)
+
+https://jackbase.me/leakscan → 301 `www.` → 302 → `http://72.62.92.114:6767/` ("Live leak report"). One visitor types a
+handle and watches the full pipeline run live: progress bar over 8 steps, a wall of found media streaming in, links
+grouped by site (copy / download / mail), Google look-alike grids, a downloadable card with QR, optional chat. Every
+scan gets its own shareable `/s/<slug>` page. Not the quick scan of sections 1-6: no sqlite, no CORS, its own page.
+
+`ultra/` is self-contained (stdlib `http.server` + SSE, one process, spawns `pipeline_steps.py` subprocesses with
+`cwd=ultra/`). Copied from the deployed build (2026-11-23) with two changes: creator names / handles in comments,
+examples and CLI defaults replaced by placeholders (`janedoee`, `jdoeex`, `examplefit`, …), and `/asset` serves image
+types only. Several modules share a name with `app/` but are newer; keep the two folders apart.
+
+### Files
+
+| File | Role |
+|---|---|
+| `live_stream_site.py` | entry: HTTP server, every route, the page (HTML/CSS/JS inline), sessions, the two-phase scan driver |
+| `pipeline_steps.py` | the pipeline as a list of steps (`--only a,b,c`); each step spawns one script below |
+| `leak_scanner.py` | step `scan`: which of the ~375 domains in `bruqi_detection_map.json` host the handle |
+| `build_linkcards.py` | synthetic "leak index" browser screenshots (Playwright; skipped without it) |
+| `discovery_seed.py`, `leak_crawler.py`, `seed_url_crawl.py`, `clean_crawl.py`, `slug_triage.py`, `expand_variants.py` | seed, deep crawl, clean, triage, mirror variants |
+| `build_cse.py`, `cse_scanner.py` | step `cse`: Google Custom Search (web + image) |
+| `build_gallery.py`, `build_google_shots.py`, `google_shots.py` | gallery + Google-Images style grids (from CSE data; the Incogniton browser path is off on the VPS) |
+| `export_dmca.py`, `make_report.py`, `report_to_pdf.py`, `dmca_finder.py` | DMCA export (LIKELY / POSSIBLE), report, abuse contacts |
+| `title_aliases.py`, `username_variations.py`, `slug_probe.py`, `web_search.py`, `collect_images.py`, `recovery_demo.py` | alias harvest, variants, helpers imported by the steps |
+| `chat_proxy.py` | `POST /api/chat` → DeepSeek; reads `kb.json` if present (not shipped here; chat runs without it) |
+| `web_common.py`, `fetch_common.py`, `netloc.py`, `leak_evidence.py`, `browser_common.py`, `connect_incogniton.py` | SSE, fetch (curl_cffi, urllib fallback), host rules, browser glue |
+| `bruqi_detection_map.json`, `fake_aggregators.txt` | known leak domains + URL templates; SEO-spam hosts to drop |
+| `fixtures/demo.crawl.json` | synthetic crawl (`*.example` hosts) for the offline replay below |
+
+Scan output lands in `ultra/webscans/`, session sidecars in `ultra/.live_sessions/` (both git-ignored).
+
+### The 8 steps (progress bar ← `pipeline_steps.py` ids)
+
+| # | Bar label | Step ids | Script |
+|---|---|---|---|
+| 1 | Presence scan | `scan` | `leak_scanner.py` |
+| 2 | Google & CSE | `cse`, `gshots` (`gcapture`, `images` off) | `build_cse.py`, `build_google_shots.py` |
+| 3 | Seed frontier | `seed` (`seedurl`) | `discovery_seed.py` |
+| 4 | Deep crawl | `crawl` | `leak_crawler.py` |
+| 5 | Clean & dedupe | `clean` | `clean_crawl.py` |
+| 6 | Triage | `triage` | `slug_triage.py` |
+| 7 | Gallery | `gallery` | `build_gallery.py` |
+| 8 | Export & report | `export` (`report`) | `export_dmca.py` |
+
+Run order per scan: title-harvest aliases (`title_aliases.py`, plain HTTP) → phase 1 = `scan` ‖ `cse` (two concurrent
+subprocesses; partial crawl waves start on domains as `scan` prints `FOUND <domain>`) → phase 2 =
+`seed,crawl,clean,triage,gallery,gshots,export` with `--resume-crawl`. One pipeline subprocess at a time across all
+sessions (a second scan shows "queued"). The exact commands are printed in the scan console.
+
+### API contract (from `ultra/live_stream_site.py`)
+
+`?job=<slug>` binds a call to a scan; without it the call hits the empty landing session.
+
+| Route | Answer |
+|---|---|
+| `GET /`, `GET /s/<slug>` | the page (same shell; JS reads the slug from the path). A misread `/s…` link 302s to the right slug or `/` |
+| `GET /healthz` | `ok` (never gated) |
+| `GET /api/state` | snapshot: `seq total pages domain_count elapsed mode source status done domains recent asset_counts report by_domain dm chat_enabled scan_enabled scan{running status handle prefix seq rc cmd phase lines} prefix slug`; 404 unknown job |
+| `GET /api/stream` | SSE: `snapshot` (state + assets), then `batch` `{events:[{seq,t,domain,url,kind}], state}`, `: ping` every 10 s, `done` |
+| `GET /api/scan/stream` | SSE of the scan console: `snapshot`, `lines` `{lines, scan}`, `end` (final scan snapshot) |
+| `GET /api/assets` | `{gallery, cse, grids, linkcards, …}` asset catalog |
+| `GET /api/links?bucket=LIKELY\|POSSIBLE&fmt=txt\|download&diff=1` | found URLs, one per line (`download` = attachment) |
+| `GET /api/sessions` | every scan on the server: `[{slug, handle, prefix, created, state: running\|queued\|done, status, total, viewers}]` |
+| `GET /asset?p=<path>&w=<px>` | an image under `ultra/` (downscaled with Pillow when `w`) |
+| `GET /media?u=<url>&w=<px>` | remote image proxy + thumbnail (refuses private / loopback hosts) |
+| `GET /qr?u=<this server's /s/<slug> URL>&sz=4..16` | PNG QR (needs `qrcode`, else 404) |
+| `POST /api/scan` `{handle, aliases[≤12], no_cse, no_variations}` | `{ok, slug, share:"/s/<slug>"}`; 400 `handle required`; 429 `busy` when `MAX_LIVE_SCANS` slots are taken; 503 when `SCAN_ENABLED=0` |
+| `POST /api/scan/cancel?job=<slug>` | `{ok:true}` |
+| `POST /api/sessions/delete` `{slug}` | cancel + forget + wipe that scan's files |
+| `POST /api/mail?job=<slug>` `{email, bucket}` | mails the links as an attachment via `SMTP_*`; `{ok:false,"error":"email not configured on this host"}` without them |
+| `POST /api/chat` `{messages, scan_context}` | SSE DeepSeek answer; 503 without `DEEPSEEK_API_KEY` |
+
+Access: `LIVE_TOKEN` set = every route but `/healthz` needs `?t=<token>` once (then a cookie). There is no per-IP rate
+limit and no auth on the session routes (anyone who can reach it can list, open, cancel and delete every scan, and
+start scans until the slots are full). Self-hosting on a public address: set `LIVE_TOKEN` or put it behind your app's
+auth.
+
+### Run it locally (no keys)
+
+Deps: Python 3.12+, `pip install Pillow curl_cffi` (the deployed image: `python:3.13-slim` + those two,
+`CMD python3 live_stream_site.py --no-open`, `HOST=0.0.0.0`). Optional: `qrcode` (card QR), `beautifulsoup4` +
+`playwright` (browser-only steps; they skip without them).
+
+| Mode | Command | Outside calls |
+|---|---|---|
+| Replay (UI work) | `cd ultra && SCAN_ENABLED=0 python3 live_stream_site.py --no-open --port 8095 --mode replay --replay fixtures/demo.crawl.json --rate 6` | none (fixture hosts are `*.example`) |
+| Landing only | `cd ultra && SCAN_ENABLED=0 python3 live_stream_site.py --no-open --port 8095` | none |
+| Real scan | `cd ultra && python3 live_stream_site.py --no-open --port 8095`, then Start | crawls ~375 public leak sites from your IP; CSE / chat only with their keys |
+
+No tests ship for `ultra/`.
+
+### Env
+
+| Var | Does |
+|---|---|
+| `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | step `cse` (web + image search); without them `cse` stops at "CSE not configured" with no Google call |
+| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, `CHAT_MAX_TOKENS` | chat (700 tokens/answer, last 8 turns) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` | "mail me the links" |
+| `DM_INSTAGRAM`, `DM_WHATSAPP`, `DM_TELEGRAM` | contact buttons |
+| `SCAN_ENABLED` (code default 1 when `pipeline_steps.py` exists), `MAX_LIVE_SCANS` (4; VPS 2), `SESSION_TTL` (21600 s), `LIVE_TOKEN` | scan on/off, slots, idle GC, access gate |
+| `HOST`, `PORT` (127.0.0.1:8090), `TRUST_XFF`, `WEBSCAN_DIR`, `REPORT_PREFIX`, `PER_DOMAIN_LINKS`, `LINKS_CAP` | bind, scratch dir, single-campaign mode, link caps |
+| `INCOGNITON_*`, `CAPTCHA_ALERT*`, `SHOT_*` | desktop-browser screenshot path (off on the VPS: `INCOGNITON_DISABLE=1`) |
+
+### Costs per ultra scan
+
+| Service | Spend |
+|---|---|
+| Google CSE (paid after the free daily quota) | step `cse`: up to 2 + 15 web + 6 image = **≤ 23 calls**; `no_cse` = 0 |
+| DeepSeek | 0 per scan; 1 call per chat message |
+| SMTP | 1 mail per "mail me" |
+| Browserbase | none (not used by this build) |
+| Leak sites | free, but a full crawl is minutes of outbound requests to ~375 adult hosts from the server's IP |
+
+Same consent and display rules as section 6: scan only creators who asked, blur by default.

@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .DS_Store
 /tmp/
+ultra/webscans/
+ultra/.live_sessions/
+ultra/campaigns/
+ultra/exports/
+ultra/slugs_cache.json

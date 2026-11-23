@@ -1,0 +1,95 @@
+[
+ {
+  "domain": "leaks-a.example",
+  "media": [
+   "https://leaks-a.example/media/demo-creator-000.jpg",
+   "https://leaks-a.example/media/demo-creator-001.jpg",
+   "https://leaks-a.example/media/demo-creator-002.jpg",
+   "https://leaks-a.example/media/demo-creator-003.jpg",
+   "https://leaks-a.example/media/demo-creator-004.jpg",
+   "https://leaks-a.example/media/demo-creator-005.jpg",
+   "https://leaks-a.example/media/demo-creator-006.jpg",
+   "https://leaks-a.example/media/demo-creator-007.jpg",
+   "https://leaks-a.example/media/demo-creator-008.jpg",
+   "https://leaks-a.example/media/demo-creator-009.jpg",
+   "https://leaks-a.example/media/demo-creator-010.jpg",
+   "https://leaks-a.example/media/demo-creator-011.jpg",
+   "https://leaks-a.example/media/demo-creator-012.jpg",
+   "https://leaks-a.example/media/demo-creator-013.jpg",
+   "https://leaks-a.example/media/demo-creator-014.jpg",
+   "https://leaks-a.example/media/demo-creator-015.jpg",
+   "https://leaks-a.example/media/demo-creator-016.jpg",
+   "https://leaks-a.example/media/demo-creator-017.jpg",
+   "https://leaks-a.example/media/demo-creator-018.jpg",
+   "https://leaks-a.example/media/demo-creator-019.jpg",
+   "https://leaks-a.example/media/demo-creator-020.jpg",
+   "https://leaks-a.example/media/demo-creator-021.jpg",
+   "https://leaks-a.example/media/demo-creator-022.jpg",
+   "https://leaks-a.example/media/demo-creator-023.jpg"
+  ],
+  "pages": [
+   "https://leaks-a.example/demo-creator/post/0/",
+   "https://leaks-a.example/demo-creator/post/1/",
+   "https://leaks-a.example/demo-creator/post/2/",
+   "https://leaks-a.example/demo-creator/post/3/",
+   "https://leaks-a.example/demo-creator/post/4/",
+   "https://leaks-a.example/demo-creator/post/5/"
+  ]
+ },
+ {
+  "domain": "leaks-b.example",
+  "media": [
+   "https://leaks-b.example/media/demo-creator-000.jpg",
+   "https://leaks-b.example/media/demo-creator-001.jpg",
+   "https://leaks-b.example/media/demo-creator-002.jpg",
+   "https://leaks-b.example/media/demo-creator-003.jpg",
+   "https://leaks-b.example/media/demo-creator-004.jpg",
+   "https://leaks-b.example/media/demo-creator-005.jpg",
+   "https://leaks-b.example/media/demo-creator-006.jpg",
+   "https://leaks-b.example/media/demo-creator-007.jpg",
+   "https://leaks-b.example/media/demo-creator-008.jpg",
+   "https://leaks-b.example/media/demo-creator-009.jpg",
+   "https://leaks-b.example/media/demo-creator-010.jpg",
+   "https://leaks-b.example/media/demo-creator-011.jpg",
+   "https://leaks-b.example/media/demo-creator-012.jpg",
+   "https://leaks-b.example/media/demo-creator-013.jpg"
+  ],
+  "pages": [
+   "https://leaks-b.example/demo-creator/post/0/",
+   "https://leaks-b.example/demo-creator/post/1/",
+   "https://leaks-b.example/demo-creator/post/2/"
+  ]
+ },
+ {
+  "domain": "mirror-c.example",
+  "media": [
+   "https://mirror-c.example/media/demo-creator-000.jpg",
+   "https://mirror-c.example/media/demo-creator-001.jpg",
+   "https://mirror-c.example/media/demo-creator-002.jpg",
+   "https://mirror-c.example/media/demo-creator-003.jpg",
+   "https://mirror-c.example/media/demo-creator-004.jpg",
+   "https://mirror-c.example/media/demo-creator-005.jpg",
+   "https://mirror-c.example/media/demo-creator-006.jpg",
+   "https://mirror-c.example/media/demo-creator-007.jpg",
+   "https://mirror-c.example/media/demo-creator-008.jpg"
+  ],
+  "pages": [
+   "https://mirror-c.example/demo-creator/post/0/",
+   "https://mirror-c.example/demo-creator/post/1/"
+  ]
+ },
+ {
+  "domain": "tube-d.example",
+  "media": [
+   "https://tube-d.example/media/demo-creator-000.jpg",
+   "https://tube-d.example/media/demo-creator-001.jpg",
+   "https://tube-d.example/media/demo-creator-002.jpg",
+   "https://tube-d.example/media/demo-creator-003.jpg",
+   "https://tube-d.example/media/demo-creator-004.jpg"
+  ],
+  "pages": [
+   "https://tube-d.example/demo-creator/post/0/",
+   "https://tube-d.example/demo-creator/post/1/"
+  ]
+ }
+]
