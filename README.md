@@ -1,5 +1,7 @@
 # leakscan-site
 
+Rebuilding the free scan in another app: see [HANDOFF.md](HANDOFF.md).
+
 Google Ads landing site for Abolita: personal leak-removal service for creators. Static HTML/CSS/JS, no build, no
 cookies or third-party requests on the landing pages except `js/analytics.js` (Google Ads, see below). `site/` is what ships. `site/showcase/` is the demo of
 the official site each client gets (fictional creator, built from the tessa template); the landing page links and
