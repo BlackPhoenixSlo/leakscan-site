@@ -272,7 +272,7 @@ types only. Several modules share a name with `app/` but are newer; keep the two
 | `chat_proxy.py` | `POST /api/chat` → DeepSeek; reads `kb.json` if present (not shipped here; chat runs without it) |
 | `web_common.py`, `fetch_common.py`, `netloc.py`, `leak_evidence.py`, `browser_common.py`, `connect_incogniton.py` | SSE, fetch (curl_cffi, urllib fallback), host rules, browser glue |
 | `bruqi_detection_map.json`, `fake_aggregators.txt` | known leak domains + URL templates; SEO-spam hosts to drop |
-| `fixtures/demo.crawl.json` | synthetic crawl (`*.example` hosts) for the offline replay below |
+| `fixtures/demo.crawl.json` | synthetic crawl (`*.example` hosts) for the offline demo report below |
 
 Scan output lands in `ultra/webscans/`, session sidecars in `ultra/.live_sessions/` (both git-ignored).
 
@@ -330,9 +330,18 @@ Deps: Python 3.12+, `pip install Pillow curl_cffi` (the deployed image: `python:
 
 | Mode | Command | Outside calls |
 |---|---|---|
-| Replay (UI work) | `cd ultra && SCAN_ENABLED=0 python3 live_stream_site.py --no-open --port 8095 --mode replay --replay fixtures/demo.crawl.json --rate 6` | none (fixture hosts are `*.example`) |
+| Demo report (UI work) | see below, then http://127.0.0.1:8095/s/demoReport01 | none (fixture hosts are `*.example`) |
 | Landing only | `cd ultra && SCAN_ENABLED=0 python3 live_stream_site.py --no-open --port 8095` | none |
 | Real scan | `cd ultra && python3 live_stream_site.py --no-open --port 8095`, then Start | crawls ~375 public leak sites from your IP; CSE / chat only with their keys |
+
+Demo report = a finished scan rebuilt from disk (65 links on 4 sites; also listed under "Live scans on this server"):
+
+```
+cd ultra && mkdir -p .live_sessions webscans
+cp fixtures/demo.crawl.json webscans/webscan_demo.crawl.json
+echo '{"slug":"demoReport01","handle":"democreator","prefix":"webscans/webscan_demo"}' > .live_sessions/demoReport01.json
+SCAN_ENABLED=0 python3 live_stream_site.py --no-open --port 8095
+```
 
 No tests ship for `ultra/`.
 
