@@ -169,6 +169,9 @@ only gstatic) = All / Videos tabs; `images` = Google thumb URLs = Images tab; `s
 Client IP = `X-Real-IP`, else last `X-Forwarded-For` hop when `TRUST_XFF=1`, else the socket peer. All 429s are JSON
 `{"error":"rate_limited"}`.
 
+Partner access: `?key=<PARTNER_KEY>` on any `/api/*` URL (preflight included) allows any origin; keyed scans share
+one bucket of `PARTNER_PER_HOUR` (default 10) on top of the per-IP limits. Unset key = off.
+
 CORS: only origins listed in `CORS_ORIGINS` (comma list, exact match) get `Access-Control-Allow-Origin` + `Vary:
 Origin`; preflight `OPTIONS` → 204 with `GET, POST, OPTIONS` / `Content-Type`, max-age 86400. Unknown origin → bare
 204, so the browser blocks the call (checked live: `Origin: https://example.com` gets no ACAO header).
