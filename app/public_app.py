@@ -28,6 +28,7 @@ import base64
 import concurrent.futures as _cf
 import glob
 import hashlib
+import hmac  # one-project
 import json
 import os
 import re
@@ -947,7 +948,7 @@ def _loc_ok(url, alias_toks, timeout=12):
         with urllib.request.urlopen(urllib.request.Request(url, headers=_LOC_UA),
                                     timeout=timeout, context=_LOC_SSL) as r:
             if getattr(r, "status", 200) != 200:
-                return False
+                return False  # one-project
             body = r.read(80000).decode("utf-8", "replace")
     except Exception:
         return False
@@ -1731,6 +1732,12 @@ def scan_reuse_serve(h, key, handle, platform, ip, aliases, socials):
 
 # 3) the one video rule (replaces upstream's): the landing / scan page read `kind` only (no client-side URL sniffing)
 _VIDEO_LINK_RE = re.compile(r"\.(?:mp4|m3u8|webm|mov|mkv)(?:[?#]|$)|/(?:videos?|watch|embed|clips?|vod)(?:[/?#.-]|$)", re.I)
+# Keyed access (`?key=<PARTNER_KEY>` on the URL): any origin may call, scans capped PARTNER_PER_HOUR in total.
+PARTNER_KEY = os.environ.get("PARTNER_KEY", "")
+PARTNER_LIMITER = ratelimit.Limiter(
+    rate_per_min=float(os.environ.get("PARTNER_PER_HOUR", "10")) / 60,
+    burst=float(os.environ.get("PARTNER_PER_HOUR", "10")), max_concurrent=1000)
+
 # <<< one-project patch <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
@@ -1741,10 +1748,16 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     # ------------------------------------------------------------------- CORS
+    def _partner(self):  # one-project
+        if not PARTNER_KEY:  # one-project
+            return False  # one-project
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(getattr(self, "path", "")).query)  # one-project
+        return hmac.compare_digest((q.get("key") or [""])[0].encode(), PARTNER_KEY.encode())  # one-project
+
     def _cors_origin(self):
         hdrs = getattr(self, "headers", None)
         o = ((hdrs.get("Origin") if hdrs else None) or "").rstrip("/")
-        return o if o in CORS_ORIGINS else None
+        return o if o and (o in CORS_ORIGINS or self._partner()) else None  # one-project
 
     def end_headers(self):
         # Every response path (_json, _html, SSE via wc.sse_start, /api/thumb, static) ends here.
@@ -2192,6 +2205,8 @@ class Handler(BaseHTTPRequestHandler):
         body = self._read_json_capped(2048)
         if body is None:
             return  # 413 already sent
+        if self._partner() and not PARTNER_LIMITER.allow("partner", concurrency=False):  # one-project
+            return self._json({"error": "rate_limited"}, 429)  # one-project
         if not SCAN_LIMITER.allow(ip):
             return self._json({"error": "rate_limited"}, 429)
 

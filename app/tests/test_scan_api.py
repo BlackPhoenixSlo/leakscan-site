@@ -113,6 +113,30 @@ class TestCors(unittest.TestCase):
         self.assertIsNone(r.getheader("Access-Control-Allow-Origin"))
         self.assertIsNone(r.getheader("Access-Control-Allow-Methods"))
 
+    def test_partner_key_opens_any_origin(self):
+        old = public_app.PARTNER_KEY
+        public_app.PARTNER_KEY = "k1"
+        try:
+            ok = self.req("OPTIONS", "/api/public-scan?key=k1", "https://crm.partner.example")
+            self.assertEqual(ok.getheader("Access-Control-Allow-Origin"), "https://crm.partner.example")
+            bad = self.req("OPTIONS", "/api/public-scan?key=k2", "https://crm.partner.example")
+            self.assertIsNone(bad.getheader("Access-Control-Allow-Origin"))
+        finally:
+            public_app.PARTNER_KEY = old
+
+    def test_partner_hourly_cap(self):
+        old = public_app.PARTNER_KEY, public_app.PARTNER_LIMITER
+        public_app.PARTNER_KEY = "k1"
+        public_app.PARTNER_LIMITER = public_app.ratelimit.Limiter(rate_per_min=0, burst=0, max_concurrent=1000)
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=5)
+            c.request("POST", "/api/public-scan?key=k1", body=b"{}", headers={"Content-Type": "application/json"})
+            r = c.getresponse()
+            self.assertEqual((r.status, r.read()), (429, b'{"error": "rate_limited"}'))
+            c.close()
+        finally:
+            public_app.PARTNER_KEY, public_app.PARTNER_LIMITER = old
+
     def test_json_carries_cors(self):
         r = self.req("GET", "/api/scan-result/nonexistent", ORIGIN)
         self.assertEqual(r.status, 404)
