@@ -3,6 +3,7 @@
   "path": "/v1/me",
   "request": null,
   "response": {
+    "accepting_new": true,
     "brand": "Example Removal",
     "contact_url": "https://removal.example/contact",
     "creators_max": 5,
