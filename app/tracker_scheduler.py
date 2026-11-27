@@ -1,9 +1,9 @@
 """Daily pass (spec "Daily pass (service)"): a daemon thread like the retention loop wakes every TICK_S; from
 TRACKER_DAILY_AT (UTC HH:MM, default 04:00) on it claims the day's daily_scans row (tracker_seed.claim) for every
 unpaused, undeleted watch, seeds the unseeded ones (the seed probes and finishes its own row) and runs the rest's daily
-lanes one watch at a time (tracker_lanes.run_daily: the Origin probe, each url_key once a day, then the Mega lookup) and
-finishes their rows, failed when the probe failed; one watch's error fails only its own row. Then the
-purge, once per UTC day. Rows still open from an earlier day (a crash) finish failed; today's are taken over after
+lanes one watch at a time (tracker_lanes.run_daily: the Origin probe, each url_key once a day, the Mega lookup, the
+listing recheck) and finishes their rows, failed when the probe failed; one watch's error fails only its own row. Then
+the purge, once per UTC day. Rows still open from an earlier day (a crash) finish failed; today's are taken over after
 tracker_seed.LEASE_H. TRACKER_SCHEDULER=0 keeps the thread off."""
 import ipaddress
 import os

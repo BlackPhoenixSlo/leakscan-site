@@ -1,6 +1,7 @@
 """The vendored Leak judge pieces: Jev (tracker_jev over tracker_llm.post_json) against a stub HTTP endpoint on
 loopback, never a real model call; the judge prompt, verdict parser and band (tracker_verdicts); policy_kind
-(tracker_pagekind). Ported from leakhunt 7ccbdd3's tests (test_jev, test_judge)."""
+(tracker_pagekind). Ported from leakhunt 7ccbdd3's tests (test_jev, test_judge). Hit admission (tracker_judge): the
+URL / title / weak-alias table and the own-profile, own-host and aggregator drops. Fictional creators only."""
 import json
 import os
 import sys
@@ -11,9 +12,12 @@ from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
+import public_app
 import tracker_jev as jev
+import tracker_judge
 import tracker_llm
 import tracker_verdicts as tv
+from tracker_fixture import Base, tdb
 from tracker_pagekind import CLIENT_KINDS, GENERIC_LISTINGS, Handles, policy_kind
 
 SECRET = "apikey_s3cr3t-never-printed"
@@ -327,6 +331,70 @@ class Judge(unittest.TestCase):
 
         for bad in (fail, refused, lambda s, u: "text", lambda s, u: {"verdicts": "x"}, lambda s, u: {}[0]):
             self.assertEqual(tv.judge_batch(rows_, [HANDLE], bad), {})
+
+
+WATCH = {"watch_id": "w_mia", "username": "mia_vale", "aliases_json": json.dumps(["miavale_x", "Mia-V", "rv"])}
+SITE = "https://leaksite.example"
+
+
+class Admission(unittest.TestCase):
+    def setUp(self):
+        p = mock.patch.object(public_app, "CORS_ORIGINS", frozenset({"https://removal.example"}))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_needles(self):
+        self.assertEqual(tracker_judge.needles(WATCH), ("miavale", ["miavale", "miavalex"], ["miav"]))
+        self.assertEqual(tracker_judge.needles({**WATCH, "username": "m.v_a"})[:2], ("", ["miavalex"]))
+
+    def test_url_title_and_weak_alias_table(self):
+        table = [
+            (f"{SITE}/video/mia_vale-beach-101", "", "leak"),
+            (f"{SITE}/v/Mia.Vale/", "Set", "leak"),
+            (f"{SITE}/v/mia%5Fvale-7", "", "leak"),
+            (f"{SITE}/post/miavale_x-99", "anything", "leak"),
+            (f"{SITE}/post/miav-99", "Mia_Vale gym set", "leak"),
+            (f"{SITE}/post/miav-99", "gym set", None),
+            (f"{SITE}/post/123", "miav gym set", None),
+            (f"{SITE}/post/123", "new mia_vale shower set", "pending"),
+            (f"{SITE}/post/123", "MiaVale_X clips", "pending"),
+            (f"{SITE}/post/123", "Mia Vale clips", None),
+            (f"{SITE}/post/rv-1", "rv", None),
+            (f"{SITE}/post/123", "", None),
+            ("https://mega.nz/folder/AbC#mia_vale", "", "leak"),
+        ]
+        self.assertEqual([(u, t, tracker_judge.admission(WATCH, u, t)) for u, t, _ in table], table)
+
+    def test_own_profile_own_host_and_aggregator_drops(self):
+        for url in ("https://onlyfans.com/mia_vale", "https://www.instagram.com/mia_vale/", "https://x.com/mia_vale",
+                    "https://twitter.com/miavale_x", "https://removal.example/r/mia_vale",
+                    "https://www.removal.example/mia_vale", "https://cdn.removal.example/mia_vale.html",
+                    "https://s.leakshaven.com/mia_vale", "https://leakshaven.com/model/mia_vale",
+                    "https://ahvideoscdn.net/mia_vale-1.html"):
+            self.assertIsNone(tracker_judge.admission(WATCH, url, "mia_vale"), url)
+        self.assertEqual(tracker_judge.admission(WATCH, "https://notremoval.example/mia_vale", ""), "leak")
+
+
+class AdmitHit(Base):
+    def test_writes_a_site_search_leak_or_a_pending_hit(self):
+        wid = self.watch(self.tenant(), aliases=("miavale_x", "miav"))
+        with tdb.db() as c:
+            w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
+            got = [tracker_judge.admit_hit(c, w, u, t, "site_search", self.T0, first_scan=f) for u, t, f in (
+                (f"{SITE}/video/mia_vale-101#top", "Beach", False), ("https://mega.nz/file/X1#mia_vale", "", True),
+                (f"{SITE}/video/101", "mia_vale beach", False), ("https://onlyfans.com/mia_vale", "mia_vale", False),
+                (f"{SITE}/video/mia_vale-101", "again", False))]
+        self.assertEqual(got, ["leak", "leak", "pending", None, "leak"])
+        leaks = self.rows("SELECT leak_id, url_key, leak_site, kind, title FROM leaks ORDER BY kind")
+        self.assertEqual([{k: r[k] for k in ("url_key", "leak_site", "kind", "title")} for r in leaks], [
+            {"url_key": "mega.nz/file/x1#mia_vale", "leak_site": "mega.nz", "kind": "filehost", "title": ""},
+            {"url_key": "leaksite.example/video/mia_vale-101", "leak_site": "leaksite.example", "kind": "page",
+             "title": "Beach"}])
+        self.assertEqual([[e["data"] for e in self.events(r["leak_id"])] for r in leaks],
+                         [[{"source": "site_search", "first_scan": True}],
+                          [{"source": "site_search", "first_scan": False}]])
+        self.assertEqual(self.rows("SELECT url, title, source FROM pending_hits"),
+                         [{"url": f"{SITE}/video/101", "title": "mia_vale beach", "source": "site_search"}])
 
 
 if __name__ == "__main__":
