@@ -1,4 +1,4 @@
-"""Browserbase Google step (images + web text, one session per scan), profile refine, declared
+"""Browserbase Google step (images + web text, unproxied session; IG grid: own proxied one), profile refine, declared
 socials. Declared bypasses (all synthetic data):
   - Browserbase REST -> media_gather._bb_create/_bb_release faked (counts creates/releases)
   - Browserbase CDP -> media_gather._cdp_page yields FakePage (goto/content/evaluate/url/
@@ -37,6 +37,8 @@ import profile_extract as pe  # noqa: E402
 import public_app  # noqa: E402
 import ratelimit  # noqa: E402
 import upstream_stub as stub  # noqa: E402
+
+REAL_BB_CREATE = mg._bb_create
 
 H = stub.HANDLE
 FIX = stub.FIXTURES
@@ -209,14 +211,15 @@ class _Env(unittest.TestCase):
         bodies[stub.IG_CDN + "scanresult.jpg"] = stub.synth(600, 600, 91)
         self.cdn = mg.urlopen = stub.FakeCDN(bodies)
         self.embed = mg.page_open = stub.FakeEmbed()
-        self.creates, self.releases, self.pages, self.lock = [], [], [], threading.Lock()
+        self.creates, self.proxies, self.releases, self.pages, self.lock = [], [], [], [], threading.Lock()
         self.page_factory = FakePage
         self.hold = threading.Event()
         self.hold.set()
 
-        def create(key, proj, timeout, deadline):
+        def create(key, proj, timeout, deadline, proxies=False):
             with self.lock:
                 self.creates.append(time.monotonic())
+                self.proxies.append(proxies)
                 return {"id": f"s{len(self.creates)}", "connectUrl": "wss://fake"}
 
         def release(key, proj, sid):
@@ -290,16 +293,17 @@ class TestBrowserGather(_Env):
                                  text=True, timeout=60)
             self.assertEqual(out.stdout.strip(), want, out.stderr[-300:])
 
-    def test_one_session_images_text_grid_and_refine(self):
+    def test_google_and_grid_sessions_images_text_grid_and_refine(self):
         orig = {"display_name": "Mira Example", "bio": "Old bio.", "avatar": True, "accounts": [], "confidence": 0.6}
         slug = self.new_scan(orig)
         st = mg.gather(slug, "instagram.com", H, orig, SCAN_ITEMS, budget=60, sources=self.sources())
         self.assertEqual(st, "ready")
-        self.assertEqual((len(self.creates), self.releases, len(self.pages)), (1, ["s1"], 1))
+        self.assertEqual((self.proxies, self.releases, len(self.pages)), ([False, True], ["s1", "s2"], 2))
         page = self.pages[0]
         kinds = ["home" if u == mg.GOOGLE_HOME else "isch" if "tbm=isch" in u else "web" if "google.com" in u
-                 else "ig" for u in page.gotos]
+                 else "ig" for u in page.gotos + self.pages[1].gotos]
         self.assertEqual(kinds, ["home", "web", "web", "isch", "isch", "ig"])      # warmup, b (feeds refine), a, c
+        self.assertEqual(self.pages[1].gotos, [f"https://www.instagram.com/{H}/"])
         self.assertTrue(all("safe=active" in u for u in page.gotos if "google" in u))
         idx = mg._read_index(slug)
         srcs = [i["source"] for i in idx["images"]]
@@ -364,7 +368,7 @@ class TestBrowserGather(_Env):
         shutil.rmtree(os.path.join(self.tmp.name, "media-cache"), ignore_errors=True)
         slug = self.new_scan()
         mg.gather(slug, "instagram.com", H, None, SCAN_ITEMS, budget=60)
-        page = self.pages[1]
+        page = self.pages[2]                                     # scan 1 had a Google + a grid session
         self.assertIn(mg._ACCEPT_JS, page.evals)
         self.assertTrue(page.accepted)
         self.assertIn("google", [i["source"] for i in mg._read_index(slug)["images"]])
@@ -529,7 +533,7 @@ class TestBrowserGather(_Env):
         self.page_factory = lambda: FakePage(fail="google.com")   # every Google navigation raises
         slug = self.new_scan()
         self.assertEqual(mg.gather(slug, "instagram.com", H, None, SCAN_ITEMS, budget=60), "ready")
-        self.assertEqual(self.releases, ["s1"])
+        self.assertEqual(self.releases, ["s1", "s2"])
         self.assertEqual({i["source"] for i in mg._read_index(slug)["images"]}, {"instagram"})  # grid still ran
         self.assertFalse(os.path.exists(mg._cache_path(mg.cache_key("instagram.com", H))))      # transient
 
@@ -539,14 +543,14 @@ class TestBrowserGather(_Env):
             yield
         mg._cdp_page = broken
         self.assertEqual(mg.gather(self.new_scan(), "instagram.com", H, None, SCAN_ITEMS, budget=60), "none")
-        self.assertEqual(self.releases, ["s1", "s2"])                # released although connect failed
+        self.assertEqual(self.releases, ["s1", "s2", "s3", "s4"])    # released although connect failed
 
     def test_cache_semantics_unchanged(self):
         a = self.new_scan()
         mg.gather(a, "instagram.com", H, None, SCAN_ITEMS, budget=60)
         b = self.new_scan()
         mg.gather(b, "instagram.com", H, None, SCAN_ITEMS, budget=60)
-        self.assertEqual(len(self.creates), 1)                    # cache hit: no second session
+        self.assertEqual(len(self.creates), 2)                    # cache hit: no session for b
         self.assertEqual(mg._read_index(a)["images"], mg._read_index(b)["images"])
         self.assertEqual(mg.load_snippets(a), mg.load_snippets(b))   # snippets travel with the cache
         self.assertEqual(len(self.llm_calls()), 2)                # each scan's profile refined once
@@ -561,13 +565,62 @@ class TestBrowserGather(_Env):
         while len(self.creates) < 2 and time.time() - t0 < 10:
             time.sleep(0.02)
         time.sleep(0.5)
-        self.assertEqual(len(self.creates), 2)                    # MAX_GATHERS sessions, third ran browserless
+        self.assertEqual(len(self.creates), 2)                    # MAX_GATHERS Google sessions, third ran browserless
         self.assertGreaterEqual(self.creates[1] - self.creates[0], 0.19)   # creates serialized
         self.hold.set()
         t0 = time.time()
         while any(mg.public_view(s)["status"] == "pending" for s in slugs) and time.time() - t0 < 30:
             time.sleep(0.05)
-        self.assertEqual(sorted(self.releases), ["s1", "s2"])
+        self.assertEqual(sorted(self.releases), ["s1", "s2", "s3", "s4"])   # + each slot's grid session
+
+
+class TestProxySplit(_Env):
+    def setUp(self):
+        super().setUp()
+        saved = mg.BB_PROXIES
+        mg.BB_PROXIES = True
+        self.addCleanup(setattr, mg, "BB_PROXIES", saved)
+
+    def embed_enough(self):
+        self.embed.pages[H] = stub.embed_page()
+        for i, u in enumerate(mg.parse_embed(stub.embed_page().decode())):
+            self.cdn.bodies[u] = stub.synth(640, 800, 40 + i)
+
+    def test_google_only_one_unproxied_session(self):
+        self.embed_enough()
+        mg.gather(self.new_scan(), "instagram.com", H, None, SCAN_ITEMS, budget=60)
+        self.assertEqual((self.proxies, self.releases), ([False], ["s1"]))
+        self.assertFalse([u for u in self.pages[0].gotos if u.startswith("https://www.instagram.com/")])
+
+    def test_grid_only_one_proxied_session(self):
+        mg.MEDIA_GOOGLE = "off"
+        slug = self.new_scan()
+        mg.gather(slug, "instagram.com", H, None, SCAN_ITEMS, budget=60)
+        self.assertEqual((self.proxies, self.releases), ([True], ["s1"]))
+        self.assertEqual(self.pages[0].gotos, [f"https://www.instagram.com/{H}/"])
+        self.assertEqual({i["source"] for i in mg._read_index(slug)["images"]}, {"instagram"})
+
+    def test_both_wanted_google_unproxied_then_grid_proxied(self):
+        mg.gather(self.new_scan(), "instagram.com", H, None, SCAN_ITEMS, budget=60)
+        self.assertEqual((self.proxies, self.releases), ([False, True], ["s1", "s2"]))
+        self.assertFalse([u for u in self.pages[1].gotos if "google" in u])
+
+    def test_proxies_off_grid_session_unproxied(self):
+        mg.BB_PROXIES = False
+        mg.gather(self.new_scan(), "instagram.com", H, None, SCAN_ITEMS, budget=60)
+        self.assertEqual(self.proxies, [False, False])
+
+    def test_create_body_proxies_flag(self):
+        bodies = []
+        saved = mg._bb
+        mg._bb = lambda method, path, key, body, timeout=15: bodies.append(body) or {"id": "x", "connectUrl": "wss://x"}
+        try:
+            REAL_BB_CREATE("k", "p", 60, time.monotonic() + 60)
+            REAL_BB_CREATE("k", "p", 60, time.monotonic() + 60, proxies=True)
+        finally:
+            mg._bb = saved
+        self.assertEqual([b.get("proxies") for b in bodies], [None, True])
+        self.assertTrue(all(b["browserSettings"]["solveCaptchas"] for b in bodies))
 
 
 class TestSocials(_Env):

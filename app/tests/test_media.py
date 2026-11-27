@@ -74,7 +74,7 @@ class _Env(unittest.TestCase):
         pe.urlopen = _no_fetch
         mg.PUBLIC_ORIGIN = PUB
         mg.MEDIA_GOOGLE, mg.BB_CREATE_GAP = "cse", 0
-        mg._bb_create = lambda key, proj, timeout, deadline: {"id": "s1", "connectUrl": "wss://fake"}
+        mg._bb_create = lambda key, proj, timeout, deadline, proxies=False: {"id": "s1", "connectUrl": "wss://fake"}
         mg._bb_release = lambda key, proj, sid: True
         mg._cdp_page = contextlib.contextmanager(lambda url, deadline: (yield object()))
 
