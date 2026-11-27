@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/v1/me",
+  "request": {},
+  "response": {
+    "error": "method_not_allowed"
+  },
+  "status": 405
+}

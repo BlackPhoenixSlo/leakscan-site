@@ -121,21 +121,29 @@ def match(suggestions, aliases, names=()):
     """Pure: suggest items -> the matched creator {title, modelId}, or None. A social-handle match
     (matchedSource != name, matchedSearch == an alias) wins; else an exact title == alias / name, only when
     exactly one creator has that title (two same-named creators -> can't tell them apart -> None)."""
+    return match_source(suggestions, aliases, names)[0]
+
+
+def match_source(suggestions, aliases, names=()):
+    """match() -> (who, source, needle): source "handle" (the needle is aliases[0], the search term), "alias" or
+    "name", needle the normalised string that matched; (None, None, None) without a match."""
     al = {_norm(a) for a in aliases if _norm(a)}
     nm = al | {_norm(n) for n in names if _norm(n)}
+    term = _norm(aliases[0]) if aliases else ""
     items = [it for it in (suggestions if isinstance(suggestions, list) else [])
              if isinstance(it, dict) and isinstance(it.get("title"), str) and it["title"].strip()
              and _model_id(it.get("modelId"))]
-    pick = lambda it: {"title": it["title"], "modelId": it["modelId"]}
+    pick = lambda it, n: ({"title": it["title"], "modelId": it["modelId"]},
+                          "handle" if n == term else "alias" if n in al else "name", n)
     for it in items:
         src = _norm(it.get("matchedSource"))
         if src and src != "name" and _norm(it.get("matchedSearch")) in al:
-            return pick(it)
+            return pick(it, _norm(it.get("matchedSearch")))
     for it in items:
         t = _norm(it["title"])
         if t in nm and len({x["modelId"] for x in items if _norm(x["title"]) == t}) == 1:
-            return pick(it)
-    return None
+            return pick(it, t)
+    return None, None, None
 
 
 def _int(v):
@@ -195,31 +203,34 @@ def packs(data, who):
     return out
 
 
-def _lookup(term, aliases, names, deadline):
+def _lookup(term, aliases, names, deadline, source=False):
     try:
-        who = match(_get("/content/suggest", {"term": term, "take": 8}, deadline), [term, *aliases], names)
+        who, how, needle = match_source(_get("/content/suggest", {"term": term, "take": 8}, deadline), [term, *aliases],
+                                        names)
         if not who:
             return [], "nomatch"
-        return packs(_get("/content", {"search": who["title"], "count": MAX_PACKS, "sorting": "NEWEST"},
-                          deadline), who), "ok"
+        out = packs(_get("/content", {"search": who["title"], "count": MAX_PACKS, "sorting": "NEWEST"},
+                         deadline), who)
+        return [dict(p, match_source=how, match_term=needle) for p in out] if source else out, "ok"
     except Skip as e:
         return [], str(e)
     except Exception as e:                   # never break the scan
         return [], f"err:{type(e).__name__}"
 
 
-def start(term, aliases, names=()):
+def start(term, aliases, names=(), source=False):
     """term + alias set -> Future of (mega items, reason): one suggest + one pack-list call in a daemon thread of its
     own that gives up at TIMEOUT s from now (it closes a response still dripping at the deadline; a daemon never holds
     up the process exit). Wait for it with result(). reason: ok | nomatch | short | timeout | busy | net | http<code>
-    | badjson | err:<type>. The worker never raises."""
+    | badjson | err:<type>. The worker never raises. `source` (the tracker's private run only): each item also carries
+    match_source (handle | alias | name) and match_term (match_source())."""
     fut = _cf.Future()
     term = _norm(term)
     if len(term) <= 2:                       # the site's own autocomplete needs > 2 chars
         fut.set_result(([], "short"))
         return fut
     deadline = time.monotonic() + TIMEOUT
-    threading.Thread(target=lambda: fut.set_result(_lookup(term, aliases, names, deadline)),
+    threading.Thread(target=lambda: fut.set_result(_lookup(term, aliases, names, deadline, source)),
                      name="leakshaven", daemon=True).start()
     return fut
 

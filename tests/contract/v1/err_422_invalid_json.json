@@ -1,0 +1,10 @@
+{
+  "method": "PUT",
+  "path": "/v1/watches/w_other_0003",
+  "request": null,
+  "response": {
+    "error": "invalid_json",
+    "field": null
+  },
+  "status": 422
+}
