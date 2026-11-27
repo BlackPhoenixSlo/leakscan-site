@@ -19,6 +19,9 @@ sys.path.insert(0, APP)
 import db
 import public_app
 import tracker_db
+import tracker_judge
+import tracker_lanes
+import tracker_plan
 import tracker_seed
 import tracker_view
 
@@ -776,7 +779,105 @@ class TestContract(Base):
             call("err_410", "GET", "/v1/creators/w_rowanash_0002")
             call("err_422", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="m"))
             call("err_422_invalid_json", "PUT", "/v1/watches/w_other_0003", None)
+        self.coverage_scenario(out)
         return out
+
+    def coverage_scenario(self, out):
+        """A second tenant (so the goldens above keep their rows): Coverage lanes and Google visibility as the lane
+        writers leave them, full passes on slot days only."""
+        key = self.tenant("tn_example0002", "Example Agency Two")
+
+        def call(name, path):
+            st, _, b = self.req("GET", path, None, key)
+            out[name] = {"method": "GET", "path": path, "request": None, "status": st, "response": b}
+
+        def put(wid, at, **over):
+            self.clock = at
+            self.assertEqual(self.req("PUT", f"/v1/watches/{wid}", body(**over), key)[0], 200)
+            with tracker_db.db() as c:
+                c.execute("UPDATE watches SET seeded_at = COALESCE(seeded_at, ?) WHERE watch_id = ?", (iso(at.date(), 9, 5), wid))
+                return c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
+
+        iso = lambda day, h=4, m=0: f"{day.isoformat()}T{h:02d}:{m:02d}:00Z"
+        last_slot = lambda w: NOW.date() - timedelta(days=(NOW.weekday() - w["weekly_slot"]) % 7 or 7)
+        at9 = lambda day: datetime(2026, 11, day, 9, 0, tzinfo=timezone.utc)
+        rec, fresh, full = tracker_lanes._record, tracker_lanes.FRESH, tracker_lanes.FULL
+        nov = lambda day: NOW.date().replace(day=day)
+
+        w = put("w_miavale_0101", at9(20), account_id="acc-2001", instagram="mia.vale.official", x="itsmiavale")
+        slot = last_slot(w)
+        self.assertTrue(nov(21) < slot < nov(27), slot)
+        plan = tracker_plan.build(w, w["platform"])
+        tr = plan.trim(plan.loads - 6)
+        self.assertEqual([x["field"] for x in tr.dropped], ["alias:0", "x", "instagram"])
+        before = slot - timedelta(days=1)
+        rec("w_miavale_0101", before.isoformat(), fresh, iso(before, 4, 3))
+        rec("w_miavale_0101", slot.isoformat(), full, iso(slot, 4, 10), "reduced", "cap_tenant_month", next_on="2026-12-01",
+            trimmed=tr.dropped, carry=json.dumps({"on": "2026-12-01", "reason": "cap_tenant_month", "first": True, "pages": [
+                list(tracker_lanes._page_key(q)) for q in tracker_lanes._pages(tr.cut)]}))
+        rec("w_miavale_0101", "2026-11-26", "mega_lookup", iso(nov(26), 4, 2))
+        rec("w_miavale_0101", "2026-11-26", fresh, iso(nov(26), 4, 3), "waiting", "cap_tenant_month", next_on="2026-12-01")
+        rec("w_miavale_0101", "2026-11-27", "origin_probe", iso(nov(27), 4, 1), ledger=False)
+        rec("w_miavale_0101", "2026-11-27", "mega_lookup", iso(nov(27), 4, 2), "failed")
+        rec("w_miavale_0101", "2026-11-27", "listing_recheck", iso(nov(27), 4, 2))
+        rec("w_miavale_0101", "2026-11-27", fresh, iso(nov(27), 4, 3), "waiting", "cap_tenant_month", next_on="2026-12-01")
+
+        rowan = dict(account_id="acc-2002", username="rowanash", display_name="Rowan Ash", aliases=[], instagram=None, x=None)
+        put("w_rowanash_0102", at9(10), **rowan)
+        for lane, m in (("origin_probe", 1), ("mega_lookup", 2), ("listing_recheck", 2)):
+            rec("w_rowanash_0102", "2026-11-26", lane, iso(nov(26), 4, m), ledger=lane != "origin_probe")
+        with tracker_db.db() as c:
+            c.executemany("INSERT INTO daily_scans (watch_id, day, started_at, finished_at, outcome) VALUES (?,?,?,?,?)",
+                          [("w_miavale_0101", "2026-11-26", iso(nov(26)), iso(nov(26), 4, 5), "partial"),
+                           ("w_miavale_0101", "2026-11-27", iso(nov(27)), iso(nov(27), 4, 5), "partial"),
+                           ("w_rowanash_0102", "2026-11-26", iso(nov(26)), iso(nov(26), 4, 5), "ok")])
+        put("w_rowanash_0102", at9(26), paused=True, **rowan)
+
+        vis = dict(account_id="acc-2003", platform="fansly", instagram=None, x=None)
+        w = put("w_miavale_0103", at9(11), **vis)
+        s = last_slot(w)
+        passes = [s - timedelta(days=14), s - timedelta(days=7), s]
+        self.assertTrue(nov(11) < passes[0] <= nov(18), passes)
+        urls = {"true": "https://example-leaks.test/miavale-set-1", "false": "https://example-leaks.test/miavale-set-2",
+                "null": "https://forum.example-leaks.test/t/mia.vale.x"}
+        keys = {k: tracker_judge.leak_key(u) for k, u in urls.items()}
+        handle, alias = ("web", "handle"), ("web", "alias:miavalex")
+
+        def full_pass(w, day, returned):
+            with tracker_db.db() as c:
+                plan = tracker_plan.build(w, w["platform"])
+                pairs = {tracker_lanes._pair(q, plan.values) for q in plan.queries}
+                if day == passes[0]:
+                    self.assertLessEqual({handle, alias}, pairs)
+                    ids = iter(["lk_0201", "lk_0202", "lk_0203"])
+                    with mock.patch.object(tracker_db, "new_id", lambda prefix: next(ids)):
+                        self.assertEqual([tracker_judge.admit_hit(c, w, u, "set", "google_web", iso(day, 4, 10), first_scan=True)
+                                          for u in urls.values()], ["leak"] * 3)
+                tracker_lanes._visibility(c, w, plan, {keys[k]: v for k, v in returned.items()}, pairs, iso(day, 4, 10), True)
+            rec(w["watch_id"], day.isoformat(), full, iso(day, 4, 10), next_on=(day + timedelta(days=7)).isoformat())
+
+        def status(day, fr, to, dead=None):
+            with tracker_db.db() as c:
+                for k in keys:
+                    lid = c.execute("SELECT leak_id FROM leaks WHERE url_key = ?", (keys[k],)).fetchone()[0]
+                    tracker_db.add_event(c, lid, "status", {"from": fr, "to": to, "dead_since": dead}, iso(day, 4, 1))
+
+        full_pass(w, passes[0], {"true": {handle}, "false": {handle}, "null": {alias}})
+        status(passes[0] + timedelta(days=1), None, "live")
+        full_pass(w, passes[1], {"null": {alias}})
+        dead = passes[1] + timedelta(days=1)
+        status(dead + timedelta(days=1), "live", "gone", iso(dead, 4, 1))
+        w = put("w_miavale_0103", at9(passes[2].day - 1), aliases=[], **vis)
+        full_pass(w, passes[2], {"true": {handle}})
+        with tracker_db.db() as c:
+            c.execute("INSERT INTO probe_state (leak_id, last_probe_at, last_live_at, consecutive_dead, last_status, origin_status, "
+                      "probes) SELECT leak_id, ?, ?, ?, 'dead', 'gone', ? FROM leaks WHERE watch_id = 'w_miavale_0103'",
+                      (iso(nov(27), 4, 1), iso(dead - timedelta(days=1), 4, 1), (nov(27) - dead).days + 1,
+                       (nov(27) - passes[0]).days))
+        self.clock = NOW
+        call("creator_one_coverage", "/v1/creators/w_miavale_0101")
+        call("creator_one_coverage_paused", "/v1/creators/w_rowanash_0102")
+        call("creator_leaks_visibility", "/v1/creators/w_miavale_0103/leaks")
 
     def test_goldens(self):
         out = self.scenario()
