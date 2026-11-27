@@ -4,7 +4,7 @@ before a cap was lowered can still be consumed in full (overshoot bounded by the
 spend into a watch-less carry row, so deleting a watch never reopens day or month room."""
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 import tracker_db as tdb
 
@@ -20,6 +20,7 @@ class Reservation:
     unit: str
     held: int
     used: int = 0
+    short: Optional["Refused"] = None
 
 
 class Refused(NamedTuple):
@@ -46,7 +47,8 @@ def month_loads_spent(c, tenant_id, month):
 
 
 def reserve(tenant_id, watch_id, unit, n, partial=False):
-    """Hold n units (partial=True: min(n, room), > 0) -> Reservation, or Refused(reason, next_on) holding nothing.
+    """Hold n units (partial=True: min(n, room), > 0; under n sets .short = Refused(reason, next_on)) -> Reservation,
+    or Refused(reason, next_on) holding nothing.
     reason: cap_global | cap_tenant_month | creator_cap | gone (watch deleted or missing); next_on None = no date."""
     if unit not in UNITS or n < 1:
         raise ValueError(f"bad reserve {unit} {n}")
@@ -80,7 +82,8 @@ def _reserve(c, tenant_id, watch_id, unit, n, partial):
     grant = min(n, room) if partial else (n if n <= room else 0)
     if grant <= 0:
         return Refused(reason, next_on)
-    r = Reservation(tdb.new_id("rs_"), tenant_id, watch_id, unit, grant)
+    r = Reservation(tdb.new_id("rs_"), tenant_id, watch_id, unit, grant,
+                    short=Refused(reason, next_on) if grant < n else None)
     c.execute("INSERT INTO load_reservation (id, tenant_id, watch_id, unit, day, month, held, created_at) "
               "VALUES (?,?,?,?,?,?,?,?)", (r.id, tenant_id, watch_id, unit, d, month, grant, tdb.fmt(now)))
     return r

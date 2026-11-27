@@ -10,13 +10,18 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   probe_state.last_status    raw last probe: live | dead | blocked | unknown.
   probe_state.origin_status  settled: NULL (no settled probe yet) | live | gone (gone = 2 dead in a row).
   leaks.recheck_at  the listing recheck's last attempt at this Leak (tracker_lanes), NULL = never.
-  leak_events       seen{source: google_web|mega_index|site_search, first_scan: bool}; google_seen{};
+  leaks.google_fields_json  [[vertical, field]] whose full-pass query ever returned the Leak (tracker_lanes); an alias
+                    field is `alias:<norm(alias)>`, the seed's Google Leaks are [["web","handle"]]; NULL = none.
+  leak_events       seen{source: google_web|mega_index|site_search, first_scan: bool}; google_seen{visible: true |
+                    false | null} written only when visibility changes ({} = Phase 1's, visible); no google_seen = null;
                     status{from: NULL|live|gone, to: live|gone, dead_since: ts|NULL} only when origin_status changes;
                     a mega Leak's status adds source: mega_index.
   daily_scans.outcome        NULL while running | ok | partial (a lane_day row of that day is partial or failed) | failed
                              (the Origin probe failed) | skipped.
   tenants.bb_key / bb_project   the tenant's own Browserbase creds (tracker_cli tenant bb); never printed or logged.
   watches.weekly_slot   0 = Monday .. 6; with plan_loads set by tracker_admission (admit on create, backfill in init).
+  watches.carry_json    the full pass's cap-cut pages {on: UTC day, reason, first: the slot run's first-scan baseline,
+                        pages: [[vertical, text, page]]}, run once on `on` (tracker_lanes); NULL = none.
   load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired;
                     watch_id NULL = a purged watch's carried spend.
   lane_state        one row per (watch, lane) run so far (tracker_lanes): state ok | reduced | failed; next_attempt_on a
@@ -182,13 +187,18 @@ CREATE TABLE IF NOT EXISTS serp_cache (
   PRIMARY KEY (day, vertical, text, page, since)
 );
 """
+SEED_FIELDS = '[["web","handle"]]'
 _COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
             ("watches", "weekly_slot", "INTEGER CHECK (weekly_slot BETWEEN 0 AND 6)"),
             ("watches", "plan_loads", "INTEGER"),
             ("watches", "carry_json", "TEXT"),
             ("leaks", "recheck_at", "TEXT"),
             ("tenants", "bb_key", "TEXT"),
-            ("tenants", "bb_project", "TEXT")]
+            ("tenants", "bb_project", "TEXT"),
+            # every Google Leak so far is the seed's (the fresh pass shipped gated off)
+            ("leaks", "google_fields_json", "TEXT", f"UPDATE leaks SET google_fields_json = '{SEED_FIELDS}' "
+             "WHERE leak_id IN (SELECT leak_id FROM leak_events WHERE type = 'seen' AND "
+             "data_json LIKE '%\"source\":\"google_web\"%')")]
 
 _clock = None
 
@@ -215,9 +225,11 @@ def init():
         c.execute("PRAGMA journal_mode=WAL")
         c.executescript(_SCHEMA)
         c.execute("BEGIN IMMEDIATE")
-        for table, col, decl in _COLUMNS:
+        for table, col, decl, *backfill in _COLUMNS:
             if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+                for sql in backfill:
+                    c.execute(sql)
         tracker_admission.backfill(c)
 
 
@@ -273,6 +285,11 @@ def new_key():
 
 def key_hash(key):
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def visible_of(data):
+    """A google_seen event's data -> True | False | None ({} = Phase 1's, visible)."""
+    return data.get("visible", True)
 
 
 def add_event(c, leak_id, type_, data=None, at=None):
