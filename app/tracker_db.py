@@ -11,7 +11,7 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   probe_state.origin_status  settled: NULL (no settled probe yet) | live | gone (gone = 2 dead in a row).
   leak_events       seen{source: google_web|mega_index, first_scan: bool}; google_seen{};
                     status{from: NULL|live|gone, to: live|gone, dead_since: ts|NULL} only when origin_status changes;
-                    a mega Leak's: status{from: listed|gone, to: gone|listed, dead_since, source: mega_index}.
+                    a mega Leak's status adds source: mega_index.
   daily_scans.outcome        NULL while running | ok | failed.
   watches.weekly_slot   0 = Monday .. 6; with plan_loads set by tracker_admission (admit on create, backfill in init).
   load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired;

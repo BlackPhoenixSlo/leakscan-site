@@ -399,7 +399,8 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
 - Local tracer, nothing leaves the box: `python3 app/tests/tracker_stub_server.py --port N [--db PATH]` prints the base URL, then
   `TRACKER_DB=` and `TRACKER_STUB_FETCH=` paths (CSE, the Mega aggregator and Origin probes are stubs; seed inline; scheduler off).
   `POST /__tracker/daily?at=<ISO>` runs one daily pass at that moment; `POST /__tracker/fetch` `{url | "*": status | [status, body]}`
-  sets the stub probe answers. Another process sharing it: `TRACKER_DB=<path> TRACKER_FETCHER=stub TRACKER_STUB_FETCH=<path>`.
+  sets the stub probe answers; `POST /__tracker/mega` `{suggest?, title?, content?}` sets the Mega index stub's next answers
+  (a pack with `"deleted": true` stages a Mega `deleted` day). Another process sharing it: `TRACKER_DB=<path> TRACKER_FETCHER=stub TRACKER_STUB_FETCH=<path>`.
 - `TRACKER_FETCHER=stub` loads `app/tests/tracker_stub_fetch.py`; unset, probes are real bounded GETs (http/https, 15 s, 5 redirects,
   256 KB, 8 per host, no loopback / private / link-local / NAT64 / 6to4 / Teredo / own addresses; compose sets `TRACKER_SELF_IPS` to the
   VPS IPv4, the scheduler logs a warning at start when it holds no public address).

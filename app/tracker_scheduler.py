@@ -46,10 +46,10 @@ def _pass(now):
                 out["seeded"] += bool(tracker_seed.run(wid, claimed=True))
             else:
                 r = tracker_lanes.run_daily(wid, today)
-                p = r and r["probe"]
-                if p:
-                    out.update(probed=out["probed"] + 1, keys=out["keys"] + p["keys"], fetched=out["fetched"] + p["fetched"])
-                _finish([wid], today, "failed" if r and p is None else "ok")
+                if r["probe"]:
+                    out.update(probed=out["probed"] + 1, keys=out["keys"] + r["probe"]["keys"],
+                               fetched=out["fetched"] + r["probe"]["fetched"])
+                _finish([wid], today, r["outcome"])
         except Exception as e:
             log(f"tracker daily watch failed: {type(e).__name__}")
         _finish([wid], today, "failed")

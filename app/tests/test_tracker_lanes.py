@@ -130,8 +130,10 @@ class TestMegaLookup(Lanes):
         self.assertEqual(self.pills(), {url(1): "gone", url(2): "listed"})
         self.assertEqual(self.events(self.mega_leak(1), "status"),
                          [{"at": at(4), "type": "status",
-                           "data": {"from": "listed", "to": "gone", "dead_since": at(3), "source": "mega_index"}}])
-        self.assertEqual((self.dead(2), self.events(self.mega_leak(2), "status")), (0, []))
+                           "data": {"from": None, "to": "gone", "dead_since": at(3), "source": "mega_index"}}])
+        self.assertEqual(self.dead(2), 0)
+        self.assertEqual([e["data"] for e in self.events(self.mega_leak(2), "status")],
+                         [{"from": None, "to": "live", "dead_since": None, "source": "mega_index"}])
 
         self.day(5, pack(2))
         self.assertEqual(self.pills(), {url(1): "gone", url(2): "listed"})
@@ -141,7 +143,7 @@ class TestMegaLookup(Lanes):
         self.day(6, pack(1), pack(2, deleted=True))
         self.assertEqual(self.pills(), {url(1): "listed", url(2): "listed"})
         self.assertEqual(self.events(self.mega_leak(1), "status")[-1]["data"],
-                         {"from": "gone", "to": "listed", "dead_since": None, "source": "mega_index"})
+                         {"from": "gone", "to": "live", "dead_since": None, "source": "mega_index"})
         self.assertEqual(self.dead(1), 0)
 
         self.day(7, pack(1))
@@ -152,6 +154,8 @@ class TestMegaLookup(Lanes):
                          [{"day": f"2026-11-0{d}", "lane": "mega_lookup", "outcome": "ok", "reason": None}
                           for d in range(2, 8)])
         self.assertEqual(self.rows("SELECT * FROM load_reservation"), [])
+        self.assertEqual(self.rows("SELECT data_json FROM leak_events WHERE type = 'status' AND (data_json LIKE '%listed%' "
+                                   "OR data_json NOT LIKE '%\"source\":\"mega_index\"%')"), [])
         self.assertEqual(self.lanes()["mega_lookup"]["last_success_at"], at(7))
 
     def test_display_name_never_sent(self):
@@ -185,10 +189,15 @@ class TestMegaLookup(Lanes):
         self.assertEqual(self.rows("SELECT outcome FROM daily_scans WHERE day = '2026-11-03'"), [{"outcome": "ok"}])
 
     def test_one_lookup_per_day(self):
-        self.day(2, pack(1, deleted=True))
+        self.day(2, pack(1))
+        self.day(3, pack(1, deleted=True))
+        with tdb.db() as c:
+            c.execute("UPDATE daily_scans SET finished_at = NULL, outcome = NULL WHERE day = '2026-11-03'")
         self.mega.calls = []
-        tracker_scheduler.daily_pass(tdb.plus(at(2), hours=3))
+        self.assertEqual(tracker_scheduler.daily_pass(tdb.plus(at(3), hours=3))["probed"], 1)
         self.assertEqual(self.mega.calls, [])
+        self.assertEqual(self.dead(1), 1)
+        self.assertEqual(self.rows("SELECT outcome FROM daily_scans WHERE day = '2026-11-03'"), [{"outcome": "ok"}])
 
 
 class TestPaused(Lanes):

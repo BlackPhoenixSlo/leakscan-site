@@ -1,15 +1,15 @@
 """Leak lanes (Phase 2 spec "Lanes in detail"): run_daily(watch_id, day) runs a seeded watch's daily lanes in order inside
 Phase 1's daily pass (tracker_scheduler) and writes each lane's lane_state row, plus a lane_day row for the lanes Phase 2
-adds. Lanes so far: origin_probe (Phase 1's probe; only its lane_state row is new), then mega_lookup. A paused or
-deleted watch runs no lane (tracker_view reads its lanes `paused`). One lane failing never stops the next.
+adds. Lanes so far: origin_probe (Phase 1's probe; only its lane_state row is new; the seed records it too), then
+mega_lookup. A paused or deleted watch runs no lane (tracker_view reads its lanes `paused`). One lane failing never stops the next.
 
 Mega lookup ($0, no reservation): the Mega index client (leakshaven) with the handle and the strong aliases (tracker_seed
 norm() length >= STRONG_MIN) and names=(), so a display-name title match can never pick the Creator; the index's
-deleted packs come back too. A new live pack is admitted like the seed's (tracker_seed._admit / _pend, source
-mega_index); a never-known deleted one is skipped. A known pack runs the 2-dead rule on its probe_state
-(consecutive_dead, first_dead, flaps, dead_since, as tracker_probe.step): deleted on two lookups in a row -> status
-listed -> gone; seen live again -> gone -> listed; absent from the index's page -> nothing changes, nothing resets.
-It runs at most once per watch per UTC day (an ok lane_day row), so a retried day never counts a sighting twice."""
+deleted packs come back too. A new live pack is admitted like the seed's (tracker_seed.admit_mega); a never-known
+deleted one is skipped. A known pack is a probe result for its probe_state (tracker_probe.record: deleted = dead,
+otherwise live), so two deleted lookups in a row turn it gone and a live one turns it live (pill Listed again), each
+status event with source mega_index; absent from the index's page -> nothing changes, nothing resets.
+It runs at most once per watch per UTC day (an ok lane_day row): a retried day makes no second index call."""
 import json
 
 import leakshaven
@@ -46,12 +46,9 @@ def _ran_ok(watch_id, day, lane):
                          (watch_id, day, lane)).fetchone() is not None
 
 
-def run_daily(watch_id, day):
-    """-> {"probe": tracker_probe.run()'s counts, None when it raised}; None for a paused, deleted or missing watch."""
-    with tdb.db() as c:
-        w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
-    if not w or w["paused"] or w["deleted_at"]:
-        return None
+def origin_probe(watch_id, day):
+    """Phase 1's probe for one watch as the origin_probe lane (the daily pass and the seed) -> tracker_probe.run()'s
+    counts, None when it raised; writes the lane's lane_state row either way."""
     at = tdb.now()
     try:
         probe = tracker_probe.run([watch_id])
@@ -59,6 +56,16 @@ def run_daily(watch_id, day):
         probe = None
         tracker_probe.log(f"tracker origin probe failed: {type(e).__name__}")
     _record(watch_id, day, "origin_probe", probe is not None, at, ledger=False)
+    return probe
+
+
+def run_daily(watch_id, day):
+    """-> {outcome: ok | failed (the Origin probe failed) | skipped (paused, deleted or missing), probe: counts | None}."""
+    with tdb.db() as c:
+        w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
+    if not w or w["paused"] or w["deleted_at"]:
+        return {"outcome": "skipped", "probe": None}
+    probe = origin_probe(watch_id, day)
     if leakshaven.ENABLED and not _ran_ok(watch_id, day, "mega_lookup"):
         at = tdb.now()
         try:
@@ -68,7 +75,7 @@ def run_daily(watch_id, day):
             ok = False
             tracker_probe.log(f"tracker mega lookup failed: {e if isinstance(e, LaneFailed) else type(e).__name__}")
         _record(watch_id, day, "mega_lookup", ok, at)
-    return {"probe": probe}
+    return {"outcome": "ok" if probe is not None else "failed", "probe": probe}
 
 
 def _mega(w, at):
@@ -83,45 +90,11 @@ def _mega(w, at):
         first = c.execute("SELECT 1 FROM lane_state WHERE watch_id = ? AND lane = 'mega_lookup' AND last_success_at IS "
                           "NOT NULL", (wid,)).fetchone() is None
         for it in items:
-            url, title, dead = it.get("url") or "", it.get("title") or "", it.get("status") == "deleted"
-            key = rules.url_key(url)
-            known = c.execute("SELECT l.leak_id AS lid, p.consecutive_dead, p.origin_status, p.first_dead, p.flaps, "
-                              "p.dead_since FROM leaks l LEFT JOIN probe_state p ON p.leak_id = l.leak_id "
-                              "WHERE l.watch_id = ? AND l.url_key = ? AND l.kind = 'mega'", (wid, key)).fetchone()
+            dead = it.get("status") == "deleted"
+            known = c.execute("SELECT l.leak_id, p.* FROM leaks l LEFT JOIN probe_state p ON p.leak_id = l.leak_id "
+                              "WHERE l.watch_id = ? AND l.url_key = ? AND l.kind = 'mega'",
+                              (wid, rules.url_key(it.get("url") or ""))).fetchone()
             if known:
-                _sighting(c, known, dead, at)
-                continue
-            if dead:
-                continue
-            how, term = it.get("match_source"), tracker_seed.norm(it.get("match_term"))
-            if (how == "handle" and len(handle) >= tracker_seed.HANDLE_MIN) or \
-                    (how == "alias" and len(term) >= tracker_seed.STRONG_MIN):
-                tracker_seed._admit(c, wid, url, key, tracker_seed.MEGA_SITE, "mega", title, "mega_index", at,
-                                    first_scan=first)
-            else:
-                tracker_seed._pend(c, wid, url, key, title, "mega_index", at)
-
-
-def _sighting(c, r, dead, at):
-    n, since, origin = r["consecutive_dead"] or 0, r["dead_since"], r["origin_status"]
-    first_dead, flaps, ev = r["first_dead"] or 0, r["flaps"] or 0, None
-    if dead:
-        n += 1
-        if n == 1:
-            first_dead, since = first_dead + 1, at
-        if n >= 2 and origin != "gone":
-            origin, ev = "gone", {"from": "listed", "to": "gone", "dead_since": since, "source": "mega_index"}
-    else:
-        if n == 0 and origin != "gone":
-            return
-        if n == 1:
-            flaps += 1
-        if origin == "gone":
-            ev = {"from": "gone", "to": "listed", "dead_since": None, "source": "mega_index"}
-        n, since, origin = 0, None, None
-    c.execute("INSERT INTO probe_state (leak_id, consecutive_dead, origin_status, first_dead, flaps, dead_since) "
-              "VALUES (?,?,?,?,?,?) ON CONFLICT (leak_id) DO UPDATE SET consecutive_dead = excluded.consecutive_dead, "
-              "origin_status = excluded.origin_status, first_dead = excluded.first_dead, flaps = excluded.flaps, "
-              "dead_since = excluded.dead_since", (r["lid"], n, origin, first_dead, flaps, since))
-    if ev:
-        tdb.add_event(c, r["lid"], "status", ev, at)
+                tracker_probe.record(c, known, "dead" if dead else "live", at, source="mega_index")
+            elif not dead:
+                tracker_seed.admit_mega(c, wid, it, handle, at, first_scan=first)

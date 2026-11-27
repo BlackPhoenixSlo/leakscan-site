@@ -15,6 +15,7 @@ from datetime import timedelta
 from urllib.parse import unquote
 
 import tracker_db as tdb
+import tracker_lanes
 import tracker_probe
 import tracker_rules as rules
 import tracker_view
@@ -71,6 +72,16 @@ def _pend(c, watch_id, url, key, title, source, at):
     return c.execute("INSERT OR IGNORE INTO pending_hits (watch_id, url_key, url, title, source, seen_at) "
                      "SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM leaks WHERE watch_id = ? AND url_key = ?)",
                      (watch_id, key, url, title, source, at, watch_id, key)).rowcount
+
+
+def admit_mega(c, watch_id, it, handle, at, first_scan=True):
+    """One Mega index item (leakshaven start(source=True)) -> (admitted, pending) 0/1 counts: a Leak when its aggregator
+    match came from the handle (>= HANDLE_MIN) or a strong alias, else a Pending hit. handle is norm()ed."""
+    url, title, how = it.get("url") or "", it.get("title") or "", it.get("match_source")
+    key, term = rules.url_key(url), norm(it.get("match_term"))
+    if (how == "handle" and len(handle) >= HANDLE_MIN) or (how == "alias" and len(term) >= STRONG_MIN):
+        return _admit(c, watch_id, url, key, MEGA_SITE, "mega", title, "mega_index", at, first_scan), 0
+    return 0, _pend(c, watch_id, url, key, title, "mega_index", at)
 
 
 def _finish(watch_id, today, outcome):
@@ -146,18 +157,9 @@ def _seed(w, at):
             elif any(n in norm(title) or n in norm(url) for n in names):
                 pending += _pend(c, watch_id, url, key, title, "google_web", at)
         for it in cand["mega"]:
-            url, title, how = it.get("url") or "", it.get("title") or "", it.get("match_source")
-            key, term = rules.url_key(url), norm(it.get("match_term"))
-            if (how == "handle" and len(handle) >= HANDLE_MIN) or (how == "alias" and len(term) >= STRONG_MIN):
-                admitted += _admit(c, watch_id, url, key, MEGA_SITE, "mega", title, "mega_index", at)
-            else:
-                pending += _pend(c, watch_id, url, key, title, "mega_index", at)
+            a, p = admit_mega(c, watch_id, it, handle, at)
+            admitted, pending = admitted + a, pending + p
         c.execute("UPDATE watches SET seeded_at = ? WHERE watch_id = ?", (at, watch_id))
-    try:
-        tracker_probe.run([watch_id])
-        outcome = "ok"
-    except Exception as e:
-        tracker_probe.log(f"tracker seed probe failed: {type(e).__name__}")
-        outcome = "failed"
+    outcome = "ok" if tracker_lanes.origin_probe(watch_id, at[:10]) is not None else "failed"
     tracker_probe.log(f"tracker seed {outcome} admitted={admitted} pending={pending}")
     return {"admitted": admitted, "pending": pending, "outcome": outcome}

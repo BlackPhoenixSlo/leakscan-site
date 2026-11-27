@@ -219,22 +219,27 @@ _LIVE_PAGES = ("FROM leaks l JOIN watches w ON w.watch_id = l.watch_id LEFT JOIN
                "WHERE l.kind = 'page' AND w.paused = 0 AND w.deleted_at IS NULL")
 
 
+def record(c, r, status, at, **extra):
+    """One settled result for one Leak: r = a row with its leak_id and probe_state columns (NULL when it has none). Writes
+    the new state and, when origin_status changes, the status event (extra merged into its data). -> False, and writes
+    nothing, when the Leak was already settled this UTC day."""
+    old = {k: r[k] for k in _FRESH} if r["probes"] is not None else dict(_FRESH)
+    if (old["last_probe_at"] or "")[:10] == at[:10]:
+        return False
+    st, ev = step(old, status, at)
+    c.execute("INSERT OR REPLACE INTO probe_state (leak_id, " + ", ".join(_FRESH) + ") VALUES (?"
+              + ", ?" * len(_FRESH) + ")", (r["leak_id"], *(st[k] for k in _FRESH)))
+    if ev:
+        tdb.add_event(c, r["leak_id"], "status", {**ev, **extra}, at)
+    return True
+
+
 def apply(key, status, at=None):
     """One probe result -> every probe-able Leak with this url_key not probed this UTC day. -> Leaks updated."""
     at = at or tdb.now()
-    n = 0
     with tdb.db() as c:
-        for r in c.execute(f"SELECT l.leak_id, p.* {_LIVE_PAGES} AND l.url_key = ?", (key,)).fetchall():
-            old = {k: r[k] for k in _FRESH} if r["probes"] is not None else dict(_FRESH)
-            if (old["last_probe_at"] or "")[:10] == at[:10]:
-                continue
-            st, ev = step(old, status, at)
-            c.execute("INSERT OR REPLACE INTO probe_state (leak_id, " + ", ".join(_FRESH) + ") VALUES (?"
-                      + ", ?" * len(_FRESH) + ")", (r["leak_id"], *(st[k] for k in _FRESH)))
-            if ev:
-                tdb.add_event(c, r["leak_id"], "status", ev, at)
-            n += 1
-    return n
+        return sum(record(c, r, status, at) for r in c.execute(f"SELECT l.leak_id, p.* {_LIVE_PAGES} AND l.url_key = ?",
+                                                                 (key,)).fetchall())
 
 
 def _today_status(c, key, today):

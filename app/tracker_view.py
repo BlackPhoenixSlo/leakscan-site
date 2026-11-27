@@ -129,9 +129,11 @@ def lanes(c, w):
     out = []
     for lane, cadence in LANES:
         r = rows.get(lane)
-        x = {"lane": lane, "cadence": cadence, "state": r["state"] if r else "never", "reason": r["reason"] if r else None,
-             "last_success_at": r["last_success_at"] if r else None, "last_attempt_at": r["last_attempt_at"] if r else None,
-             "next_attempt_on": r["next_attempt_on"] if r else None, "trimmed": json.loads(r["trimmed_json"]) if r else []}
+        x = {"lane": lane, "cadence": cadence, "state": "never", "reason": None, "last_success_at": None,
+             "last_attempt_at": None, "next_attempt_on": None, "trimmed": []}
+        if r:
+            x.update({k: r[k] for k in ("state", "reason", "last_success_at", "last_attempt_at", "next_attempt_on")},
+                     trimmed=json.loads(r["trimmed_json"]))
         if w["paused"]:
             x.update(state="paused", reason=None, next_attempt_on=None)
         out.append(x)
