@@ -205,6 +205,22 @@ class TestWatches(Base):
         self.req("DELETE", "/v1/watches/w_one_00001", key=self.a)
         self.assertEqual(self.put("w_three_0003", account_id="3")[2]["created"], True)
 
+    def test_public_cap(self):
+        os.environ.update(TRACKER_PUBLIC_PER_HOUR="2", TRACKER_UNCAPPED_TENANTS="tn_owner")
+        own = self.tenant("tn_owner", "Owner")
+        self.put("w_one_00001", account_id="1")
+        self.req("DELETE", "/v1/watches/w_one_00001", key=self.a)
+        self.clock = NOW + timedelta(minutes=30)
+        self.put("w_bee_00001", self.b, account_id="1")
+        self.assertEqual(self.put("w_two_00002", account_id="2")[::2], (429, {"error": "rate_limited"}))
+        with tracker_db.db() as c:
+            self.assertIsNone(c.execute("SELECT 1 FROM watches WHERE watch_id = 'w_two_00002'").fetchone())
+        self.assertEqual(self.seeds, ["w_one_00001", "w_bee_00001"])
+        self.assertEqual(self.put("w_bee_00001", self.b, account_id="1", paused=True)[0], 200)
+        self.assertEqual([self.put(f"w_own_0000{i}", own, account_id=str(i))[0] for i in range(3)], [200] * 3)
+        self.clock = NOW + timedelta(minutes=61)
+        self.assertEqual(self.put("w_two_00002", account_id="2")[2]["created"], True)
+
     def test_account_taken(self):
         self.put("w_mia_00001")
         self.assertEqual(self.put("w_dup_00002")[::2], (409, {"error": "account_taken", "watch_id": "w_mia_00001"}))
@@ -547,6 +563,8 @@ class TestContract(Base):
                 c.execute("UPDATE tenants SET creators_max = 2 WHERE tenant_id = 'tn_example0001'")
             call("err_409_creator_cap", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="example_three"))
             call("delete", "DELETE", "/v1/watches/w_rowanash_0002?requested_at=2026-11-27T11:00:00Z")
+            with mock.patch.dict(os.environ, TRACKER_PUBLIC_PER_HOUR="0"):
+                call("err_429", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="example_three"))
             call("err_410", "GET", "/v1/creators/w_rowanash_0002")
             call("err_422", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="m"))
             call("err_422_invalid_json", "PUT", "/v1/watches/w_other_0003", None)

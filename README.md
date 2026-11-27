@@ -387,6 +387,8 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
   come from `TRACKER_BRAND` / `TRACKER_CONTACT_URL`. Nothing scans until a tenant, a key and a watch exist. Owner, on the VPS:
   `docker exec leakscan-app python3 /app/tracker_cli.py tenant add "<label>"` -> tenant_id, then `... key issue <tenant_id>` (printed once,
   stored as sha256). Also `tenant cap|list`, `key revoke`, `purge [--dry-run]`, `report`, `daily [--at ISO]`.
+- Public cap: tenants not in `TRACKER_UNCAPPED_TENANTS` share `TRACKER_PUBLIC_PER_HOUR` (10) new watches per hour, deleted ones
+  counted; over it a new watch's PUT answers 429 `{"error": "rate_limited"}` with no row and no seed. Forks use this hosted API with a key.
 - Own SQLite file `TRACKER_DB` (compose: `/data/tracker.db`; default `app/tracker.db`), never `public.db`. `tracker_seed` runs
   `public_app.quick_candidates` (the Quick scan's Google step + Mega lookup, no row / slug / profile / media / alias discovery), then the
   watch's first probe pass; `tracker_scheduler` (started from `main()`, `TRACKER_SCHEDULER=0` = off) runs the daily pass from
