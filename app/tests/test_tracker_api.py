@@ -547,6 +547,106 @@ class TestLanes(Base):
         self.assertEqual(next(x for x in self.lanes("w_mia_00001") if x["lane"] == "mega_lookup")["state"], "ok")
 
 
+class TestToday(Base):
+    DAY = "2026-11-27"
+
+    def scan(self, wid, finished=True, outcome="ok", day=DAY):
+        with tracker_db.db() as c:
+            c.execute("INSERT OR REPLACE INTO daily_scans (watch_id, day, started_at, finished_at, outcome) VALUES (?,?,?,?,?)",
+                      (wid, day, f"{day}T04:00:00Z", f"{day}T04:05:00Z" if finished else None, outcome if finished else None))
+
+    def lane_day(self, wid, lane, outcome, reason=None, day=DAY):
+        with tracker_db.db() as c:
+            c.execute("INSERT OR REPLACE INTO lane_day (watch_id, day, lane, outcome, reason) VALUES (?,?,?,?,?)",
+                      (wid, day, lane, outcome, reason))
+
+    def today(self, wid="w_mia_00001", key=None):
+        one = self.req("GET", f"/v1/creators/{wid}", key=key or self.a)[2]
+        row = next(x for x in self.req("GET", "/v1/creators", key=key or self.a)[2]["creators"] if x["watch_id"] == wid)
+        self.assertEqual(one["today"], row["today"])
+        return row["today"]
+
+    def state(self, wid="w_mia_00001"):
+        return self.today(wid)["state"]
+
+    def test_shape_and_counts(self):
+        self.put("w_mia_00001")
+        self.assertEqual(self.today(), {"day": self.DAY, "state": "pending", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
+        h = lambda hour, days=0: ts(NOW.replace(hour=hour) - timedelta(days=days))
+        self.leak("w_mia_00001", "lk_new", "https://example-leaks.test/new", seen=h(4), first_scan=False)
+        self.leak("w_mia_00001", "lk_new2", "https://example-leaks.test/new2", seen=h(0), first_scan=False)
+        self.leak("w_mia_00001", "lk_first", "https://example-leaks.test/first", seen=h(4))
+        self.leak("w_mia_00001", "lk_old_new", "https://example-leaks.test/oldnew", seen=h(23, 1), first_scan=False)
+        self.leak("w_mia_00001", "lk_old_first", "https://example-leaks.test/oldfirst", seen=h(23, 1))
+        self.leak("w_mia_00001", "lk_back", "https://example-leaks.test/back", seen=h(4, 9),
+                  statuses=[(h(4, 9), None, "live", None), (h(4, 3), "live", "gone", h(4, 4)), (h(4), "gone", "live", None)])
+        self.leak("w_mia_00001", "lk_back_old", "https://example-leaks.test/backold", seen=h(4, 9),
+                  statuses=[(h(4, 5), "live", "gone", None), (h(4, 1), "gone", "live", None)])
+        self.leak("w_mia_00001", "lk_gone", "https://example-leaks.test/gone", seen=h(4, 9),
+                  statuses=[(h(4, 8), None, "live", None), (h(4), "live", "gone", h(4, 1))])
+        self.leak("w_mia_00001", "lk_mega_gone", "https://mega.example-index.test/f/1", kind="mega", site="example-index.test",
+                  seen=h(4, 9), source="mega_index", statuses=[(h(5), "live", "gone", None)])
+        self.leak("w_mia_00001", "lk_gone_old", "https://example-leaks.test/goneold", seen=h(4, 9),
+                  statuses=[(h(4, 1), "live", "gone", h(4, 2))])
+        self.scan("w_mia_00001")
+        t = self.today()
+        self.assertEqual(t, {"day": self.DAY, "state": "complete", "new": 2, "first_scan": 1, "came_back": 1, "gone": 2})
+        counts = self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["counts"]
+        self.assertEqual(t["new"], counts["new_today"])
+        self.clock = NOW + timedelta(days=1)
+        self.assertEqual(self.today(), {"day": "2026-11-28", "state": "pending", "new": 0, "first_scan": 0, "came_back": 0,
+                                        "gone": 0})
+
+    def test_states(self):
+        self.put("w_mia_00001")
+        self.assertEqual(self.state(), "pending")
+        self.scan("w_mia_00001", finished=False)
+        self.lane_day("w_mia_00001", "mega_lookup", "failed", "lane_failed")
+        self.assertEqual(self.state(), "pending")
+        self.scan("w_mia_00001")
+        self.assertEqual(self.state(), "partial")
+        self.lane_day("w_mia_00001", "mega_lookup", "ok")
+        self.assertEqual(self.state(), "complete")
+        self.lane_day("w_mia_00001", "google_fresh", "partial", "google_failed")
+        self.assertEqual(self.state(), "coverage_reduced")
+        self.lane_day("w_mia_00001", "google_full", "partial", "google_failed")
+        self.assertEqual(self.state(), "coverage_reduced")
+        self.lane_day("w_mia_00001", "google_full", "partial", "cap_global")
+        self.assertEqual(self.state(), "partial")
+        self.lane_day("w_mia_00001", "google_full", "ok")
+        self.lane_day("w_mia_00001", "listing_recheck", "partial", "listing_rotated")
+        self.assertEqual(self.state(), "partial")
+        self.lane_day("w_mia_00001", "listing_recheck", "ok")
+        self.lane_day("w_mia_00001", "google_fresh", "ok")
+        self.lane_day("w_mia_00001", "mega_lookup", "failed", "lane_failed", day="2026-11-26")
+        self.assertEqual(self.state(), "complete")
+        self.scan("w_mia_00001", outcome="failed")
+        self.assertEqual(self.state(), "partial")
+        self.put("w_mia_00001", paused=True)
+        self.assertEqual(self.state(), "paused")
+        self.put("w_mia_00001", paused=False)
+        self.assertEqual(self.state(), "partial")
+
+    def test_zero_leaks_failed_lane_partial(self):
+        self.put("w_mia_00001")
+        self.scan("w_mia_00001", outcome="partial")
+        self.lane_day("w_mia_00001", "mega_lookup", "failed", "lane_failed")
+        self.assertEqual(self.today(), {"day": self.DAY, "state": "partial", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
+
+    def test_tenant_isolation(self):
+        self.put("w_mia_00001")
+        self.put("w_rowan_0001", key=self.b, account_id="acc-2001", username="rowanash", display_name="Rowan Ash", aliases=[])
+        self.leak("w_mia_00001", "lk_new", "https://example-leaks.test/new", seen=ts(NOW.replace(hour=4)), first_scan=False)
+        self.scan("w_mia_00001")
+        self.lane_day("w_mia_00001", "mega_lookup", "failed", "lane_failed")
+        self.scan("w_rowan_0001")
+        self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.b)[:3:2], (404, {"error": "not_found"}))
+        self.assertEqual([x["watch_id"] for x in self.req("GET", "/v1/creators", key=self.b)[2]["creators"]], ["w_rowan_0001"])
+        self.assertEqual(self.today("w_rowan_0001", key=self.b),
+                         {"day": self.DAY, "state": "complete", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
+        self.assertEqual((self.today()["state"], self.today()["new"]), ("partial", 1))
+
+
 class TestCors(Base):
     def test_no_cors_on_v1(self):
         self.put("w_mia_00001")
@@ -645,6 +745,8 @@ class TestContract(Base):
                               "next_attempt_on) VALUES ('w_miavale_0001',?,?,?,?,?,'2026-11-28')",
                               [("origin_probe", "ok", None, d(27, 4, 1), d(27, 4, 1)),
                                ("mega_lookup", "failed", "lane_failed", d(27, 4, 2), d(26, 4, 2))])
+                c.execute("INSERT INTO lane_day (watch_id, day, lane, outcome, reason) VALUES "
+                          "('w_miavale_0001', '2026-11-27', 'mega_lookup', 'failed', 'lane_failed')")
             call("creator_one", "GET", "/v1/creators/w_miavale_0001")
             call("creator_leaks", "GET", "/v1/creators/w_miavale_0001/leaks")
             call("leaks", "GET", "/v1/leaks?watch_id=w_miavale_0001&watch_id=w_rowanash_0002&limit=2")
