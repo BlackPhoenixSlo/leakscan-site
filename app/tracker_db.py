@@ -12,6 +12,7 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   leak_events       seen{source: google_web|mega_index, first_scan: bool}; google_seen{};
                     status{from: NULL|live|gone, to: live|gone, dead_since: ts|NULL} only when origin_status changes.
   daily_scans.outcome        NULL while running | ok | failed.
+  watches.weekly_slot   0 = Monday .. 6; with plan_loads set by tracker_admission (admit on create, backfill in init).
   load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired;
                     watch_id NULL = a purged watch's carried spend.
 """
@@ -142,7 +143,10 @@ CREATE INDEX IF NOT EXISTS idx_resv_month ON load_reservation(tenant_id, month, 
 CREATE INDEX IF NOT EXISTS idx_resv_watch ON load_reservation(watch_id);
 CREATE INDEX IF NOT EXISTS idx_resv_state ON load_reservation(state, created_at);
 """
-_COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000")]
+_COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
+            ("watches", "weekly_slot", "INTEGER CHECK (weekly_slot BETWEEN 0 AND 6)"),
+            ("watches", "plan_loads", "INTEGER"),
+            ("watches", "carry_json", "TEXT")]
 
 _clock = None
 
@@ -172,6 +176,8 @@ def init():
         for table, col, decl in _COLUMNS:
             if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+        import tracker_admission
+        tracker_admission.backfill(c)
 
 
 def set_clock(fn):

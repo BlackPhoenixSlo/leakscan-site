@@ -8,6 +8,7 @@ import sys
 import urllib.parse
 from datetime import timedelta
 
+import tracker_admission
 import tracker_db
 import tracker_seed
 import tracker_view
@@ -23,6 +24,7 @@ X_HANDLE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
 NOT_FOUND = {"error": "not_found"}
 GONE = {"error": "watch_deleted"}
 RATE_LIMITED = {"error": "rate_limited"}
+WAITLIST = {"error": "waitlist"}
 
 
 class _Err(Exception):
@@ -172,9 +174,10 @@ def _page(items, q, events):
 def me(t, q, raw):
     with tracker_db.db() as c:
         used = c.execute("SELECT COUNT(*) FROM watches WHERE tenant_id = ? AND deleted_at IS NULL", (t["tenant_id"],)).fetchone()[0]
+        accepting = tracker_admission.accepting_new(c)
     return 200, {"tenant_id": t["tenant_id"], "label": t["label"], "brand": os.environ.get("TRACKER_BRAND") or None,
                  "contact_url": os.environ.get("TRACKER_CONTACT_URL") or None, "creators_max": t["creators_max"],
-                 "creators_used": used}
+                 "creators_used": used, "accepting_new": accepting}
 
 
 def put_watch(t, q, raw, watch_id):
@@ -192,17 +195,22 @@ def put_watch(t, q, raw, watch_id):
                            (tid, v["account_id"], watch_id)).fetchone()
         if holder:
             raise _Err(409, {"error": "account_taken", "watch_id": holder[0]})
+        plan = tracker_admission.plan_loads(v)
         if w is None:
-            cap = c.execute("SELECT creators_max FROM tenants WHERE tenant_id = ?", (tid,)).fetchone()[0]
-            if c.execute("SELECT COUNT(*) FROM watches WHERE tenant_id = ? AND deleted_at IS NULL", (tid,)).fetchone()[0] >= cap:
-                raise _Err(409, {"error": "creator_cap", "creators_max": cap})
+            a = tracker_admission.admit(c, tid, v)
+            if isinstance(a, tracker_admission.CreatorCap):
+                raise _Err(409, {"error": "creator_cap", "creators_max": a.cap})
+            if isinstance(a, tracker_admission.Waitlist):
+                raise _Err(409, WAITLIST)
             n, free = _new_watches_last_hour(c, ts)
             if tid not in free and n >= int(os.environ.get("TRACKER_PUBLIC_PER_HOUR") or 10):
                 raise _Err(429, RATE_LIMITED)
-            v.update(watch_id=watch_id, tenant_id=tid, paused_at=ts if v["paused"] else None, created_at=ts, updated_at=ts)
+            v.update(watch_id=watch_id, tenant_id=tid, paused_at=ts if v["paused"] else None, created_at=ts, updated_at=ts,
+                     weekly_slot=a.weekday, plan_loads=plan)
             c.execute(f"INSERT INTO watches ({', '.join(v)}) VALUES ({', '.join('?' * len(v))})", list(v.values()))
         else:
-            v.update(paused_at=w["paused_at"] if bool(w["paused"]) == bool(v["paused"]) else ts if v["paused"] else None, updated_at=ts)
+            v.update(paused_at=w["paused_at"] if bool(w["paused"]) == bool(v["paused"]) else ts if v["paused"] else None, updated_at=ts,
+                     plan_loads=plan)
             c.execute(f"UPDATE watches SET {', '.join(k + ' = ?' for k in v)} WHERE watch_id = ?", [*v.values(), watch_id])
     if w is None and not v["paused"]:
         try:
