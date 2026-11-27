@@ -1375,6 +1375,8 @@ import alias_enrich
 import leakshaven
 import site_static
 import thumb_sheet
+import tracker_api
+import tracker_db
 
 _API_PREFIXES = ("/api/", "/static/", "/s/")
 _API_PATHS = ("/healthz", "/favicon.ico")
@@ -1755,6 +1757,8 @@ class Handler(BaseHTTPRequestHandler):
         return hmac.compare_digest((q.get("key") or [""])[0].encode(), PARTNER_KEY.encode())  # one-project
 
     def _cors_origin(self):
+        if tracker_api.is_v1(urllib.parse.urlparse(getattr(self, "path", "")).path):  # one-project: tracker v1
+            return None  # one-project: tracker v1
         hdrs = getattr(self, "headers", None)
         o = ((hdrs.get("Origin") if hdrs else None) or "").rstrip("/")
         return o if o and (o in CORS_ORIGINS or self._partner()) else None  # one-project
@@ -1877,6 +1881,8 @@ class Handler(BaseHTTPRequestHandler):
     # ----------------------------------------------------------------- routing
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
+        if tracker_api.is_v1(path):  # one-project: tracker v1
+            return tracker_api.handle(self, "GET")  # one-project: tracker v1
         if _one_project_get(self, path):  # one-project: landing site
             return  # one-project: landing site
         if path in ("/", "/index.html"):
@@ -1919,8 +1925,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_HEAD(self):  # one-project: HEAD
         return _one_project_head(self)  # one-project: HEAD
 
+    def do_PUT(self):  # one-project: tracker v1
+        return tracker_api.handle(self, "PUT")  # one-project: tracker v1
+
+    def do_DELETE(self):  # one-project: tracker v1
+        return tracker_api.handle(self, "DELETE")  # one-project: tracker v1
+
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
+        if tracker_api.is_v1(path):  # one-project: tracker v1
+            return tracker_api.handle(self, "POST")  # one-project: tracker v1
         if path == "/api/public-scan":
             return self.api_public_scan()
         if path == "/api/chat":
@@ -2356,6 +2370,7 @@ def _sweep_webscan_scratch():
 
 def main():
     db.init_db()
+    tracker_db.init()  # one-project: tracker v1
     try:
         n = _sweep_webscan_scratch()
         if n:

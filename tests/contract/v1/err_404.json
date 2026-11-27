@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/v1/creators/w_unknown_0009",
+  "request": null,
+  "response": {
+    "error": "not_found"
+  },
+  "status": 404
+}
