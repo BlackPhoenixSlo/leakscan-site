@@ -180,7 +180,7 @@ def me(t, q, raw):
         accepting = tracker_admission.accepting_new(c)
     return 200, {"tenant_id": t["tenant_id"], "label": t["label"], "brand": os.environ.get("TRACKER_BRAND") or None,
                  "contact_url": os.environ.get("TRACKER_CONTACT_URL") or None, "creators_max": t["creators_max"],
-                 "creators_used": used, "accepting_new": accepting}
+                 "creators_used": used, "accepting_new": accepting, "notices_updated_at": None}
 
 
 def put_watch(t, q, raw, watch_id):

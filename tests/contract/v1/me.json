@@ -9,6 +9,7 @@
     "creators_max": 5,
     "creators_used": 2,
     "label": "Example Agency",
+    "notices_updated_at": null,
     "tenant_id": "tn_example0001"
   },
   "status": 200

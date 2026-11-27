@@ -7,6 +7,7 @@ import tracker_db
 
 PILLS = ("live", "cached", "gone", "listed", "not_checked")
 CAME_BACK_DAYS = 30
+OFFER_LIVE_DAYS, OFFER_NEW_DAYS = 30, 7
 LANES = (("origin_probe", "daily"), ("mega_lookup", "daily"), ("listing_recheck", "daily"), ("google_fresh", "daily"),
          ("google_full", "weekly"), ("registry_crawl", "weekly"))
 
@@ -134,6 +135,18 @@ def day_state(c, w, day):
     return "coverage_reduced" if reasons else "complete"
 
 
+def service_status(c, w):
+    """(status, since). Every watch is `none` until the Removal client mapping (Phase 3 ticket 38) lands."""
+    return "none", None
+
+
+def offer_counts(ls, counts, now_dt):
+    old, week = tracker_db.fmt(now_dt - timedelta(days=OFFER_LIVE_DAYS)), tracker_db.day(now_dt - timedelta(days=OFFER_NEW_DAYS - 1))
+    return {"visible": counts["live"] + counts["cached"], "came_back_30d": counts["came_back_30d"], "cached": counts["cached"],
+            "live_30d": sum(x["pill"] == "live" and x["first_seen_at"] <= old for x in ls),
+            "new_7d": sum(not x["found_on_first_scan"] and x["first_seen_at"][:10] >= week for x in ls)}
+
+
 def creator(c, w, now_dt):
     today = tracker_db.day(now_dt)
     ls = leaks(c, [w["watch_id"]], now_dt)
@@ -146,11 +159,16 @@ def creator(c, w, now_dt):
     counts["came_back_30d"] = sum(x["came_back"] for x in ls)
     last = c.execute("SELECT MAX(finished_at) FROM daily_scans WHERE watch_id=? AND outcome IN ('ok', 'partial')",
                      (w["watch_id"],)).fetchone()[0]
+    first = c.execute("SELECT finished_at FROM daily_scans WHERE watch_id=? AND outcome IN ('ok', 'partial') ORDER BY day LIMIT 1",
+                      (w["watch_id"],)).fetchone()
+    status, since = service_status(c, w)
     return {"watch_id": w["watch_id"], "account_id": w["account_id"], "paused": bool(w["paused"]),
             "paused_since": w["paused_at"] if w["paused"] else None, "seeded": w["seeded_at"] is not None,
             "last_checked_at": last, "next_check_at": next_check_at(now_dt), "counts": counts,
             "today": {"day": today, "state": day_state(c, w, today), "new": counts["new_today"], "first_scan": found.count(True),
-                      "came_back": _changed(ls, today, "live", "gone"), "gone": _changed(ls, today, "gone")}}
+                      "came_back": _changed(ls, today, "live", "gone"), "gone": _changed(ls, today, "gone")},
+            "service_status": status, "service_status_since": since, "removal": None, "offer_counts": offer_counts(ls, counts, now_dt),
+            "first_daily_at": first[0] if first else None}
 
 
 def lanes(c, w):
