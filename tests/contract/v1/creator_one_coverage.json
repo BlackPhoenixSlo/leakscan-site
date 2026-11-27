@@ -101,10 +101,12 @@
     },
     "paused": false,
     "paused_since": null,
+    "preview_leak": null,
     "removal": null,
     "seeded": true,
     "service_status": "none",
     "service_status_since": null,
+    "taken_down": null,
     "today": {
       "came_back": 0,
       "day": "2026-11-27",

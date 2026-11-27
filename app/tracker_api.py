@@ -12,9 +12,11 @@ import tracker_admission
 import tracker_db
 import tracker_judge
 import tracker_seed
+import tracker_video
 import tracker_view
 
 BODY_CAP = 64 * 1024
+CHUNK = 64 * 1024
 LIMIT_DEFAULT, LIMIT_MAX, IDS_MAX = 50, 200, 500
 PURGE_DAYS = 30
 PLATFORMS = ("onlyfans", "fansly")
@@ -32,6 +34,11 @@ class _Err(Exception):
     def __init__(self, code, body):
         super().__init__(code)
         self.code, self.body = code, body
+
+
+class _Take:
+    def __init__(self, f, ctype, ranged):
+        self.f, self.ctype, self.ranged = f, ctype, ranged
 
 
 def _invalid(field):
@@ -56,13 +63,15 @@ def is_v1(path):
     return path == "/v1" or path.startswith("/v1/")
 
 
-def _send(h, code, obj):
+def _send(h, code, obj, headers=()):
     body = b"" if obj is None else json.dumps(obj, ensure_ascii=False).encode("utf-8")
     h.send_response(code)
     if obj is not None:
         h.send_header("Content-Type", "application/json; charset=utf-8")
     if code == 401:
         h.send_header("WWW-Authenticate", "Bearer")
+    for k, v in headers:
+        h.send_header(k, v)
     h.send_header("Content-Length", str(len(body)))
     h.send_header("Cache-Control", "no-store")
     h.send_header("X-Content-Type-Options", "nosniff")
@@ -73,6 +82,40 @@ def _send(h, code, obj):
         h.wfile.write(body)
     except (BrokenPipeError, ConnectionResetError):
         pass
+
+
+def _stream(h, take):
+    """One fixed file in CHUNK reads; `Range` is honoured on the video part only."""
+    with take.f as f:
+        size = os.fstat(f.fileno()).st_size
+        try:
+            rng = tracker_video.byte_range(h.headers.get("Range"), size) if take.ranged else None
+        except ValueError:
+            return _send(h, 416, {"error": "range_not_satisfiable"}, [("Content-Range", f"bytes */{size}")])
+        start, end = rng or (0, size - 1)
+        h.send_response(206 if rng else 200)
+        h.send_header("Content-Type", take.ctype)
+        h.send_header("Content-Length", str(end - start + 1))
+        if take.ranged:
+            h.send_header("Accept-Ranges", "bytes")
+        if rng:
+            h.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        h.send_header("Cache-Control", "no-store")
+        h.send_header("X-Content-Type-Options", "nosniff")
+        h.end_headers()
+        f.seek(start)
+        left = end - start + 1
+        try:
+            while left > 0:
+                chunk = f.read(min(CHUNK, left))
+                if not chunk:
+                    break
+                h.wfile.write(chunk)
+                left -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        if left:
+            h.close_connection = True
 
 
 def _auth(h):
@@ -180,7 +223,8 @@ def me(t, q, raw):
         accepting = tracker_admission.accepting_new(c)
     return 200, {"tenant_id": t["tenant_id"], "label": t["label"], "brand": os.environ.get("TRACKER_BRAND") or None,
                  "contact_url": os.environ.get("TRACKER_CONTACT_URL") or None, "creators_max": t["creators_max"],
-                 "creators_used": used, "accepting_new": accepting, "notices_updated_at": None}
+                 "creators_used": used, "accepting_new": accepting, "notices_updated_at": None,
+                 "video": tracker_video.meta()}
 
 
 def put_watch(t, q, raw, watch_id):
@@ -252,7 +296,10 @@ def creator_one(t, q, raw, watch_id):
     now = tracker_db.now_dt()
     with tracker_db.db() as c:
         w = _own(c, t, watch_id)
-        return 200, {**tracker_view.creator(c, w, now), "lanes": tracker_view.lanes(c, w)}
+        ls = tracker_view.leaks(c, [watch_id], now)
+        row = tracker_view.creator(c, w, now, ls)
+        return 200, {**row, "lanes": tracker_view.lanes(c, w), "taken_down": tracker_view.taken_down(ls, row["service_status"]),
+                     "preview_leak": tracker_view.preview_leak(ls)}
 
 
 def creator_leaks(t, q, raw, watch_id):
@@ -273,6 +320,18 @@ def all_leaks(t, q, raw):
         return 200, _page(tracker_view.leaks(c, live, now), q, events=False)
 
 
+def offer_video(t, q, raw, part):
+    name, ctype = tracker_video.PARTS.get(part, (None, None))
+    p = tracker_video.path(name) if name else None
+    try:
+        f = open(p, "rb") if p else None
+    except OSError:
+        f = None
+    if f is None:
+        raise _Err(404, NOT_FOUND)
+    return 200, _Take(f, ctype, part == "video")
+
+
 ROUTES = (
     (re.compile(r"^/v1/me$"), {"GET": me}),
     (re.compile(r"^/v1/watches/([^/]+)$"), {"PUT": put_watch, "DELETE": delete_watch}),
@@ -280,6 +339,7 @@ ROUTES = (
     (re.compile(r"^/v1/creators/([^/]+)$"), {"GET": creator_one}),
     (re.compile(r"^/v1/creators/([^/]+)/leaks$"), {"GET": creator_leaks}),
     (re.compile(r"^/v1/leaks$"), {"GET": all_leaks}),
+    (re.compile(r"^/v1/offer-video/([^/]+)$"), {"GET": offer_video}),
 )
 
 
@@ -322,4 +382,6 @@ def handle(h, method):
     except Exception as e:
         _log(f"{method} failed: {type(e).__name__}")
         code, obj = 500, {"error": "internal"}
+    if isinstance(obj, _Take):
+        return _stream(h, obj)
     _send(h, code, obj)

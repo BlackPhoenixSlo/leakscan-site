@@ -7,6 +7,7 @@ import tracker_db
 
 PILLS = ("live", "cached", "gone", "listed", "not_checked")
 CAME_BACK_DAYS = 30
+TAKEN_DOWN_MAX = 6
 OFFER_LIVE_DAYS, OFFER_NEW_DAYS = 30, 7
 LANES = (("origin_probe", "daily"), ("mega_lookup", "daily"), ("listing_recheck", "daily"), ("google_fresh", "daily"),
          ("google_full", "weekly"), ("registry_crawl", "weekly"))
@@ -142,9 +143,9 @@ def offer_counts(ls, counts, now_dt):
             "new_7d": sum(not x["found_on_first_scan"] and x["first_seen_at"][:10] >= week for x in ls)}
 
 
-def creator(c, w, now_dt):
+def creator(c, w, now_dt, ls=None):
     today = tracker_db.day(now_dt)
-    ls = leaks(c, [w["watch_id"]], now_dt)
+    ls = leaks(c, [w["watch_id"]], now_dt) if ls is None else ls
     counts = {p: 0 for p in PILLS}
     for x in ls:
         counts[x["pill"]] += 1
@@ -161,6 +162,37 @@ def creator(c, w, now_dt):
                       "came_back": _changed(ls, today, "live", "gone"), "gone": _changed(ls, today, "gone")},
             "service_status": "none", "service_status_since": None, "removal": None, "offer_counts": offer_counts(ls, counts, now_dt),
             "first_daily_at": first}
+
+
+def _gone_at(events):
+    return next((e["at"] for e in reversed(events) if e["type"] == "status" and e["data"].get("to") == "gone"), None)
+
+
+def taken_down(ls, service_status):
+    """`active`/`former` only: Gone-pill Leaks with gone_after_notice, newest current gone event first, then leak_id."""
+    if service_status not in ("active", "former"):
+        return None
+    out = [{"leak_id": x["leak_id"], "leak_site": x["leak_site"], "kind": x["kind"], "title": x["title"],
+            "gone_at": _gone_at(x["events"]), "preview": x.get("preview")}
+           for x in ls if x.get("gone_after_notice") is True and x["pill"] == "gone"]
+    out.sort(key=lambda x: x["leak_id"])
+    out.sort(key=lambda x: x["gone_at"] or "", reverse=True)
+    return out[:TAKEN_DOWN_MAX]
+
+
+def preview_leak(ls):
+    """The Visible Leak with the newest preview seen_at, else the most recently seen Live page Leak, else None."""
+    ls = sorted(ls, key=lambda x: x["leak_id"])
+    pv = [x for x in ls if x["pill"] in ("live", "cached") and (x.get("preview") or {}).get("seen_at")]
+    if pv:
+        x = max(pv, key=lambda x: x["preview"]["seen_at"])
+    else:
+        live = [x for x in ls if x["kind"] == "page" and x["pill"] == "live"]
+        if not live:
+            return None
+        x = max(live, key=lambda x: max((e["at"] for e in x["events"] if e["type"] == "seen"), default=x["first_seen_at"]))
+    return {"leak_id": x["leak_id"], "leak_site": x["leak_site"], "kind": x["kind"], "title": x["title"], "pill": x["pill"],
+            "first_seen_at": x["first_seen_at"], "preview": x.get("preview")}
 
 
 def lanes(c, w):

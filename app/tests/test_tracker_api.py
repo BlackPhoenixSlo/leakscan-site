@@ -60,7 +60,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        env = {k: v for k, v in os.environ.items() if k not in ("TRACKER_DAILY_AT", "TRACKER_BRAND", "TRACKER_CONTACT_URL")}
+        env = {k: v for k, v in os.environ.items() if k not in ("TRACKER_DAILY_AT", "TRACKER_BRAND", "TRACKER_CONTACT_URL", "TRACKER_OFFER_VIDEO_DIR")}
         env["TRACKER_DB"] = os.path.join(self.tmp.name, "tracker.db")
         p = mock.patch.dict(os.environ, env, clear=True)
         p.start()
@@ -143,7 +143,7 @@ class TestAuth(Base):
         self.assertEqual(self.req("DELETE", "/v1/watches/w_ash_00002", key=self.a)[0], 204)
         st, r, b = self.req("GET", "/v1/me", key=self.a)
         self.assertEqual(b, {"tenant_id": "tn_tenant_a", "label": "Agency A", "brand": None, "contact_url": None, "creators_max": 5,
-                             "creators_used": 1, "accepting_new": True, "notices_updated_at": None})
+                             "creators_used": 1, "accepting_new": True, "notices_updated_at": None, "video": None})
         self.assertEqual(r.getheader("Cache-Control"), "no-store")
         with mock.patch.dict(os.environ, TRACKER_BRAND="Example Removal", TRACKER_CONTACT_URL="https://removal.example/contact"):
             b = self.req("GET", "/v1/me", key=self.a)[2]
@@ -749,6 +749,15 @@ class TestContract(Base):
                           ("w_miavale_0001", "2026-11-27", d(27, 4, 0), d(27, 4, 5)))
                 c.execute("UPDATE watches SET seeded_at = ? WHERE watch_id = 'w_miavale_0001'", (d(20, 9, 6),))
             call("me", "GET", "/v1/me")
+            vdir = os.path.join(self.tmp.name, "offer-video")
+            os.makedirs(vdir)
+            for name, data in (("offer.mp4", b"\0" * 64), ("poster.webp", b"RIFF"), ("captions.vtt", b"WEBVTT\n"), ("cues.json", json.dumps(
+                    {"duration_s": 42, "cues": [{"t_s": t, "kind": k} for t, k in ((3, "google"), (9.5, "google_images"), (16, "mega"),
+                                                                                   (22, "forum"), (28, "x"), (40, "end"))]}).encode())):
+                with open(os.path.join(vdir, name), "wb") as f:
+                    f.write(data)
+            with mock.patch.dict(os.environ, TRACKER_OFFER_VIDEO_DIR=vdir):
+                call("me_video", "GET", "/v1/me")
             call("creators", "GET", "/v1/creators")
             with tracker_db.db() as c:
                 c.executemany("INSERT INTO lane_state (watch_id, lane, state, reason, last_attempt_at, last_success_at, "
