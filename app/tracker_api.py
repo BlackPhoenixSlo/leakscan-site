@@ -195,7 +195,6 @@ def put_watch(t, q, raw, watch_id):
                            (tid, v["account_id"], watch_id)).fetchone()
         if holder:
             raise _Err(409, {"error": "account_taken", "watch_id": holder[0]})
-        plan = tracker_admission.plan_loads(v)
         if w is None:
             a = tracker_admission.admit(c, tid, v)
             if isinstance(a, tracker_admission.CreatorCap):
@@ -206,11 +205,11 @@ def put_watch(t, q, raw, watch_id):
             if tid not in free and n >= int(os.environ.get("TRACKER_PUBLIC_PER_HOUR") or 10):
                 raise _Err(429, RATE_LIMITED)
             v.update(watch_id=watch_id, tenant_id=tid, paused_at=ts if v["paused"] else None, created_at=ts, updated_at=ts,
-                     weekly_slot=a.weekday, plan_loads=plan)
+                     weekly_slot=a.weekday, plan_loads=a.plan_loads)
             c.execute(f"INSERT INTO watches ({', '.join(v)}) VALUES ({', '.join('?' * len(v))})", list(v.values()))
         else:
             v.update(paused_at=w["paused_at"] if bool(w["paused"]) == bool(v["paused"]) else ts if v["paused"] else None, updated_at=ts,
-                     plan_loads=plan)
+                     plan_loads=tracker_admission.plan_loads(v))
             c.execute(f"UPDATE watches SET {', '.join(k + ' = ?' for k in v)} WHERE watch_id = ?", [*v.values(), watch_id])
     if w is None and not v["paused"]:
         try:

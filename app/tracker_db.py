@@ -25,6 +25,8 @@ import sqlite3
 import string
 from datetime import datetime, timedelta, timezone
 
+import tracker_admission
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 TS = "%Y-%m-%dT%H:%M:%SZ"
 KEY_PREFIX = "ltk_"
@@ -176,7 +178,6 @@ def init():
         for table, col, decl in _COLUMNS:
             if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
-        import tracker_admission
         tracker_admission.backfill(c)
 
 

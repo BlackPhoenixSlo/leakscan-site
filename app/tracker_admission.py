@@ -2,20 +2,24 @@
 non-deleted watch, paused or not, costs 1 fresh load each day plus its plan_loads on its weekly_slot day, so resuming
 never needs admission. Admission binds on create only: an identity edit recomputes plan_loads and is never refused,
 runtime trimming and tracker_budget.reserve hold the cap after that."""
-from typing import NamedTuple
+from dataclasses import dataclass
 
 PLAN_MAX = 31
 
 
-class Slot(NamedTuple):
+@dataclass(frozen=True)
+class Slot:
     weekday: int
+    plan_loads: int
 
 
-class Waitlist(NamedTuple):
+@dataclass(frozen=True)
+class Waitlist:
     pass
 
 
-class CreatorCap(NamedTuple):
+@dataclass(frozen=True)
+class CreatorCap:
     cap: int
 
 
@@ -28,7 +32,7 @@ def projected(c):
     p = [c.execute("SELECT COUNT(*) FROM watches WHERE deleted_at IS NULL").fetchone()[0]] * 7
     for d, n in c.execute("SELECT weekly_slot, SUM(plan_loads) FROM watches WHERE deleted_at IS NULL "
                           "AND weekly_slot IS NOT NULL GROUP BY weekly_slot"):
-        p[d] += n or 0
+        p[d] += n
     return p
 
 
@@ -49,12 +53,13 @@ def accepting_new(c):
 
 
 def admit(c, tenant_id, identity):
-    """Inside the caller's watch-create transaction -> Slot(weekday) | Waitlist() | CreatorCap(cap)."""
+    """Inside the caller's watch-create transaction -> Slot(weekday, plan_loads) | Waitlist() | CreatorCap(cap)."""
     cap = c.execute("SELECT creators_max FROM tenants WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
     if c.execute("SELECT COUNT(*) FROM watches WHERE tenant_id = ? AND deleted_at IS NULL", (tenant_id,)).fetchone()[0] >= cap:
         return CreatorCap(cap)
-    d = _fits(c, plan_loads(identity))
-    return Waitlist() if d is None else Slot(d)
+    plan = plan_loads(identity)
+    d = _fits(c, plan)
+    return Waitlist() if d is None else Slot(d, plan)
 
 
 def backfill(c):

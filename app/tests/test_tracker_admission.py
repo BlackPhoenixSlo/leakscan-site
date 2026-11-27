@@ -1,6 +1,8 @@
 """tracker_admission: least-loaded Weekly slot, waitlist, Creator cap, paused watches, edits, backfill (spec Service
 seams, ticket 23). Temp TRACKER_DB, fixed clock, fictional Creators only."""
+import contextlib
 import json
+import os
 import sqlite3
 from datetime import timedelta
 from unittest import mock
@@ -32,12 +34,12 @@ class AdmissionBase(Base):
 
 class TestSlot(AdmissionBase):
     def test_least_loaded_tie_lowest_weekday(self):
-        self.assertEqual(self.admit(), adm.Slot(0))
+        self.assertEqual(self.admit(), adm.Slot(0, 31))
         self.slotted(0)
-        self.assertEqual(self.admit(), adm.Slot(1))
+        self.assertEqual(self.admit(), adm.Slot(1, 31))
         for d, plan in ((1, 9), (2, 4), (3, 7), (4, 4), (5, 8), (6, 5)):
             self.slotted(d, plan)
-        self.assertEqual(self.admit(), adm.Slot(2))
+        self.assertEqual(self.admit(), adm.Slot(2, 31))
 
     def test_slot_column_range(self):
         with self.assertRaises(sqlite3.IntegrityError):
@@ -52,7 +54,7 @@ class TestWaitlist(AdmissionBase):
         self.cap(69)
         self.assertEqual(self.admit(), adm.Waitlist())
         self.cap(70)
-        self.assertEqual(self.admit(), adm.Slot(0))
+        self.assertEqual(self.admit(), adm.Slot(0, 31))
 
     def test_any_day_past_cap(self):
         self.slotted(0, plan=100)
@@ -60,7 +62,7 @@ class TestWaitlist(AdmissionBase):
         self.cap(101)
         self.assertEqual(self.admit(), adm.Waitlist())
         self.cap(102)
-        self.assertEqual(self.admit(), adm.Slot(1))
+        self.assertEqual(self.admit(), adm.Slot(1, 31))
 
     def test_accepting_new(self):
         self.slotted(0, plan=100)
@@ -76,7 +78,7 @@ class TestWaitlist(AdmissionBase):
         self.cap(101)
         with tdb.db() as c:
             c.execute("UPDATE watches SET deleted_at = ? WHERE watch_id = ?", (tdb.now(), w))
-        self.assertEqual(self.admit(), adm.Slot(0))
+        self.assertEqual(self.admit(), adm.Slot(0, 31))
 
 
 class TestCreatorCap(AdmissionBase):
@@ -85,19 +87,20 @@ class TestCreatorCap(AdmissionBase):
             c.execute("UPDATE tenants SET creators_max = 1 WHERE tenant_id = ?", (self.t,))
         w = self.watch(self.t, weekly_slot=0, plan_loads=31)
         self.assertEqual(self.admit(), adm.CreatorCap(1))
-        self.assertEqual(self.admit(self.tenant("Agency B")), adm.Slot(1))
+        self.assertNotEqual(adm.CreatorCap(1), adm.Slot(1, 31))
+        self.assertEqual(self.admit(self.tenant("Agency B")), adm.Slot(1, 31))
         self.cap(1)
         self.assertEqual(self.admit(), adm.CreatorCap(1), "creator cap answers before the waitlist")
         self.cap(300)
         with tdb.db() as c:
             c.execute("UPDATE watches SET deleted_at = ? WHERE watch_id = ?", (tdb.now(), w))
-        self.assertEqual(self.admit(), adm.Slot(0))
+        self.assertEqual(self.admit(), adm.Slot(0, 31))
 
 
 class TestPaused(AdmissionBase):
     def test_paused_watches_count(self):
         self.slotted(0, plan=100, paused=True)
-        self.assertEqual(self.admit(), adm.Slot(1))
+        self.assertEqual(self.admit(), adm.Slot(1, 31))
         self.cap(101)
         self.assertEqual(self.admit(), adm.Waitlist())
 
@@ -145,3 +148,22 @@ class TestBackfill(AdmissionBase):
         self.assertEqual(got, want)
         tdb.init()
         self.assertEqual({r["watch_id"]: (r["weekly_slot"], r["plan_loads"]) for r in self.rows("SELECT * FROM watches")}, want)
+
+
+class TestMigration(Base):
+    def test_phase_1_watches_get_slot_and_plan(self):
+        mock.patch.dict(os.environ, TRACKER_DB=os.path.join(self.tmp.name, "phase1.db")).start()
+        self.addCleanup(mock.patch.stopall)
+        with contextlib.closing(sqlite3.connect(tdb.path())) as c:
+            c.execute("CREATE TABLE watches (watch_id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, account_id TEXT NOT NULL, "
+                      "platform TEXT NOT NULL, username TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 0, display_name TEXT, "
+                      "aliases_json TEXT NOT NULL DEFAULT '[]', instagram TEXT, x TEXT, paused INTEGER NOT NULL DEFAULT 0, "
+                      "paused_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, seeded_at TEXT, deleted_at TEXT, "
+                      "purge_after TEXT)")
+            c.execute("INSERT INTO watches (watch_id, tenant_id, account_id, platform, username, created_at, updated_at) "
+                      "VALUES ('w_old_00001', 'tn_old', 'acc-1', 'onlyfans', 'mia_vale', ?, ?)", (self.T0, self.T0))
+            c.commit()
+        tdb.init()
+        tdb.init()
+        self.assertEqual(self.rows("SELECT watch_id, weekly_slot, plan_loads, carry_json FROM watches"),
+                         [{"watch_id": "w_old_00001", "weekly_slot": 0, "plan_loads": 31, "carry_json": None}])
