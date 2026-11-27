@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Leak tracker owner CLI (spec "Measures"): tenants, keys, purge, report, daily pass. Uses TRACKER_DB.
+"""Leak tracker owner CLI (spec "Measures"): tenants, keys, caps, purge, report, daily pass. Uses TRACKER_DB.
 
   python3 app/tracker_cli.py tenant add <label> [--max N] | tenant cap <tenant_id> <n> | tenant list
   python3 app/tracker_cli.py key issue <tenant_id> | key revoke <tenant_id>
+  python3 app/tracker_cli.py caps global [--daily-loads N] [--daily-judge N] (no flag: caps + today's spend) | caps tenant <tenant_id> --month-loads N
   python3 app/tracker_cli.py purge [--dry-run] | report | daily [--at ISO]
 """
 import argparse
 import json
 import sys
 
+import tracker_budget
 import tracker_db
 
 
@@ -32,12 +34,14 @@ def tenant_cap(a):
 
 
 def tenant_list(a):
+    month = tracker_db.day()[:7]
     with tracker_db.db() as c:
         for r in c.execute("SELECT t.tenant_id, t.label, t.creators_max, "
                            "(SELECT COUNT(*) FROM watches w WHERE w.tenant_id = t.tenant_id AND w.deleted_at IS NULL), "
-                           "(SELECT COUNT(*) FROM tenant_keys k WHERE k.tenant_id = t.tenant_id AND k.revoked_at IS NULL) "
-                           "FROM tenants t ORDER BY t.created_at, t.tenant_id"):
-            print(f"{r[0]}\t{r[1]}\tmax={r[2]}\tused={r[3]}\tkeys={r[4]}")
+                           "(SELECT COUNT(*) FROM tenant_keys k WHERE k.tenant_id = t.tenant_id AND k.revoked_at IS NULL), "
+                           "t.month_loads FROM tenants t ORDER BY t.created_at, t.tenant_id").fetchall():
+            print(f"{r[0]}\t{r[1]}\tmax={r[2]}\tused={r[3]}\tkeys={r[4]}\tmonth_loads={r[5]}"
+                  f"\tloads_month={tracker_budget.month_loads_spent(c, r[0], month)}")
 
 
 def key_issue(a):
@@ -55,6 +59,31 @@ def key_revoke(a):
         n = c.execute("UPDATE tenant_keys SET revoked_at = ? WHERE tenant_id = ? AND revoked_at IS NULL",
                       (tracker_db.now(), a.tenant_id)).rowcount
     print(f"revoked {n}")
+
+
+def caps_global(a):
+    d = tracker_db.day()
+    with tracker_db.db() as c:
+        if a.daily_loads is None and a.daily_judge is None:
+            loads, judge = c.execute("SELECT daily_loads, daily_judge FROM tracker_limits WHERE id = 1").fetchone()
+            print(f"global\tdaily_loads={loads}\tdaily_judge={judge}\tloads_today={tracker_budget.day_spent(c, 'load', d)}"
+                  f"\tjudge_today={tracker_budget.day_spent(c, 'judge_call', d)}")
+            return
+        c.execute("UPDATE tracker_limits SET daily_loads = COALESCE(?, daily_loads), "
+                  "daily_judge = COALESCE(?, daily_judge) WHERE id = 1", (a.daily_loads, a.daily_judge))
+
+
+def caps_tenant(a):
+    with tracker_db.db() as c:
+        _tenant(c, a.tenant_id)
+        c.execute("UPDATE tenants SET month_loads = ? WHERE tenant_id = ?", (a.month_loads, a.tenant_id))
+
+
+def _count(s):
+    n = int(s)
+    if n < 0:
+        raise argparse.ArgumentTypeError("must be >= 0")
+    return n
 
 
 def purge(a):
@@ -95,6 +124,15 @@ def main(argv=None):
         x = k.add_parser(name)
         x.add_argument("tenant_id")
         x.set_defaults(fn=fn)
+    k = sub.add_parser("caps").add_subparsers(dest="sub", required=True)
+    x = k.add_parser("global")
+    x.add_argument("--daily-loads", type=_count)
+    x.add_argument("--daily-judge", type=_count)
+    x.set_defaults(fn=caps_global)
+    x = k.add_parser("tenant")
+    x.add_argument("tenant_id")
+    x.add_argument("--month-loads", type=_count, required=True)
+    x.set_defaults(fn=caps_tenant)
     x = sub.add_parser("purge")
     x.add_argument("--dry-run", action="store_true")
     x.set_defaults(fn=purge)
