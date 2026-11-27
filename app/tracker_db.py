@@ -187,6 +187,7 @@ CREATE TABLE IF NOT EXISTS serp_cache (
   PRIMARY KEY (day, vertical, text, page, since)
 );
 """
+SEED_FIELDS = '[["web","handle"]]'
 _COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
             ("watches", "weekly_slot", "INTEGER CHECK (weekly_slot BETWEEN 0 AND 6)"),
             ("watches", "plan_loads", "INTEGER"),
@@ -194,8 +195,10 @@ _COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
             ("leaks", "recheck_at", "TEXT"),
             ("tenants", "bb_key", "TEXT"),
             ("tenants", "bb_project", "TEXT"),
-            ("leaks", "google_fields_json", "TEXT")]
-SEED_FIELDS = '[["web","handle"]]'
+            # every Google Leak so far is the seed's (the fresh pass shipped gated off)
+            ("leaks", "google_fields_json", "TEXT", f"UPDATE leaks SET google_fields_json = '{SEED_FIELDS}' "
+             "WHERE leak_id IN (SELECT leak_id FROM leak_events WHERE type = 'seen' AND "
+             "data_json LIKE '%\"source\":\"google_web\"%')")]
 
 _clock = None
 
@@ -222,12 +225,11 @@ def init():
         c.execute("PRAGMA journal_mode=WAL")
         c.executescript(_SCHEMA)
         c.execute("BEGIN IMMEDIATE")
-        for table, col, decl in _COLUMNS:
+        for table, col, decl, *backfill in _COLUMNS:
             if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
-                if col == "google_fields_json":  # every Google Leak so far is the seed's (the fresh pass shipped gated off)
-                    c.execute("UPDATE leaks SET google_fields_json = ? WHERE leak_id IN (SELECT leak_id FROM leak_events "
-                              "WHERE type = 'seen' AND data_json LIKE '%\"source\":\"google_web\"%')", (SEED_FIELDS,))
+                for sql in backfill:
+                    c.execute(sql)
         tracker_admission.backfill(c)
 
 
@@ -283,6 +285,11 @@ def new_key():
 
 def key_hash(key):
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def visible_of(data):
+    """A google_seen event's data -> True | False | None ({} = Phase 1's, visible)."""
+    return data.get("visible", True)
 
 
 def add_event(c, leak_id, type_, data=None, at=None):

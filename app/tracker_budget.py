@@ -4,7 +4,7 @@ before a cap was lowered can still be consumed in full (overshoot bounded by the
 spend into a watch-less carry row, so deleting a watch never reopens day or month room."""
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 import tracker_db as tdb
 
@@ -20,7 +20,7 @@ class Reservation:
     unit: str
     held: int
     used: int = 0
-    short: "Refused" = None
+    short: Optional["Refused"] = None
 
 
 class Refused(NamedTuple):

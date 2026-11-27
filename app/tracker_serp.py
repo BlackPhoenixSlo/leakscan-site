@@ -12,6 +12,7 @@ _block_assets, a page per load) and adapters (BrowserbaseFetcher's create and re
 REST helpers, shared) with playwright imported lazily (the service image has playwright but no browsers: remote CDP
 only). Proxies are never requested and the CAPTCHA solver is always on. The walls / retry / reservation loop is the
 caller's (tracker_lanes), so every navigation is charged first."""
+import functools
 import re
 import time
 from html.parser import HTMLParser
@@ -64,6 +65,12 @@ def classify_serp(final_url, html):
     if "rso" in ids:
         return "results"
     return "no_results" if "search" in ids else "unknown"
+
+
+def says_no_results(html):
+    """Google's own empty-result wording is on the page (a bare #search shell is "no_results" without it)."""
+    low = html.lower()
+    return any(t in low for t in _NO_RESULTS)
 
 
 def is_goto(url):
@@ -232,7 +239,8 @@ def serp_links(html, base=GOOGLE_SEARCH):
 LOADS_PER_SESSION = 12  # then a fresh session (a new IP)
 WALLS = ("captcha", "consent", "unknown")
 BLOCKED_TYPES = {"image", "media", "font", "stylesheet"}
-IMAGES_BLOCKED = {"media", "font"}  # the images parser reads tile attributes; images stay until a parser test shows otherwise
+# the images parser reads tile attributes; images stay until a parser test shows otherwise
+BLOCKED = {"web": BLOCKED_TYPES, "videos": BLOCKED_TYPES, "images": {"media", "font"}}
 SESSION_S = 300
 SOLVE_WAIT_S = 30
 LOAD_S = 30
@@ -249,25 +257,11 @@ def _playwright():
     return sync_playwright().start()
 
 
-def _block(route, types):
+def block_assets(route, types=BLOCKED_TYPES):
     if route.request.resource_type in types:
         route.abort()
     else:
         route.continue_()
-
-
-def block_assets(route):
-    """Web and videos loads."""
-    _block(route, BLOCKED_TYPES)
-
-
-def block_fonts_media(route):
-    """Images loads."""
-    _block(route, IMAGES_BLOCKED)
-
-
-def blocker(vertical):
-    return block_fonts_media if vertical == "images" else block_assets
 
 
 class Session:
@@ -298,7 +292,7 @@ class Session:
         ctx = self._browser.contexts[0] if self._browser.contexts else self._browser.new_context()
         page = ctx.new_page()
         try:
-            page.route("**/*", blocker(vertical))
+            page.route("**/*", functools.partial(block_assets, types=BLOCKED[vertical]))
         except Exception:
             close_page(page)
             raise

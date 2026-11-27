@@ -160,6 +160,22 @@ class Classify(unittest.TestCase):
                 self.assertEqual(classify_serp(url, html), kind)
 
 
+class NoResultsWording(unittest.TestCase):
+    def test_per_vertical_only_googles_wording_confirms_empty(self):
+        web_empty = "<html><body><div id='search'><p>Your search - <b>\"rowan_ash\"</b> - did not match any documents.</p></div></body></html>"
+        vid_empty = web_empty.replace("rowan_ash", "mia_vale leaked")
+        for vertical, url, empty, full in [
+            ("web", f"{G}/search?q=x", web_empty, fixture("google_web_mia.html")),
+            ("images", f"{G}/search?q=x&tbm=isch", fixture("google_images_empty.html"), fixture("google_images_mia.html")),
+            ("videos", f"{G}/search?q=x&tbm=vid", vid_empty, fixture("google_videos_mia.html")),
+        ]:
+            with self.subTest(vertical=vertical):
+                self.assertEqual((classify_serp(url, empty), ts.says_no_results(empty), serp_links(empty)),
+                                 ("no_results", True, []))
+                self.assertEqual((classify_serp(url, SHELL_ONLY), ts.says_no_results(SHELL_ONLY)), ("no_results", False))
+                self.assertEqual((classify_serp(url, full), ts.says_no_results(full)), ("results", False))
+
+
 class Url(unittest.TestCase):
     def test_serp_url_parameters(self):
         q = parse_qs(urlsplit(serp_url('"mia vale"', "web", 2, "w")).query)

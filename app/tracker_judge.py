@@ -68,7 +68,7 @@ def admit(c, watch_id, url, key, site, kind, title, source, at, first_scan=True)
             known = c.execute("SELECT leak_id FROM leaks WHERE watch_id = ? AND url_key = ?", (watch_id, key)).fetchone()
             last = c.execute("SELECT data_json FROM leak_events WHERE leak_id = ? AND type = 'google_seen' "
                              "ORDER BY id DESC LIMIT 1", (known[0],)).fetchone()
-            if last is None or json.loads(last[0] or "{}").get("visible", True) is not True:
+            if last is None or tdb.visible_of(json.loads(last[0] or "{}")) is not True:
                 tdb.add_event(c, known[0], "google_seen", {"visible": True}, at)
         return 0
     tdb.add_event(c, leak_id, "seen", {"source": source, "first_scan": first_scan}, at)

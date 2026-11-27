@@ -394,6 +394,7 @@ HOST_KEY, HOST_PROJECT, OWN_KEY = "bb-host-key-fake", "prj-host", "bb-own-key-fa
 RESULTS = '<html><body><div id="search"><div id="rso">{}</div></div></body></html>'
 EMPTY = '<html><body><div id="search">Your search did not match any documents.</div></body></html>'
 WALL = '<html><body><form id="captcha-form"></form></body></html>'
+SHELL = '<html><body><div id="search"><div id="center_col"></div></div></body></html>'
 CREATE = {"projectId": HOST_PROJECT, "timeout": 300, "browserSettings": {"solveCaptchas": True}}
 
 
@@ -436,7 +437,7 @@ class BBStub(ThreadingHTTPServer):
 class FakePW:
     """Started sync Playwright stand-in: chromium.connect_over_cdp -> a browser whose pages record every goto as
     (connectUrl, url) in navs and the page's route handler in blocks. script: per-navigation overrides ("wall",
-    "fail"), else a results page with links[(vertical, q)], or links[q] on web (no links: the empty-result page).
+    "fail", "shell" = a bare #search), else a results page with links[(vertical, q)], or links[q] on web (no links: the empty-result page).
     page_fail: new_page raises."""
 
     def __init__(self):
@@ -462,6 +463,9 @@ class FakePW:
                     raise RuntimeError("net::ERR_TIMED_OUT")
                 if step == "wall":
                     self.url, self.html = "https://www.google.com/sorry/index?continue=x", WALL
+                    return
+                if step == "shell":
+                    self.url, self.html = u, SHELL
                     return
                 qs = parse_qs(urlsplit(u).query)
                 v = {"isch": "images", "vid": "videos"}.get(qs.get("tbm", [""])[0], "web")
@@ -568,7 +572,8 @@ class TestFreshPass(Fresh):
         self.assertEqual(self.bb.creates, [(HOST_KEY, CREATE)])
         self.assertEqual(self.pw.navs, [("wss://bb.stub/1", q.urls()[0])])
         self.assertIn("tbs=qdr%3Ad", q.urls()[0])
-        self.assertEqual([(p, h) for p, h in self.pw.routes], [("**/*", tracker_serp.block_assets)])
+        self.assertEqual([(p, h.func, h.keywords) for p, h in self.pw.routes],
+                         [("**/*", tracker_serp.block_assets, {"types": tracker_serp.BLOCKED_TYPES})])
         self.assertEqual(self.bb.releases, [(HOST_KEY, "/sessions/bb1", {"projectId": HOST_PROJECT, "status": "REQUEST_RELEASE"})])
         self.assertEqual(self.pw.closed, ["wss://bb.stub/1"])
         self.assert_charged()
@@ -971,9 +976,9 @@ class TestFullPass(Full):
         self.assertEqual(len(self.bb.releases), 3)
         blocks = dict(zip((u for _, u in self.pw.navs), self.pw.blocks))
         for u in urls:
-            want = tracker_serp.block_fonts_media if "tbm=isch" in u else tracker_serp.block_assets
-            self.assertIs(blocks[u], want, u)
-        self.assertEqual({"tbm=isch" in u for u in urls if blocks[u] is tracker_serp.block_fonts_media}, {True})
+            self.assertIs(blocks[u].func, tracker_serp.block_assets)
+            want = {"media", "font"} if "tbm=isch" in u else {"image", "media", "font", "stylesheet"}
+            self.assertEqual(blocks[u].keywords, {"types": want}, u)
         self.assert_charged()
         self.assertEqual(self.used(), 15)
         self.assertEqual(self.lane_view(), {"cadence": "weekly", "state": "ok", "reason": None,
@@ -1002,13 +1007,12 @@ class TestFullPass(Full):
         got = {}
         for t in ("image", "font", "media", "stylesheet", "document", "script"):
             r = Route(t)
-            tracker_serp.block_fonts_media(r)
+            tracker_serp.block_assets(r, tracker_serp.BLOCKED["images"])
             got[t] = r.done
         self.assertEqual(got, {"image": "continue", "font": "abort", "media": "abort", "stylesheet": "continue",
                                "document": "continue", "script": "continue"})
-        self.assertIs(tracker_serp.blocker("images"), tracker_serp.block_fonts_media)
-        self.assertIs(tracker_serp.blocker("web"), tracker_serp.block_assets)
-        self.assertIs(tracker_serp.blocker("videos"), tracker_serp.block_assets)
+        self.assertEqual(tracker_serp.BLOCKED, {"web": tracker_serp.BLOCKED_TYPES, "videos": tracker_serp.BLOCKED_TYPES,
+                                                "images": {"media", "font"}})
 
     def test_slot_weekday_runs_other_weekdays_dont(self):
         self.slot(3)
@@ -1183,10 +1187,93 @@ class TestFullPass(Full):
         self.slot(3)
         self.bb.fail = True
         self.day(3)
-        self.assertEqual(len(self.bb.creates), n + 2)
+        self.assertEqual(len(self.bb.creates), n + 1)
         self.assertEqual(len(self.pw.navs), 15)
         self.assert_charged()
         self.assertEqual((self.full()["state"], self.full()["reason"]), ("reduced", "google_failed"))
+
+    def test_breaker_carries_across_the_ticks_weekly_watches(self):
+        w2 = self.watch(self.t, username="rowan_ash", account_id="acc-r", weekly_slot=wd(2))
+        self.pw.script = ["wall"] * 100
+        self.day(2)
+        self.assert_charged()
+        self.assertLessEqual(self.used(), 6)
+        self.assertEqual(self.used(), 6)
+        self.assertEqual(sorted(self.used(w) for w in (self.w, w2)), [2, 4])
+        self.assertEqual({(self.full(w)["state"], self.full(w)["reason"]) for w in (self.w, w2)},
+                         {("reduced", "google_failed")})
+        self.assertEqual(self.rows("SELECT * FROM serp_cache"), [])
+
+    def test_empty_shell_page_is_incomplete_on_the_full_pass_only(self):
+        self.pw.script = ["shell", "shell"]
+        self.day(2)
+        self.assert_charged()
+        self.assertEqual(len(self.full_navs()), 14)
+        self.assertEqual(self.fresh()["state"], "ok")
+        self.assertEqual((self.full()["state"], self.full()["reason"]), ("reduced", "google_failed"))
+        cached = {(r["vertical"], r["text"], r["page"], r["since"]) for r in self.rows("SELECT * FROM serp_cache")}
+        self.assertNotIn(("web", '"mia_vale"', 0, ""), cached)
+        self.assertIn(("web", '"mia_vale"', 1, ""), cached)
+        self.assertEqual(len(cached), 1 + 13)
+
+    def test_restart_after_the_daily_rows_reticks_weekly_once(self):
+        with mock.patch.object(tracker_lanes, "run_weekly_batch"):
+            self.day(2)
+        self.assertEqual((self.full_navs(), self.full()["state"]), ([], "never"))
+        self.assertEqual(self.scan(), "ok")
+        tracker_scheduler.daily_pass(tdb.plus(at(2), hours=1))
+        self.assertEqual(len(self.full_navs()), 14)
+        tracker_scheduler.daily_pass(tdb.plus(at(2), hours=2))
+        self.assertEqual(len(self.full_navs()), 14)
+        self.assertEqual(self.full_day(), [{"day": "2026-11-02", "outcome": "ok", "reason": None}])
+        self.assert_charged()
+
+    def test_watch_seeded_today_runs_its_due_full_pass(self):
+        import tracker_seed
+        w2 = self.watch(self.t, username="rowan_ash", account_id="acc-r", seeded=False, weekly_slot=wd(2))
+        cand = {"google": [], "mega": [], "errors": []}
+        with mock.patch.object(tracker_seed, "_quick_candidates", return_value=lambda *a: cand):
+            self.day(2)
+        self.assertEqual(self.full(w2)["state"], "ok")
+        self.assertEqual(sum('rowan_ash' in u for u in self.full_navs()), tracker_plan.build(self.row(w2), "onlyfans").loads)
+        self.assert_charged()
+
+    def test_trimmed_slot_keeps_first_scan_for_the_carry(self):
+        mega_hit, later = f"{SITE}/video/mia_vale-c1", f"{SITE}/video/mia_vale-c2"
+        self.pw.links[("web", '"mia_vale" mega.nz')] = [(mega_hit, "Mia")]
+        with tdb.db() as c:
+            c.execute("UPDATE tracker_limits SET daily_loads = 10")
+        self.day(2)
+        self.assertEqual(self.full()["state"], "reduced")
+        with tdb.db() as c:
+            c.execute("UPDATE tracker_limits SET daily_loads = 300")
+        self.day(3)
+        self.assertEqual(self.full()["state"], "ok")
+        self.pw.links[("web", '"mia_vale"')] = [(later, "Mia")]
+        self.day(9)
+        b = self.get(f"/v1/creators/{self.w}/leaks")[1]
+        self.assertEqual({x["url"]: x["found_on_first_scan"] for x in b["leaks"]}, {mega_hit: True, later: False})
+        self.assert_charged()
+
+    def test_crash_mid_carry_keeps_the_carry_for_a_retick(self):
+        self.pw.links[("web", '"mia_vale" mega.nz')] = [(f"{SITE}/video/mia_vale-c1", "Mia")]
+        with tdb.db() as c:
+            c.execute("UPDATE tracker_limits SET daily_loads = 10")
+        self.day(2)
+        carry = self.carry()
+        with tdb.db() as c:
+            c.execute("UPDATE tracker_limits SET daily_loads = 300")
+        with mock.patch.object(tracker_lanes.tracker_judge, "admit_hit", side_effect=RuntimeError("boom")):
+            self.day(3)
+        self.assertEqual(self.carry(), carry)
+        self.assertEqual(self.full()["state"], "failed")
+        n = len(self.full_navs())
+        tracker_scheduler.daily_pass(tdb.plus(at(3), hours=1))
+        self.assertEqual(len(self.full_navs()), n)
+        self.assertIsNone(self.carry())
+        self.assertEqual(self.full()["state"], "ok")
+        self.assertEqual(len(self.rows("SELECT * FROM leaks WHERE url = ?", f"{SITE}/video/mia_vale-c1")), 1)
+        self.assert_charged()
 
     def test_two_tenants_same_handle_reuse_the_cache(self):
         self.clock(tdb.plus(Base.T0, seconds=1))
@@ -1274,10 +1361,41 @@ class TestVisibility(Full):
         self.assertEqual(self.pill(), "gone")
         self.assertEqual(self.fields(both), [["web", "handle"]])
         self.assertEqual(self.vis(both), [True])
-        self.assertEqual(self.vis(fresh_only), [True, None])
-        self.assertEqual(self.pill(f"{SITE}/video/mia_vale-k3"), "gone")
+        self.assertEqual(self.vis(fresh_only), [True])
+        self.assertEqual(self.pill(f"{SITE}/video/mia_vale-k3"), "cached")
         self.assertEqual(self.vis(mega), [])
         self.assertIsNone(self.rows("SELECT google_fields_json FROM leaks WHERE leak_id = ?", mega)[0]["google_fields_json"])
+        self.assert_charged()
+
+    def test_refused_or_failed_pass_writes_no_google_seen(self):
+        lid = self.known([["images", "alias:miavalex"]])
+        with tdb.db() as c:
+            c.execute("UPDATE watches SET aliases_json = '[\"miav\"]' WHERE watch_id = ?", (self.w,))
+            c.execute("UPDATE tenants SET month_loads = 1")
+        self.day(2)
+        self.assertEqual((self.full()["state"], self.full()["reason"]), ("waiting", "cap_tenant_month"))
+        self.assertEqual(self.vis(lid), [True])
+        self.assertEqual(self.fields(lid), [["images", "alias:miavalex"]])
+        with tdb.db() as c:
+            c.execute("UPDATE tenants SET month_loads = 1000")
+        self.slot(3)
+        self.pw.script = ["fail"] * 100
+        self.day(3)
+        self.assertEqual((self.full()["state"], self.full()["reason"]), ("reduced", "google_failed"))
+        self.assertEqual(self.vis(lid), [True])
+        self.slot(4)
+        self.pw.script = []
+        self.day(4)
+        self.assertEqual(self.vis(lid), [True, None])
+        self.assert_charged()
+
+    def test_shell_page_never_counts_toward_false(self):
+        lid = self.known([["web", "handle"]])
+        self.pw.script = [None, None, None, None, None, None, None, None, None, "shell"]
+        self.day(2)
+        self.assertEqual(self.vis(lid), [True])
+        self.day(9)
+        self.assertEqual(self.vis(lid), [True, False])
         self.assert_charged()
 
     def test_seed_google_leaks_hold_web_handle(self):

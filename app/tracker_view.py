@@ -59,7 +59,7 @@ def _probes(c, leak_ids):
 def visible(events):
     """Google visibility from the last google_seen: True | False | None (unknown, also when there is none)."""
     seen = [e for e in events if e["type"] == "google_seen"]
-    return seen[-1]["data"].get("visible", True) if seen else None
+    return tracker_db.visible_of(seen[-1]["data"]) if seen else None
 
 
 def pill(kind, origin_status, events):

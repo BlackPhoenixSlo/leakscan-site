@@ -125,7 +125,7 @@ def _seed(w, at):
             cls = rules.host_class(host)
             if cls == "skip":
                 continue
-            key = rules.url_key(url, keep_fragment=cls != "page")
+            key = tracker_judge.leak_key(url, cls)
             if any(n in tracker_judge.norm(url) for n in strong):
                 if tracker_judge.admit(c, watch_id, url, key, rules.registrable_domain(host) or host, cls, title,
                                        "google_web", at):
