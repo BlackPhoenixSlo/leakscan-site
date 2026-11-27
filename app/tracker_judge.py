@@ -84,13 +84,18 @@ def pend(c, watch_id, url, key, title, source, at):
                      (watch_id, key, url, title, source, at, watch_id, key)).rowcount
 
 
+def leak_key(url, kind=None):
+    """The url_key a hit's Leak or Pending hit is stored under."""
+    return rules.url_key(url, keep_fragment=(kind or rules.host_class(rules.host_of(url))) != "page")
+
+
 def admit_hit(c, w, url, title, source, at, first_scan=False):
     """admission(), then the Leak or the Pending hit -> the verdict."""
     host = rules.host_of(url)
     kind = rules.host_class(host)
     verdict = _verdict(w, url, title, host, kind)
     if verdict:
-        key = rules.url_key(url, keep_fragment=kind != "page")
+        key = leak_key(url, kind)
         if verdict == "leak":
             admit(c, w["watch_id"], url, key, rules.registrable_domain(host) or host, kind, title, source, at, first_scan)
         else:

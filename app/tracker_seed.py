@@ -127,8 +127,11 @@ def _seed(w, at):
                 continue
             key = rules.url_key(url, keep_fragment=cls != "page")
             if any(n in tracker_judge.norm(url) for n in strong):
-                admitted += tracker_judge.admit(c, watch_id, url, key, rules.registrable_domain(host) or host, cls,
-                                                title, "google_web", at)
+                if tracker_judge.admit(c, watch_id, url, key, rules.registrable_domain(host) or host, cls, title,
+                                       "google_web", at):
+                    admitted += 1
+                    c.execute("UPDATE leaks SET google_fields_json = ? WHERE watch_id = ? AND url_key = ?",
+                              (tdb.SEED_FIELDS, watch_id, key))
             elif any(n in tracker_judge.norm(title) or n in tracker_judge.norm(url) for n in names):
                 pending += tracker_judge.pend(c, watch_id, url, key, title, "google_web", at)
         for it in cand["mega"]:

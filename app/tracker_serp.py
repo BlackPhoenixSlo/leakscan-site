@@ -232,6 +232,7 @@ def serp_links(html, base=GOOGLE_SEARCH):
 LOADS_PER_SESSION = 12  # then a fresh session (a new IP)
 WALLS = ("captcha", "consent", "unknown")
 BLOCKED_TYPES = {"image", "media", "font", "stylesheet"}
+IMAGES_BLOCKED = {"media", "font"}  # the images parser reads tile attributes; images stay until a parser test shows otherwise
 SESSION_S = 300
 SOLVE_WAIT_S = 30
 LOAD_S = 30
@@ -248,16 +249,31 @@ def _playwright():
     return sync_playwright().start()
 
 
-def block_assets(route):
-    if route.request.resource_type in BLOCKED_TYPES:
+def _block(route, types):
+    if route.request.resource_type in types:
         route.abort()
     else:
         route.continue_()
 
 
+def block_assets(route):
+    """Web and videos loads."""
+    _block(route, BLOCKED_TYPES)
+
+
+def block_fonts_media(route):
+    """Images loads."""
+    _block(route, IMAGES_BLOCKED)
+
+
+def blocker(vertical):
+    return block_fonts_media if vertical == "images" else block_assets
+
+
 class Session:
     """One Browserbase session: create() (Playwright first, so a broken one bills nothing; then the REST create and
-    CDP), page() -> a fresh page with the asset blocker routed, load(page, url) -> (final_url, html), release().
+    CDP), page(vertical) -> a fresh page with that vertical's asset blocker routed, load(page, url) -> (final_url, html),
+    release().
     `loads` counts this session's navigations; stale() = LOADS_PER_SESSION loads or ROTATE_S old. The key is never
     logged."""
 
@@ -278,11 +294,11 @@ class Session:
     def stale(self):
         return self.loads >= LOADS_PER_SESSION or _clock() - self.born >= ROTATE_S
 
-    def page(self):
+    def page(self, vertical="web"):
         ctx = self._browser.contexts[0] if self._browser.contexts else self._browser.new_context()
         page = ctx.new_page()
         try:
-            page.route("**/*", block_assets)
+            page.route("**/*", blocker(vertical))
         except Exception:
             close_page(page)
             raise

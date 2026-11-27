@@ -4,7 +4,8 @@ unpaused, undeleted watch, seeds the unseeded ones (the seed probes and finishes
 lanes one watch at a time (tracker_lanes.run_daily: the Origin probe, each url_key once a day, the Mega lookup, the
 listing recheck) and finishes their rows, failed when the probe failed; one watch's error fails only its own row. Then
 the Google fresh pass over those watches (tracker_lanes.run_fresh_batch; after the rows finish, since the paid batch can
-outlast tracker_seed.LEASE_H), and an ok row with a partial or failed lane_day row of the day turns partial. Then the
+outlast tracker_seed.LEASE_H), then the weekly lanes of each of them on its slot weekday or carry day
+(tracker_lanes.run_weekly), and an ok row with a partial or failed lane_day row of the day turns partial. Then the
 purge, once per UTC day. Rows still open from an earlier day (a crash) finish failed; today's are taken over after
 tracker_seed.LEASE_H. TRACKER_SCHEDULER=0 keeps the thread off."""
 import ipaddress
@@ -63,6 +64,11 @@ def _pass(now):
         tracker_lanes.run_fresh_batch(done, today)
     except Exception as e:
         log(f"tracker fresh pass failed: {type(e).__name__}")
+    for wid in done:
+        try:
+            tracker_lanes.run_weekly(wid, today)
+        except Exception as e:
+            log(f"tracker weekly lanes failed: {type(e).__name__}")
     with tdb.db() as c:
         c.executemany("UPDATE daily_scans SET outcome = 'partial' WHERE watch_id = ? AND day = ? AND outcome = 'ok' "
                       "AND EXISTS (SELECT 1 FROM lane_day WHERE watch_id = daily_scans.watch_id AND "

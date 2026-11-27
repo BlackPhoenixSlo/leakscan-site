@@ -56,6 +56,12 @@ def _probes(c, leak_ids):
     return out
 
 
+def visible(events):
+    """Google visibility from the last google_seen: True | False | None (unknown, also when there is none)."""
+    seen = [e for e in events if e["type"] == "google_seen"]
+    return seen[-1]["data"].get("visible", True) if seen else None
+
+
 def pill(kind, origin_status, events):
     statuses = [e for e in events if e["type"] == "status"]
     if kind != "page":
@@ -63,7 +69,7 @@ def pill(kind, origin_status, events):
             return "listed"
         origin_status = "gone"
     if origin_status == "gone":
-        return "cached" if any(e["type"] == "google_seen" for e in events) else "gone"
+        return "cached" if visible(events) is True else "gone"
     return "live" if origin_status == "live" else "not_checked"
 
 

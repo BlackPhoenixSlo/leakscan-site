@@ -428,6 +428,14 @@ class TestPill(Base):
                                            ("telegram", None, ev(gone, live), "listed")):
             self.assertEqual(tracker_view.pill(kind, origin, events), want, (kind, origin, events))
 
+    def test_google_visibility(self):
+        ev = lambda *vis: [{"at": ts(NOW), "type": "google_seen", "data": {} if v is ... else {"visible": v}} for v in vis]
+        gone = {"at": ts(NOW), "type": "status", "data": {"from": "live", "to": "gone"}}
+        for events, want in ((ev(...), "cached"), (ev(True), "cached"), (ev(False), "gone"), (ev(None), "gone"),
+                             (ev(True, False), "gone"), (ev(False, True), "cached"), (ev(True, None), "gone")):
+            self.assertEqual(tracker_view.pill("page", "gone", events), want, events)
+            self.assertEqual(tracker_view.pill("mega", None, events + [gone]), want, events)
+
     def test_over_http(self):
         self.put("w_mia_00001")
         d = lambda n: ts(NOW - timedelta(days=n))
@@ -507,6 +515,19 @@ class TestLanes(Base):
                                               "next_attempt_on": "2026-11-28", "trimmed": []})
         self.assertEqual(got["origin_probe"]["state"], "ok")
         self.assertNotIn("lanes", self.req("GET", "/v1/creators", key=self.a)[2]["creators"][0])
+
+    def test_trimmed(self):
+        self.put("w_mia_00001")
+        self.lane_row("w_mia_00001", "google_full", "reduced", "cap_global")
+        trimmed = [{"field": "alias:0", "value": "mia.vale.x"}, {"field": "instagram", "value": "mia.vale"},
+                   {"field": "x", "value": "miavale"}]
+        with tracker_db.db() as c:
+            c.execute("UPDATE lane_state SET trimmed_json = ? WHERE lane = 'google_full'", (json.dumps(trimmed),))
+        got = {x["lane"]: x for x in self.lanes("w_mia_00001")}
+        self.assertEqual({k: got["google_full"][k] for k in ("cadence", "state", "reason", "trimmed")},
+                         {"cadence": "weekly", "state": "reduced", "reason": "cap_global", "trimmed": trimmed})
+        self.assertEqual({x["lane"]: x["trimmed"] for x in got.values() if x["lane"] != "google_full"},
+                         dict.fromkeys([n for n, _ in self.LANES if n != "google_full"], []))
 
     def test_paused(self):
         self.put("w_mia_00001")

@@ -34,12 +34,23 @@ google_failed (lane_day partial). A session also rotates at serp.ROTATE_S old. B
 incomplete queries in a row, and the group's remaining misses are google_failed with no reservation and no session.
 Refused -> `waiting` with the cap's reason and next_on (a gone watch records nothing); the watch is never paused. A
 watch whose tenant row is missing is skipped. Result links go through tracker_judge.admit_hit with source google_web (a
-/goto link is dropped), which only ever marks a Leak visible in Google. No other engine is called."""
+/goto link is dropped), which only ever marks a Leak visible in Google. No other engine is called.
+
+Google full pass (paid, run_weekly(watch_id, day) after the fresh batch, on the watch's weekly_slot weekday or its carry
+day): the same gate, creds, Session, cache (since '') and breaker as fresh; each vertical blocks its own assets
+(tracker_serp.blocker). tracker_plan.build()'s misses + FULL_RETRIES (wall retries) are reserved with a partial grant; a
+short grant trims the plan (Plan.trim) to what fits, the dropped fields go to lane_state.trimmed (lane `reduced`, the
+cap's reason, lane_day partial). A slot run cut by cap_global / cap_tenant_month writes watches.carry_json: its cut pages
+run once on the cap's next_on (next UTC day / the 1st), never carried again. Each returned link's (vertical, field) pairs
+join leaks.google_fields_json; a full pass that completed every planned pair of a Leak and returned none marks it not
+visible (google_seen visible false), an empty set (fields gone from the identity) unknown (null)."""
 import functools
 import html as _html
 import json
 import os
 import re
+from dataclasses import replace
+from datetime import date, timedelta
 from urllib.parse import parse_qsl, urljoin, urlsplit
 
 import leak_crawler
@@ -65,24 +76,26 @@ _OUTCOME = {"ok": "ok", "reduced": "partial", "failed": "failed", "waiting": "pa
 FRESH = "google_fresh"
 BREAKER = 3
 FRESH_HOLD = 2  # the load and its one wall retry; settle releases what a query didn't use
+FULL = tracker_plan.LANE
+FULL_RETRIES = 2
 
 
 class LaneFailed(Exception):
     pass
 
 
-def _record(watch_id, day, lane, at, state="ok", reason=None, ledger=True, next_on=None, success=None):
-    """next_on None = the next UTC day; success None = state ok or reduced."""
+def _record(watch_id, day, lane, at, state="ok", reason=None, ledger=True, next_on=None, success=None, trimmed=()):
+    """next_on None = the next UTC day; success None = state ok or reduced; trimmed = [{field, value}] skipped."""
     reason = reason or ("lane_failed" if state == "failed" else None)
     success = state in ("ok", "reduced") if success is None else success
     next_on = next_on or tdb.plus(day + "T00:00:00Z", days=1)[:10]
     with tdb.db() as c:
-        c.execute("INSERT INTO lane_state (watch_id, lane, state, reason, last_attempt_at, last_success_at, next_attempt_on) "
-                  "VALUES (?,?,?,?,?,?,?) ON CONFLICT (watch_id, lane) DO UPDATE SET state = excluded.state, "
+        c.execute("INSERT INTO lane_state (watch_id, lane, state, reason, last_attempt_at, last_success_at, next_attempt_on, "
+                  "trimmed_json) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (watch_id, lane) DO UPDATE SET state = excluded.state, "
                   "reason = excluded.reason, last_attempt_at = excluded.last_attempt_at, "
                   "last_success_at = COALESCE(excluded.last_success_at, lane_state.last_success_at), "
                   "next_attempt_on = excluded.next_attempt_on, trimmed_json = excluded.trimmed_json",
-                  (watch_id, lane, state, reason, at, at if success else None, next_on))
+                  (watch_id, lane, state, reason, at, at if success else None, next_on, json.dumps(list(trimmed))))
         if ledger:
             c.execute("INSERT INTO lane_day (watch_id, day, lane, outcome, reason) VALUES (?,?,?,?,?) ON CONFLICT "
                       "(watch_id, day, lane) DO UPDATE SET outcome = excluded.outcome, reason = excluded.reason",
@@ -246,6 +259,17 @@ def _recheck(w, at):
     return "listing_rotated" if len(todo) > LISTING_MAX else None
 
 
+def _creds(c, w, uncapped, lane):
+    """-> the watch's Browserbase (key, project), () when it has none, None (logged) when its tenant row is missing."""
+    t = c.execute("SELECT bb_key, bb_project FROM tenants WHERE tenant_id = ?", (w["tenant_id"],)).fetchone()
+    if not t:
+        tracker_probe.log(f"tracker {lane} skipped {w['watch_id']}: no tenant row")
+        return None
+    creds = (os.environ.get("BROWSERBASE_API_KEY", ""), os.environ.get("BROWSERBASE_PROJECT_ID", "")) \
+        if w["tenant_id"] in uncapped else tuple(t)
+    return creds if all(creds) else ()
+
+
 def run_fresh_batch(watch_ids, day):
     """The Google fresh pass over watch_ids (the daily pass's, in its order) for UTC day (module docstring)."""
     paid, uncapped, groups = tdb.env_set("TRACKER_PAID_TENANTS"), tdb.env_set("TRACKER_UNCAPPED_TENANTS"), {}
@@ -258,13 +282,10 @@ def run_fresh_batch(watch_ids, day):
             w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
             if not w or w["paused"] or w["deleted_at"] or w["tenant_id"] not in paid:
                 continue
-            t = c.execute("SELECT bb_key, bb_project FROM tenants WHERE tenant_id = ?", (w["tenant_id"],)).fetchone()
-            if not t:
-                tracker_probe.log(f"tracker {FRESH} skipped {wid}: no tenant row")
+            creds = _creds(c, w, uncapped, FRESH)
+            if creds is None:
                 continue
-            creds = (os.environ.get("BROWSERBASE_API_KEY", ""), os.environ.get("BROWSERBASE_PROJECT_ID", "")) \
-                if w["tenant_id"] in uncapped else tuple(t)
-            if not all(creds):
+            if not creds:
                 groups.setdefault(None, []).append(w)
             elif not _ran(wid, day, FRESH):
                 groups.setdefault(creds, []).append(w)
@@ -274,12 +295,66 @@ def run_fresh_batch(watch_ids, day):
         _Batch(creds, day).run(ws)
 
 
-class _Batch:
-    """One creds group's misses, packed into sessions. The breaker: a failed create, or BREAKER incomplete queries in
-    a row, and every later miss in the group is google_failed with no reservation and no session."""
+class _Serp:
+    """Browserbase sessions on one creds for one lane run, and the breaker: a failed create, or BREAKER incomplete
+    queries in a row (miss()), and every later miss gets no reservation and no session (broken)."""
+
+    def __init__(self, creds, day, lane):
+        self.creds, self.day, self.lane, self.session, self.fails, self.broken = creds, day, lane, None, 0, False
+
+    def miss(self):
+        self.fails += 1
+        self.broken = self.broken or self.fails >= BREAKER
+
+    def drop(self):
+        if self.session:
+            self.session.release()
+        self.session = None
+
+    def search(self, r, url, vertical="web"):
+        """-> the page's [[url, title]], or None (incomplete). A load is consumed right before each navigation, after
+        its page is ready. A wall retries once in a fresh session while the hold has a load left."""
+        walls = 0
+        while walls < 2 and r.used < r.held:
+            if self.session is None or self.session.stale():
+                self.drop()
+                self.session = serp.Session(*self.creds)
+                try:
+                    self.session.create()
+                except Exception:
+                    self.broken = True
+                    self.drop()
+                    raise
+            try:
+                page = self.session.page(vertical)
+            except Exception as e:
+                tracker_probe.log(f"tracker {self.lane} page failed: {type(e).__name__}")
+                self.drop()
+                return None
+            if not tracker_budget.consume(r):
+                serp.close_page(page)
+                return None
+            try:
+                final, html = self.session.load(page, url)
+            except Exception as e:
+                tracker_probe.log(f"tracker {self.lane} load failed: {type(e).__name__}")
+                self.drop()
+                return None
+            kind = serp.classify_serp(final, html or "")
+            if kind in serp.WALLS:
+                walls += 1
+                self.drop()
+                continue
+            links = serp.serp_links(html, final)
+            return [list(x) for x in links] if links or kind == "no_results" else None
+        return None
+
+
+class _Batch(_Serp):
+    """One creds group's fresh misses, packed into sessions."""
 
     def __init__(self, creds, day):
-        self.creds, self.day, self.session, self.fails, self.broken = creds, day, None, 0, False
+        super().__init__(creds, day, FRESH)
 
     def run(self, ws):
         try:
@@ -290,17 +365,11 @@ class _Batch:
                     tracker_probe.log(f"tracker {FRESH} failed: {type(e).__name__}")
                     self._failed(w, tdb.now())
         finally:
-            self._drop()
+            self.drop()
 
     def _failed(self, w, at):
-        self.fails += 1
-        self.broken = self.broken or self.fails >= BREAKER
+        self.miss()
         _record(w["watch_id"], self.day, FRESH, at, "reduced", "google_failed", success=False)
-
-    def _drop(self):
-        if self.session:
-            self.session.release()
-        self.session = None
 
     def _watch(self, w):
         at, q = tdb.now(), tracker_plan.fresh(w)
@@ -319,7 +388,7 @@ class _Batch:
                     _record(w["watch_id"], self.day, FRESH, at, "waiting", r.reason, next_on=r.next_on)
                 return
             try:
-                links = self._search(r, q.urls()[0])
+                links = self.search(r, q.urls()[0])
             finally:
                 tracker_budget.settle(r)
             if links is None:
@@ -336,40 +405,172 @@ class _Batch:
                     tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
         _record(w["watch_id"], self.day, FRESH, at)
 
-    def _search(self, r, url):
-        """-> the page's [[url, title]], or None (incomplete). A load is consumed right before each navigation, after
-        its page is ready."""
-        walls = 0
-        while walls < 2 and r.used < r.held:
-            if self.session is None or self.session.stale():
-                self._drop()
-                self.session = serp.Session(*self.creds)
+
+def weekly_due(w, day):
+    """The watch's weekly lanes run on its slot weekday and on the day its carried pages are due."""
+    carry = json.loads(w["carry_json"] or "null")
+    return w["weekly_slot"] == date.fromisoformat(day).weekday() or bool(carry and carry["on"] <= day)
+
+
+def run_weekly(watch_id, day):
+    """The weekly lanes of one unpaused, undeleted watch that is weekly_due on UTC day -> True when due. Lanes so far:
+    google_full; the registry crawl (ticket 30) is added here as its own lane."""
+    with tdb.db() as c:
+        w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
+    if not w or w["paused"] or w["deleted_at"] or not weekly_due(w, day):
+        return False
+    if not _ran(watch_id, day, FULL):
+        try:
+            _full(w, day)
+        except Exception as e:
+            tracker_probe.log(f"tracker {FULL} failed: {type(e).__name__}")
+            _record(watch_id, day, FULL, tdb.now(), "failed", next_on=_next_slot(w, day))
+    return True
+
+
+def _next_slot(w, day):
+    d = date.fromisoformat(day)
+    return (d + timedelta(days=(w["weekly_slot"] - d.weekday()) % 7 or 7)).isoformat()
+
+
+def _pages(queries):
+    return [replace(q, start=p, pages=1) for q in queries for p in range(q.start, q.start + q.pages)]
+
+
+def _page_key(q):
+    return q.vertical, q.text, q.start
+
+
+def _pair(q, values):
+    """A query's (vertical, field) for google_fields_json; an alias is keyed by its norm() value, since alias:<i> shifts
+    when an earlier alias is removed."""
+    return q.vertical, _field_key(q.field, values[q.field])
+
+
+def _field_key(field, value):
+    return f"alias:{tracker_judge.norm(value)}" if field.startswith("alias:") else field
+
+
+def _carried(full, pages):
+    """The current plan's single-page queries still named by a carry (a removed field's pages are gone)."""
+    keep = {tuple(p) for p in pages}
+    qs = tuple(q for q in _pages(full.queries) if _page_key(q) in keep)
+    return tracker_plan.Plan(qs, {f: v for f, v in full.values.items() if any(q.field == f for q in qs)})
+
+
+def _full(w, day):
+    """The full Google pass (spec "Full Google pass"): the slot's whole plan, or a carry's pages on their day. Gate,
+    creds, serp_cache and the session / wall / breaker loop are the fresh pass's (_Serp). Holds misses +
+    FULL_RETRIES wall retries (partial grant); a grant under the misses trims the plan to grant - FULL_RETRIES misses
+    (at least 1). The slot run carries cap_global / cap_tenant_month cuts to the cap's next_on, once; a carry run never
+    carries again."""
+    paid, uncapped, wid = tdb.env_set("TRACKER_PAID_TENANTS"), tdb.env_set("TRACKER_UNCAPPED_TENANTS"), w["watch_id"]
+    if w["tenant_id"] not in paid:
+        return
+    slot, carry = w["weekly_slot"] == date.fromisoformat(day).weekday(), json.loads(w["carry_json"] or "null")
+    with tdb.db() as c:
+        c.execute("DELETE FROM serp_cache WHERE day < ?", (day,))
+        c.execute("UPDATE watches SET carry_json = NULL WHERE watch_id = ?", (wid,))
+        creds = _creds(c, w, uncapped, FULL)
+    at, next_on = tdb.now(), _next_slot(w, day)
+    if creds is None:
+        return
+    if not creds:
+        _record(wid, day, FULL, at, "waiting", "no_browserbase_key", ledger=False, next_on=next_on)
+        return
+    full = tracker_plan.build(w, w["platform"])
+    plan = full if slot or not carry else _carried(full, carry["pages"])
+    with tdb.db() as c:
+        cache = {}
+        for q in _pages(plan.queries):
+            row = c.execute("SELECT results_json FROM serp_cache WHERE day = ? AND vertical = ? AND text = ? AND "
+                            "page = ? AND since = ''", (day, *_page_key(q))).fetchone()
+            if row:
+                cache[_page_key(q)] = json.loads(row[0])
+    misses = lambda p: sum(_page_key(q) not in cache for q in _pages(p.queries))
+    need, r, short, dropped, cut = misses(plan), None, None, [], []
+    if need:
+        r = tracker_budget.reserve(w["tenant_id"], wid, "load", need + min(FULL_RETRIES, need), partial=True)
+        if isinstance(r, tracker_budget.Refused):
+            if r.reason == "gone":
+                return
+            short, r, cut, plan = r, None, list(plan.queries), tracker_plan.Plan((), {})
+        elif r.held < need:
+            short, room = r.short, max(1, r.held - FULL_RETRIES)
+            t = next(n for n in range(plan.loads, -1, -1) if misses(plan.trim(n).plan) <= room)
+            tr = plan.trim(t)
+            plan, dropped, cut = tr.plan, tr.dropped, tr.cut
+    done, results, browser = set(), [], _Serp(creds, day, FULL)
+    try:
+        for q in _pages(plan.queries):
+            k = _page_key(q)
+            links = cache.get(k)
+            if links is None and not browser.broken:
                 try:
-                    self.session.create()
-                except Exception:
-                    self.broken = True
-                    self._drop()
-                    raise
-            try:
-                page = self.session.page()
-            except Exception as e:
-                tracker_probe.log(f"tracker {FRESH} page failed: {type(e).__name__}")
-                self._drop()
-                return None
-            if not tracker_budget.consume(r):
-                serp.close_page(page)
-                return None
-            try:
-                final, html = self.session.load(page, url)
-            except Exception as e:
-                tracker_probe.log(f"tracker {FRESH} load failed: {type(e).__name__}")
-                self._drop()
-                return None
-            kind = serp.classify_serp(final, html or "")
-            if kind in serp.WALLS:
-                walls += 1
-                self._drop()
-                continue
-            links = serp.serp_links(html, final)
-            return [list(x) for x in links] if links or kind == "no_results" else None
-        return None
+                    links = browser.search(r, q.urls()[0], q.vertical)
+                except Exception as e:
+                    tracker_probe.log(f"tracker {FULL} search failed: {type(e).__name__}")
+                if links is None:
+                    browser.miss()
+                    continue
+                browser.fails = 0
+                with tdb.db() as c:
+                    c.execute("INSERT OR REPLACE INTO serp_cache (day, vertical, text, page, since, results_json) "
+                              "VALUES (?,?,?,?,'',?)", (day, *k, json.dumps(links)))
+            if links is not None:
+                done.add(k)
+                results.append((q, links))
+    finally:
+        browser.drop()
+        if r:
+            tracker_budget.settle(r)
+    want = {}
+    for q in _pages(full.queries):
+        want.setdefault(_pair(q, full.values), set()).add(_page_key(q))
+    with tdb.db() as c:
+        first, returned = _first(c, wid, FULL), {}
+        for q, links in results:
+            for u, title in links:
+                if not serp.is_goto(u):
+                    tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
+                    returned.setdefault(tracker_judge.leak_key(u), set()).add(_pair(q, full.values))
+        _visibility(c, w, full, returned, {p for p, ks in want.items() if ks <= done}, at)
+        if slot and cut and short.reason in ("cap_global", "cap_tenant_month"):
+            next_on = short.next_on
+            c.execute("UPDATE watches SET carry_json = ? WHERE watch_id = ?", (json.dumps(
+                {"on": next_on, "reason": short.reason, "pages": [list(_page_key(q)) for q in _pages(cut)]}), wid))
+    incomplete = any(_page_key(q) not in done for q in _pages(plan.queries))
+    if short and r is None:
+        state, reason = "waiting", short.reason
+    elif incomplete:
+        state, reason = "reduced", "google_failed"
+    elif cut:
+        state, reason = "reduced", short.reason
+    else:
+        state, reason = "ok", None
+    _record(wid, day, FULL, at, state, reason, next_on=next_on, trimmed=dropped,
+            success=state in ("ok", "reduced") and not incomplete)
+
+
+def _visibility(c, w, full, returned, complete, at):
+    """After a full-pass run: each Leak's google_fields_json gains the pairs that returned it and loses those whose
+    field left the identity; google_seen{visible} is written on a change: true when returned, null when the set is
+    empty, false when every pair of the set still in the plan completed in this run (complete) without returning it."""
+    fields = {_field_key(f, v) for f, v in full.values.items()}
+    planned = {_pair(q, full.values) for q in full.queries}
+    last = {}
+    for lid, data in c.execute("SELECT e.leak_id, e.data_json FROM leak_events e JOIN leaks l ON l.leak_id = e.leak_id "
+                               "WHERE l.watch_id = ? AND e.type = 'google_seen' ORDER BY e.id", (w["watch_id"],)):
+        last[lid] = json.loads(data or "{}").get("visible", True)
+    for row in c.execute("SELECT leak_id, url_key, google_fields_json FROM leaks WHERE watch_id = ?",
+                         (w["watch_id"],)).fetchall():
+        lid, old = row["leak_id"], {tuple(p) for p in json.loads(row["google_fields_json"] or "[]")}
+        got = returned.get(row["url_key"], set())
+        new = {p for p in old | got if p[1] in fields}
+        if new != old:
+            c.execute("UPDATE leaks SET google_fields_json = ? WHERE leak_id = ?",
+                      (json.dumps(sorted(new), separators=(",", ":")), lid))
+        cur, checked = last.get(lid), new & planned
+        vis = True if got else None if not new else False if checked and checked <= complete else cur
+        if vis != cur:
+            tdb.add_event(c, lid, "google_seen", {"visible": vis}, at)
