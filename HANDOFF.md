@@ -200,7 +200,8 @@ Env vars (`deploy/.env.example`; container defaults in `deploy/Dockerfile`):
 |---|---|
 | `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | Google Custom Search; without both the quick scan can't run |
 | `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | profile extraction + refine (and chat); without it `profile` is the non-LLM `fallback_profile` |
-| `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID`, `BROWSERBASE_PROXIES` | remote browser for her photos (`media`); code default proxies on, example sets 0 |
+| `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID` | remote browser for her photos (`media`) |
+| `BROWSERBASE_PROXIES` | residential proxies for the Instagram grid fallback session only (code default on, example sets 0); Google never uses them. Measured 2026-11-27, n=1: Google Images unproxied = same 248 imgs, no captcha, 8.5 s vs 16.7 s, saves 3.7 MB; Instagram unproxied = login wall, 0 imgs; proxied = 12 grid imgs, 4.0 MB |
 | `MEDIA_ENABLED`, `MEDIA_BROWSERBASE`, `MEDIA_BUDGET`, `MEDIA_MAX`, `MEDIA_GOOGLE` | photo step on/off, seconds per gather, photos per scan (≤ 12), `browser`/`cse`/`off` |
 | `PROFILE_ENABLED`, `PROFILE_CSE_EXTRA`, `PROFILE_LLM_TIMEOUT`, `PROFILE_BUDGET` | profile step |
 | `ALIAS_ENRICH`, `ALIAS_BUDGET`, `LEAKSHAVEN_ENABLED`, `LEAKSHAVEN_TIMEOUT` | alias step, Mega lookup |
@@ -234,7 +235,7 @@ last. (a) only for a demo, after the owner has added your origin.
 |---|---|
 | Google CSE | 8 calls (+1 per declared social), +1 fallback page when < 7 sites, + ≤ 16 for discovered aliases: worst case 25 (+1 `PROFILE_CSE_EXTRA`) |
 | DeepSeek | 1 profile call + 1 refine call in the photo step; chat, if used, per message |
-| Browserbase | one remote-browser session, ≤ `MEDIA_BUDGET` s (90), more with proxies (`MEDIA_GOOGLE=cse`: CSE image calls instead of the browser's Google step) |
+| Browserbase | ≤ 2 remote-browser sessions (Google unproxied, Instagram grid fallback proxied), ≤ `MEDIA_BUDGET` s (90) together, more with proxies (`MEDIA_GOOGLE=cse`: CSE image calls instead of the browser's Google step) |
 | leakshaven.com | 2 free public requests |
 | repeat of the same inputs within `SCAN_REUSE_TTL` | 0 outside calls |
 

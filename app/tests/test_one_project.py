@@ -19,7 +19,7 @@ SITES = {
                       "tracker v1": 10, "tracker candidates": 1, "tracker scheduler": 5},
     "cse_scanner.py": {"deadline": 6, "errors": 7},
     "profile_extract.py": {"hints": 8},
-    "media_gather.py": {"NONE_TTL": 3, "warmup": 1, "web retry": 5, "retention": 4},
+    "media_gather.py": {"NONE_TTL": 3, "warmup": 1, "web retry": 5, "retention": 4, "proxy split": 15},
     "db.py": {"domain_count": 4, "get_scan": 1, "retention": 4},
     "chat_proxy.py": {"retention": 2},
 }
