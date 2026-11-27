@@ -4,7 +4,7 @@ adds. Lanes so far: origin_probe (Phase 1's probe; only its lane_state row is ne
 mega_lookup, then listing_recheck. A paused or deleted watch runs no lane (tracker_view reads its lanes `paused`). One
 lane failing never stops the next. Each added lane runs at most once per watch per UTC day (a non-failed lane_day row).
 
-Mega lookup ($0, no reservation): the Mega index client (leakshaven) with the handle and the strong aliases (tracker_seed
+Mega lookup ($0, no reservation): the Mega index client (leakshaven) with the handle and the strong aliases (tracker_judge
 norm() length >= STRONG_MIN) and names=(), so a display-name title match can never pick the Creator; the index's
 deleted packs come back too. A new live pack is admitted like the seed's (tracker_seed.admit_mega); a never-known
 deleted one is skipped. A known pack is a probe result for its probe_state (tracker_probe.record: deleted = dead,
@@ -17,7 +17,8 @@ HTTP (tracker_probe's fetcher: its public-address rule, 15 s, <= 5 redirects, bo
 per-host throttle. Every same-site anchor that isn't media, a listing or the page itself is a hit for
 tracker_judge.admit_hit with source site_search. More listings than LISTING_MAX -> lane `reduced`, reason
 listing_rotated (lane_day `partial`); no listing answering at all -> `failed`.
-A Leak a lane admits on its first-ever successful run for the watch is a first-scan find (seen.first_scan)."""
+A Leak a lane admits on its first-ever successful run for the watch is a first-scan find (seen.first_scan); for the
+listing recheck, so is one found on a listing never rechecked before (leaks.recheck_at NULL)."""
 import functools
 import html as _html
 import json
@@ -49,6 +50,7 @@ class LaneFailed(Exception):
 
 
 def _record(watch_id, day, lane, at, state="ok", reason=None, ledger=True):
+    reason = reason or ("lane_failed" if state == "failed" else None)
     with tdb.db() as c:
         c.execute("INSERT INTO lane_state (watch_id, lane, state, reason, last_attempt_at, last_success_at, next_attempt_on) "
                   "VALUES (?,?,?,?,?,?,?) ON CONFLICT (watch_id, lane) DO UPDATE SET state = excluded.state, "
@@ -81,7 +83,7 @@ def _lane(w, day, lane, fn):
         reason = fn(w, at)
         state = "reduced" if reason else "ok"
     except Exception as e:
-        state, reason = "failed", "lane_failed"
+        state, reason = "failed", None
         tracker_probe.log(f"tracker {lane} failed: {e if isinstance(e, LaneFailed) else type(e).__name__}")
     _record(w["watch_id"], day, lane, at, state, reason)
 
@@ -95,8 +97,7 @@ def origin_probe(watch_id, day):
     except Exception as e:
         probe = None
         tracker_probe.log(f"tracker origin probe failed: {type(e).__name__}")
-    _record(watch_id, day, "origin_probe", at, *(("ok",) if probe is not None else ("failed", "lane_failed")),
-            ledger=False)
+    _record(watch_id, day, "origin_probe", at, "ok" if probe is not None else "failed", ledger=False)
     return probe
 
 
@@ -115,9 +116,9 @@ def run_daily(watch_id, day):
 
 
 def _mega(w, at):
-    wid, handle = w["watch_id"], tracker_seed.norm(w["username"])
+    wid, handle = w["watch_id"], tracker_judge.norm(w["username"])
     strong = [a for a in json.loads(w["aliases_json"] or "[]")
-              if isinstance(a, str) and len(tracker_seed.norm(a)) >= tracker_seed.STRONG_MIN]
+              if isinstance(a, str) and len(tracker_judge.norm(a)) >= tracker_judge.STRONG_MIN]
     items, reason = leakshaven.result(leakshaven.start(w["username"], strong, (), source=True, deleted=True),
                                       leakshaven.TIMEOUT)
     if reason not in _MEGA_OK:
@@ -171,7 +172,7 @@ def is_listing(url, names):
         m = rx.fullmatch(p.path)
         if m:
             name = dict(parse_qsl(p.query)).get(key, "") if key else m.group("n")
-            if any(n in tracker_seed.norm(name) for n in names):
+            if any(n in tracker_judge.norm(name) for n in names):
                 return True
     return False
 
@@ -197,7 +198,7 @@ def _hits(base, body, names):
 def _recheck(w, at):
     wid, names = w["watch_id"], tracker_judge.needles(w)[1]
     with tdb.db() as c:
-        rows = c.execute("SELECT leak_id, url FROM leaks WHERE watch_id = ? AND kind = 'page' "
+        rows = c.execute("SELECT leak_id, url, recheck_at FROM leaks WHERE watch_id = ? AND kind = 'page' "
                          "ORDER BY recheck_at, created_at, rowid", (wid,)).fetchall()
         first = _first(c, wid, "listing_recheck")
     todo = [r for r in rows if is_listing(r["url"], names)]
@@ -214,7 +215,8 @@ def _recheck(w, at):
             c.execute("UPDATE leaks SET recheck_at = ? WHERE leak_id = ?", (at, r["leak_id"]))
             if status == 200:
                 for u, title in _hits(url, body, names):
-                    tracker_judge.admit_hit(c, w, u, title, "site_search", at, first_scan=first)
+                    tracker_judge.admit_hit(c, w, u, title, "site_search", at,
+                                            first_scan=first or r["recheck_at"] is None)
     if todo and not answered:
         raise LaneFailed("no listing answered")
     return "listing_rotated" if len(todo) > LISTING_MAX else None

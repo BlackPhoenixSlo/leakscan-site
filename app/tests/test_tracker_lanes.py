@@ -243,7 +243,7 @@ class TestListingRecheck(Lanes):
         ids = [self.leak(self.w, listing(i)) for i in range(21)]
         self.leak(self.w, f"{SITE}/video/mia_vale-clip-1")
         with tdb.db() as c:
-            c.executemany("UPDATE leaks SET recheck_at = ? WHERE leak_id = ?",
+            c.executemany("UPDATE leaks SET created_at = ? WHERE leak_id = ?",
                           [(f"2026-10-{30 - i:02d}T00:00:00Z", lid) for i, lid in enumerate(ids)])
             c.execute("UPDATE tracker_limits SET daily_loads = 0, daily_judge = 0")
             c.execute("UPDATE tenants SET month_loads = 0")
@@ -260,13 +260,31 @@ class TestListingRecheck(Lanes):
                          [{"outcome": "partial", "reason": "listing_rotated"}])
         self.assertEqual(self.rows("SELECT * FROM load_reservation"), [])
         self.assertEqual([r["recheck_at"] for r in self.rows("SELECT recheck_at FROM leaks WHERE url LIKE '%/models/%' "
-                                                             "ORDER BY rowid")], ["2026-10-30T00:00:00Z"] + [at(2)] * 20)
+                                                             "ORDER BY rowid")], [None] + [at(2)] * 20)
 
         tracker_stub_fetch.CALLS.clear()
+        self.answers({listing(0): page(("/video/mia_vale-201", "a")), listing(20): page(("/video/mia_vale-202", "b"))})
         self.day(3)
-        self.assertEqual(tracker_stub_fetch.CALLS[-20:], [listing(i) for i in range(20)])
+        self.assertEqual(tracker_stub_fetch.CALLS[-20:], [listing(0)] + [listing(i) for i in range(20, 1, -1)])
         self.assertEqual(self.lanes()["listing_recheck"]["state"], "reduced")
         self.assertEqual(self.rows("SELECT * FROM load_reservation"), [])
+        found = {x["url"]: x["found_on_first_scan"] for x in self.get(f"/v1/creators/{self.w}/leaks")[1]["leaks"]
+                 if x["sources"] == ["site_search"]}
+        self.assertEqual(found, {f"{SITE}/video/mia_vale-201": True, f"{SITE}/video/mia_vale-202": False})
+        self.assertEqual(self.get(f"/v1/creators/{self.w}")[1]["counts"]["new_today"], 1)
+
+    def test_listing_added_after_the_first_run_finds_first_scan_posts(self):
+        old, new = listing(1), listing(2)
+        self.leak(self.w, old)
+        self.day(2)
+        self.assertEqual(self.lanes()["listing_recheck"]["last_success_at"], at(2))
+        self.leak(self.w, new)
+        self.answers({old: page(("/video/mia_vale-301", "a")), new: page(("/video/mia_vale-302", "b"))})
+        self.day(3)
+        found = {x["url"]: x["found_on_first_scan"] for x in self.get(f"/v1/creators/{self.w}/leaks")[1]["leaks"]
+                 if x["sources"] == ["site_search"]}
+        self.assertEqual(found, {f"{SITE}/video/mia_vale-301": False, f"{SITE}/video/mia_vale-302": True})
+        self.assertEqual(self.get(f"/v1/creators/{self.w}")[1]["counts"]["new_today"], 1)
 
     def test_recheck_admits_site_search_leaks_new_today_and_hides_title_only_hits(self):
         home = f"{SITE}/models/mia_vale/"

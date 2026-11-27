@@ -4,37 +4,29 @@
 Admission: needles are lowercased with `_`, `.`, `-` removed (URLs percent-decoded first). A Google item passes the
 host rules (tracker_rules.host_class "skip" is never a Leak nor a Pending hit) and its URL holds the handle (>= 4) or
 a strong alias (>= 5). A Mega item needs its aggregator match from the handle (>= 4) or a strong alias, never a name.
-Any other item naming the handle or an alias (>= 4) in its title or URL is a Pending hit. The display name is unused."""
+Any other item naming the handle or an alias (>= 4) in its title or URL is a Pending hit. The display name is unused.
+Needles, norm() and the Leak / Pending hit writes are tracker_judge's; this rule is Phase 1's, not tracker_judge.admission."""
 import contextlib
 import json
 import os
-import re
-import sys
 import threading
 from datetime import timedelta
-from urllib.parse import unquote
 
 import tracker_db as tdb
+import tracker_judge
 import tracker_lanes
 import tracker_probe
 import tracker_rules as rules
 import tracker_view
 
-HANDLE_MIN, STRONG_MIN = 4, 5
 LEASE_H = 2
 MEGA_SITE = "leakshaven.com"
 _LOCK = threading.Lock()
 _busy = set()
 
 
-def norm(s):
-    return re.sub(r"[_.\-]", "", unquote(s or "").lower())
-
-
 def _quick_candidates():
-    # `python3 app/public_app.py` runs as __main__: importing public_app would load a second copy of the app
-    main = sys.modules.get("__main__")
-    return getattr(main, "quick_candidates", None) or __import__("public_app").quick_candidates
+    return tracker_judge.app_attr("quick_candidates")
 
 
 @contextlib.contextmanager
@@ -57,31 +49,15 @@ def start(watch_id):
     threading.Thread(target=run, args=(watch_id,), daemon=True, name="tracker seed").start()
 
 
-def _admit(c, watch_id, url, key, site, kind, title, source, at, first_scan=True):
-    leak_id = tdb.new_id("lk_")
-    if not c.execute("INSERT OR IGNORE INTO leaks (leak_id, watch_id, url_key, url, leak_site, kind, title, created_at) "
-                     "VALUES (?,?,?,?,?,?,?,?)", (leak_id, watch_id, key, url, site, kind, title, at)).rowcount:
-        return 0
-    tdb.add_event(c, leak_id, "seen", {"source": source, "first_scan": first_scan}, at)
-    if source == "google_web":
-        tdb.add_event(c, leak_id, "google_seen", None, at)
-    return 1
-
-
-def _pend(c, watch_id, url, key, title, source, at):
-    return c.execute("INSERT OR IGNORE INTO pending_hits (watch_id, url_key, url, title, source, seen_at) "
-                     "SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM leaks WHERE watch_id = ? AND url_key = ?)",
-                     (watch_id, key, url, title, source, at, watch_id, key)).rowcount
-
-
 def admit_mega(c, watch_id, it, handle, at, first_scan=True):
     """One Mega index item (leakshaven start(source=True)) -> (admitted, pending) 0/1 counts: a Leak when its aggregator
     match came from the handle (>= HANDLE_MIN) or a strong alias, else a Pending hit. handle is norm()ed."""
     url, title, how = it.get("url") or "", it.get("title") or "", it.get("match_source")
-    key, term = rules.url_key(url), norm(it.get("match_term"))
-    if (how == "handle" and len(handle) >= HANDLE_MIN) or (how == "alias" and len(term) >= STRONG_MIN):
-        return _admit(c, watch_id, url, key, MEGA_SITE, "mega", title, "mega_index", at, first_scan), 0
-    return 0, _pend(c, watch_id, url, key, title, "mega_index", at)
+    key, term = rules.url_key(url), tracker_judge.norm(it.get("match_term"))
+    if (how == "handle" and len(handle) >= tracker_judge.HANDLE_MIN) or (
+            how == "alias" and len(term) >= tracker_judge.STRONG_MIN):
+        return tracker_judge.admit(c, watch_id, url, key, MEGA_SITE, "mega", title, "mega_index", at, first_scan), 0
+    return 0, tracker_judge.pend(c, watch_id, url, key, title, "mega_index", at)
 
 
 def _finish(watch_id, today, outcome):
@@ -139,9 +115,8 @@ def _seed(w, at):
     if "unavailable" in cand["errors"] or (cand["errors"] and not cand["google"]):
         tracker_probe.log(f"tracker seed failed errors={len(cand['errors'])}")
         return {"admitted": 0, "pending": 0, "outcome": "failed"}
-    handle = norm(w["username"])
-    names = [n for n in dict.fromkeys([handle, *map(norm, aliases)]) if len(n) >= HANDLE_MIN]
-    strong = [n for n in names if n == handle or len(n) >= STRONG_MIN]
+    handle, strong, weak = tracker_judge.needles(w)
+    names = strong + weak
     admitted = pending = 0
     with tdb.db() as c:
         for it in cand["google"]:
@@ -151,11 +126,11 @@ def _seed(w, at):
             if cls == "skip":
                 continue
             key = rules.url_key(url, keep_fragment=cls != "page")
-            if any(n in norm(url) for n in strong):
-                admitted += _admit(c, watch_id, url, key, rules.registrable_domain(host) or host, cls, title,
-                                   "google_web", at)
-            elif any(n in norm(title) or n in norm(url) for n in names):
-                pending += _pend(c, watch_id, url, key, title, "google_web", at)
+            if any(n in tracker_judge.norm(url) for n in strong):
+                admitted += tracker_judge.admit(c, watch_id, url, key, rules.registrable_domain(host) or host, cls,
+                                                title, "google_web", at)
+            elif any(n in tracker_judge.norm(title) or n in tracker_judge.norm(url) for n in names):
+                pending += tracker_judge.pend(c, watch_id, url, key, title, "google_web", at)
         for it in cand["mega"]:
             a, p = admit_mega(c, watch_id, it, handle, at)
             admitted, pending = admitted + a, pending + p
