@@ -261,7 +261,8 @@ class TestToday(Lanes):
         self.assertEqual(self.today(), {"day": "2026-11-05", "state": "complete", "new": 0, "first_scan": 0, "came_back": 0,
                                         "gone": 1})
         self.day(6, pack(1), pack(2), pack(3))
-        self.assertEqual((self.today()["gone"], self.today()["came_back"]), (0, 1))
+        t = self.today()
+        self.assertEqual((t["gone"], t["came_back"]), (0, 1))
 
     def test_zero_leaks_failed_lane_reads_partial(self):
         self.mega.mode = "404"

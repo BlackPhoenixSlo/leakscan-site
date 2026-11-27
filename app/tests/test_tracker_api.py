@@ -586,11 +586,13 @@ class TestToday(Base):
                   statuses=[(h(4, 8), None, "live", None), (h(4), "live", "gone", h(4, 1))])
         self.leak("w_mia_00001", "lk_mega_gone", "https://mega.example-index.test/f/1", kind="mega", site="example-index.test",
                   seen=h(4, 9), source="mega_index", statuses=[(h(5), "live", "gone", None)])
+        self.leak("w_mia_00001", "lk_gone_unseen", "https://example-leaks.test/goneunseen", seen=h(4, 2),
+                  statuses=[(h(4), None, "gone", h(4, 1))])
         self.leak("w_mia_00001", "lk_gone_old", "https://example-leaks.test/goneold", seen=h(4, 9),
                   statuses=[(h(4, 1), "live", "gone", h(4, 2))])
         self.scan("w_mia_00001")
         t = self.today()
-        self.assertEqual(t, {"day": self.DAY, "state": "complete", "new": 2, "first_scan": 1, "came_back": 1, "gone": 2})
+        self.assertEqual(t, {"day": self.DAY, "state": "complete", "new": 2, "first_scan": 1, "came_back": 1, "gone": 3})
         counts = self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["counts"]
         self.assertEqual(t["new"], counts["new_today"])
         self.clock = NOW + timedelta(days=1)
@@ -622,6 +624,8 @@ class TestToday(Base):
         self.assertEqual(self.state(), "complete")
         self.scan("w_mia_00001", outcome="failed")
         self.assertEqual(self.state(), "partial")
+        self.scan("w_mia_00001", outcome="skipped")
+        self.assertEqual(self.state(), "partial")
         self.put("w_mia_00001", paused=True)
         self.assertEqual(self.state(), "paused")
         self.put("w_mia_00001", paused=False)
@@ -644,7 +648,8 @@ class TestToday(Base):
         self.assertEqual([x["watch_id"] for x in self.req("GET", "/v1/creators", key=self.b)[2]["creators"]], ["w_rowan_0001"])
         self.assertEqual(self.today("w_rowan_0001", key=self.b),
                          {"day": self.DAY, "state": "complete", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
-        self.assertEqual((self.today()["state"], self.today()["new"]), ("partial", 1))
+        t = self.today()
+        self.assertEqual((t["state"], t["new"]), ("partial", 1))
 
 
 class TestCors(Base):
@@ -747,6 +752,7 @@ class TestContract(Base):
                                ("mega_lookup", "failed", "lane_failed", d(27, 4, 2), d(26, 4, 2))])
                 c.execute("INSERT INTO lane_day (watch_id, day, lane, outcome, reason) VALUES "
                           "('w_miavale_0001', '2026-11-27', 'mega_lookup', 'failed', 'lane_failed')")
+                c.execute("UPDATE daily_scans SET outcome = 'partial' WHERE watch_id = 'w_miavale_0001'")
             call("creator_one", "GET", "/v1/creators/w_miavale_0001")
             call("creator_leaks", "GET", "/v1/creators/w_miavale_0001/leaks")
             call("leaks", "GET", "/v1/leaks?watch_id=w_miavale_0001&watch_id=w_rowanash_0002&limit=2")

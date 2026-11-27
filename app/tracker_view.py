@@ -120,8 +120,7 @@ def _changed(ls, day, to, fr=None):
 
 
 def day_state(c, w, day):
-    """paused | pending (day's daily_scans row missing or open) | partial (a non-ok lane_day row other than
-    google_failed, or a failed scan) | coverage_reduced (only google_failed) | complete."""
+    """pending = no finished daily_scans row for day; the paid batches run after it finishes."""
     if w["paused"]:
         return "paused"
     scan = c.execute("SELECT finished_at, outcome FROM daily_scans WHERE watch_id = ? AND day = ?",
@@ -130,7 +129,7 @@ def day_state(c, w, day):
         return "pending"
     reasons = {r[0] for r in c.execute("SELECT reason FROM lane_day WHERE watch_id = ? AND day = ? AND outcome != 'ok'",
                                        (w["watch_id"], day))}
-    if scan["outcome"] == "failed" or reasons - {"google_failed"}:
+    if scan["outcome"] in ("failed", "skipped") or reasons - {"google_failed"}:
         return "partial"
     return "coverage_reduced" if reasons else "complete"
 
