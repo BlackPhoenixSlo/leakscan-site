@@ -1546,6 +1546,45 @@ def scan_begin(handle, platform, aliases, socials, rows, results, prog, started,
     return {"aliases": info, "hints": {"names": names, "aliases": found}, "join": join}, rows, results
 
 
+def quick_google(handle, aliases, prog=None, errors=None):
+    """The Quick scan's Google step (handle first in aliases): each alias's bare query, then the prefixed seeds (+1 call
+    per extra alias), and a shallow depth fallback when too few sites turned up -> (per-URL items, per-host rows,
+    Google's raw total). Raises what cse_search_wide raises; failed calls go to `errors`."""
+    seeds = [(a, a) for a in aliases] + [(f"{p} {a}", a) for a in aliases for p in CSE_PREFIXES]
+    results, raw_total = cse_scanner.cse_search_wide(
+        [q for q, _ in seeds], max_calls=CSE_QUICK_CALLS + len(aliases) - 1, on_progress=prog,
+        tags=[a for _, a in seeds], errors=errors)
+    rows = cse_scanner.summarize_cse(results)
+    if len(rows) < MIN_SITES_FOR_FALLBACK and FALLBACK_EXTRA_PAGES > 0:
+        try:
+            results = results + cse_scanner.cse_paginate(handle, pages=FALLBACK_EXTRA_PAGES, on_progress=prog,
+                                                         errors=errors)
+            rows = cse_scanner.summarize_cse(results)
+        except Exception:
+            pass
+    return results, rows, raw_total
+
+
+def quick_candidates(handle, aliases):
+    """The Leak tracker's private run of the Quick scan's candidate step: quick_google over the handle + aliases, then
+    the Mega aggregator lookup with no names (each item says which needle matched: match_source / match_term). No SSE,
+    limiter, alias discovery, scan row, slug, profile or media; reads no stored scan.
+    -> {"google": per-URL items, "mega": items, "errors": [...]}; "unavailable" when Google isn't configured or the
+    search raised (the Mega lookup is then skipped)."""
+    errors, aliases = [], [handle] + [a for a in aliases if a.lower() != handle.lower()]
+    if not cse_scanner.cse_available():
+        return {"google": [], "mega": [], "errors": ["unavailable"]}
+    try:
+        results = quick_google(handle, aliases, errors=errors)[0]
+    except Exception as e:
+        return {"google": [], "mega": [], "errors": errors + ["unavailable", type(e).__name__]}
+    mega = []
+    if leakshaven.ENABLED:
+        mega, reason = leakshaven.result(leakshaven.start(handle, aliases[1:], (), source=True), leakshaven.TIMEOUT)
+        _event(f"tracker leakshaven {reason} packs={len(mega)}")
+    return {"google": results, "mega": mega, "errors": errors}
+
+
 def _estimate(n_results, n_rows):
     """The grounded Google-index estimate (upstream's formula, one place): _scan_cse's google_total, and what each
     result / hit row added to it when the aggregator rule takes one out again (off_aggregators)."""
@@ -2276,19 +2315,7 @@ class Handler(BaseHTTPRequestHandler):
             return wc.sse_fail(self, "Quick search isn't configured right now. Try the deep scan.")
         prog = lambda m: wc.sse(self, "progress", m)
         try:
-            # each alias's bare query first, then the prefixed seeds; +1 call per extra alias
-            seeds = [(a, a) for a in aliases] + [(f"{p} {a}", a) for a in aliases for p in CSE_PREFIXES]
-            results, raw_total = cse_scanner.cse_search_wide(
-                [q for q, _ in seeds], max_calls=CSE_QUICK_CALLS + len(aliases) - 1, on_progress=prog,
-                tags=[a for _, a in seeds], errors=errors)  # one-project: scan reuse
-            rows = cse_scanner.summarize_cse(results)
-            if len(rows) < MIN_SITES_FOR_FALLBACK and FALLBACK_EXTRA_PAGES > 0:
-                try:
-                    results = results + cse_scanner.cse_paginate(
-                        handle, pages=FALLBACK_EXTRA_PAGES, on_progress=prog, errors=errors)  # one-project: scan reuse
-                    rows = cse_scanner.summarize_cse(results)
-                except Exception:
-                    pass
+            results, rows, raw_total = quick_google(handle, aliases, prog, errors)  # one-project: tracker candidates
         except Exception:
             return wc.sse_fail(self, "Quick search is temporarily unavailable. Please try again.")
         if errors and not rows:  # one-project: scan unfinished
@@ -2372,6 +2399,10 @@ def main():
         threading.Thread(target=_retention_loop, daemon=True, name="retention").start()  # one-project: retention
     except Exception as e:
         _event(f"prune skipped: {type(e).__name__}")
+    try:  # one-project: tracker scheduler
+        __import__("tracker_scheduler").start()  # one-project: tracker scheduler
+    except Exception as e:  # one-project: tracker scheduler
+        _event(f"tracker scheduler skipped: {type(e).__name__}")  # one-project: tracker scheduler
     srv = ThreadingHTTPServer((PUBLIC_HOST, PORT), Handler)
     srv.daemon_threads = True
     _event(f"public app on http://{PUBLIC_HOST}:{PORT}  "
