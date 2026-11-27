@@ -5,7 +5,8 @@ import math
 import os
 import re
 
-PARTS = {"video": ("offer.mp4", "video/mp4"), "poster": ("poster.webp", "image/webp"), "captions": ("captions.vtt", "text/vtt")}
+PARTS = {"video": ("offer.mp4", "video/mp4", True), "poster": ("poster.webp", "image/webp", False),
+         "captions": ("captions.vtt", "text/vtt", False)}
 CUES_FILE, CUES_MAX, CUES_CAP = "cues.json", 12, 64 * 1024
 KINDS = ("google", "google_images", "mega", "forum", "x", "end")
 RANGE = re.compile(r"bytes=(\d*)-(\d*)")

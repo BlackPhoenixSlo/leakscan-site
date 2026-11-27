@@ -132,6 +132,20 @@ class TestOfferVideo(Base):
         for r in cases:
             self.assertEqual((r.getheader("X-Content-Type-Options"), r.getheader("Cache-Control")), ("nosniff", "no-store"), r.status)
 
+    def test_head_and_other_methods_never_serve(self):
+        for part in (*TYPES, "nope"):
+            for m, key, want in (("HEAD", None, 401), ("HEAD", self.a, 405), ("PUT", None, 401),
+                                 ("DELETE", self.a, 405)):
+                c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=10)
+                c.request(m, f"/v1/offer-video/{part}", headers={"Authorization": f"Bearer {key}"} if key else {})
+                r = c.getresponse()
+                data = r.read()
+                c.close()
+                self.assertEqual(r.status, want, (m, part))
+                self.assertNotEqual(r.getheader("Content-Type"), TYPES.get(part, ("",))[0], (m, part))
+                self.assertNotIn(b"WEBVTT", data)
+                self.assertEqual(data[:4] if m != "HEAD" else data, b'{"er' if m != "HEAD" else b"", (m, part))
+
     def test_401_no_key(self):
         for part in TYPES:
             st, r, b = self.req("GET", f"/v1/offer-video/{part}")

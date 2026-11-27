@@ -16,7 +16,7 @@ SITES = {
     "public_app.py": {"hints": 4, "landing site": 2, "HEAD": 2, "aggregator rule": 3, "mega[]": 1, "aliases": 2,
                       "scan_begin": 2, "scan_end": 5, "estimate": 1, "domain_count": 1,
                       "api_thumb Vary": 2, "thumb sheet": 2, "scan reuse": 10, "retention": 3, "scan links": 2, "scan unfinished": 6,
-                      "tracker v1": 10, "tracker candidates": 1, "tracker scheduler": 5},
+                      "tracker v1": 12, "tracker candidates": 1, "tracker scheduler": 5},
     "cse_scanner.py": {"deadline": 6, "errors": 7},
     "profile_extract.py": {"hints": 8},
     "media_gather.py": {"NONE_TTL": 3, "warmup": 1, "web retry": 5, "retention": 4, "proxy split": 13, "bb client": 7},

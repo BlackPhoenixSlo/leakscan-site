@@ -1962,6 +1962,8 @@ class Handler(BaseHTTPRequestHandler):
         return wc.send_simple(self, 404, "Not found")
 
     def do_HEAD(self):  # one-project: HEAD
+        if tracker_api.is_v1(urllib.parse.urlparse(self.path).path):  # one-project: tracker v1
+            return tracker_api.handle(self, "HEAD")  # one-project: tracker v1
         return _one_project_head(self)  # one-project: HEAD
 
     def do_PUT(self):  # one-project: tracker v1

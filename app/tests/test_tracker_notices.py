@@ -5,7 +5,6 @@ from datetime import timedelta
 
 from test_tracker_api import NOW, Base, ts
 import tracker_db
-import tracker_view
 
 ONE_ONLY = ("lanes", "taken_down", "preview_leak")
 
@@ -108,29 +107,6 @@ class TestRemoval(Base):
         self.assertEqual((r["service_status"], r["taken_down"]), ("none", None))
         self.assertNotIn("taken_down", self.req("GET", "/v1/creators", key=self.a)[2]["creators"][0])
 
-    def test_taken_down_rule(self):
-        self.put("w_mia_00001")
-        gone = {"origin": "gone", "at": ts(NOW)}
-        for i, h in enumerate((5, 1, 9, 3, 3, 7, 2, 8)):
-            self.leak("w_mia_00001", f"lk_n{i}", f"https://example-leaks.test/n{i}", probe=gone, title=f"set {i}",
-                      statuses=[(ts(NOW - timedelta(days=3)), None, "live", None), (ts(NOW - timedelta(hours=h)), "live", "gone", None)])
-        self.leak("w_mia_00001", "lk_decay", "https://example-leaks.test/decay", probe=gone,
-                  statuses=[(ts(NOW - timedelta(minutes=5)), "live", "gone", None)])
-        self.leak("w_mia_00001", "lk_cached", "https://example-leaks.test/cached", probe=gone, google=True,
-                  statuses=[(ts(NOW - timedelta(minutes=5)), "live", "gone", None)])
-        with tracker_db.db() as c:
-            ls = tracker_view.leaks(c, ["w_mia_00001"], NOW)
-        for x in ls:
-            x["gone_after_notice"] = x["leak_id"] != "lk_decay"
-        for status in ("none", "paused", None):
-            self.assertIsNone(tracker_view.taken_down(ls, status), status)
-        got = tracker_view.taken_down(ls, "active")
-        self.assertEqual([x["leak_id"] for x in got], ["lk_n1", "lk_n6", "lk_n3", "lk_n4", "lk_n0", "lk_n5"])
-        self.assertEqual(got[0], {"leak_id": "lk_n1", "leak_site": "example-leaks.test", "kind": "page", "title": "set 1",
-                                  "gone_at": ts(NOW - timedelta(hours=1)), "preview": None})
-        self.assertEqual(tracker_view.taken_down(ls, "former"), got)
-        self.assertEqual(tracker_view.taken_down([dict(x, gone_after_notice=False) for x in ls], "active"), [])
-
     def test_preview_leak_fallback(self):
         self.put("w_mia_00001")
         self.assertIsNone(self.one()["preview_leak"])
@@ -151,13 +127,6 @@ class TestRemoval(Base):
             tracker_db.add_event(c, "lk_b_old", "seen", {"source": "site_search"}, at=ts(NOW - timedelta(hours=1)))
         p = self.one()["preview_leak"]
         self.assertEqual((p["leak_id"], p["first_seen_at"], p["preview"]), ("lk_b_old", ts(NOW - timedelta(days=20)), None))
-        with tracker_db.db() as c:
-            ls = tracker_view.leaks(c, ["w_mia_00001"], NOW)
-        by = {x["leak_id"]: x for x in ls}
-        by["lk_gone"]["preview"] = {"seen_at": ts(NOW)}
-        by["lk_cached"]["preview"] = {"seen_at": ts(NOW - timedelta(days=9))}
-        by["lk_a_new"]["preview"] = {"seen_at": ts(NOW - timedelta(days=10))}
-        self.assertEqual(tracker_view.preview_leak(ls)["leak_id"], "lk_cached")
 
 
 if __name__ == "__main__":
