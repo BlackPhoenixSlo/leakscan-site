@@ -8,3 +8,5 @@ ultra/.live_sessions/
 ultra/campaigns/
 ultra/exports/
 ultra/slugs_cache.json
+app/*.db
+app/*.db-*

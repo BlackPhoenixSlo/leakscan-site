@@ -21,6 +21,7 @@ services:
       BIO_VERIFY_ENABLED: "0"
       TRUST_XFF: "1"
       PUBLIC_DB: "/data/public.db"
+      TRACKER_DB: "/data/tracker.db"
       SITE_DIR: "/site"
     ports:
       - "${LEAKSCAN_PORT:-8080}:8080"

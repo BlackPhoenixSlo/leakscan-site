@@ -383,7 +383,11 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
 
 ## Leak tracker (Seam 6)
 
-- Own SQLite file `TRACKER_DB` (default `app/tracker.db`; deploy must point it under `/data`), never `public.db`. `tracker_seed` runs
+- API `/v1/*` (`app/tracker_api.py`, contract goldens in `tests/contract/v1/`): Bearer `ltk_` key per tenant, no CORS. Brand and contact URL
+  come from `TRACKER_BRAND` / `TRACKER_CONTACT_URL`. Nothing scans until a tenant, a key and a watch exist. Owner, on the VPS:
+  `docker exec leakscan-app python3 /app/tracker_cli.py tenant add "<label>"` -> tenant_id, then `... key issue <tenant_id>` (printed once,
+  stored as sha256). Also `tenant cap|list`, `key revoke`, `purge [--dry-run]`, `report`, `daily [--at ISO]`.
+- Own SQLite file `TRACKER_DB` (compose: `/data/tracker.db`; default `app/tracker.db`), never `public.db`. `tracker_seed` runs
   `public_app.quick_candidates` (the Quick scan's Google step + Mega lookup, no row / slug / profile / media / alias discovery), then the
   watch's first probe pass; `tracker_scheduler` (started from `main()`, `TRACKER_SCHEDULER=0` = off) runs the daily pass from
   `TRACKER_DAILY_AT` (04:00 UTC) and the purge once a day. Probe rules copied from leakhunt 7ccbdd3 into `app/tracker_rules.py` + `app/tracker_data/`.
@@ -393,7 +397,7 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
   sets the stub probe answers. Another process sharing it: `TRACKER_DB=<path> TRACKER_FETCHER=stub TRACKER_STUB_FETCH=<path>`.
 - `TRACKER_FETCHER=stub` loads `app/tests/tracker_stub_fetch.py`; unset, probes are real bounded GETs (http/https, 15 s, 5 redirects,
   256 KB, 8 per host, no loopback / private / link-local / own addresses, `TRACKER_SELF_IPS` adds more).
-- Tests: `app/tests/test_tracker_seed.py`, `test_tracker_probe.py`, `test_tracker_purge.py`.
+- Tests: `app/tests/test_tracker_api.py`, `test_tracker_seed.py`, `test_tracker_probe.py`, `test_tracker_purge.py`.
 
 ## Replace before launch
 
