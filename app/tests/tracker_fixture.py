@@ -12,6 +12,7 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
+import bb_client
 import leakshaven
 import tracker_db as tdb
 import tracker_probe
@@ -33,9 +34,10 @@ class Base(unittest.TestCase):
         env.start()
         self.addCleanup(env.stop)
         os.environ.pop("TRACKER_PAID_TENANTS", None)
-        paid = mock.patch.multiple(tracker_serp, BB_API="http://127.0.0.1:9", _playwright=mock.Mock(side_effect=AssertionError))
-        paid.start()
-        self.addCleanup(paid.stop)
+        for paid in (mock.patch.multiple(bb_client, BB_API="http://127.0.0.1:9", CREATE_GAP=0),
+                     mock.patch.object(tracker_serp, "_playwright", mock.Mock(side_effect=AssertionError))):
+            paid.start()
+            self.addCleanup(paid.stop)
         off = mock.patch.object(leakshaven, "ENABLED", False)
         off.start()
         self.addCleanup(off.stop)

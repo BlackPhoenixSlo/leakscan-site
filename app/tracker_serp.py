@@ -8,17 +8,16 @@ resolution (a /goto link is dropped). Local: is_media_url is tracker_rules'. Std
 
 The Browserbase session (Session) is copied from the same commit's serp (LOADS_PER_SESSION, WALLS, SerpSession's
 settle), google (GoogleSession's ready selector, consent click-through, /sorry/ wait), browser (BLOCKED_TYPES,
-_block_assets, a page per load) and adapters (BrowserbaseFetcher's create and release bodies), rewritten from httpx
-onto urllib with playwright imported lazily (the service image has playwright but no browsers: remote CDP only).
-Proxies are never requested and the CAPTCHA solver is always on. The walls / retry / reservation loop is the
+_block_assets, a page per load) and adapters (BrowserbaseFetcher's create and release), on bb_client (media_gather's
+REST helpers, shared) with playwright imported lazily (the service image has playwright but no browsers: remote CDP
+only). Proxies are never requested and the CAPTCHA solver is always on. The walls / retry / reservation loop is the
 caller's (tracker_lanes), so every navigation is charged first."""
-import json
 import re
 import time
-import urllib.request
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
+import bb_client
 from tracker_rules import is_media_url
 
 VERTICALS = ("web", "images", "videos")
@@ -230,16 +229,17 @@ def serp_links(html, base=GOOGLE_SEARCH):
     return list(out.items())
 
 
-BB_API = "https://api.browserbase.com/v1"
 LOADS_PER_SESSION = 12  # then a fresh session (a new IP)
 WALLS = ("captcha", "consent", "unknown")
 BLOCKED_TYPES = {"image", "media", "font", "stylesheet"}
 SESSION_S = 300
 SOLVE_WAIT_S = 30
 LOAD_S = 30
+ROTATE_S = SESSION_S - 2 * (LOAD_S + SOLVE_WAIT_S + 10)  # rotate before a worst-case load could outlive it
 READY = "#rso a[href], [data-lpage], #search:not(:has(#rso)), #captcha-form, #recaptcha"
 READY_JS = "s => !!document.querySelector(s)"
 READY_MS, READY_POLL_MS = 2000, 250
+_clock = time.monotonic
 
 
 def _playwright():
@@ -255,43 +255,47 @@ def block_assets(route):
         route.continue_()
 
 
-def _bb(path, key, body):
-    req = urllib.request.Request(BB_API + path, data=json.dumps(body).encode(), method="POST",
-                                 headers={"X-BB-API-Key": key, "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read() or b"{}")
-
-
 class Session:
-    """One Browserbase session: create() (REST create, then CDP), load(url) -> (final_url, html) on a fresh page with
-    the asset blocker routed, release(). `loads` counts this session's navigations. The key is never logged."""
+    """One Browserbase session: create() (Playwright first, so a broken one bills nothing; then the REST create and
+    CDP), page() -> a fresh page with the asset blocker routed, load(page, url) -> (final_url, html), release().
+    `loads` counts this session's navigations; stale() = LOADS_PER_SESSION loads or ROTATE_S old. The key is never
+    logged."""
 
     def __init__(self, key, project):
         self.key, self.project, self.loads = key, project, 0
-        self.id = self._pw = self._browser = None
+        self.id = self._pw = self._browser = self.born = None
 
     def create(self):
-        d = _bb("/sessions", self.key, {"projectId": self.project, "timeout": SESSION_S,
-                                        "browserSettings": {"solveCaptchas": True}})
-        self.id = d["id"]
         self._pw = _playwright()
+        d = bb_client.gated(lambda: bb_client.create(self.key, self.project, SESSION_S, _clock() + SESSION_S,
+                                                     who="tracker browserbase"))
+        if not d:
+            raise RuntimeError("browserbase create failed")
+        self.id, self.born = d["id"], _clock()
         self._browser = self._pw.chromium.connect_over_cdp(d["connectUrl"])
         return self
 
-    def load(self, url):
-        self.loads += 1
+    def stale(self):
+        return self.loads >= LOADS_PER_SESSION or _clock() - self.born >= ROTATE_S
+
+    def page(self):
         ctx = self._browser.contexts[0] if self._browser.contexts else self._browser.new_context()
         page = ctx.new_page()
         try:
             page.route("**/*", block_assets)
+        except Exception:
+            close_page(page)
+            raise
+        return page
+
+    def load(self, page, url):
+        self.loads += 1
+        try:
             page.goto(url, wait_until="domcontentloaded", timeout=LOAD_S * 1000)
             _settle(page)
             return page.url, page.content()
         finally:
-            try:
-                page.close()
-            except Exception:
-                pass
+            close_page(page)
 
     def release(self):
         for close in (getattr(self._browser, "close", None), getattr(self._pw, "stop", None)):
@@ -300,11 +304,15 @@ class Session:
             except Exception:
                 pass
         if self.id:
-            try:
-                _bb(f"/sessions/{self.id}", self.key, {"projectId": self.project, "status": "REQUEST_RELEASE"})
-            except Exception:
-                pass  # the session ends at its timeout
+            bb_client.release(self.key, self.project, self.id, who="tracker browserbase")
         self.id = self._pw = self._browser = None
+
+
+def close_page(page):
+    try:
+        page.close()
+    except Exception:
+        pass
 
 
 def _settle(page):

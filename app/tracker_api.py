@@ -41,7 +41,7 @@ def _invalid(field):
 def _new_watches_last_hour(c, ts):
     """New watches by capped tenants (all but TRACKER_UNCAPPED_TENANTS) in the hour before ts, deleted ones included:
     TRACKER_PUBLIC_PER_HOUR bounds paid seeds across every public tenant, so DELETE + PUT can't churn past it."""
-    free = [s.strip() for s in os.environ.get("TRACKER_UNCAPPED_TENANTS", "").split(",") if s.strip()]
+    free = sorted(tracker_db.env_set("TRACKER_UNCAPPED_TENANTS"))
     since = tracker_db.fmt(tracker_db.parse(ts) - timedelta(hours=1))
     return c.execute(f"SELECT COUNT(*) FROM watches WHERE created_at > ? AND tenant_id NOT IN ({','.join('?' * len(free))})",
                      (since, *free)).fetchone()[0], free

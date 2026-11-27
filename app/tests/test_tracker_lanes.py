@@ -4,7 +4,6 @@ stub (leakshaven_stub) and the stub fetcher (its table serves the fake listing p
 run_fresh_batch (the Google fresh pass) against a local Browserbase REST stub and a fake Playwright that records every
 navigation; every case reads the API's `lanes` over HTTP too. No real network, no paid call. Fictional creators only."""
 import contextlib
-import glob
 import http.client
 import io
 import json
@@ -16,6 +15,7 @@ from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
 from tracker_fixture import Base, tdb, tracker_scheduler, tracker_stub_fetch
+import bb_client
 import db
 import leak_crawler
 import leakshaven
@@ -28,7 +28,6 @@ import tracker_plan
 import tracker_probe
 import tracker_purge
 import tracker_serp
-import tracker_view
 
 MODEL = "00000000-0000-4000-8000-0000000000a1"
 TRAP = "00000000-0000-4000-8000-0000000000a2"
@@ -394,12 +393,16 @@ class BBStub(ThreadingHTTPServer):
     """Browserbase REST on loopback: POST /sessions -> {id, connectUrl}; POST /sessions/<id> = a release."""
 
     def __init__(self):
-        self.creates, self.releases, self.lock = [], [], threading.Lock()
+        self.creates, self.releases, self.lock, self.fail = [], [], threading.Lock(), False
         stub = self
 
         class H(BaseHTTPRequestHandler):
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                if stub.fail and self.path == "/sessions":
+                    stub.creates.append((self.headers["X-BB-API-Key"], body))
+                    self.send_error(500)
+                    return
                 with stub.lock:
                     if self.path == "/sessions":
                         stub.creates.append((self.headers["X-BB-API-Key"], body))
@@ -425,10 +428,10 @@ class BBStub(ThreadingHTTPServer):
 class FakePW:
     """Started sync Playwright stand-in: chromium.connect_over_cdp -> a browser whose pages record every goto as
     (connectUrl, url) in navs. script: per-navigation overrides ("wall", "fail"), else a results page with links[q]
-    (no links: the empty-result page)."""
+    (no links: the empty-result page). page_fail: new_page raises."""
 
     def __init__(self):
-        self.navs, self.routes, self.script, self.links, self.closed = [], [], [], {}, []
+        self.navs, self.routes, self.script, self.links, self.closed, self.page_fail = [], [], [], {}, [], False
         self.chromium = self
 
     def connect_over_cdp(self, url, **kw):
@@ -467,6 +470,8 @@ class FakePW:
 
         class Ctx:
             def new_page(self):
+                if pw.page_fail:
+                    raise RuntimeError("Target closed")
                 return Page()
 
         class Browser:
@@ -501,7 +506,9 @@ class Fresh(Lanes):
         self.bb.creates.clear()
         self.bb.releases.clear()
         self.pw = FakePW()
-        for p in (mock.patch.multiple(tracker_serp, BB_API=self.bb.base, _playwright=lambda: self.pw),
+        self.bb.fail = False
+        for p in (mock.patch.object(bb_client, "BB_API", self.bb.base),
+                  mock.patch.object(tracker_serp, "_playwright", lambda: self.pw),
                   mock.patch.dict(os.environ, TRACKER_PAID_TENANTS=self.t, TRACKER_UNCAPPED_TENANTS=self.t,
                                   BROWSERBASE_API_KEY=HOST_KEY, BROWSERBASE_PROJECT_ID=HOST_PROJECT)):
             p.start()
@@ -525,14 +532,16 @@ class Fresh(Lanes):
     def fresh(self, wid=None):
         return self.lanes(wid)["google_fresh"]
 
-    def day_state(self, wid=None, d=2):
-        with tdb.db() as c:
-            w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid or self.w,)).fetchone()
-            return tracker_view.day_state(c, w, f"2026-11-{d:02d}")
+    def lane_day(self, wid=None):
+        return self.rows("SELECT outcome, reason FROM lane_day WHERE lane = 'google_fresh' AND watch_id = ?",
+                         wid or self.w)
 
     def scan(self, wid=None, d=2):
         return self.rows("SELECT outcome FROM daily_scans WHERE watch_id = ? AND day = ?", wid or self.w,
                          f"2026-11-{d:02d}")[0]["outcome"]
+
+
+REAL_LOAD = tracker_serp.Session.load
 
 
 class TestFreshPass(Fresh):
@@ -561,7 +570,7 @@ class TestFreshPass(Fresh):
                           "next_attempt_on": "2026-11-03"})
         self.assertEqual(self.rows("SELECT outcome, reason FROM lane_day WHERE lane = 'google_fresh'"),
                          [{"outcome": "ok", "reason": None}])
-        self.assertEqual((self.scan(), self.day_state()), ("ok", "complete"))
+        self.assertEqual(self.scan(), "ok")
         self.assertEqual(self.get(f"/v1/creators/{self.w}")[1]["last_checked_at"], at(2))
 
     def test_route_blocker_aborts_image_font_media(self):
@@ -610,7 +619,7 @@ class TestFreshPass(Fresh):
                          ("reduced", "google_failed", None, at(2)))
         self.assertEqual(self.rows("SELECT outcome, reason FROM lane_day WHERE lane = 'google_fresh'"),
                          [{"outcome": "partial", "reason": "google_failed"}])
-        self.assertEqual((self.scan(), self.day_state()), ("partial", "coverage_reduced"))
+        self.assertEqual(self.scan(), "partial")
         self.assertEqual(self.rows("SELECT * FROM serp_cache"), [])
 
     def test_two_walls_end_the_query_incomplete(self):
@@ -620,7 +629,8 @@ class TestFreshPass(Fresh):
         self.assertEqual(len(self.pw.sessions()), 2)
         self.assert_charged()
         self.assertEqual((self.fresh()["state"], self.fresh()["reason"]), ("reduced", "google_failed"))
-        self.assertEqual(self.day_state(), "coverage_reduced")
+        self.assertEqual(self.scan(), "partial")
+        self.assertEqual(self.lane_day(), [{"outcome": "partial", "reason": "google_failed"}])
 
     def test_failed_load_coverage_reduced_no_other_engine(self):
         self.leak(self.w, f"{SITE}/models/mia_vale/")
@@ -636,7 +646,7 @@ class TestFreshPass(Fresh):
         self.assertEqual((lane["state"], lane["reason"]), ("reduced", "google_failed"))
         self.assertEqual(self.rows("SELECT outcome, reason FROM lane_day WHERE lane = 'google_fresh'"),
                          [{"outcome": "partial", "reason": "google_failed"}])
-        self.assertEqual((self.scan(), self.day_state()), ("partial", "coverage_reduced"))
+        self.assertEqual(self.scan(), "partial")
         self.assertEqual(self.lanes()["listing_recheck"]["state"], "ok")
 
     def test_two_tenants_same_handle_one_request_charged_to_first(self):
@@ -707,7 +717,7 @@ class TestFreshPass(Fresh):
         self.assertEqual(self.rows("SELECT outcome, reason FROM lane_day WHERE lane = 'google_fresh'"),
                          [{"outcome": "partial", "reason": "cap_global"}])
         self.assertEqual(self.rows("SELECT paused FROM watches WHERE watch_id = ?", self.w), [{"paused": 0}])
-        self.assertEqual((self.scan(), self.day_state()), ("partial", "partial"))
+        self.assertEqual(self.scan(), "partial")
         self.assertFalse(self.get(f"/v1/creators/{self.w}")[1]["paused"])
 
         with tdb.db() as c:
@@ -734,7 +744,8 @@ class TestFreshPass(Fresh):
         with mock.patch.dict(os.environ, TRACKER_UNCAPPED_TENANTS=""):
             self.day(2)
         f = self.fresh()
-        self.assertEqual((f["state"], f["reason"], f["next_attempt_on"]), ("waiting", "no_browserbase_key", None))
+        self.assertEqual((f["state"], f["reason"], f["next_attempt_on"]),
+                         ("waiting", "no_browserbase_key", "2026-11-03"))
         with mock.patch.dict(os.environ, BROWSERBASE_API_KEY=""):
             self.day(3)
         self.assertEqual((self.fresh()["state"], self.fresh()["reason"]), ("waiting", "no_browserbase_key"))
@@ -783,12 +794,100 @@ class TestFreshPass(Fresh):
         self.day(4)
         self.assertEqual(len(self.events(known, "google_seen")), 2)
 
+    def many(self, n):
+        with tdb.db() as c:
+            c.execute("UPDATE tenants SET creators_max = 20")
+        for i in range(n):
+            self.clock(tdb.plus(Base.T0, seconds=i + 1))
+            self.watch(self.t, username=f"rowan_ash{i}", account_id=f"acc-{i}")
+        return self.rows("SELECT watch_id FROM watches ORDER BY created_at, watch_id")
+
+    def test_breaker_three_failed_queries_end_the_group(self):
+        ws = self.many(4)
+        self.pw.script = ["wall", "wall", "fail", "wall", "wall"]
+        self.day(2)
+        self.assertEqual(len(self.pw.navs), 5)
+        self.assertEqual(len(self.bb.creates), 5)
+        self.assert_charged()
+        self.assertEqual(len(self.rows("SELECT * FROM load_reservation")), 3)
+        for r in ws:
+            self.assertEqual(self.lane_day(r["watch_id"]), [{"outcome": "partial", "reason": "google_failed"}])
+            self.assertEqual(self.scan(r["watch_id"]), "partial")
+
+    def test_breaker_success_resets_the_count(self):
+        ws = self.many(4)
+        self.pw.script = ["fail", "fail", None, "fail", "fail"]
+        self.day(2)
+        self.assertEqual(len(self.pw.navs), 5)
+        self.assert_charged()
+        self.assertEqual([self.lane_day(r["watch_id"])[0]["outcome"] for r in ws],
+                         ["partial", "partial", "ok", "partial", "partial"])
+
+    def test_breaker_failed_create_no_more_sessions(self):
+        self.many(3)
+        self.bb.fail = True
+        self.day(2)
+        self.assertEqual((len(self.bb.creates), self.pw.navs), (1, []))
+        self.assertEqual(self.used(), 0)
+        self.assert_charged()
+        self.assertEqual(self.rows("SELECT DISTINCT outcome, reason FROM lane_day WHERE lane = 'google_fresh'"),
+                         [{"outcome": "partial", "reason": "google_failed"}])
+        self.assertEqual(len(self.rows("SELECT * FROM lane_day WHERE lane = 'google_fresh'")), 4)
+
+    def test_broken_playwright_bills_nothing(self):
+        self.many(1)
+        with mock.patch.object(tracker_serp, "_playwright", side_effect=ImportError("No module named 'playwright'")):
+            self.day(2)
+        self.assertEqual((self.bb.creates, self.pw.navs, self.bb.releases), ([], [], []))
+        self.assertEqual(self.used(), 0)
+        self.assert_charged()
+        self.assertEqual(len(self.rows("SELECT * FROM load_reservation")), 1)
+        self.assertEqual((self.fresh()["state"], self.fresh()["reason"]), ("reduced", "google_failed"))
+
+    def test_page_prep_failure_burns_no_unit(self):
+        self.pw.page_fail = True
+        self.day(2)
+        self.assertEqual((len(self.bb.creates), self.pw.navs, self.used()), (1, [], 0))
+        self.assert_charged()
+        self.assertEqual(self.lane_day(), [{"outcome": "partial", "reason": "google_failed"}])
+
+    def test_session_rotates_by_age(self):
+        ws = self.many(2)
+        t = [1000.0]
+        with mock.patch.object(tracker_serp, "_clock", lambda: t[0]), \
+                mock.patch.object(tracker_serp.Session, "load", autospec=True,
+                                  side_effect=lambda sess, page, url: (t.__setitem__(0, t[0] + 100),
+                                                                       REAL_LOAD(sess, page, url))[1]):
+            self.day(2)
+        self.assertLess(tracker_serp.ROTATE_S, tracker_serp.SESSION_S)
+        self.assertEqual(len(self.pw.navs), 3)
+        self.assertEqual([sum(1 for c, _ in self.pw.navs if c == s) for s in self.pw.sessions()], [2, 1])
+        self.assert_charged()
+        self.assertEqual({self.fresh(r["watch_id"])["state"] for r in ws}, {"ok"})
+
+    def test_missing_tenant_row_skips_only_that_watch(self):
+        t2 = self.tenant("Agency B")
+        w2 = self.watch(t2, username="rowan_ash", account_id="acc-b")
+        with tdb.db() as c:
+            c.execute("DELETE FROM tenants WHERE tenant_id = ?", (t2,))
+        with mock.patch.dict(os.environ, TRACKER_PAID_TENANTS=f"{self.t},{t2}"):
+            tracker_lanes.run_fresh_batch([w2, self.w], "2026-11-02")
+        self.assertEqual([q for _, q in self.pw.navs], [self.q().urls()[0]])
+        self.assertEqual(self.rows("SELECT watch_id, state FROM lane_state WHERE lane = 'google_fresh'"),
+                         [{"watch_id": self.w, "state": "ok"}])
+        self.assert_charged()
+
+    def test_gone_records_nothing(self):
+        gone = tracker_lanes.tracker_budget.Refused("gone", None)
+        with mock.patch.object(tracker_lanes.tracker_budget, "reserve", return_value=gone):
+            self.day(2)
+        self.assertEqual((self.pw.navs, self.bb.creates), ([], []))
+        self.assertEqual(self.rows("SELECT * FROM lane_state WHERE lane = 'google_fresh'"), [])
+        self.assertEqual(self.lane_day(), [])
+
     def test_no_cse_or_serper_in_the_phase_2_tracker_modules(self):
-        mods = ("tracker_plan", "tracker_budget", "tracker_admission", "tracker_lanes", "tracker_judge", "tracker_usage",
-                "tracker_serp")
-        files = [f for m in mods for f in glob.glob(os.path.join(os.path.dirname(tracker_lanes.__file__), m + ".py"))]
-        self.assertGreaterEqual(len(files), 6)
-        for f in files:
+        mods = ("tracker_plan", "tracker_budget", "tracker_admission", "tracker_lanes", "tracker_judge", "tracker_serp")
+        for f in (os.path.join(os.path.dirname(tracker_lanes.__file__), m + ".py") for m in mods):
             with open(f, encoding="utf-8") as fh:
                 self.assertIsNone(re.search(r"cse_scanner|serper|customsearch", fh.read(), re.I), f)
 

@@ -139,18 +139,3 @@ def lanes(c, w):
             x.update(state="paused", reason=None, next_attempt_on=None)
         out.append(x)
     return out
-
-
-def day_state(c, w, day):
-    """A watch's UTC day: paused | pending (its daily scan isn't finished) | coverage_reduced (a google_failed lane_day
-    row) | partial (any other partial or failed lane_day row, or a failed scan) | complete."""
-    if w["paused"]:
-        return "paused"
-    scan = c.execute("SELECT finished_at, outcome FROM daily_scans WHERE watch_id = ? AND day = ?",
-                     (w["watch_id"], day)).fetchone()
-    if not scan or not scan["finished_at"]:
-        return "pending"
-    rows = c.execute("SELECT outcome, reason FROM lane_day WHERE watch_id = ? AND day = ?", (w["watch_id"], day)).fetchall()
-    if any(r["reason"] == "google_failed" for r in rows):
-        return "coverage_reduced"
-    return "partial" if scan["outcome"] != "ok" or any(r["outcome"] != "ok" for r in rows) else "complete"
