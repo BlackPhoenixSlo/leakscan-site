@@ -4,6 +4,8 @@ never needs admission. Admission binds on create only: an identity edit recomput
 runtime trimming and tracker_budget.reserve hold the cap after that."""
 from dataclasses import dataclass
 
+import tracker_plan
+
 PLAN_MAX = 31
 
 
@@ -24,8 +26,8 @@ class CreatorCap:
 
 
 def plan_loads(identity):
-    """Weekly plan loads of a watch (row-shaped identity). ASSUMPTION until ticket 21's tracker_plan: the max plan."""
-    return PLAN_MAX
+    """Weekly plan loads of a watch (row-shaped identity)."""
+    return tracker_plan.build(identity, identity["platform"]).loads
 
 
 def projected(c):

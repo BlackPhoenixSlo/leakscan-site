@@ -210,7 +210,7 @@ class TestWatches(Base):
         self.put("w_bee_00001", self.b, account_id="1")
         self.assertEqual([self.req("GET", "/v1/me", key=k)[2]["accepting_new"] for k in (self.a, self.b)], [True, True])
         with tracker_db.db() as c:
-            c.execute("UPDATE tracker_limits SET daily_loads = 33")
+            c.execute("UPDATE tracker_limits SET daily_loads = 17")
         self.assertEqual([self.req("GET", "/v1/me", key=k)[2]["accepting_new"] for k in (self.a, self.b)], [False, False])
         self.assertEqual(self.put("w_two_00002", account_id="2")[::2], (409, {"error": "waitlist"}))
         self.assertIsNone(self.watch("w_two_00002"))
@@ -225,7 +225,7 @@ class TestWatches(Base):
             c.execute("UPDATE tracker_limits SET daily_loads = 300")
         self.assertEqual(self.put("w_bee_00002", self.b, account_id="2")[2]["created"], True)
         self.assertEqual([(w["weekly_slot"], w["plan_loads"]) for w in map(self.watch, ("w_one_00001", "w_bee_00001", "w_bee_00002"))],
-                         [(0, 31), (1, 31), (2, 31)])
+                         [(0, 15), (1, 19), (2, 15)])
 
     def test_public_cap(self):
         os.environ.update(TRACKER_PUBLIC_PER_HOUR="2", TRACKER_UNCAPPED_TENANTS="tn_owner")
@@ -637,7 +637,7 @@ class TestContract(Base):
             call("err_409_creator_cap", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="example_three"))
             call("delete", "DELETE", "/v1/watches/w_rowanash_0002?requested_at=2026-11-27T11:00:00Z")
             with tracker_db.db() as c:
-                c.execute("UPDATE tracker_limits SET daily_loads = 32")
+                c.execute("UPDATE tracker_limits SET daily_loads = 16")
             call("err_409_waitlist", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="example_three"))
             with tracker_db.db() as c:
                 c.execute("UPDATE tracker_limits SET daily_loads = 300")
