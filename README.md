@@ -403,7 +403,12 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
 - `TRACKER_FETCHER=stub` loads `app/tests/tracker_stub_fetch.py`; unset, probes are real bounded GETs (http/https, 15 s, 5 redirects,
   256 KB, 8 per host, no loopback / private / link-local / NAT64 / 6to4 / Teredo / own addresses; compose sets `TRACKER_SELF_IPS` to the
   VPS IPv4, the scheduler logs a warning at start when it holds no public address).
-- Tests: `app/tests/test_tracker_api.py`, `test_tracker_seed.py`, `test_tracker_probe.py`, `test_tracker_purge.py`.
+- Vendored from leakhunt 7ccbdd3 onto the stdlib, not wired into a lane yet: `tracker_serp` (Google SERP URL, `since="d"` =
+  `tbs=qdr:d`, classifier, web / images / videos link parser, query templates), `tracker_jev` (TypeSafe Jev, band 0.2 / 0.8),
+  `tracker_llm` (DeepSeek JSON mode), `tracker_verdicts`, `tracker_pagekind`. Prompt catalog: the judge prompt is
+  `tracker_verdicts.SYSTEM`, Jev's question `tracker_jev.QUESTION`.
+- Tests: `app/tests/test_tracker_api.py`, `test_tracker_seed.py`, `test_tracker_probe.py`, `test_tracker_purge.py`,
+  `test_tracker_serp.py`, `test_tracker_judge.py`, `test_tracker_vendored.py`.
 
 ## Replace before launch
 
