@@ -1,7 +1,8 @@
 """Daily pass (spec "Daily pass (service)"): a daemon thread like the retention loop wakes every TICK_S; from
 TRACKER_DAILY_AT (UTC HH:MM, default 04:00) on it claims the day's daily_scans row (tracker_seed.claim) for every
-unpaused, undeleted watch, seeds the unseeded ones (the seed probes and finishes its own row) and probes the rest one
-watch at a time (each url_key once a day) and finishes their rows; one watch's error fails only its own row. Then the
+unpaused, undeleted watch, seeds the unseeded ones (the seed probes and finishes its own row) and runs the rest's daily
+lanes one watch at a time (tracker_lanes.run_daily: the Origin probe, each url_key once a day, then the Mega lookup) and
+finishes their rows, failed when the probe failed; one watch's error fails only its own row. Then the
 purge, once per UTC day. Rows still open from an earlier day (a crash) finish failed; today's are taken over after
 tracker_seed.LEASE_H. TRACKER_SCHEDULER=0 keeps the thread off."""
 import ipaddress
@@ -11,6 +12,7 @@ import time
 from datetime import timedelta
 
 import tracker_db as tdb
+import tracker_lanes
 import tracker_probe
 import tracker_purge
 import tracker_seed
@@ -43,9 +45,11 @@ def _pass(now):
             if wid in unseeded:
                 out["seeded"] += bool(tracker_seed.run(wid, claimed=True))
             else:
-                r = tracker_probe.run([wid])
-                out.update(probed=out["probed"] + 1, keys=out["keys"] + r["keys"], fetched=out["fetched"] + r["fetched"])
-                _finish([wid], today, "ok")
+                r = tracker_lanes.run_daily(wid, today)
+                if r["probe"]:
+                    out.update(probed=out["probed"] + 1, keys=out["keys"] + r["probe"]["keys"],
+                               fetched=out["fetched"] + r["probe"]["fetched"])
+                _finish([wid], today, r["outcome"])
         except Exception as e:
             log(f"tracker daily watch failed: {type(e).__name__}")
         _finish([wid], today, "failed")

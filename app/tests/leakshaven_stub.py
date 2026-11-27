@@ -58,6 +58,7 @@ class Stub(ThreadingHTTPServer):
     def __init__(self, port=0, mode="ok"):
         super().__init__(("127.0.0.1", port), _H)
         self.mode, self.calls, self.slow = mode, [], 3.0
+        self.suggest, self.title, self.content = SUGGEST, TITLE, CONTENT     # swapped per day by test_tracker_lanes
 
     @property
     def base(self):
@@ -92,9 +93,9 @@ class _H(BaseHTTPRequestHandler):
         if mode == "slow":
             time.sleep(self.server.slow)
         if u.path == "/content/suggest":
-            return self._send([] if mode == "nomatch" else SUGGEST)
-        if u.path == "/content" and q.get("search") == TITLE and q.get("sorting") == "NEWEST":
-            return self._send(CONTENT_OTHER if mode == "other" else CONTENT)
+            return self._send([] if mode == "nomatch" else self.server.suggest)
+        if u.path == "/content" and q.get("search") == self.server.title and q.get("sorting") == "NEWEST":
+            return self._send(CONTENT_OTHER if mode == "other" else self.server.content)
         self._send({"content": []})
 
 

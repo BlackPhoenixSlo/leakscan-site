@@ -1,5 +1,6 @@
 """Shared setup for the tracker tests: a temp TRACKER_DB, a settable clock, tenants / watches / Leaks written straight
-through tracker_db, and the stub fetcher. All data synthetic."""
+through tracker_db, and the stub fetcher. The Mega index is off (tests that run it point it at leakshaven_stub).
+All data synthetic."""
 import json
 import os
 import sys
@@ -10,6 +11,7 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
+import leakshaven
 import tracker_db as tdb
 import tracker_probe
 import tracker_rules
@@ -28,6 +30,9 @@ class Base(unittest.TestCase):
                               TRACKER_STUB_FETCH=self.fetch_file)
         env.start()
         self.addCleanup(env.stop)
+        off = mock.patch.object(leakshaven, "ENABLED", False)
+        off.start()
+        self.addCleanup(off.stop)
         self.addCleanup(self.tmp.cleanup)
         tdb.init()
         self.clock(self.T0)

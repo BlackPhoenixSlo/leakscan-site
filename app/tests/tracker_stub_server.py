@@ -4,6 +4,8 @@ the Quick scan DB, the seed inline and the scheduler thread off. Prints the base
 TRACKER_STUB_FETCH=<path> for other processes (tracker_cli with TRACKER_FETCHER=stub). Test-only routes:
   POST /__tracker/daily?at=<ISO>    one daily pass at that moment -> its counts (JSON)
   POST /__tracker/fetch             body {url | "*": status | [status, body]} -> the stub fetcher's answers
+  POST /__tracker/mega              body {suggest?, title?, content?} -> the Mega index stub's next answers (a pack
+                                    with "deleted": true is how a Mega `deleted` day is staged)
   python3 app/tests/tracker_stub_server.py --port N [--db PATH]"""
 import argparse
 import json
@@ -55,6 +57,12 @@ def main():
                 body = self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}"
                 with open(os.environ["TRACKER_STUB_FETCH"], "w", encoding="utf-8") as fh:
                     fh.write(body.decode())
+                return self._json({"ok": True})
+            if u.path == "/__tracker/mega":
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+                for k in ("suggest", "title", "content"):
+                    if k in body:
+                        setattr(agg, k, body[k])
                 return self._json({"ok": True})
             return super().do_POST()
 

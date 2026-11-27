@@ -117,6 +117,8 @@ class TestSeed(Stubs):
         self.assertEqual(sorted(tracker_stub_fetch.CALLS), sorted(u.partition("#")[0] for u, l in leaks.items()
                                                                   if l["kind"] == "page"))
         self.assertEqual(self.rows("SELECT outcome FROM daily_scans")[0]["outcome"], "ok")
+        self.assertEqual(self.rows("SELECT lane, state, last_success_at FROM lane_state WHERE watch_id = ?", w),
+                         [{"lane": "origin_probe", "state": "ok", "last_success_at": self.T0}])
 
     def test_short_needles_and_mega_match_source(self):
         def cand(handle, aliases):

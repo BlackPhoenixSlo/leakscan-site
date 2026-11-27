@@ -248,7 +248,8 @@ def creators(t, q, raw):
 def creator_one(t, q, raw, watch_id):
     now = tracker_db.now_dt()
     with tracker_db.db() as c:
-        return 200, tracker_view.creator(c, _own(c, t, watch_id), now)
+        w = _own(c, t, watch_id)
+        return 200, {**tracker_view.creator(c, w, now), "lanes": tracker_view.lanes(c, w)}
 
 
 def creator_leaks(t, q, raw, watch_id):

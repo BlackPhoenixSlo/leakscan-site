@@ -479,6 +479,52 @@ class TestPill(Base):
         self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["next_check_at"], "2026-11-28T04:00:00Z")
 
 
+class TestLanes(Base):
+    LANES = [("origin_probe", "daily"), ("mega_lookup", "daily"), ("listing_recheck", "daily"), ("google_fresh", "daily"),
+             ("google_full", "weekly"), ("registry_crawl", "weekly")]
+
+    def lane_row(self, wid, lane, state="ok", reason=None):
+        with tracker_db.db() as c:
+            c.execute("INSERT INTO lane_state (watch_id, lane, state, reason, last_attempt_at, last_success_at, next_attempt_on) "
+                      "VALUES (?,?,?,?,?,?,?)", (wid, lane, state, reason, ts(NOW), ts(NOW - timedelta(days=1)), "2026-11-28"))
+
+    def lanes(self, wid, key=None):
+        st, _, b = self.req("GET", f"/v1/creators/{wid}", key=key or self.a)
+        self.assertEqual(st, 200)
+        return b["lanes"]
+
+    def test_shape_never_ok_failed(self):
+        self.put("w_mia_00001")
+        never = {"state": "never", "reason": None, "last_success_at": None, "last_attempt_at": None, "next_attempt_on": None,
+                 "trimmed": []}
+        self.assertEqual(self.lanes("w_mia_00001"), [{"lane": n, "cadence": c, **never} for n, c in self.LANES])
+        self.lane_row("w_mia_00001", "origin_probe")
+        self.lane_row("w_mia_00001", "mega_lookup", "failed", "lane_failed")
+        got = {x["lane"]: x for x in self.lanes("w_mia_00001")}
+        self.assertEqual(got["mega_lookup"], {"lane": "mega_lookup", "cadence": "daily", "state": "failed", "reason": "lane_failed",
+                                              "last_success_at": ts(NOW - timedelta(days=1)), "last_attempt_at": ts(NOW),
+                                              "next_attempt_on": "2026-11-28", "trimmed": []})
+        self.assertEqual(got["origin_probe"]["state"], "ok")
+        self.assertNotIn("lanes", self.req("GET", "/v1/creators", key=self.a)[2]["creators"][0])
+
+    def test_paused(self):
+        self.put("w_mia_00001")
+        self.lane_row("w_mia_00001", "mega_lookup")
+        self.put("w_mia_00001", paused=True)
+        got = self.lanes("w_mia_00001")
+        self.assertEqual({x["state"] for x in got}, {"paused"})
+        self.assertEqual([x["last_success_at"] for x in got], [None, ts(NOW - timedelta(days=1)), None, None, None, None])
+        self.assertEqual({x["next_attempt_on"] for x in got}, {None})
+
+    def test_tenant_isolation(self):
+        self.put("w_mia_00001")
+        self.put("w_rowan_0001", key=self.b, account_id="acc-2001", username="rowanash", display_name="Rowan Ash", aliases=[])
+        self.lane_row("w_mia_00001", "mega_lookup")
+        self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.b)[:3:2], (404, {"error": "not_found"}))
+        self.assertEqual({x["state"] for x in self.lanes("w_rowan_0001", key=self.b)}, {"never"})
+        self.assertEqual(next(x for x in self.lanes("w_mia_00001") if x["lane"] == "mega_lookup")["state"], "ok")
+
+
 class TestCors(Base):
     def test_no_cors_on_v1(self):
         self.put("w_mia_00001")
@@ -572,6 +618,11 @@ class TestContract(Base):
                 c.execute("UPDATE watches SET seeded_at = ? WHERE watch_id = 'w_miavale_0001'", (d(20, 9, 6),))
             call("me", "GET", "/v1/me")
             call("creators", "GET", "/v1/creators")
+            with tracker_db.db() as c:
+                c.executemany("INSERT INTO lane_state (watch_id, lane, state, reason, last_attempt_at, last_success_at, "
+                              "next_attempt_on) VALUES ('w_miavale_0001',?,?,?,?,?,'2026-11-28')",
+                              [("origin_probe", "ok", None, d(27, 4, 1), d(27, 4, 1)),
+                               ("mega_lookup", "failed", "lane_failed", d(27, 4, 2), d(26, 4, 2))])
             call("creator_one", "GET", "/v1/creators/w_miavale_0001")
             call("creator_leaks", "GET", "/v1/creators/w_miavale_0001/leaks")
             call("leaks", "GET", "/v1/leaks?watch_id=w_miavale_0001&watch_id=w_rowanash_0002&limit=2")
