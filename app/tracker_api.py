@@ -10,6 +10,7 @@ from datetime import timedelta
 
 import tracker_admission
 import tracker_db
+import tracker_judge
 import tracker_seed
 import tracker_view
 
@@ -124,6 +125,8 @@ def _identity(raw):
         _invalid("display_name")
     aliases = b.get("aliases") or []
     if not isinstance(aliases, list) or len(aliases) > 5 or not all(isinstance(a, str) and 4 <= len(a) <= 64 for a in aliases):
+        _invalid("aliases")
+    if any(len(tracker_judge.norm(a)) < tracker_judge.HANDLE_MIN for a in aliases):
         _invalid("aliases")
     folded = [a.casefold() for a in aliases]
     if len(set(folded)) != len(folded) or user.casefold() in folded:

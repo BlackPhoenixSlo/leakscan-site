@@ -210,7 +210,7 @@ class TestWatches(Base):
         self.put("w_bee_00001", self.b, account_id="1")
         self.assertEqual([self.req("GET", "/v1/me", key=k)[2]["accepting_new"] for k in (self.a, self.b)], [True, True])
         with tracker_db.db() as c:
-            c.execute("UPDATE tracker_limits SET daily_loads = 17")
+            c.execute("UPDATE tracker_limits SET daily_loads = 15")
         self.assertEqual([self.req("GET", "/v1/me", key=k)[2]["accepting_new"] for k in (self.a, self.b)], [False, False])
         self.assertEqual(self.put("w_two_00002", account_id="2")[::2], (409, {"error": "waitlist"}))
         self.assertIsNone(self.watch("w_two_00002"))
@@ -225,7 +225,7 @@ class TestWatches(Base):
             c.execute("UPDATE tracker_limits SET daily_loads = 300")
         self.assertEqual(self.put("w_bee_00002", self.b, account_id="2")[2]["created"], True)
         self.assertEqual([(w["weekly_slot"], w["plan_loads"]) for w in map(self.watch, ("w_one_00001", "w_bee_00001", "w_bee_00002"))],
-                         [(0, 15), (1, 19), (2, 15)])
+                         [(0, 13), (1, 17), (2, 13)])
 
     def test_public_cap(self):
         os.environ.update(TRACKER_PUBLIC_PER_HOUR="2", TRACKER_UNCAPPED_TENANTS="tn_owner")
@@ -318,7 +318,7 @@ class TestWatches(Base):
               [("verified", v) for v in ("true", 1, None, DROP)] + \
               [("display_name", v) for v in (5, "a" * 65)] + \
               [("aliases", v) for v in ("mia.vale.x", ["abc"], ["a" * 65], [f"alias{i}" for i in range(6)], ["Mia.Vale.X", "mia.vale.x"],
-                                        ["MIAVALE"], [5])] + \
+                                        ["MIAVALE"], [5], ["m.i.a"], ["a-b_c"], ["%61%62%63"])] + \
               [("instagram", v) for v in ("", "a" * 31, "mia-vale", 5)] + \
               [("x", v) for v in ("", "a" * 16, "mia.vale")] + \
               [("paused", v) for v in ("no", 0, DROP)]
@@ -330,6 +330,7 @@ class TestWatches(Base):
         self.assertEqual(self.req("PUT", "/v1/watches/w_mia_00001", ok, self.a)[0], 200)
         self.assertEqual(self.put("w_mia_00001", aliases=[f"alias{i}" for i in range(5)], display_name="a" * 64, instagram="a" * 30,
                                   x="a" * 15)[0], 200)
+        self.assertEqual(self.put("w_mia_00001", aliases=["v.e.e.x"])[0], 200)
 
     def test_transfer_encoding_refused(self):
         c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=10)
@@ -637,7 +638,7 @@ class TestContract(Base):
             call("err_409_creator_cap", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="example_three"))
             call("delete", "DELETE", "/v1/watches/w_rowanash_0002?requested_at=2026-11-27T11:00:00Z")
             with tracker_db.db() as c:
-                c.execute("UPDATE tracker_limits SET daily_loads = 16")
+                c.execute("UPDATE tracker_limits SET daily_loads = 14")
             call("err_409_waitlist", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="example_three"))
             with tracker_db.db() as c:
                 c.execute("UPDATE tracker_limits SET daily_loads = 300")

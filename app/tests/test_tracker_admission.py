@@ -130,10 +130,13 @@ class TestEdits(AdmissionBase):
             self.assertEqual(self.rows("SELECT COUNT(*) n FROM watches")[0]["n"], 2)
             with mock.patch.object(adm, "plan_loads", return_value=50):
                 self.assertEqual(self.put("w_ash_00002", username="rowan_ash", aliases=["rowanash.x"])[0], 200)
-            self.assertEqual(self.put("w_mia_00001", paused=False, aliases=["rowanash"])[0], 200)
+            self.assertEqual(self.put("w_mia_00001", paused=False)[0], 200)
             got = self.rows("SELECT watch_id, weekly_slot, plan_loads, paused FROM watches ORDER BY watch_id")
             self.assertEqual(got, [{"watch_id": "w_ash_00002", "weekly_slot": 1, "plan_loads": 50, "paused": 0},
-                                   {"watch_id": "w_mia_00001", "weekly_slot": 0, "plan_loads": 13, "paused": 0}])
+                                   {"watch_id": "w_mia_00001", "weekly_slot": 0, "plan_loads": 9, "paused": 0}])
+            self.assertEqual(self.put("w_mia_00001", aliases=["rowanash"])[0], 200)
+            self.assertEqual(self.rows("SELECT weekly_slot, plan_loads FROM watches WHERE watch_id = 'w_mia_00001'"),
+                             [{"weekly_slot": 0, "plan_loads": 13}])
 
 
 class TestBackfill(AdmissionBase):

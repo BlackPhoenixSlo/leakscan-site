@@ -5,8 +5,7 @@ runtime trimming and tracker_budget.reserve hold the cap after that."""
 from dataclasses import dataclass
 
 import tracker_plan
-
-PLAN_MAX = 31
+from tracker_plan import PLAN_MAX
 
 
 @dataclass(frozen=True)
