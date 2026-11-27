@@ -5,7 +5,6 @@ never sent (the service has no mirror findings), the prompt keeps their line as 
 import json
 
 from tracker_jev import band
-from tracker_llm import LLMError
 from tracker_pagekind import CLIENT_KINDS, GENERIC_LISTINGS, Handles, policy_kind
 
 
@@ -79,13 +78,14 @@ def jev_verdict(p, kind):
     return None if v == "reject" and kind in CLIENT_KINDS else v
 
 
-def judge_batch(rows, handles, ask, row_kinds=None):
-    """One LLM batch: {id: (verdict, reason)} from `ask(system, user) -> parsed JSON`; {} when the call or its
-    envelope fails. A row with no verdict is left for the next round."""
-    row_kinds = row_kinds or kinds(rows, handles)
+def judge_batch(rows, handles, ask):
+    """One LLM batch: {id: (verdict, reason)} from `ask(system, user) -> parsed JSON` (profile_extract.deepseek_json's
+    failures: OSError, RuntimeError, LookupError, ValueError); {} when the call or its envelope fails. A row with no
+    verdict is left for the next round."""
+    row_kinds = kinds(rows, handles)
     items = [item(f, row_kinds[f["id"]]) for f in rows]
     try:
         out = ask(system(handles), json.dumps({"items": items}, ensure_ascii=False))
         return verdicts(out, {i["id"] for i in items})
-    except (LLMError, ValueError, TypeError, AttributeError):
+    except (OSError, RuntimeError, LookupError, ValueError, TypeError, AttributeError):
         return {}

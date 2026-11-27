@@ -405,7 +405,7 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
   VPS IPv4, the scheduler logs a warning at start when it holds no public address).
 - Vendored from leakhunt 7ccbdd3 onto the stdlib, not wired into a lane yet: `tracker_serp` (Google SERP URL, `since="d"` =
   `tbs=qdr:d`, classifier, web / images / videos link parser, query templates), `tracker_jev` (TypeSafe Jev, band 0.2 / 0.8),
-  `tracker_llm` (DeepSeek JSON mode), `tracker_verdicts`, `tracker_pagekind`. Prompt catalog: the judge prompt is
+  `tracker_llm` (its JSON POST, no redirects), `tracker_verdicts`, `tracker_pagekind`. Prompt catalog: the judge prompt is
   `tracker_verdicts.SYSTEM`, Jev's question `tracker_jev.QUESTION`.
 - Tests: `app/tests/test_tracker_api.py`, `test_tracker_seed.py`, `test_tracker_probe.py`, `test_tracker_purge.py`,
   `test_tracker_serp.py`, `test_tracker_judge.py`, `test_tracker_vendored.py`.

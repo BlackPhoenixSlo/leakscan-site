@@ -1,4 +1,4 @@
-"""The vendored Leak judge pieces: Jev (tracker_jev) and DeepSeek (tracker_llm) against a stub HTTP endpoint on
+"""The vendored Leak judge pieces: Jev (tracker_jev over tracker_llm.post_json) against a stub HTTP endpoint on
 loopback, never a real model call; the judge prompt, verdict parser and band (tracker_verdicts); policy_kind
 (tracker_pagekind). Ported from leakhunt 7ccbdd3's tests (test_jev, test_judge)."""
 import json
@@ -11,7 +11,6 @@ from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-import chat_proxy
 import tracker_jev as jev
 import tracker_llm
 import tracker_verdicts as tv
@@ -81,11 +80,10 @@ class Stubbed(unittest.TestCase):
         self.addCleanup(p.stop)
 
     def setUp(self):
-        env = mock.patch.dict(os.environ, {jev.KEY_ENV: SECRET, tracker_llm.KEY_ENV: SECRET})
+        env = mock.patch.dict(os.environ, {jev.KEY_ENV: SECRET})
         env.start()
         self.addCleanup(env.stop)
         self.patch(jev, "URL", f"{self.base}/v1/systemone")
-        self.patch(chat_proxy, "DEEPSEEK_URL", f"{self.base}/chat/completions")
         self.sleeps = []
         self.patch(jev, "sleep", self.sleeps.append)
 
@@ -202,6 +200,33 @@ class Jev(Stubbed):
         s = jev.leak_probability(rows(5), [HANDLE])
         self.assertTrue(s.p == {} and s.failed == 5 and "down for the last 3 findings" in s.error)
 
+    def test_a_redirect_is_not_followed_and_the_finding_fails(self):
+        hits = []
+
+        class Other(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_POST(self):
+                hits.append(self.headers.get("Authorization"))
+                self.send_response(200)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            do_GET = do_POST
+
+        other = ThreadingHTTPServer(("127.0.0.1", 0), Other)
+        threading.Thread(target=other.serve_forever, daemon=True).start()
+        self.addCleanup(other.server_close)
+        self.addCleanup(other.shutdown)
+        loc = {"Location": f"http://127.0.0.1:{other.server_address[1]}/steal"}
+        ts = self.serve(FakeTypeSafe(first=[(302, loc, b"")] * 3))
+        s = jev.leak_probability(rows(1), [HANDLE])
+        self.assertEqual((s.p, s.failed, s.error, len(ts.bodies)), ({}, 1, None, 1))
+        status, headers, _ = tracker_llm.post_json(jev.URL, ts.bodies[0], {"Authorization": f"Bearer {SECRET}"}, 5)
+        self.assertEqual((status, headers["Location"]), (302, loc["Location"]))
+        self.assertEqual(hits, [])
+
     def test_no_wave_starts_after_the_batch_deadline(self):
         self.patch(jev, "BATCH_S", 0.0)
         self.serve(FakeTypeSafe({"x.example": 0.9}))
@@ -233,46 +258,6 @@ class Jev(Stubbed):
         self.serve(FakeTypeSafe(first=[(200, {}, big)]))
         s = jev.leak_probability(rows(1), [HANDLE])
         self.assertEqual((s.p, s.tokens), ({1: 0.9}, jev.TOKEN_CAP * est))
-
-
-class DeepSeek(Stubbed):
-    def chat(self, status, out):
-        seen = []
-
-        def app(body, headers):
-            seen.append((body, headers))
-            return status, {}, out if isinstance(out, bytes) else json.dumps(out).encode()
-
-        self.serve(app)
-        return seen
-
-    def test_json_mode_call_strips_a_fence_and_returns_tokens(self):
-        seen = self.chat(200, {"choices": [{"message": {"content": '```json\n{"verdicts": []}\n```'}}],
-                               "usage": {"prompt_tokens": 120, "completion_tokens": 9}})
-        with mock.patch.dict(os.environ, {"DEEPSEEK_MODEL": "deepseek-v4-flash"}):
-            self.assertEqual(tracker_llm.complete_json("sys", "user"), ({"verdicts": []}, 120, 9))
-        body, headers = seen[0]
-        self.assertEqual(headers["authorization"], f"Bearer {SECRET}")
-        self.assertEqual((body["model"], body["response_format"], body["thinking"]),
-                         ("deepseek-v4-flash", {"type": "json_object"}, {"type": "disabled"}))
-        self.assertEqual(body["messages"], [{"role": "system", "content": "sys" + tracker_llm.JSON_ONLY},
-                                            {"role": "user", "content": "user"}])
-
-    def test_failures_are_llm_errors_without_the_key(self):
-        self.chat(401, f"bad key {SECRET}".encode())
-        with self.assertRaises(tracker_llm.LLMError) as e:
-            tracker_llm.complete_json("s", "u")
-        self.assertTrue("401" in str(e.exception) and SECRET not in str(e.exception))
-        for out in ({"choices": []}, {"choices": [{"message": {"content": "not json"}}]}, b"<html>"):
-            self.chat(200, out)
-            with self.assertRaises(tracker_llm.LLMError):
-                tracker_llm.complete_json("s", "u")
-        self.patch(chat_proxy, "DEEPSEEK_URL", "http://127.0.0.1:9/chat/completions")
-        with self.assertRaisesRegex(tracker_llm.LLMError, "request failed"):
-            tracker_llm.complete_json("s", "u")
-        with mock.patch.dict(os.environ, {tracker_llm.KEY_ENV: ""}):
-            with self.assertRaisesRegex(tracker_llm.LLMError, "DEEPSEEK_API_KEY is not set"):
-                tracker_llm.complete_json("s", "u")
 
 
 class Judge(unittest.TestCase):
@@ -335,9 +320,12 @@ class Judge(unittest.TestCase):
         self.assertEqual(user["items"][1]["policy_kind"], "tag")
 
         def fail(system, user):
-            raise tracker_llm.LLMError("down")
+            raise RuntimeError("no DEEPSEEK_API_KEY")
 
-        for bad in (fail, lambda s, u: "text", lambda s, u: {"verdicts": "x"}):
+        def refused(system, user):
+            raise OSError("refused")
+
+        for bad in (fail, refused, lambda s, u: "text", lambda s, u: {"verdicts": "x"}, lambda s, u: {}[0]):
             self.assertEqual(tv.judge_batch(rows_, [HANDLE], bad), {})
 
 

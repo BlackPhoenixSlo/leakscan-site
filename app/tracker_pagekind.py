@@ -37,7 +37,6 @@ FORUM_KEYS = {"t", "p", "topic", "threadid", "postid"}
 TAB_WORDS = {"video", "videos", "photo", "photos", "pics", "pictures", "images", "short", "shorts", "clips", "gallery",
              "galleries", "albums", "posts", "media", "gifs", "reels"}
 
-PAGE_KINDS = ("content", *LISTING_KINDS, "media", "other")
 DEDICATED = ("profile", "numbered")
 CLIENT_KINDS = tuple(f"client_{k}" for k in DEDICATED)
 GENERIC_LISTINGS = tuple(k for k in LISTING_KINDS if k not in DEDICATED)
@@ -165,7 +164,7 @@ def classify_url(url):
 
 
 def url_kind(url, h=None):
-    """One of PAGE_KINDS from the URL alone."""
+    """content, one of LISTING_KINDS, media or other, from the URL alone."""
     url = url if "://" in url else f"https://{url}"
     role, kind, reason = classify_url(url)
     parts = urlsplit(url)

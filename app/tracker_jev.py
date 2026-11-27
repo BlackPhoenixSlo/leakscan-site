@@ -94,10 +94,6 @@ def state(handles, f):
                      "discovered_by": f.get("source") or "", "found_on": ev.get("found_via") or ""}}
 
 
-def _body(request_state, name="leak", question=QUESTION):
-    return {"model": MODEL, "state": request_state, "questions": {name: question}}
-
-
 def _estimate(body):
     return len(json.dumps(body)) // 4
 
@@ -132,7 +128,7 @@ def _post(post, key, body):
     return None
 
 
-def _answer(raw, body, name):
+def _answer(raw, body):
     """(probability, or None when malformed; input tokens billed, estimated at ~4 chars each when absent, capped at
     TOKEN_CAP times that estimate) from a 200's body."""
     try:
@@ -147,7 +143,7 @@ def _answer(raw, body, name):
         tin = est
     tin = min(tin, TOKEN_CAP * est)
     answers = data.get("answers")
-    answer = answers.get(name) if isinstance(answers, dict) else None
+    answer = answers.get("leak") if isinstance(answers, dict) else None
     p = answer.get("noul") if isinstance(answer, dict) else None
     if isinstance(p, bool) or not isinstance(p, (int, float)) or not 0.0 <= p <= 1.0:
         return None, tin
@@ -155,26 +151,21 @@ def _answer(raw, body, name):
 
 
 def leak_probability(items, handles, *, post=post_json):
-    """Jev's P(leak) for findings `items`. Raises JevError with no key; anything after that loses only the findings
-    it touched (`Scores.failed`, `Scores.error`)."""
-    return ask([(int(f["id"]), lambda f=f: state(handles, f)) for f in items], "leak", QUESTION, post=post)
-
-
-def ask(items, name, question, *, post=post_json):
-    """Jev's probability for one Noul `question` per item (id, a function giving its request state, called in the
-    worker so a bad item loses only itself), in waves of WORKERS requests through `post`."""
+    """Jev's P(leak) for findings `items`, one Noul question each, in waves of WORKERS requests through `post`.
+    Raises JevError with no key; anything after that loses only the findings it touched (`Scores.failed`,
+    `Scores.error`)."""
     if not items:
         return Scores()
     key = api_key()
 
-    def one(item):
-        fid, make_state = item
+    def one(f):
+        fid = int(f["id"])
         try:
-            body = _body(make_state(), name, question)
+            body = {"model": MODEL, "state": state(handles, f), "questions": {"leak": QUESTION}}
             resp = _post(post, key, body)
             if resp is None:
                 return _Answer(fid, down=True)
-            return _Answer(fid, *_answer(resp[2], body, name)) if resp[0] == 200 else _Answer(fid)
+            return _Answer(fid, *_answer(resp[2], body)) if resp[0] == 200 else _Answer(fid)
         except JevError as e:
             return _Answer(fid, refused=str(e))
         except Exception:  # one bad finding loses only itself
