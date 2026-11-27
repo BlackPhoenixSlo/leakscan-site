@@ -59,10 +59,17 @@ def admission(w, url, title):
 
 
 def admit(c, watch_id, url, key, site, kind, title, source, at, first_scan=True):
-    """A Leak with its seen{source, first_scan} event (and google_seen for google_web) -> 1, 0 when url_key is known."""
+    """A Leak with its seen{source, first_scan} event (and google_seen for google_web) -> 1, 0 when url_key is known;
+    a known Leak a google_web hit names gets google_seen{visible: true} when its last google_seen isn't visible."""
     leak_id = tdb.new_id("lk_")
     if not c.execute("INSERT OR IGNORE INTO leaks (leak_id, watch_id, url_key, url, leak_site, kind, title, created_at) "
                      "VALUES (?,?,?,?,?,?,?,?)", (leak_id, watch_id, key, url, site, kind, title, at)).rowcount:
+        if source == "google_web":
+            known = c.execute("SELECT leak_id FROM leaks WHERE watch_id = ? AND url_key = ?", (watch_id, key)).fetchone()
+            last = c.execute("SELECT data_json FROM leak_events WHERE leak_id = ? AND type = 'google_seen' "
+                             "ORDER BY id DESC LIMIT 1", (known[0],)).fetchone()
+            if last is None or json.loads(last[0] or "{}").get("visible", True) is not True:
+                tdb.add_event(c, known[0], "google_seen", {"visible": True}, at)
         return 0
     tdb.add_event(c, leak_id, "seen", {"source": source, "first_scan": first_scan}, at)
     if source == "google_web":

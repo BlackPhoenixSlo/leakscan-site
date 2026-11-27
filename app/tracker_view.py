@@ -116,7 +116,8 @@ def creator(c, w, now_dt):
     counts["new_today"] = sum(x["first_seen_at"][:10] == today and not x["found_on_first_scan"] for x in ls)
     counts["found_on_first_scan"] = sum(x["found_on_first_scan"] for x in ls)
     counts["came_back_30d"] = sum(x["came_back"] for x in ls)
-    last = c.execute("SELECT MAX(finished_at) FROM daily_scans WHERE watch_id=? AND outcome='ok'", (w["watch_id"],)).fetchone()[0]
+    last = c.execute("SELECT MAX(finished_at) FROM daily_scans WHERE watch_id=? AND outcome IN ('ok', 'partial')",
+                     (w["watch_id"],)).fetchone()[0]
     return {"watch_id": w["watch_id"], "account_id": w["account_id"], "paused": bool(w["paused"]),
             "paused_since": w["paused_at"] if w["paused"] else None, "seeded": w["seeded_at"] is not None,
             "last_checked_at": last, "next_check_at": next_check_at(now_dt), "counts": counts}
@@ -138,3 +139,18 @@ def lanes(c, w):
             x.update(state="paused", reason=None, next_attempt_on=None)
         out.append(x)
     return out
+
+
+def day_state(c, w, day):
+    """A watch's UTC day: paused | pending (its daily scan isn't finished) | coverage_reduced (a google_failed lane_day
+    row) | partial (any other partial or failed lane_day row, or a failed scan) | complete."""
+    if w["paused"]:
+        return "paused"
+    scan = c.execute("SELECT finished_at, outcome FROM daily_scans WHERE watch_id = ? AND day = ?",
+                     (w["watch_id"], day)).fetchone()
+    if not scan or not scan["finished_at"]:
+        return "pending"
+    rows = c.execute("SELECT outcome, reason FROM lane_day WHERE watch_id = ? AND day = ?", (w["watch_id"], day)).fetchall()
+    if any(r["reason"] == "google_failed" for r in rows):
+        return "coverage_reduced"
+    return "partial" if scan["outcome"] != "ok" or any(r["outcome"] != "ok" for r in rows) else "complete"

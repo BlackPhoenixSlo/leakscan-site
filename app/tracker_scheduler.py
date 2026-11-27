@@ -2,9 +2,10 @@
 TRACKER_DAILY_AT (UTC HH:MM, default 04:00) on it claims the day's daily_scans row (tracker_seed.claim) for every
 unpaused, undeleted watch, seeds the unseeded ones (the seed probes and finishes its own row) and runs the rest's daily
 lanes one watch at a time (tracker_lanes.run_daily: the Origin probe, each url_key once a day, the Mega lookup, the
-listing recheck) and finishes their rows, failed when the probe failed; one watch's error fails only its own row. Then
-the purge, once per UTC day. Rows still open from an earlier day (a crash) finish failed; today's are taken over after
-tracker_seed.LEASE_H. TRACKER_SCHEDULER=0 keeps the thread off."""
+listing recheck), then the Google fresh pass over those watches (tracker_lanes.run_fresh_batch), and finishes their
+rows: failed when the probe failed, partial when a lane_day row of the day is partial or failed, else ok; one watch's
+error fails only its own row. Then the purge, once per UTC day. Rows still open from an earlier day (a crash) finish
+failed; today's are taken over after tracker_seed.LEASE_H. TRACKER_SCHEDULER=0 keeps the thread off."""
 import ipaddress
 import os
 import threading
@@ -40,6 +41,7 @@ def _pass(now):
                                         "ORDER BY created_at, watch_id")]
         mine = [w for w in live if tracker_seed.claim(c, w, now, retry=True)]
         unseeded = {r[0] for r in c.execute("SELECT watch_id FROM watches WHERE seeded_at IS NULL")}
+    done = {}
     for wid in mine:
         try:
             if wid in unseeded:
@@ -49,10 +51,21 @@ def _pass(now):
                 if r["probe"]:
                     out.update(probed=out["probed"] + 1, keys=out["keys"] + r["probe"]["keys"],
                                fetched=out["fetched"] + r["probe"]["fetched"])
+                if r["outcome"] != "skipped":
+                    done[wid] = r["outcome"]
+                    continue
                 _finish([wid], today, r["outcome"])
         except Exception as e:
             log(f"tracker daily watch failed: {type(e).__name__}")
         _finish([wid], today, "failed")
+    try:
+        tracker_lanes.run_fresh_batch(list(done), today)
+    except Exception as e:
+        log(f"tracker fresh pass failed: {type(e).__name__}")
+    with tdb.db() as c:
+        cut = {r[0] for r in c.execute("SELECT DISTINCT watch_id FROM lane_day WHERE day = ? AND outcome != 'ok'", (today,))}
+    for wid, outcome in done.items():
+        _finish([wid], today, "partial" if outcome == "ok" and wid in cut else outcome)
     if _purged_day != today:
         _purged_day = today
         out["purged"] = tracker_purge.run(tdb.now())

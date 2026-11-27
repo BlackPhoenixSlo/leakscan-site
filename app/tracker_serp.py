@@ -3,9 +3,19 @@ page classification, result unwrapping and the link parser, plus the query templ
 (the laptop leak tools; read-only source) google (serp_url, classify_serp, is_goto, unwrap, serp_links) and search
 (VERTICALS, TEMPLATES, FILE_HOST_TEMPLATES); serp_links rewritten from bs4 onto html.parser with bs4's html.parser
 tree rules (void and self-closed tags hold nothing, an end tag closes the nearest open tag of its name, script /
-style / template / rt / rp text and comments are no text). Not copied: the Browserbase session and backend, /goto
-resolution. Local: is_media_url is tracker_rules'. Stdlib only."""
+style / template / rt / rp text and comments are no text). Not copied: the backend's paging, counters and stats, /goto
+resolution (a /goto link is dropped). Local: is_media_url is tracker_rules'. Stdlib only.
+
+The Browserbase session (Session) is copied from the same commit's serp (LOADS_PER_SESSION, WALLS, SerpSession's
+settle), google (GoogleSession's ready selector, consent click-through, /sorry/ wait), browser (BLOCKED_TYPES,
+_block_assets, a page per load) and adapters (BrowserbaseFetcher's create and release bodies), rewritten from httpx
+onto urllib with playwright imported lazily (the service image has playwright but no browsers: remote CDP only).
+Proxies are never requested and the CAPTCHA solver is always on. The walls / retry / reservation loop is the
+caller's (tracker_lanes), so every navigation is charged first."""
+import json
 import re
+import time
+import urllib.request
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
@@ -218,3 +228,98 @@ def serp_links(html, base=GOOGLE_SEARCH):
                 tile = el
             out[url] = (_tile_title(tile) if tile is not None else "") or _title(el)
     return list(out.items())
+
+
+BB_API = "https://api.browserbase.com/v1"
+LOADS_PER_SESSION = 12  # then a fresh session (a new IP)
+WALLS = ("captcha", "consent", "unknown")
+BLOCKED_TYPES = {"image", "media", "font", "stylesheet"}
+SESSION_S = 300
+SOLVE_WAIT_S = 30
+LOAD_S = 30
+READY = "#rso a[href], [data-lpage], #search:not(:has(#rso)), #captcha-form, #recaptcha"
+READY_JS = "s => !!document.querySelector(s)"
+READY_MS, READY_POLL_MS = 2000, 250
+
+
+def _playwright():
+    """Started sync Playwright; a module-level seam so tests inject a fake."""
+    from playwright.sync_api import sync_playwright
+    return sync_playwright().start()
+
+
+def block_assets(route):
+    if route.request.resource_type in BLOCKED_TYPES:
+        route.abort()
+    else:
+        route.continue_()
+
+
+def _bb(path, key, body):
+    req = urllib.request.Request(BB_API + path, data=json.dumps(body).encode(), method="POST",
+                                 headers={"X-BB-API-Key": key, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read() or b"{}")
+
+
+class Session:
+    """One Browserbase session: create() (REST create, then CDP), load(url) -> (final_url, html) on a fresh page with
+    the asset blocker routed, release(). `loads` counts this session's navigations. The key is never logged."""
+
+    def __init__(self, key, project):
+        self.key, self.project, self.loads = key, project, 0
+        self.id = self._pw = self._browser = None
+
+    def create(self):
+        d = _bb("/sessions", self.key, {"projectId": self.project, "timeout": SESSION_S,
+                                        "browserSettings": {"solveCaptchas": True}})
+        self.id = d["id"]
+        self._pw = _playwright()
+        self._browser = self._pw.chromium.connect_over_cdp(d["connectUrl"])
+        return self
+
+    def load(self, url):
+        self.loads += 1
+        ctx = self._browser.contexts[0] if self._browser.contexts else self._browser.new_context()
+        page = ctx.new_page()
+        try:
+            page.route("**/*", block_assets)
+            page.goto(url, wait_until="domcontentloaded", timeout=LOAD_S * 1000)
+            _settle(page)
+            return page.url, page.content()
+        finally:
+            try:
+                page.close()
+            except Exception:
+                pass
+
+    def release(self):
+        for close in (getattr(self._browser, "close", None), getattr(self._pw, "stop", None)):
+            try:
+                close and close()
+            except Exception:
+                pass
+        if self.id:
+            try:
+                _bb(f"/sessions/{self.id}", self.key, {"projectId": self.project, "status": "REQUEST_RELEASE"})
+            except Exception:
+                pass  # the session ends at its timeout
+        self.id = self._pw = self._browser = None
+
+
+def _settle(page):
+    if (urlsplit(page.url).hostname or "").startswith("consent.google."):
+        try:
+            page.locator("button").filter(has_text=re.compile(r"reject all|accept all", re.I)).first.click(timeout=5000)
+            page.wait_for_load_state("domcontentloaded")
+        except Exception:
+            pass
+    waited = 0
+    while "/sorry/" in urlsplit(page.url).path and waited < SOLVE_WAIT_S:
+        page.wait_for_timeout(1000)
+        waited += 1
+    if "/sorry/" in urlsplit(page.url).path:
+        return
+    deadline = time.monotonic() + READY_MS / 1000
+    while not page.evaluate(READY_JS, READY) and time.monotonic() < deadline:
+        page.wait_for_timeout(READY_POLL_MS)

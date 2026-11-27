@@ -1,8 +1,9 @@
 """Leak lanes (Phase 2 spec "Lanes in detail"): run_daily(watch_id, day) runs a seeded watch's daily lanes in order inside
 Phase 1's daily pass (tracker_scheduler) and writes each lane's lane_state row, plus a lane_day row for the lanes Phase 2
 adds. Lanes so far: origin_probe (Phase 1's probe; only its lane_state row is new; the seed records it too), then
-mega_lookup, then listing_recheck. A paused or deleted watch runs no lane (tracker_view reads its lanes `paused`). One
-lane failing never stops the next. Each added lane runs at most once per watch per UTC day (a non-failed lane_day row).
+mega_lookup, then listing_recheck; after every watch's run_daily, run_fresh_batch(watch_ids, day) runs google_fresh.
+A paused or deleted watch runs no lane (tracker_view reads its lanes `paused`). One lane failing never stops the next.
+Each added lane runs at most once per watch per UTC day (a non-failed lane_day row).
 
 Mega lookup ($0, no reservation): the Mega index client (leakshaven) with the handle and the strong aliases (tracker_judge
 norm() length >= STRONG_MIN) and names=(), so a display-name title match can never pick the Creator; the index's
@@ -18,7 +19,20 @@ per-host throttle. Every same-site anchor that isn't media, a listing or the pag
 tracker_judge.admit_hit with source site_search. More listings than LISTING_MAX -> lane `reduced`, reason
 listing_rotated (lane_day `partial`); no listing answering at all -> `failed`.
 A Leak a lane admits on its first-ever successful run for the watch is a first-scan find (seen.first_scan); for the
-listing recheck, so is one found on a listing never rechecked before (leaks.recheck_at NULL)."""
+listing recheck, so is one found on a listing never rechecked before (leaks.recheck_at NULL).
+
+Google fresh pass (paid, run_fresh_batch after every watch's $0 lanes): runs only for tenants on TRACKER_PAID_TENANTS
+(comma list, default empty: nothing paid runs, the lane stays `never`). Browserbase creds: the host's BROWSERBASE_API_KEY
+/ BROWSERBASE_PROJECT_ID for TRACKER_UNCAPPED_TENANTS, the tenant's own (tracker_cli tenant bb) for every other; none ->
+`waiting` / no_browserbase_key, no lane_day row. Watches are grouped by creds, so a session never serves two keys, and
+each group's misses are packed LOADS_PER_SESSION to a Browserbase session (tracker_serp.Session). Each watch's query is
+tracker_plan.fresh(); serp_cache by (UTC day, vertical, text, page, since) first: a hit reuses the links and reserves
+nothing, a miss reserves FRESH_HOLD loads (partial grant), consumes one before every navigation and caches the links of
+a page that loaded. A wall (tracker_serp.WALLS) ends the session and retries once in a fresh one, if the hold has a
+load left; a second wall, a failed load, a results page without links or a spent hold -> no result: `reduced` /
+google_failed (lane_day partial, the day reads coverage_reduced). Refused -> `waiting` with the cap's reason and
+next_on; the watch is never paused. Result links go through tracker_judge.admit_hit with source google_web (a /goto link
+is dropped), which only ever marks a Leak visible in Google. No other engine is called."""
 import functools
 import html as _html
 import json
@@ -28,12 +42,15 @@ from urllib.parse import parse_qsl, urljoin, urlsplit
 
 import leak_crawler
 import leakshaven
+import tracker_budget
 import tracker_db as tdb
 import tracker_judge
 import tracker_pagekind
+import tracker_plan
 import tracker_probe
 import tracker_rules as rules
 import tracker_seed
+import tracker_serp as serp
 
 _MEGA_OK = ("ok", "nomatch", "short")
 MAP_FILE = os.path.join(tdb.HERE, "bruqi_detection_map.json")
@@ -42,23 +59,27 @@ LISTING_BODY = 2 * 1024 * 1024
 LISTING_GAP = 0.4
 _ANCHOR = re.compile(r"""<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>(.*?)</a>""", re.I | re.S)
 _TAG = re.compile(r"<[^>]+>")
-_OUTCOME = {"ok": "ok", "reduced": "partial", "failed": "failed"}
+_OUTCOME = {"ok": "ok", "reduced": "partial", "failed": "failed", "waiting": "partial"}
+FRESH = "google_fresh"
+FRESH_HOLD = 2  # the load and its one wall retry; settle releases what a query didn't use
 
 
 class LaneFailed(Exception):
     pass
 
 
-def _record(watch_id, day, lane, at, state="ok", reason=None, ledger=True):
+def _record(watch_id, day, lane, at, state="ok", reason=None, ledger=True, next_on="", success=None):
+    """next_on "" = the next UTC day; success None = state ok or reduced."""
     reason = reason or ("lane_failed" if state == "failed" else None)
+    success = state in ("ok", "reduced") if success is None else success
+    next_on = tdb.plus(day + "T00:00:00Z", days=1)[:10] if next_on == "" else next_on
     with tdb.db() as c:
         c.execute("INSERT INTO lane_state (watch_id, lane, state, reason, last_attempt_at, last_success_at, next_attempt_on) "
                   "VALUES (?,?,?,?,?,?,?) ON CONFLICT (watch_id, lane) DO UPDATE SET state = excluded.state, "
                   "reason = excluded.reason, last_attempt_at = excluded.last_attempt_at, "
                   "last_success_at = COALESCE(excluded.last_success_at, lane_state.last_success_at), "
                   "next_attempt_on = excluded.next_attempt_on, trimmed_json = excluded.trimmed_json",
-                  (watch_id, lane, state, reason, at, None if state == "failed" else at,
-                   tdb.plus(day + "T00:00:00Z", days=1)[:10]))
+                  (watch_id, lane, state, reason, at, at if success else None, next_on))
         if ledger:
             c.execute("INSERT INTO lane_day (watch_id, day, lane, outcome, reason) VALUES (?,?,?,?,?) ON CONFLICT "
                       "(watch_id, day, lane) DO UPDATE SET outcome = excluded.outcome, reason = excluded.reason",
@@ -220,3 +241,118 @@ def _recheck(w, at):
     if todo and not answered:
         raise LaneFailed("no listing answered")
     return "listing_rotated" if len(todo) > LISTING_MAX else None
+
+
+def _csv(name):
+    return {t.strip() for t in os.environ.get(name, "").split(",") if t.strip()}
+
+
+def _creds(c, tenant_id):
+    """-> (key, project) or None."""
+    if tenant_id in _csv("TRACKER_UNCAPPED_TENANTS"):
+        creds = os.environ.get("BROWSERBASE_API_KEY", ""), os.environ.get("BROWSERBASE_PROJECT_ID", "")
+    else:
+        creds = tuple(c.execute("SELECT bb_key, bb_project FROM tenants WHERE tenant_id = ?", (tenant_id,)).fetchone())
+    return creds if all(creds) else None
+
+
+def run_fresh_batch(watch_ids, day):
+    """The Google fresh pass over watch_ids (the daily pass's, in its order) for UTC day (module docstring)."""
+    paid, groups = _csv("TRACKER_PAID_TENANTS"), {}
+    if not paid:
+        return
+    with tdb.db() as c:
+        c.execute("DELETE FROM serp_cache WHERE day < ?", (day,))
+    with tdb.db() as c:
+        for wid in watch_ids:
+            w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
+            if not w or w["paused"] or w["deleted_at"] or w["tenant_id"] not in paid:
+                continue
+            creds = _creds(c, w["tenant_id"])
+            if creds is None:
+                groups.setdefault(None, []).append(w)
+            elif not _ran(wid, day, FRESH):
+                groups.setdefault(creds, []).append(w)
+    for w in groups.pop(None, []):
+        _record(w["watch_id"], day, FRESH, tdb.now(), "waiting", "no_browserbase_key", ledger=False, next_on=None)
+    for creds, ws in groups.items():
+        _Batch(creds, day).run(ws)
+
+
+class _Batch:
+    def __init__(self, creds, day):
+        self.creds, self.day, self.session = creds, day, None
+
+    def run(self, ws):
+        try:
+            for w in ws:
+                try:
+                    self._watch(w)
+                except Exception as e:
+                    tracker_probe.log(f"tracker {FRESH} failed: {type(e).__name__}")
+                    _record(w["watch_id"], self.day, FRESH, tdb.now(), "reduced", "google_failed", success=False)
+        finally:
+            self._drop()
+
+    def _drop(self):
+        if self.session:
+            self.session.release()
+        self.session = None
+
+    def _watch(self, w):
+        at, q = tdb.now(), tracker_plan.fresh(w)
+        key = (self.day, q.vertical, q.text, q.start, q.since or "")
+        with tdb.db() as c:
+            row = c.execute("SELECT results_json FROM serp_cache WHERE day = ? AND vertical = ? AND text = ? AND "
+                            "page = ? AND since = ?", key).fetchone()
+        links = json.loads(row[0]) if row else None
+        if links is None:
+            r = tracker_budget.reserve(w["tenant_id"], w["watch_id"], "load", FRESH_HOLD, partial=True)
+            if isinstance(r, tracker_budget.Refused):
+                _record(w["watch_id"], self.day, FRESH, at, "waiting", r.reason, next_on=r.next_on)
+                return
+            try:
+                links = self._search(r, q.urls()[0])
+            finally:
+                tracker_budget.settle(r)
+            if links is None:
+                _record(w["watch_id"], self.day, FRESH, at, "reduced", "google_failed", success=False)
+                return
+            with tdb.db() as c:
+                c.execute("INSERT OR REPLACE INTO serp_cache (day, vertical, text, page, since, results_json) "
+                          "VALUES (?,?,?,?,?,?)", (*key, json.dumps(links)))
+        with tdb.db() as c:
+            first = _first(c, w["watch_id"], FRESH)
+            for u, title in links:
+                if not serp.is_goto(u):
+                    tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
+        _record(w["watch_id"], self.day, FRESH, at)
+
+    def _search(self, r, url):
+        """-> the page's [[url, title]], or None (incomplete). One load consumed before every navigation."""
+        walls = 0
+        while walls < 2 and r.used < r.held:
+            if self.session is None or self.session.loads >= serp.LOADS_PER_SESSION:
+                self._drop()
+                self.session = serp.Session(*self.creds)
+                try:
+                    self.session.create()
+                except Exception:
+                    self._drop()
+                    raise
+            if not tracker_budget.consume(r):
+                return None
+            try:
+                final, html = self.session.load(url)
+            except Exception as e:
+                tracker_probe.log(f"tracker {FRESH} load failed: {type(e).__name__}")
+                self._drop()
+                return None
+            kind = serp.classify_serp(final, html or "")
+            if kind in serp.WALLS:
+                walls += 1
+                self._drop()
+                continue
+            links = serp.serp_links(html, final)
+            return [list(x) for x in links] if links or kind == "no_results" else None
+        return None

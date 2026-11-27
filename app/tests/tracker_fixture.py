@@ -1,6 +1,7 @@
 """Shared setup for the tracker tests: a temp TRACKER_DB, a settable clock, tenants / watches / Leaks written straight
-through tracker_db, and the stub fetcher. The Mega index is off (tests that run it point it at leakshaven_stub).
-All data synthetic."""
+through tracker_db, and the stub fetcher. The Mega index is off (tests that run it point it at leakshaven_stub); no
+tenant is on TRACKER_PAID_TENANTS and Browserbase points nowhere (tests that run the Google lanes stub both). All data
+synthetic."""
 import json
 import os
 import sys
@@ -17,6 +18,7 @@ import tracker_probe
 import tracker_rules
 import tracker_scheduler
 import tracker_seed
+import tracker_serp
 import tracker_stub_fetch
 
 
@@ -30,6 +32,10 @@ class Base(unittest.TestCase):
                               TRACKER_STUB_FETCH=self.fetch_file)
         env.start()
         self.addCleanup(env.stop)
+        os.environ.pop("TRACKER_PAID_TENANTS", None)
+        paid = mock.patch.multiple(tracker_serp, BB_API="http://127.0.0.1:9", _playwright=mock.Mock(side_effect=AssertionError))
+        paid.start()
+        self.addCleanup(paid.stop)
         off = mock.patch.object(leakshaven, "ENABLED", False)
         off.start()
         self.addCleanup(off.stop)
