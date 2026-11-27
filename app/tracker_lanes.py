@@ -45,7 +45,8 @@ cap's reason, lane_day partial). A slot run cut by cap_global / cap_tenant_month
 run once on the cap's next_on (next UTC day / the 1st), never carried again. Each returned link's (vertical, field) pairs
 join leaks.google_fields_json. Only a run that searched (a page completed, breaker intact) touches visibility: one that
 completed every planned pair of a Leak and returned none marks it not visible (google_seen visible false), a set
-emptied by fields leaving the identity unknown (null). The first-scan baseline holds until a run ends ok."""
+emptied by fields leaving the identity unknown (null); a tripped breaker only adds pairs. A run with a completed page
+ends the first-scan baseline, which a trimmed slot hands to its carry run."""
 import functools
 import html as _html
 import json
@@ -312,8 +313,8 @@ class _Serp:
     """Browserbase sessions on one creds for a UTC day, the day's serp_cache, and the breaker: a failed create, or
     BREAKER incomplete searches in a row, and every later miss gets no reservation and no session (broken)."""
 
-    def __init__(self, creds, day, lane):
-        self.creds, self.day, self.lane, self.session, self.fails, self.broken = creds, day, lane, None, 0, False
+    def __init__(self, creds, day):
+        self.creds, self.day, self.session, self.fails, self.broken = creds, day, None, 0, False
 
     def drop(self):
         if self.session:
@@ -331,16 +332,22 @@ class _Serp:
             c.execute("INSERT OR REPLACE INTO serp_cache (day, vertical, text, page, since, results_json) "
                       "VALUES (?,?,?,?,?,?)", (self.day, q.vertical, q.text, q.start, since, json.dumps(links)))
 
-    def search(self, r, url, vertical="web", strict=False):
+    def search(self, lane, r, url, vertical="web", strict=False):
         """-> the page's [[url, title]], or None (incomplete; counts toward the breaker, links reset it). A load is
         consumed right before each navigation, after its page is ready. A wall retries once in a fresh session while
         the hold has a load left. strict: an empty page is complete only with Google's no-results wording."""
-        links = self._search(r, url, vertical, strict)
-        self.fails = 0 if links is not None else self.fails + 1
-        self.broken = self.broken or self.fails >= BREAKER
+        links = self._search(lane, r, url, vertical, strict)
+        if links is None:
+            self.failed()
+        else:
+            self.fails = 0
         return links
 
-    def _search(self, r, url, vertical, strict):
+    def failed(self):
+        self.fails += 1
+        self.broken = self.broken or self.fails >= BREAKER
+
+    def _search(self, lane, r, url, vertical, strict):
         walls = 0
         while walls < 2 and r.used < r.held:
             if self.session is None or self.session.stale():
@@ -355,7 +362,7 @@ class _Serp:
             try:
                 page = self.session.page(vertical)
             except Exception as e:
-                tracker_probe.log(f"tracker {self.lane} page failed: {type(e).__name__}")
+                tracker_probe.log(f"tracker {lane} page failed: {type(e).__name__}")
                 self.drop()
                 return None
             if not tracker_budget.consume(r):
@@ -364,7 +371,7 @@ class _Serp:
             try:
                 final, html = self.session.load(page, url)
             except Exception as e:
-                tracker_probe.log(f"tracker {self.lane} load failed: {type(e).__name__}")
+                tracker_probe.log(f"tracker {lane} load failed: {type(e).__name__}")
                 self.drop()
                 return None
             kind = serp.classify_serp(final, html or "")
@@ -382,9 +389,6 @@ class _Serp:
 class _Batch(_Serp):
     """One creds group's fresh misses, packed into sessions."""
 
-    def __init__(self, creds, day):
-        super().__init__(creds, day, FRESH)
-
     def run(self, ws):
         try:
             for w in ws:
@@ -392,6 +396,7 @@ class _Batch(_Serp):
                     self._watch(w)
                 except Exception as e:
                     tracker_probe.log(f"tracker {FRESH} failed: {type(e).__name__}")
+                    self.failed()
                     self._failed(w, tdb.now())
         finally:
             self.drop()
@@ -413,7 +418,7 @@ class _Batch(_Serp):
                     _record(w["watch_id"], self.day, FRESH, at, "waiting", r.reason, next_on=r.next_on)
                 return
             try:
-                links = self.search(r, q.urls()[0])
+                links = self.search(FRESH, r, q.urls()[0])
             finally:
                 tracker_budget.settle(r)
             if links is None:
@@ -445,7 +450,7 @@ def run_weekly_batch(watch_ids, day, serps=None):
             tracker_probe.log(f"tracker weekly lanes failed: {type(e).__name__}")
 
 
-def run_weekly(watch_id, day, serps=None):
+def run_weekly(watch_id, day, serps):
     """The weekly lanes of one unpaused, undeleted, seeded watch that is weekly_due on UTC day -> True when due; serps
     {creds: _Serp} is shared across a tick's watches. Lanes so far: google_full; the registry crawl (ticket 30) is
     added here as its own lane."""
@@ -455,7 +460,7 @@ def run_weekly(watch_id, day, serps=None):
         return False
     if not _ran(watch_id, day, FULL):
         try:
-            _full(w, day, {} if serps is None else serps)
+            _full(w, day, serps)
         except Exception as e:
             tracker_probe.log(f"tracker {FULL} failed: {type(e).__name__}")
             _record(watch_id, day, FULL, tdb.now(), "failed", next_on=_next_slot(w, day))
@@ -498,7 +503,8 @@ def _full(w, day, serps):
     loop and breaker; strict: an empty page needs Google's no-results wording). Holds the misses + FULL_RETRIES wall
     retries (partial grant); a grant under the misses trims the plan until its misses fit the grant - FULL_RETRIES (at
     least 1). The slot run carries cap_global / cap_tenant_month cuts to the cap's next_on, once; a carry run never
-    carries again. carry_json changes only with the run's lane_state (a crash keeps a pending carry)."""
+    carries again, and keeps the slot's first-scan baseline in carry_json.first. A run with a completed page is a success
+(it ends the baseline, _first). carry_json changes only with the run's lane_state (a crash keeps a pending carry)."""
     paid, uncapped, wid = tdb.env_set("TRACKER_PAID_TENANTS"), tdb.env_set("TRACKER_UNCAPPED_TENANTS"), w["watch_id"]
     if w["tenant_id"] not in paid:
         return
@@ -512,8 +518,7 @@ def _full(w, day, serps):
     if not creds:
         _record(wid, day, FULL, at, "waiting", "no_browserbase_key", ledger=False, next_on=next_on, carry=None)
         return
-    browser = serps.get(creds) or serps.setdefault(creds, _Serp(creds, day, FULL))
-    browser.lane = FULL
+    browser = serps.setdefault(creds, _Serp(creds, day))
     full = tracker_plan.build(w, w["platform"])
     plan = full if slot or not carry else _carried(full, carry["pages"])
     cache = {}
@@ -541,7 +546,7 @@ def _full(w, day, serps):
             links = cache.get(k)
             if links is None and not browser.broken:
                 try:
-                    links = browser.search(r, q.urls()[0], q.vertical, strict=True)
+                    links = browser.search(FULL, r, q.urls()[0], q.vertical, strict=True)
                 except Exception as e:
                     tracker_probe.log(f"tracker {FULL} search failed: {type(e).__name__}")
                 if links is not None:
@@ -557,20 +562,20 @@ def _full(w, day, serps):
     for q in _pages(full.queries):
         want.setdefault(_pair(q, full.values), set()).add(_page_key(q))
     with tdb.db() as c:
-        first = c.execute("SELECT 1 FROM lane_day WHERE watch_id = ? AND lane = ? AND outcome = 'ok'",
-                          (wid, FULL)).fetchone() is None
+        first = _first(c, wid, FULL) or bool(not slot and carry.get("first"))
         returned = {}
         for q, links in results:
             for u, title in links:
                 if not serp.is_goto(u):
                     tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
                     returned.setdefault(tracker_judge.leak_key(u), set()).add(_pair(q, full.values))
-        if done and not browser.broken:
-            _visibility(c, w, full, returned, {p for p, ks in want.items() if ks <= done}, at)
+        if done:
+            _visibility(c, w, full, returned, {p for p, ks in want.items() if ks <= done}, at, not browser.broken)
     new_carry = None
     if slot and cut and short.reason in ("cap_global", "cap_tenant_month"):
         next_on = short.next_on
-        new_carry = json.dumps({"on": next_on, "reason": short.reason, "pages": [list(_page_key(q)) for q in _pages(cut)]})
+        new_carry = json.dumps({"on": next_on, "reason": short.reason, "first": first,
+                                "pages": [list(_page_key(q)) for q in _pages(cut)]})
     incomplete = any(_page_key(q) not in done for q in _pages(plan.queries))
     if short and r is None:
         state, reason = "waiting", short.reason
@@ -581,14 +586,14 @@ def _full(w, day, serps):
     else:
         state, reason = "ok", None
     _record(wid, day, FULL, at, state, reason, next_on=next_on, trimmed=dropped,
-            success=state in ("ok", "reduced") and not incomplete, carry=new_carry)
+            success=state in ("ok", "reduced") and bool(done), carry=new_carry)
 
 
-def _visibility(c, w, full, returned, complete, at):
-    """After a full-pass run that searched (some page completed, breaker intact): each Leak's google_fields_json gains
-    the pairs that returned it and loses those whose field left the identity; google_seen{visible} is written on a
-    change: true when returned, null when a non-empty set became empty, false when every pair of the set still in the
-    plan completed in this run (complete) without returning it; otherwise (a fresh-only Leak too) it stays."""
+def _visibility(c, w, full, returned, complete, at, judge):
+    """After a full-pass run where some page completed: each Leak's google_fields_json gains the pairs that returned it
+    and loses those whose field left the identity; google_seen{visible} is written on a change: true when returned;
+    only when judge (the breaker held): null when a non-empty set became empty, false when every pair of the set still
+    in the plan completed in this run (complete) without returning it; otherwise (a fresh-only Leak too) it stays."""
     fields = {_field_key(f, v) for f, v in full.values.items()}
     planned = {_pair(q, full.values) for q in full.queries}
     last = {}
@@ -599,11 +604,12 @@ def _visibility(c, w, full, returned, complete, at):
                          (w["watch_id"],)).fetchall():
         lid, old = row["leak_id"], {tuple(p) for p in json.loads(row["google_fields_json"] or "[]")}
         got = returned.get(row["url_key"], set())
-        new = {p for p in old | got if p[1] in fields}
+        new = {p for p in old | got if p[1] in fields} if judge else old | got
         if new != old:
             c.execute("UPDATE leaks SET google_fields_json = ? WHERE leak_id = ?",
                       (json.dumps(sorted(new), separators=(",", ":")), lid))
         cur, checked = last.get(lid), new & planned
-        vis = True if got else None if old and not new else False if checked and checked <= complete else cur
+        vis = True if got else cur if not judge else None if old and not new else \
+            False if checked and checked <= complete else cur
         if vis != cur:
             tdb.add_event(c, lid, "google_seen", {"visible": vis}, at)

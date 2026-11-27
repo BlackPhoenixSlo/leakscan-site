@@ -842,6 +842,15 @@ class TestFreshPass(Fresh):
         self.assertEqual([self.lane_day(r["watch_id"])[0]["outcome"] for r in ws],
                          ["partial", "partial", "ok", "partial", "partial"])
 
+    def test_breaker_counts_errors_outside_the_search(self):
+        ws = self.many(4)
+        with mock.patch.object(tracker_lanes.tracker_budget, "reserve", side_effect=RuntimeError("db")) as reserve:
+            self.day(2)
+        self.assertEqual(reserve.call_count, 3)
+        self.assertEqual(self.pw.navs, [])
+        for r in ws:
+            self.assertEqual(self.lane_day(r["watch_id"]), [{"outcome": "partial", "reason": "google_failed"}])
+
     def test_breaker_failed_create_no_more_sessions(self):
         self.many(3)
         self.bb.fail = True
@@ -1070,7 +1079,7 @@ class TestFullPass(Full):
         self.assertEqual(self.full_day(), [{"day": "2026-11-02", "outcome": "partial", "reason": "cap_global"}])
         self.assertEqual(self.scan(), "partial")
         carry = self.carry()
-        self.assertEqual((carry["on"], carry["reason"]), ("2026-11-03", "cap_global"))
+        self.assertEqual((carry["on"], carry["reason"], carry["first"]), ("2026-11-03", "cap_global", True))
         self.assertEqual(sorted(map(tuple, carry["pages"])), sorted((q.vertical, q.text, 0) for q in cut))
 
         with tdb.db() as c:
@@ -1166,7 +1175,7 @@ class TestFullPass(Full):
         self.assertEqual(self.rows("SELECT held, used FROM load_reservation ORDER BY created_at, held"),
                          [{"held": 2, "used": 1}, {"held": 16, "used": 16}])
         f = self.full()
-        self.assertEqual((f["state"], f["reason"], f["last_success_at"]), ("reduced", "google_failed", None))
+        self.assertEqual((f["state"], f["reason"], f["last_success_at"]), ("reduced", "google_failed", at(2)))
         self.assertEqual(self.full_day(), [{"day": "2026-11-02", "outcome": "partial", "reason": "google_failed"}])
         self.assertEqual(self.rows("SELECT page FROM serp_cache WHERE text = '\"mia_vale\"' AND vertical = 'web'"),
                          [{"page": 0}])
@@ -1253,6 +1262,18 @@ class TestFullPass(Full):
         self.day(9)
         b = self.get(f"/v1/creators/{self.w}/leaks")[1]
         self.assertEqual({x["url"]: x["found_on_first_scan"] for x in b["leaks"]}, {mega_hit: True, later: False})
+        self.assert_charged()
+
+    def test_walled_slot_still_ends_the_first_scan_baseline(self):
+        first, later = f"{SITE}/video/mia_vale-f1", f"{SITE}/video/mia_vale-f2"
+        self.pw.links[("web", '"mia_vale" onlyfans')] = [(first, "Mia")]
+        self.pw.script = [None, "wall", "wall"]
+        self.day(2)
+        self.assertEqual((self.full()["state"], self.full()["reason"]), ("reduced", "google_failed"))
+        self.pw.links[("web", '"mia_vale" leaked')] = [(later, "Mia")]
+        self.day(9)
+        b = self.get(f"/v1/creators/{self.w}/leaks")[1]
+        self.assertEqual({x["url"]: x["found_on_first_scan"] for x in b["leaks"]}, {first: True, later: False})
         self.assert_charged()
 
     def test_crash_mid_carry_keeps_the_carry_for_a_retick(self):
@@ -1396,6 +1417,25 @@ class TestVisibility(Full):
         self.assertEqual(self.vis(lid), [True])
         self.day(9)
         self.assertEqual(self.vis(lid), [True, False])
+        self.assert_charged()
+
+    def test_tripped_breaker_adds_pairs_but_never_nulls_or_falses(self):
+        hit = f"{SITE}/video/mia_vale-b1"
+        only_alias = self.known([["images", "alias:miavalex"]])
+        handle = self.known([["web", "handle"]], url=f"{SITE}/video/mia_vale-k2")
+        with tdb.db() as c:
+            c.execute("UPDATE watches SET aliases_json = '[\"miav\"]' WHERE watch_id = ?", (self.w,))
+        self.pw.links[("web", '"mia_vale"')] = [(hit, "Mia")]
+        self.pw.script = [None, None] + ["wall"] * 100
+        self.day(2)
+        self.assertEqual(self.rows("SELECT google_fields_json FROM leaks WHERE url = ?", hit),
+                         [{"google_fields_json": '[["web","handle"]]'}])
+        self.assertEqual((self.vis(only_alias), self.vis(handle)), ([True], [True]))
+        self.assertEqual(self.fields(only_alias), [["images", "alias:miavalex"]])
+        self.slot(3)
+        self.pw.script = []
+        self.day(3)
+        self.assertEqual((self.vis(only_alias), self.vis(handle)), ([True, None], [True, False]))
         self.assert_charged()
 
     def test_seed_google_leaks_hold_web_handle(self):

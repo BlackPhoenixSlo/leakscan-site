@@ -20,8 +20,8 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
                              (the Origin probe failed) | skipped.
   tenants.bb_key / bb_project   the tenant's own Browserbase creds (tracker_cli tenant bb); never printed or logged.
   watches.weekly_slot   0 = Monday .. 6; with plan_loads set by tracker_admission (admit on create, backfill in init).
-  watches.carry_json    the full pass's cap-cut pages {on: UTC day, reason, pages: [[vertical, text, page]]}, run once
-                        on `on` (tracker_lanes); NULL = none.
+  watches.carry_json    the full pass's cap-cut pages {on: UTC day, reason, first: the slot run's first-scan baseline,
+                        pages: [[vertical, text, page]]}, run once on `on` (tracker_lanes); NULL = none.
   load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired;
                     watch_id NULL = a purged watch's carried spend.
   lane_state        one row per (watch, lane) run so far (tracker_lanes): state ok | reduced | failed; next_attempt_on a
