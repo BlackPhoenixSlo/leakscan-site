@@ -43,6 +43,7 @@ import urllib.request
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
+import bb_client  # one-project: bb client
 import cse_scanner
 import db
 from netloc import registrable_domain
@@ -69,7 +70,7 @@ if MEDIA_GOOGLE not in ("browser", "cse", "off"):
 BB_PROXIES = _flag("BROWSERBASE_PROXIES", "1")
 # "" -> relative src ("/api/media/<slug>/<n>.jpg"); unset -> the VPS origin.
 PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "https://scan.srv1395798.hstgr.cloud").rstrip("/")
-BB_API = "https://api.browserbase.com/v1"
+BB_API = bb_client.BB_API  # one-project: bb client
 MAX_GATHERS = 2               # concurrent full gathers (Browserbase); when busy -> Google step only
 CACHE_TTL = db.RETAIN_BIG_DAYS * 86400  # one-project: retention (the 3-day promise)
 NONE_TTL = int(os.environ.get("MEDIA_NONE_TTL", "3600"))  # one-project: NONE_TTL (an empty result is retried after an hour, not a week)
@@ -124,8 +125,7 @@ log = lambda msg: (sys.stderr.write(msg + "\n"), sys.stderr.flush())   # public_
 _LOCK = threading.Lock()
 _RUNNING = set()
 _SEM = threading.BoundedSemaphore(MAX_GATHERS)
-_BB_GATE = threading.Lock()   # serializes session creates (BB_CREATE_GAP apart)
-_BB_LAST = [0.0]
+_BB_GATE, _BB_LAST = bb_client.GATE, bb_client.LAST  # one-project: bb client (shared with tracker_serp)
 
 
 # ── paths / index ────────────────────────────────────────────────────────────
@@ -570,59 +570,20 @@ def grid_from_page(page, handle, deadline):
 
 
 def _bb(method, path, key, body, timeout=15):
-    req = urllib.request.Request(BB_API + path, data=json.dumps(body).encode(), method=method,
-                                 headers={"X-BB-API-Key": key, "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read() or b"{}")
+    return bb_client.call(method, path, key, body, timeout)  # one-project: bb client
 
 
 def _bb_create(key, proj, timeout, deadline, proxies=False):  # one-project: proxy split
-    body = {"projectId": proj, "browserSettings": {"solveCaptchas": True}, "timeout": timeout}
-    if proxies:  # one-project: proxy split
-        body["proxies"] = True
-    for attempt in (0, 1):
-        try:
-            d = _bb("POST", "/sessions", key, body)
-            return {"id": d["id"], "connectUrl": d["connectUrl"]}
-        except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt == 0:   # 25 creates/min shared with other tools: retry once
-                try:
-                    wait = float(e.headers.get("Retry-After") or 10)
-                except ValueError:
-                    wait = 10.0
-                wait = min(wait, deadline - time.monotonic() - 30)
-                if wait >= 0:
-                    time.sleep(wait)
-                    continue
-            log(f"media browserbase create failed: {e.code}")
-            return None
-        except Exception as e:
-            log(f"media browserbase create failed: {type(e).__name__}")
-            return None
-    return None
+    return bb_client.create(key, proj, timeout, deadline, proxies, call=_bb, log=log, who="media browserbase")  # one-project: bb client
 
 
 def _bb_release(key, proj, sid):
-    for _ in range(2):
-        try:
-            _bb("POST", f"/sessions/{sid}", key, {"projectId": proj, "status": "REQUEST_RELEASE"})
-            return True
-        except Exception:
-            pass
-    log("media browserbase release failed")
-    return False
+    return bb_client.release(key, proj, sid, call=_bb, log=log, who="media browserbase")  # one-project: bb client
 
 
 def _bb_create_gated(key, proj, timeout, deadline, proxies=False):  # one-project: proxy split
     """Process-wide: one create at a time, >= BB_CREATE_GAP s apart (no 429 bursts)."""
-    with _BB_GATE:
-        wait = _BB_LAST[0] + BB_CREATE_GAP - time.monotonic()
-        if wait > 0:
-            time.sleep(wait)
-        try:
-            return _bb_create(key, proj, timeout, deadline, proxies=proxies)  # one-project: proxy split
-        finally:
-            _BB_LAST[0] = time.monotonic()
+    return bb_client.gated(lambda: _bb_create(key, proj, timeout, deadline, proxies=proxies), BB_CREATE_GAP)  # one-project: bb client
 
 
 def bb_keys():

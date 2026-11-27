@@ -13,13 +13,17 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   leak_events       seen{source: google_web|mega_index|site_search, first_scan: bool}; google_seen{};
                     status{from: NULL|live|gone, to: live|gone, dead_since: ts|NULL} only when origin_status changes;
                     a mega Leak's status adds source: mega_index.
-  daily_scans.outcome        NULL while running | ok | failed.
+  daily_scans.outcome        NULL while running | ok | partial (a lane_day row of that day is partial or failed) | failed
+                             (the Origin probe failed) | skipped.
+  tenants.bb_key / bb_project   the tenant's own Browserbase creds (tracker_cli tenant bb); never printed or logged.
   watches.weekly_slot   0 = Monday .. 6; with plan_loads set by tracker_admission (admit on create, backfill in init).
   load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired;
                     watch_id NULL = a purged watch's carried spend.
   lane_state        one row per (watch, lane) run so far (tracker_lanes): state ok | reduced | failed; next_attempt_on a
                     UTC day.
   lane_day          one row per (watch, UTC day, lane) run: outcome ok | partial | failed, reason (scan_partial's).
+  serp_cache        one SERP's result links per (UTC day, vertical, query text, page, since ('' = none)); rows of an
+                    earlier day are cleared by the next Google lane run.
 """
 import contextlib
 import hashlib
@@ -168,12 +172,23 @@ CREATE TABLE IF NOT EXISTS lane_day (
   reason   TEXT,
   PRIMARY KEY (watch_id, day, lane)
 );
+CREATE TABLE IF NOT EXISTS serp_cache (
+  day          TEXT NOT NULL,
+  vertical     TEXT NOT NULL,
+  text         TEXT NOT NULL,
+  page         INTEGER NOT NULL,
+  since        TEXT NOT NULL DEFAULT '',
+  results_json TEXT NOT NULL,
+  PRIMARY KEY (day, vertical, text, page, since)
+);
 """
 _COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
             ("watches", "weekly_slot", "INTEGER CHECK (weekly_slot BETWEEN 0 AND 6)"),
             ("watches", "plan_loads", "INTEGER"),
             ("watches", "carry_json", "TEXT"),
-            ("leaks", "recheck_at", "TEXT")]
+            ("leaks", "recheck_at", "TEXT"),
+            ("tenants", "bb_key", "TEXT"),
+            ("tenants", "bb_project", "TEXT")]
 
 _clock = None
 
@@ -241,6 +256,11 @@ def day(dt=None):
 
 def plus(ts, **delta):
     return fmt(parse(ts) + timedelta(**delta))
+
+
+def env_set(name):
+    """A comma-list env var (TRACKER_UNCAPPED_TENANTS, TRACKER_PAID_TENANTS) -> the set of its non-blank items."""
+    return {t.strip() for t in os.environ.get(name, "").split(",") if t.strip()}
 
 
 def new_id(prefix):

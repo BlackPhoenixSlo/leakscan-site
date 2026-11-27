@@ -2,6 +2,7 @@
 """Leak tracker owner CLI (spec "Measures"): tenants, keys, caps, purge, report, daily pass. Uses TRACKER_DB.
 
   python3 app/tracker_cli.py tenant add <label> [--max N] | tenant cap <tenant_id> <n> | tenant list
+  python3 app/tracker_cli.py tenant bb <tenant_id> --key-file PATH --project ID   (the tenant's own Browserbase creds)
   python3 app/tracker_cli.py key issue <tenant_id> | key revoke <tenant_id>
   python3 app/tracker_cli.py caps global [--daily-loads N] [--daily-judge N] (no flag: caps + today's spend) | caps tenant <tenant_id> --month-loads N
   python3 app/tracker_cli.py purge [--dry-run] | report | daily [--at ISO]
@@ -31,6 +32,17 @@ def tenant_cap(a):
     with tracker_db.db() as c:
         _tenant(c, a.tenant_id)
         c.execute("UPDATE tenants SET creators_max = ? WHERE tenant_id = ?", (a.n, a.tenant_id))
+
+
+def tenant_bb(a):
+    with open(a.key_file, encoding="utf-8") as fh:
+        key = fh.read().strip()
+    if not key or not a.project.strip():
+        sys.exit("empty key or project")
+    with tracker_db.db() as c:
+        _tenant(c, a.tenant_id)
+        c.execute("UPDATE tenants SET bb_key = ?, bb_project = ? WHERE tenant_id = ?", (key, a.project.strip(), a.tenant_id))
+    print(f"browserbase creds set for {a.tenant_id}")
 
 
 def tenant_list(a):
@@ -119,6 +131,11 @@ def main(argv=None):
     x.add_argument("n", type=int)
     x.set_defaults(fn=tenant_cap)
     t.add_parser("list").set_defaults(fn=tenant_list)
+    x = t.add_parser("bb")
+    x.add_argument("tenant_id")
+    x.add_argument("--key-file", required=True)
+    x.add_argument("--project", required=True)
+    x.set_defaults(fn=tenant_bb)
     k = sub.add_parser("key").add_subparsers(dest="sub", required=True)
     for name, fn in (("issue", key_issue), ("revoke", key_revoke)):
         x = k.add_parser(name)
