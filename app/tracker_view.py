@@ -113,20 +113,44 @@ def leaks(c, watch_ids, now_dt):
     return out
 
 
+def _changed(ls, day, to, fr=None):
+    return sum(any(e["type"] == "status" and (e["at"] or "")[:10] == day and e["data"].get("to") == to
+                   and (fr is None or e["data"].get("from") == fr) for e in x["events"])
+               for x in ls)
+
+
+def day_state(c, w, day):
+    """pending = no finished daily_scans row for day; the paid batches run after it finishes."""
+    if w["paused"]:
+        return "paused"
+    scan = c.execute("SELECT finished_at, outcome FROM daily_scans WHERE watch_id = ? AND day = ?",
+                     (w["watch_id"], day)).fetchone()
+    if not scan or scan["finished_at"] is None:
+        return "pending"
+    reasons = {r[0] for r in c.execute("SELECT reason FROM lane_day WHERE watch_id = ? AND day = ? AND outcome != 'ok'",
+                                       (w["watch_id"], day))}
+    if scan["outcome"] in ("failed", "skipped") or reasons - {"google_failed"}:
+        return "partial"
+    return "coverage_reduced" if reasons else "complete"
+
+
 def creator(c, w, now_dt):
     today = tracker_db.day(now_dt)
     ls = leaks(c, [w["watch_id"]], now_dt)
     counts = {p: 0 for p in PILLS}
     for x in ls:
         counts[x["pill"]] += 1
-    counts["new_today"] = sum(x["first_seen_at"][:10] == today and not x["found_on_first_scan"] for x in ls)
+    found = [x["found_on_first_scan"] for x in ls if x["first_seen_at"][:10] == today]
+    counts["new_today"] = found.count(False)
     counts["found_on_first_scan"] = sum(x["found_on_first_scan"] for x in ls)
     counts["came_back_30d"] = sum(x["came_back"] for x in ls)
     last = c.execute("SELECT MAX(finished_at) FROM daily_scans WHERE watch_id=? AND outcome IN ('ok', 'partial')",
                      (w["watch_id"],)).fetchone()[0]
     return {"watch_id": w["watch_id"], "account_id": w["account_id"], "paused": bool(w["paused"]),
             "paused_since": w["paused_at"] if w["paused"] else None, "seeded": w["seeded_at"] is not None,
-            "last_checked_at": last, "next_check_at": next_check_at(now_dt), "counts": counts}
+            "last_checked_at": last, "next_check_at": next_check_at(now_dt), "counts": counts,
+            "today": {"day": today, "state": day_state(c, w, today), "new": counts["new_today"], "first_scan": found.count(True),
+                      "came_back": _changed(ls, today, "live", "gone"), "gone": _changed(ls, today, "gone")}}
 
 
 def lanes(c, w):

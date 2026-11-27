@@ -81,6 +81,14 @@
     "paused": false,
     "paused_since": null,
     "seeded": true,
+    "today": {
+      "came_back": 0,
+      "day": "2026-11-27",
+      "first_scan": 0,
+      "gone": 0,
+      "new": 1,
+      "state": "partial"
+    },
     "watch_id": "w_miavale_0001"
   },
   "status": 200

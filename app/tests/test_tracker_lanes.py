@@ -242,6 +242,39 @@ class TestMegaLookup(Lanes):
         self.assertEqual(self.rows("SELECT outcome FROM daily_scans WHERE day = '2026-11-03'"), [{"outcome": "ok"}])
 
 
+class TestToday(Lanes):
+    def today(self, wid=None):
+        one = self.get(f"/v1/creators/{wid or self.w}")[1]["today"]
+        self.assertEqual([x["today"] for x in self.get("/v1/creators")[1]["creators"] if x["watch_id"] == (wid or self.w)], [one])
+        return one
+
+    def test_first_run_finds_stay_out_of_new(self):
+        self.day(2, pack(1), pack(2))
+        self.assertEqual(self.today(), {"day": "2026-11-02", "state": "complete", "new": 0, "first_scan": 2, "came_back": 0,
+                                        "gone": 0})
+        self.day(3, pack(1), pack(2), pack(3))
+        self.assertEqual(self.today(), {"day": "2026-11-03", "state": "complete", "new": 1, "first_scan": 0, "came_back": 0,
+                                        "gone": 0})
+        self.day(4, pack(1, deleted=True), pack(2), pack(3))
+        self.day(5, pack(1, deleted=True), pack(2), pack(3))
+        self.assertEqual(self.pills()[url(1)], "gone")
+        self.assertEqual(self.today(), {"day": "2026-11-05", "state": "complete", "new": 0, "first_scan": 0, "came_back": 0,
+                                        "gone": 1})
+        self.day(6, pack(1), pack(2), pack(3))
+        t = self.today()
+        self.assertEqual((t["gone"], t["came_back"]), (0, 1))
+
+    def test_zero_leaks_failed_lane_reads_partial(self):
+        self.mega.mode = "404"
+        self.day(2)
+        self.assertEqual(self.rows("SELECT * FROM leaks"), [])
+        self.assertEqual(self.rows("SELECT lane, outcome, reason FROM lane_day WHERE watch_id = ? ORDER BY lane", self.w),
+                         [{"lane": "listing_recheck", "outcome": "ok", "reason": None},
+                          {"lane": "mega_lookup", "outcome": "failed", "reason": "lane_failed"}])
+        self.assertEqual(self.today(), {"day": "2026-11-02", "state": "partial", "new": 0, "first_scan": 0, "came_back": 0,
+                                        "gone": 0})
+
+
 class TestListingRecheck(Lanes):
     def test_creator_listing_from_the_detection_map(self):
         names = ["miavale", "miavalex"]
@@ -667,6 +700,21 @@ class TestFreshPass(Fresh):
                          [{"outcome": "partial", "reason": "google_failed"}])
         self.assertEqual(self.scan(), "partial")
         self.assertEqual(self.lanes()["listing_recheck"]["state"], "ok")
+        self.assertEqual(self.get(f"/v1/creators/{self.w}")[1]["today"]["state"], "coverage_reduced")
+
+    def test_zero_leaks_under_a_cap_reads_partial(self):
+        with tdb.db() as c:
+            c.execute("UPDATE tracker_limits SET daily_loads = 0")
+        self.day(2)
+        self.assert_charged()
+        self.assertEqual(self.pw.navs, [])
+        self.assertEqual(self.rows("SELECT * FROM leaks"), [])
+        self.assertEqual(self.rows("SELECT lane, outcome, reason FROM lane_day WHERE watch_id = ? ORDER BY lane", self.w),
+                         [{"lane": "google_fresh", "outcome": "partial", "reason": "cap_global"},
+                          {"lane": "listing_recheck", "outcome": "ok", "reason": None},
+                          {"lane": "mega_lookup", "outcome": "ok", "reason": None}])
+        self.assertEqual(self.get("/v1/creators")[1]["creators"][0]["today"],
+                         {"day": "2026-11-02", "state": "partial", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
 
     def test_two_tenants_same_handle_one_request_charged_to_first(self):
         self.clock(tdb.plus(Base.T0, seconds=1))
