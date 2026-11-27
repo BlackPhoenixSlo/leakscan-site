@@ -972,7 +972,6 @@ def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_g
                 google_web_retry(st, raw, page, handle, profile, ig, leak, deadline)  # one-project: web retry
             if want_grid and not g.full and deadline - time.monotonic() > 8:
                 t1 = time.monotonic()
-                block_heavy(page)  # one-project: proxy split
                 try:
                     for data in grid_from_page(page, ig, deadline):
                         st["instagram"] += g.add(data, "instagram")
@@ -1221,17 +1220,6 @@ def google_web_retry(st, raw, page, handle, profile, ig, leak, deadline):
     except Exception as e:
         st["ok"] = False
         log(f"media google web retry failed: {type(e).__name__}")
-
-
-# Images are not aborted in the grid session: _GRID_JS/pick_grid read naturalWidth/Height, 0 for an aborted image.
-GRID_ABORT = ("media", "font")
-
-
-def block_heavy(page):
-    try:
-        page.route("**/*", lambda r: r.abort() if r.request.resource_type in GRID_ABORT else r.continue_())
-    except Exception as e:
-        log(f"media grid route failed: {type(e).__name__}")
 
 
 def browser_split(g, *, deadline, want_google, want_grid, **kw):

@@ -76,7 +76,7 @@ class FakePage:
         self.web = _read("google_web.html") if web is None else web
         self.images = _read("google_images.html") if images is None else images
         self.accepted, self.pending = False, None
-        self.clicked, self.routes = [], []
+        self.clicked = []
         self.overlay = overlay      # measured EU shape: in-page dialog over parseable results, blocks clicks
         self.context = types.SimpleNamespace(add_cookies=self._add_cookies)
 
@@ -140,9 +140,6 @@ class FakePage:
 
     def on(self, event, fn):
         pass
-
-    def route(self, pattern, handler):
-        self.routes.append((pattern, handler))
 
 
 class TimedSorry(FakePage):
@@ -307,7 +304,6 @@ class TestBrowserGather(_Env):
                  else "ig" for u in page.gotos + self.pages[1].gotos]
         self.assertEqual(kinds, ["home", "web", "web", "isch", "isch", "ig"])      # warmup, b (feeds refine), a, c
         self.assertEqual(self.pages[1].gotos, [f"https://www.instagram.com/{H}/"])
-        self.assertEqual((len(page.routes), len(self.pages[1].routes)), (0, 1))
         self.assertTrue(all("safe=active" in u for u in page.gotos if "google" in u))
         idx = mg._read_index(slug)
         srcs = [i["source"] for i in idx["images"]]
@@ -625,18 +621,6 @@ class TestProxySplit(_Env):
             mg._bb = saved
         self.assertEqual([b.get("proxies") for b in bodies], [None, True])
         self.assertTrue(all(b["browserSettings"]["solveCaptchas"] for b in bodies))
-
-    def test_grid_route_aborts_media_font_not_images(self):
-        mg.MEDIA_GOOGLE = "off"
-        mg.gather(self.new_scan(), "instagram.com", H, None, SCAN_ITEMS, budget=60)
-        pattern, handler = self.pages[0].routes[0]
-        done = []
-        for kind in ("image", "media", "font", "document", "script", "xhr"):
-            handler(types.SimpleNamespace(request=types.SimpleNamespace(resource_type=kind),
-                                          abort=lambda k=kind: done.append((k, "abort")),
-                                          continue_=lambda k=kind: done.append((k, "continue"))))
-        self.assertEqual(pattern, "**/*")
-        self.assertEqual([k for k, a in done if a == "abort"], ["media", "font"])
 
 
 class TestSocials(_Env):
