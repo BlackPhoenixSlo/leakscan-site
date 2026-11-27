@@ -1,0 +1,18 @@
+{
+  "_note": "Link-only hosts: a search hit there is kept as a finding of this kind (filehost | telegram) but never fetched, admitted, crawled or availability-checked (file hosts serve files or JS shells, Telegram serves channel posts). A `name.*` family matches any TLD (bunkr.si, bunkr.la ...). Read by registry.link_kind / Registry.host_class.",
+  "hosts": {
+    "mega.nz": "filehost",
+    "mega.co.nz": "filehost",
+    "mega.io": "filehost",
+    "gofile.io": "filehost",
+    "pixeldrain.com": "filehost",
+    "bunkr.*": "filehost",
+    "cyberdrop.*": "filehost",
+    "mediafire.com": "filehost",
+    "terabox.*": "filehost",
+    "1fichier.com": "filehost",
+    "dropbox.com": "filehost",
+    "t.me": "telegram",
+    "telegram.me": "telegram"
+  }
+}
