@@ -11,13 +11,16 @@ import os
 import re
 import sys
 import threading
+from datetime import timedelta
 from urllib.parse import unquote
 
 import tracker_db as tdb
 import tracker_probe
 import tracker_rules as rules
+import tracker_view
 
 HANDLE_MIN, STRONG_MIN = 4, 5
+LEASE_H = 2
 MEGA_SITE = "leakshaven.com"
 _LOCK = threading.Lock()
 _busy = set()
@@ -76,22 +79,47 @@ def _finish(watch_id, today, outcome):
                   (tdb.now(), outcome, watch_id, today))
 
 
-def run(watch_id):
+def claim(c, watch_id, now_dt, retry=False):
+    """Open watch_id's daily_scans row for now_dt's UTC day: the claim on its seed / daily work across threads and
+    processes -> True when the caller now holds it. retry (the daily pass) also takes over a row left open over LEASE_H
+    hours (a crash), and once a row that failed before the day's TRACKER_DAILY_AT (Seed 5)."""
+    at, today = tdb.fmt(now_dt), tdb.day(now_dt)
+    if c.execute("INSERT OR IGNORE INTO daily_scans (watch_id, day, started_at) VALUES (?,?,?)",
+                 (watch_id, today, at)).rowcount:
+        return True
+    stale, due = tdb.fmt(now_dt - timedelta(hours=LEASE_H)), tdb.fmt(tracker_view.due_at(now_dt))
+    return retry and c.execute(
+        "UPDATE daily_scans SET started_at = ?, finished_at = NULL, outcome = NULL WHERE watch_id = ? AND day = ? AND "
+        "((finished_at IS NULL AND started_at < ?) OR (outcome = 'failed' AND started_at < ?))",
+        (at, watch_id, today, stale, due)).rowcount == 1
+
+
+def run(watch_id, claimed=False):
     """Seed one unpaused, undeleted, unseeded watch -> {admitted, pending, outcome: ok | failed}, None when skipped
-    (or already running here). A failed candidate step leaves seeded_at NULL and the day's row failed (the next daily
-    pass retries)."""
+    (or already running here, or its day's row is someone else's). claimed: the caller already holds the day's row.
+    The row always finishes; a failed candidate step leaves seeded_at NULL (the daily pass retries)."""
     with claim_all([watch_id]) as mine:
-        return _run(watch_id) if mine else None
+        return _run(watch_id, claimed) if mine else None
 
 
-def _run(watch_id):
+def _run(watch_id, claimed):
+    now = tdb.now_dt()
+    at, today = tdb.fmt(now), tdb.day(now)
     with tdb.db() as c:
         w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
-    if not w or w["deleted_at"] or w["paused"] or w["seeded_at"]:
-        return None
-    at, today = tdb.now(), tdb.day()
-    with tdb.db() as c:
-        c.execute("INSERT OR IGNORE INTO daily_scans (watch_id, day, started_at) VALUES (?,?,?)", (watch_id, today, at))
+        if not w or w["deleted_at"] or w["paused"] or w["seeded_at"] or not (claimed or claim(c, watch_id, now)):
+            return None
+    outcome = "failed"
+    try:
+        out = _seed(w, at)
+        outcome = out["outcome"]
+        return out
+    finally:
+        _finish(watch_id, today, outcome)
+
+
+def _seed(w, at):
+    watch_id = w["watch_id"]
     aliases = [a for a in json.loads(w["aliases_json"] or "[]") if isinstance(a, str) and a.strip()]
     try:
         cand = _quick_candidates()(w["username"], aliases)
@@ -99,7 +127,6 @@ def _run(watch_id):
         cand = {"google": [], "mega": [], "errors": ["unavailable", type(e).__name__]}
     if "unavailable" in cand["errors"] or (cand["errors"] and not cand["google"]):
         tracker_probe.log(f"tracker seed failed errors={len(cand['errors'])}")
-        _finish(watch_id, today, "failed")
         return {"admitted": 0, "pending": 0, "outcome": "failed"}
     handle = norm(w["username"])
     names = [n for n in dict.fromkeys([handle, *map(norm, aliases)]) if len(n) >= HANDLE_MIN]
@@ -132,6 +159,5 @@ def _run(watch_id):
     except Exception as e:
         tracker_probe.log(f"tracker seed probe failed: {type(e).__name__}")
         outcome = "failed"
-    _finish(watch_id, today, outcome)
     tracker_probe.log(f"tracker seed {outcome} admitted={admitted} pending={pending}")
     return {"admitted": admitted, "pending": pending, "outcome": outcome}

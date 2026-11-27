@@ -69,10 +69,9 @@ def report(a):
 
 def daily(a):
     import tracker_scheduler
-    at = tracker_db.parse(a.at) if a.at else tracker_db.now_dt()
-    if at is None:
+    at = tracker_db.parse(a.at) if a.at else None
+    if a.at and at is None:
         sys.exit(f"bad --at {a.at}")
-    tracker_db.set_clock(lambda: at)
     out = tracker_scheduler.daily_pass(at)
     if out is not None:
         print(json.dumps(out, indent=2, sort_keys=True, default=str))

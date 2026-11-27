@@ -1,12 +1,14 @@
 """Origin probe + Probe state + the daily pass + `tracker report` (Seam 5). Probes go to tracker_stub_fetch or a
 loopback HTTP server; no real target is ever fetched. All data synthetic."""
 import threading
+import time
 import unittest
 from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from tracker_fixture import Base, tdb, tracker_probe, tracker_scheduler, tracker_stub_fetch
 import tracker_report
+import tracker_view
 
 A, B, C = "https://leaksite.example/mia_vale/1", "https://tube.example/v/mia_vale", "https://forum.example/t/miavale"
 
@@ -89,14 +91,32 @@ class TestDaily(Base):
         self.assertEqual(self.state(l1)["last_status"], self.state(l2)["last_status"])
         self.assertEqual({x["outcome"] for x in self.rows("SELECT outcome FROM daily_scans")}, {"ok"})
 
+    def test_a_later_tenant_reuses_the_days_probe(self):
+        wa = self.watch(self.tenant("A"))
+        la = self.leak(wa, A)
+        self.answers({"*": 404})
+        tracker_probe.run([wa])
+        self.clock("2026-11-02T09:00:00Z")
+        self.answers({"*": 200})
+        wb = self.watch(self.tenant("B"))
+        lb = self.leak(wb, A + "/")
+        r = tracker_probe.run([wb])
+        self.assertEqual(tracker_stub_fetch.CALLS, [A])
+        self.assertEqual((r["fetched"], r["reused"]), (0, 1))
+        self.assertEqual((self.state(lb)["last_status"], self.state(lb)["consecutive_dead"]), ("dead", 1))
+        self.assertEqual(self.state(la)["last_status"], "dead")
+
     def test_a_restart_mid_pass_fetches_no_url_key_twice(self):
         w = self.watch(self.tenant())
         for u in (A, B, C):
             self.leak(w, u)
         with tdb.db() as c:
-            c.execute("INSERT INTO daily_scans (watch_id, day, started_at) VALUES (?,?,?)", (w, "2026-11-02", tdb.now()))
+            c.execute("INSERT INTO daily_scans (watch_id, day, started_at) VALUES (?,?,?)", (w, "2026-11-02", "2026-11-02T04:00:00Z"))
         tracker_probe.apply(tracker_probe.rules.url_key(A), "live")
         tracker_probe._inflight.clear()
+        tracker_scheduler.daily_pass()
+        self.assertEqual(tracker_stub_fetch.CALLS, [])
+        self.clock("2026-11-02T06:01:00Z")
         tracker_scheduler.daily_pass()
         tracker_scheduler.daily_pass()
         self.assertEqual(sorted(tracker_stub_fetch.CALLS), sorted([B, C]))
@@ -136,7 +156,18 @@ class TestDaily(Base):
         tracker_scheduler.daily_pass("2026-11-09T06:00:00Z")
         self.assertEqual(self.rows("SELECT day FROM daily_scans")[0]["day"], "2026-11-09")
         self.assertEqual(tdb.now(), self.T0)
-        self.assertEqual(tracker_scheduler.next_check_at(tdb.parse("2026-11-09T06:00:00Z")), "2026-11-10T04:00:00Z")
+        self.assertEqual(tracker_view.next_check_at(tdb.parse("2026-11-09T06:00:00Z")), "2026-11-10T04:00:00Z")
+
+    def test_daily_at_env_and_its_fallback(self):
+        with mock.patch.dict("os.environ", TRACKER_DAILY_AT="06:00"):
+            self.assertIsNone(tracker_scheduler.daily_pass("2026-11-09T05:59:00Z"))
+            self.assertIsNotNone(tracker_scheduler.daily_pass("2026-11-09T06:00:00Z"))
+            self.assertEqual(tracker_view.next_check_at(tdb.parse("2026-11-09T05:00:00Z")), "2026-11-09T06:00:00Z")
+        for bad in ("4am", "25:00", "04:60", ""):
+            with mock.patch.dict("os.environ", TRACKER_DAILY_AT=bad):
+                self.assertIsNone(tracker_scheduler.daily_pass("2026-11-10T03:59:00Z"), bad)
+                self.assertIsNotNone(tracker_scheduler.daily_pass("2026-11-10T04:00:00Z"), bad)
+                self.assertEqual(tracker_view.next_check_at(tdb.parse("2026-11-10T03:00:00Z")), "2026-11-10T04:00:00Z")
 
 
 class TestReport(Base):
@@ -184,6 +215,19 @@ class _Upstream(BaseHTTPRequestHandler):
             self.send_header("Location", f"http://private.test:{port}/page")
             self.send_header("Content-Length", "0")
             self.end_headers()
+        elif p.startswith("/drip-"):
+            try:
+                if p == "/drip-head":
+                    self.wfile.write(b"HTTP/1.1 200 OK\r\nX-Slow: ")
+                else:
+                    self.wfile.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<title>")
+                for _ in range(40):
+                    self.wfile.flush()
+                    time.sleep(0.25)
+                    self.wfile.write(b"a")
+            except OSError:
+                pass
+            self.close_connection = True
         elif p == "/big":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -224,9 +268,11 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(tracker_probe.Fetcher(resolve=self.resolve)(self.url("/page")), (0, ""))
         self.assertEqual(self.fetcher()(self.url("/page", "private.test")), (0, ""))
         for ip in ("127.0.0.1", "10.1.2.3", "192.168.0.1", "169.254.169.254", "::1", "fe80::1", "::ffff:10.0.0.1",
-                   "0.0.0.0", "100.64.0.1"):
+                   "0.0.0.0", "100.64.0.1", "64:ff9b::a00:1", "64:ff9b::5db8:d822", "64:ff9b:1::5db8:d822",
+                   "2002:a00:1::1", "2002:5db8:d822::1", "2001:0:4136:e378:8000:63bf:3fff:fdd2"):
             self.assertFalse(tracker_probe.ip_ok(ip), ip)
-        self.assertTrue(tracker_probe.ip_ok("93.184.216.34"))
+        for ip in ("93.184.216.34", "2606:4700:4700::1111"):
+            self.assertTrue(tracker_probe.ip_ok(ip), ip)
 
     def test_private_redirect_refused(self):
         self.assertEqual(self.fetcher()(self.url("/to-private")), (0, ""))
@@ -239,6 +285,12 @@ class TestBounds(unittest.TestCase):
     def test_body_size(self):
         status, body = self.fetcher()(self.url("/big"))
         self.assertEqual((status, len(body)), (200, tracker_probe.MAX_BODY))
+
+    def test_total_deadline_holds_against_a_drip(self):
+        for path in ("/drip-head", "/drip-body"):
+            t0 = time.monotonic()
+            self.assertEqual(self.fetcher(total=1.5)(self.url(path)), (0, ""), path)
+            self.assertLess(time.monotonic() - t0, 2.0, path)
 
     def test_scheme(self):
         self.assertEqual(self.fetcher()("ftp://public.test/x"), (0, ""))

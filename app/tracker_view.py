@@ -20,9 +20,14 @@ def daily_at():
     return 4, 0
 
 
-def next_check_at(now_dt):
+def due_at(dt):
+    """dt's UTC day at TRACKER_DAILY_AT."""
     h, m = daily_at()
-    at = now_dt.replace(hour=h, minute=m, second=0, microsecond=0)
+    return dt.replace(hour=h, minute=m, second=0, microsecond=0)
+
+
+def next_check_at(now_dt):
+    at = due_at(now_dt)
     return tracker_db.fmt(at if at > now_dt else at + timedelta(days=1))
 
 
@@ -106,7 +111,7 @@ def creator(c, w, now_dt):
     counts = {p: 0 for p in PILLS}
     for x in ls:
         counts[x["pill"]] += 1
-    counts["new_today"] = sum(x["first_seen_at"][:10] == today for x in ls)
+    counts["new_today"] = sum(x["first_seen_at"][:10] == today and not x["found_on_first_scan"] for x in ls)
     counts["found_on_first_scan"] = sum(x["found_on_first_scan"] for x in ls)
     counts["came_back_30d"] = sum(x["came_back"] for x in ls)
     last = c.execute("SELECT MAX(finished_at) FROM daily_scans WHERE watch_id=? AND outcome='ok'", (w["watch_id"],)).fetchone()[0]

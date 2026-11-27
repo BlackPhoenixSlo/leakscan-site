@@ -35,6 +35,7 @@ _REDIRECTS = (301, 302, 303, 307, 308)
 _LOCK = threading.Lock()
 _inflight = set()
 _override = None
+_NOT_GLOBAL6 = tuple(ipaddress.ip_network(n) for n in ("64:ff9b::/96", "64:ff9b:1::/48", "2002::/16", "2001::/32"))
 
 
 def log(msg):
@@ -56,12 +57,15 @@ def _self_ips():
 
 
 def ip_ok(ip):
-    """A public unicast address that isn't one of the service's own (TRACKER_SELF_IPS + this host's names)."""
+    """A public unicast address that isn't one of the service's own (TRACKER_SELF_IPS + this host's names). NAT64,
+    6to4 and Teredo addresses are refused: they embed an IPv4 address the check would not see."""
     try:
         a = ipaddress.ip_address(ip.split("%", 1)[0])
     except ValueError:
         return False
     a = getattr(a, "ipv4_mapped", None) or a
+    if a.version == 6 and any(a in n for n in _NOT_GLOBAL6):
+        return False
     return a.is_global and not a.is_multicast and str(a) not in _self_ips()
 
 
@@ -69,23 +73,44 @@ def _resolve(host, port):
     return [ai[4][0] for ai in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)]
 
 
-class _HTTP(http.client.HTTPConnection):
+class _Killable:
+    """kill() (the hop's deadline timer) shuts the socket down, so a server dripping bytes can't outlast the deadline.
+    Its own reference: http.client drops conn.sock once the response owns the socket."""
+    killed, _s = False, None
+
+    def _hold(self, s):
+        self._s = s
+        if self.killed:
+            raise OSError("deadline")
+        return s
+
+    def kill(self):
+        self.killed = True
+        try:
+            if self._s:
+                self._s.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+
+class _HTTP(_Killable, http.client.HTTPConnection):
     def __init__(self, ip, host, port, timeout):
         super().__init__(host, port, timeout=timeout)
         self._ip = ip
 
     def connect(self):
-        self.sock = socket.create_connection((self._ip, self.port), self.timeout)
+        self.sock = self._hold(socket.create_connection((self._ip, self.port), self.timeout))
 
 
-class _HTTPS(http.client.HTTPSConnection):
+class _HTTPS(_Killable, http.client.HTTPSConnection):
     def __init__(self, ip, host, port, timeout):
         super().__init__(host, port, timeout=timeout, context=ssl.create_default_context())
         self._ip = ip
 
     def connect(self):
-        sock = socket.create_connection((self._ip, self.port), self.timeout)
-        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+        sock = self._hold(socket.create_connection((self._ip, self.port), self.timeout))
+        self.sock = self._hold(self._context.wrap_socket(sock, server_hostname=self.host, do_handshake_on_connect=False))
+        self.sock.do_handshake()
 
 
 class Fetcher:
@@ -112,6 +137,9 @@ class Fetcher:
                 if left <= 0:
                     return 0, ""
                 conn = (_HTTPS if p.scheme == "https" else _HTTP)(ips[0], p.hostname, port, left)
+                timer = threading.Timer(left, conn.kill)
+                timer.daemon = True
+                timer.start()
                 try:
                     conn.request("GET", (p.path or "/") + (f"?{p.query}" if p.query else ""), headers={
                         "User-Agent": UA, "Accept": "text/html,*/*;q=0.8", "Accept-Encoding": "identity"})
@@ -127,8 +155,11 @@ class Fetcher:
                         if not chunk:
                             break
                         body += chunk
+                    if conn.killed:
+                        return 0, ""
                     return r.status, body.decode(r.headers.get_content_charset() or "utf-8", "replace")
                 finally:
+                    timer.cancel()
                     conn.close()
             return 0, ""
         except Exception:

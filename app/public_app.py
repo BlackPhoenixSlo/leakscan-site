@@ -2397,7 +2397,6 @@ def _sweep_webscan_scratch():
 
 def main():
     db.init_db()
-    tracker_db.init()  # one-project: tracker v1
     try:
         n = _sweep_webscan_scratch()
         if n:
@@ -2415,6 +2414,7 @@ def main():
     except Exception as e:
         _event(f"prune skipped: {type(e).__name__}")
     try:  # one-project: tracker scheduler
+        tracker_db.init()  # one-project: tracker scheduler
         __import__("tracker_scheduler").start()  # one-project: tracker scheduler
     except Exception as e:  # one-project: tracker scheduler
         _event(f"tracker scheduler skipped: {type(e).__name__}")  # one-project: tracker scheduler

@@ -293,6 +293,18 @@ class TestWatches(Base):
         self.assertEqual(self.put("w_mia_00001", aliases=[f"alias{i}" for i in range(5)], display_name="a" * 64, instagram="a" * 30,
                                   x="a" * 15)[0], 200)
 
+    def test_transfer_encoding_refused(self):
+        c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=10)
+        c.putrequest("PUT", "/v1/watches/w_mia_00001")
+        for k, v in (("Authorization", f"Bearer {self.a}"), ("Content-Type", "application/json"), ("Transfer-Encoding", "chunked")):
+            c.putheader(k, v)
+        c.endheaders()
+        c.send(b"5\r\nhello\r\n0\r\n\r\n")
+        r = c.getresponse()
+        self.assertEqual((r.status, json.loads(r.read()), r.getheader("Connection")), (411, {"error": "length_required"}, "close"))
+        c.close()
+        self.assertIsNone(self.watch("w_mia_00001"))
+
     def test_invalid_json_and_cap(self):
         for raw in (b"{nope", b"[1,2]", b"", b"\xff\xfe", b"null"):
             st, _, b = self.req("PUT", "/v1/watches/w_mia_00001", key=self.a, raw=raw)
@@ -416,10 +428,11 @@ class TestPill(Base):
             c.execute("INSERT INTO daily_scans (watch_id, day, started_at, finished_at, outcome) VALUES ('w_mia_00001', '2026-11-27', ?, ?, 'failed')",
                       (d(0), d(0)))
         self.leak("w_mia_00001", "lk_today", "https://example-leaks.test/today", seen=ts(NOW.replace(hour=4)), first_scan=False)
+        self.leak("w_mia_00001", "lk_today_seed", "https://example-leaks.test/today-seed", seen=ts(NOW.replace(hour=9)))
         with mock.patch.dict(os.environ, TRACKER_DAILY_AT="13:30"):
             row = self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]
-        self.assertEqual(row["counts"], {"live": 3, "cached": 1, "gone": 3, "listed": 2, "not_checked": 2, "new_today": 1,
-                                         "found_on_first_scan": 7, "came_back_30d": 1})
+        self.assertEqual(row["counts"], {"live": 3, "cached": 1, "gone": 3, "listed": 2, "not_checked": 3, "new_today": 1,
+                                         "found_on_first_scan": 8, "came_back_30d": 1})
         self.assertEqual((row["last_checked_at"], row["next_check_at"], row["seeded"]), (d(1), "2026-11-27T13:30:00Z", False))
         self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["next_check_at"], "2026-11-28T04:00:00Z")
         self.clock = NOW.replace(hour=3, minute=59)

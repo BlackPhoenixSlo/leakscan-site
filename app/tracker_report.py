@@ -4,9 +4,7 @@ tracker_probe), both numbers printed; no observations prints zeros and no rate."
 import json
 
 import tracker_db as tdb
-from tracker_view import pill
-
-PILLS = ("live", "cached", "gone", "listed", "not_checked")
+from tracker_view import PILLS, pill
 
 
 def counts(tenant_id):

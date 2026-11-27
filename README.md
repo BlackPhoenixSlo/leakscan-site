@@ -390,13 +390,17 @@ Done 2026-11-08 (Cloudflare, DNS only; canonicals, sitemap, privacy on abolita.c
 - Own SQLite file `TRACKER_DB` (compose: `/data/tracker.db`; default `app/tracker.db`), never `public.db`. `tracker_seed` runs
   `public_app.quick_candidates` (the Quick scan's Google step + Mega lookup, no row / slug / profile / media / alias discovery), then the
   watch's first probe pass; `tracker_scheduler` (started from `main()`, `TRACKER_SCHEDULER=0` = off) runs the daily pass from
-  `TRACKER_DAILY_AT` (04:00 UTC) and the purge once a day. Probe rules copied from leakhunt 7ccbdd3 into `app/tracker_rules.py` + `app/tracker_data/`.
+  `TRACKER_DAILY_AT` (04:00 UTC) and the purge once a day. A watch's `daily_scans` row for the UTC day is its claim (across threads and
+  processes), so a `tracker_cli daily` next to the server never seeds or probes one watch twice; url_key fetch dedupe across
+  processes is only via finished probes, so two processes probing different watches that share a url_key at the same moment can each
+  fetch it once (accepted: one extra GET). Probe rules copied from leakhunt 7ccbdd3 into `app/tracker_rules.py` + `app/tracker_data/`.
 - Local tracer, nothing leaves the box: `python3 app/tests/tracker_stub_server.py --port N [--db PATH]` prints the base URL, then
   `TRACKER_DB=` and `TRACKER_STUB_FETCH=` paths (CSE, the Mega aggregator and Origin probes are stubs; seed inline; scheduler off).
   `POST /__tracker/daily?at=<ISO>` runs one daily pass at that moment; `POST /__tracker/fetch` `{url | "*": status | [status, body]}`
   sets the stub probe answers. Another process sharing it: `TRACKER_DB=<path> TRACKER_FETCHER=stub TRACKER_STUB_FETCH=<path>`.
 - `TRACKER_FETCHER=stub` loads `app/tests/tracker_stub_fetch.py`; unset, probes are real bounded GETs (http/https, 15 s, 5 redirects,
-  256 KB, 8 per host, no loopback / private / link-local / own addresses, `TRACKER_SELF_IPS` adds more).
+  256 KB, 8 per host, no loopback / private / link-local / NAT64 / 6to4 / Teredo / own addresses; compose sets `TRACKER_SELF_IPS` to the
+  VPS IPv4, the scheduler logs a warning at start when it holds no public address).
 - Tests: `app/tests/test_tracker_api.py`, `test_tracker_seed.py`, `test_tracker_probe.py`, `test_tracker_purge.py`.
 
 ## Replace before launch

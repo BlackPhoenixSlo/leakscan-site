@@ -1,6 +1,8 @@
 """Seed + the Quick scan's private candidate step (ticket 03) (Seam 5). Google CSE -> upstream_stub, the Mega
 aggregator -> leakshaven_stub, probes -> tracker_stub_fetch; no real network. All data synthetic."""
+import contextlib
 import os
+import threading
 import unittest
 from unittest import mock
 
@@ -146,15 +148,90 @@ class TestSeed(Stubs):
         self.assertIsNone(self.rows("SELECT seeded_at FROM watches")[0]["seeded_at"])
         self.assertEqual(self.rows("SELECT * FROM leaks"), [])
         self.assertEqual(self.rows("SELECT outcome FROM daily_scans")[0]["outcome"], "failed")
-        self.cse.cse_fault = None
+        calls = len(self.cse.calls)
         self.clock("2026-11-02T04:30:00Z")
+        self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 1)
+        self.assertGreater(len(self.cse.calls), calls)
+        self.assertEqual(self.rows("SELECT outcome FROM daily_scans")[0]["outcome"], "failed")
+        calls = len(self.cse.calls)
+        self.clock("2026-11-02T04:31:00Z")
         self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 0)
+        self.assertEqual(len(self.cse.calls), calls)
+        self.cse.cse_fault = None
         self.clock("2026-11-03T04:01:00Z")
         self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 1)
         self.assertEqual(self.rows("SELECT seeded_at FROM watches")[0]["seeded_at"], "2026-11-03T04:01:00Z")
         self.assertTrue(self.leaks(w))
         self.assertEqual([(r["day"], r["outcome"]) for r in self.rows("SELECT * FROM daily_scans ORDER BY day")],
                          [("2026-11-02", "failed"), ("2026-11-03", "ok")])
+
+    def test_seed_failed_after_daily_at_waits_for_the_next_day(self):
+        self.cse.cse_fault = "429"
+        self.clock("2026-11-02T10:00:00Z")
+        w = self.watch(self.tenant(), username=H, seeded=False)
+        self.assertEqual(tracker_seed.run(w)["outcome"], "failed")
+        calls = len(self.cse.calls)
+        self.cse.cse_fault = None
+        self.clock("2026-11-02T10:01:00Z")
+        self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 0)
+        self.assertEqual(len(self.cse.calls), calls)
+        self.clock("2026-11-03T04:00:00Z")
+        self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 1)
+        self.assertTrue(self.leaks(w))
+
+    def test_seed_raising_after_the_candidate_step_finishes_failed_and_the_pass_goes_on(self):
+        calls = []
+        t = self.tenant()
+        x = self.watch(t, username=H, seeded=False)
+        y, z = self.watch(t), self.watch(self.tenant("B"))
+        self.leak(y, "https://leaksite.example/mia_vale/1")
+        self.leak(z, "https://tube.example/v/mia_vale")
+        real = tracker_seed.tracker_probe.run
+
+        def probe(ids):
+            if ids == [z]:
+                raise RuntimeError("boom")
+            return real(ids)
+
+        with mock.patch.object(tracker_seed, "_quick_candidates",
+                               return_value=lambda h, a: calls.append(h) or {"errors": [], "google": GOOGLE, "mega": []}), \
+                mock.patch.object(tracker_seed.rules, "host_class", side_effect=RuntimeError("boom")), \
+                mock.patch.object(tracker_scheduler.tracker_probe, "run", side_effect=probe):
+            r = tracker_scheduler.daily_pass()
+            self.clock("2026-11-02T05:01:00Z")
+            tracker_scheduler.daily_pass()
+        self.assertEqual(len(calls), 1)
+        self.assertIsNotNone(r["purged"])
+        self.assertEqual(tracker_stub_fetch.CALLS, ["https://leaksite.example/mia_vale/1"])
+        self.assertEqual({d["watch_id"]: d["outcome"] for d in self.rows("SELECT * FROM daily_scans")},
+                         {x: "failed", y: "ok", z: "failed"})
+
+    def test_concurrent_passes_seed_a_watch_once(self):
+        entered, release, calls = threading.Event(), threading.Event(), []
+
+        def cand(h, a):
+            calls.append(h)
+            entered.set()
+            release.wait(5)
+            return {"errors": [], "google": GOOGLE, "mega": []}
+
+        @contextlib.contextmanager
+        def no_lock(ids):
+            yield list(ids)
+
+        w = self.watch(self.tenant(), username=H, seeded=False)
+        with mock.patch.object(tracker_seed, "_quick_candidates", return_value=cand), \
+                mock.patch.object(tracker_seed, "claim_all", no_lock):
+            first = threading.Thread(target=tracker_scheduler.daily_pass)
+            first.start()
+            self.assertTrue(entered.wait(5))
+            second = tracker_scheduler.daily_pass()
+            release.set()
+            first.join(10)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(second["seeded"], 0)
+        self.assertTrue(self.leaks(w))
+        self.assertEqual(self.rows("SELECT outcome FROM daily_scans")[0]["outcome"], "ok")
 
     def test_unavailable_google_fails_the_seed(self):
         w = self.watch(self.tenant(), username=H, seeded=False)

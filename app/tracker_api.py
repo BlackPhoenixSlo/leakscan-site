@@ -53,6 +53,8 @@ def _send(h, code, obj):
     h.send_header("Content-Length", str(len(body)))
     h.send_header("Cache-Control", "no-store")
     h.send_header("X-Content-Type-Options", "nosniff")
+    if h.close_connection:
+        h.send_header("Connection", "close")
     h.end_headers()
     try:
         h.wfile.write(body)
@@ -233,7 +235,6 @@ def creator_leaks(t, q, raw, watch_id):
     now = tracker_db.now_dt()
     with tracker_db.db() as c:
         _own(c, t, watch_id)
-        _limit(q), _cursor(q)
         return 200, _page(tracker_view.leaks(c, [watch_id], now), q, events=True)
 
 
@@ -241,7 +242,6 @@ def all_leaks(t, q, raw):
     ids = q.get("watch_id") or []
     if not 1 <= len(ids) <= IDS_MAX:
         _invalid("watch_id")
-    _limit(q), _cursor(q)
     ids, now = sorted({i for i in ids if WATCH_ID.match(i)}), tracker_db.now_dt()
     with tracker_db.db() as c:
         live = [r[0] for r in c.execute(f"SELECT watch_id FROM watches WHERE tenant_id = ? AND deleted_at IS NULL "
@@ -260,6 +260,9 @@ ROUTES = (
 
 
 def _dispatch(h, method, u):
+    if h.headers.get("Transfer-Encoding") is not None:
+        h.close_connection = True
+        raise _Err(411, {"error": "length_required"})
     try:
         n = int(h.headers.get("Content-Length") or 0)
     except ValueError:
@@ -267,7 +270,12 @@ def _dispatch(h, method, u):
     if n < 0 or n > BODY_CAP:
         h.close_connection = True
         raise _Err(413, {"error": "payload_too_large"})
-    raw = h.rfile.read(n) if n else b""
+    prev = h.connection.gettimeout()
+    h.connection.settimeout(30)
+    try:
+        raw = h.rfile.read(n) if n else b""
+    finally:
+        h.connection.settimeout(prev)
     t = _auth(h)
     for rx, methods in ROUTES:
         m = rx.match(u.path)
