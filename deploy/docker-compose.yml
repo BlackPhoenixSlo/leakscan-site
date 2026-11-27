@@ -22,6 +22,7 @@ services:
       TRUST_XFF: "1"
       PUBLIC_DB: "/data/public.db"
       TRACKER_DB: "/data/tracker.db"
+      TRACKER_OFFER_VIDEO_DIR: "/data/offer-video"
       TRACKER_SELF_IPS: "${TRACKER_SELF_IPS:-72.62.92.114}"
       SITE_DIR: "/site"
     ports:

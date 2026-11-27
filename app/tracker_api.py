@@ -12,9 +12,11 @@ import tracker_admission
 import tracker_db
 import tracker_judge
 import tracker_seed
+import tracker_video
 import tracker_view
 
 BODY_CAP = 64 * 1024
+CHUNK = 64 * 1024
 LIMIT_DEFAULT, LIMIT_MAX, IDS_MAX = 50, 200, 500
 PURGE_DAYS = 30
 PLATFORMS = ("onlyfans", "fansly")
@@ -32,6 +34,11 @@ class _Err(Exception):
     def __init__(self, code, body):
         super().__init__(code)
         self.code, self.body = code, body
+
+
+class _Take:
+    def __init__(self, f, ctype, ranged):
+        self.f, self.ctype, self.ranged = f, ctype, ranged
 
 
 def _invalid(field):
@@ -56,23 +63,65 @@ def is_v1(path):
     return path == "/v1" or path.startswith("/v1/")
 
 
-def _send(h, code, obj):
+def _no_store(h):
+    h.send_header("Cache-Control", "no-store")
+    h.send_header("X-Content-Type-Options", "nosniff")
+
+
+def _send(h, code, obj, headers=()):
     body = b"" if obj is None else json.dumps(obj, ensure_ascii=False).encode("utf-8")
     h.send_response(code)
     if obj is not None:
         h.send_header("Content-Type", "application/json; charset=utf-8")
     if code == 401:
         h.send_header("WWW-Authenticate", "Bearer")
+    for k, v in headers:
+        h.send_header(k, v)
     h.send_header("Content-Length", str(len(body)))
-    h.send_header("Cache-Control", "no-store")
-    h.send_header("X-Content-Type-Options", "nosniff")
+    _no_store(h)
     if h.close_connection:
         h.send_header("Connection", "close")
     h.end_headers()
+    if h.command == "HEAD":
+        return
     try:
         h.wfile.write(body)
     except (BrokenPipeError, ConnectionResetError):
         pass
+
+
+def _stream(h, take):
+    with take.f as f:
+        size = os.fstat(f.fileno()).st_size
+        try:
+            rng = tracker_video.byte_range(h.headers.get("Range"), size) if take.ranged else None
+        except ValueError:
+            return _send(h, 416, {"error": "range_not_satisfiable"}, [("Content-Range", f"bytes */{size}")])
+        start, end = rng or (0, size - 1)
+        h.send_response(206 if rng else 200)
+        h.send_header("Content-Type", take.ctype)
+        h.send_header("Content-Length", str(end - start + 1))
+        if take.ranged:
+            h.send_header("Accept-Ranges", "bytes")
+        if rng:
+            h.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        _no_store(h)
+        h.end_headers()
+        f.seek(start)
+        left = end - start + 1
+        try:
+            while left > 0:
+                chunk = f.read(min(CHUNK, left))
+                if not chunk:
+                    break
+                h.wfile.write(chunk)
+                left -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except OSError as e:
+            _log(f"offer-video stream failed: {type(e).__name__}")
+        if left:
+            h.close_connection = True
 
 
 def _auth(h):
@@ -180,7 +229,8 @@ def me(t, q, raw):
         accepting = tracker_admission.accepting_new(c)
     return 200, {"tenant_id": t["tenant_id"], "label": t["label"], "brand": os.environ.get("TRACKER_BRAND") or None,
                  "contact_url": os.environ.get("TRACKER_CONTACT_URL") or None, "creators_max": t["creators_max"],
-                 "creators_used": used, "accepting_new": accepting, "notices_updated_at": None}
+                 "creators_used": used, "accepting_new": accepting, "notices_updated_at": None,
+                 "video": tracker_video.meta()}
 
 
 def put_watch(t, q, raw, watch_id):
@@ -245,14 +295,17 @@ def creators(t, q, raw):
     with tracker_db.db() as c:
         ws = c.execute("SELECT * FROM watches WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY created_at, watch_id",
                        (t["tenant_id"],)).fetchall()
-        return 200, {"as_of": tracker_db.fmt(now), "creators": [tracker_view.creator(c, w, now) for w in ws]}
+        return 200, {"as_of": tracker_db.fmt(now),
+                     "creators": [tracker_view.creator(c, w, now, tracker_view.leaks(c, [w["watch_id"]], now)) for w in ws]}
 
 
 def creator_one(t, q, raw, watch_id):
     now = tracker_db.now_dt()
     with tracker_db.db() as c:
         w = _own(c, t, watch_id)
-        return 200, {**tracker_view.creator(c, w, now), "lanes": tracker_view.lanes(c, w)}
+        ls = tracker_view.leaks(c, [watch_id], now)
+        return 200, {**tracker_view.creator(c, w, now, ls), "lanes": tracker_view.lanes(c, w), "taken_down": None,
+                     "preview_leak": tracker_view.preview_leak(ls)}
 
 
 def creator_leaks(t, q, raw, watch_id):
@@ -273,6 +326,17 @@ def all_leaks(t, q, raw):
         return 200, _page(tracker_view.leaks(c, live, now), q, events=False)
 
 
+def offer_video(t, q, raw, part):
+    name, ctype, ranged = tracker_video.PARTS.get(part, (None, None, False))
+    p = tracker_video.path(name) if name else None
+    if not p:
+        raise _Err(404, NOT_FOUND)
+    try:
+        return _Take(open(p, "rb"), ctype, ranged)
+    except OSError:
+        raise _Err(404, NOT_FOUND) from None
+
+
 ROUTES = (
     (re.compile(r"^/v1/me$"), {"GET": me}),
     (re.compile(r"^/v1/watches/([^/]+)$"), {"PUT": put_watch, "DELETE": delete_watch}),
@@ -280,6 +344,7 @@ ROUTES = (
     (re.compile(r"^/v1/creators/([^/]+)$"), {"GET": creator_one}),
     (re.compile(r"^/v1/creators/([^/]+)/leaks$"), {"GET": creator_leaks}),
     (re.compile(r"^/v1/leaks$"), {"GET": all_leaks}),
+    (re.compile(r"^/v1/offer-video/([^/]+)$"), {"GET": offer_video}),
 )
 
 
@@ -311,15 +376,19 @@ def _dispatch(h, method, u):
 
 
 def handle(h, method):
-    """Entry from public_app.Handler for GET/POST/PUT/DELETE; non-/v1 paths keep the stock 501 for PUT/DELETE."""
+    """Entry from public_app.Handler for GET/HEAD/POST/PUT/DELETE; non-/v1 paths keep the stock 501 for PUT/DELETE.
+    No route takes HEAD, so it answers 401/404/405 without a body."""
     u = urllib.parse.urlsplit(h.path)
     if not is_v1(u.path):
         return h.send_error(501, f"Unsupported method ({method!r})")
     try:
-        code, obj = _dispatch(h, method, u)
+        res = _dispatch(h, method, u)
     except _Err as e:
-        code, obj = e.code, e.body
+        res = e.code, e.body
     except Exception as e:
         _log(f"{method} failed: {type(e).__name__}")
-        code, obj = 500, {"error": "internal"}
+        res = 500, {"error": "internal"}
+    if isinstance(res, _Take):
+        return _stream(h, res)
+    code, obj = res
     _send(h, code, obj)

@@ -1,9 +1,12 @@
-"""Removal service seam (Phase 3 `test_tracker_notices`), `none` branch: offer counts, first_daily_at, Service status."""
+"""Removal service seam (Phase 3 `test_tracker_notices`), `none` branch: offer counts, first_daily_at, Service status,
+taken_down and preview_leak."""
 import unittest
 from datetime import timedelta
 
 from test_tracker_api import NOW, Base, ts
 import tracker_db
+
+ONE_ONLY = ("lanes", "taken_down", "preview_leak")
 
 
 class TestRemoval(Base):
@@ -15,7 +18,7 @@ class TestRemoval(Base):
     def reads(self, wid="w_mia_00001", key=None):
         one = self.req("GET", f"/v1/creators/{wid}", key=key or self.a)[2]
         row = next(x for x in self.req("GET", "/v1/creators", key=key or self.a)[2]["creators"] if x["watch_id"] == wid)
-        self.assertEqual({k: v for k, v in one.items() if k != "lanes"}, row)
+        self.assertEqual({k: v for k, v in one.items() if k not in ONE_ONLY}, row)
         return row
 
     def test_offer_counts_windows(self):
@@ -92,6 +95,38 @@ class TestRemoval(Base):
         self.assertEqual((b["offer_counts"], b["first_daily_at"]),
                          ({"visible": 0, "came_back_30d": 0, "cached": 0, "live_30d": 0, "new_7d": 0}, None))
         self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.b)[:3:2], (404, {"error": "not_found"}))
+
+    def one(self, wid="w_mia_00001"):
+        return self.req("GET", f"/v1/creators/{wid}", key=self.a)[2]
+
+    def test_taken_down_null_for_none(self):
+        self.put("w_mia_00001")
+        self.leak("w_mia_00001", "lk_gone", "https://example-leaks.test/gone", probe={"origin": "gone", "at": ts(NOW)},
+                  statuses=[(ts(NOW - timedelta(days=1)), "live", "gone", None)])
+        r = self.one()
+        self.assertEqual((r["service_status"], r["taken_down"]), ("none", None))
+        self.assertNotIn("taken_down", self.req("GET", "/v1/creators", key=self.a)[2]["creators"][0])
+
+    def test_preview_leak_fallback(self):
+        self.put("w_mia_00001")
+        self.assertIsNone(self.one()["preview_leak"])
+        self.leak("w_mia_00001", "lk_mega", "https://mega.example-index.test/f/1", kind="mega", site="example-index.test",
+                  source="mega_index", seen=ts(NOW))
+        self.leak("w_mia_00001", "lk_gone", "https://example-leaks.test/gone", seen=ts(NOW), probe={"origin": "gone", "at": ts(NOW)})
+        self.leak("w_mia_00001", "lk_cached", "https://example-leaks.test/cached", seen=ts(NOW), google=True,
+                  probe={"origin": "gone", "at": ts(NOW)})
+        self.leak("w_mia_00001", "lk_unchecked", "https://example-leaks.test/unchecked", seen=ts(NOW))
+        self.assertIsNone(self.one()["preview_leak"])
+        live = {"origin": "live", "at": ts(NOW)}
+        self.leak("w_mia_00001", "lk_b_old", "https://example-leaks.test/b", seen=ts(NOW - timedelta(days=20)), probe=live, title="b")
+        self.leak("w_mia_00001", "lk_a_new", "https://example-leaks.test/a", seen=ts(NOW - timedelta(days=2)), probe=live, title="a")
+        self.assertEqual(self.one()["preview_leak"], {"leak_id": "lk_a_new", "leak_site": "example-leaks.test", "kind": "page",
+                                                      "title": "a", "pill": "live", "first_seen_at": ts(NOW - timedelta(days=2)),
+                                                      "preview": None})
+        with tracker_db.db() as c:
+            tracker_db.add_event(c, "lk_b_old", "seen", {"source": "site_search"}, at=ts(NOW - timedelta(hours=1)))
+        p = self.one()["preview_leak"]
+        self.assertEqual((p["leak_id"], p["first_seen_at"], p["preview"]), ("lk_b_old", ts(NOW - timedelta(days=20)), None))
 
 
 if __name__ == "__main__":

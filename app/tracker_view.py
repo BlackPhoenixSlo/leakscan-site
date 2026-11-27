@@ -142,9 +142,8 @@ def offer_counts(ls, counts, now_dt):
             "new_7d": sum(not x["found_on_first_scan"] and x["first_seen_at"][:10] >= week for x in ls)}
 
 
-def creator(c, w, now_dt):
+def creator(c, w, now_dt, ls):
     today = tracker_db.day(now_dt)
-    ls = leaks(c, [w["watch_id"]], now_dt)
     counts = {p: 0 for p in PILLS}
     for x in ls:
         counts[x["pill"]] += 1
@@ -161,6 +160,16 @@ def creator(c, w, now_dt):
                       "came_back": _changed(ls, today, "live", "gone"), "gone": _changed(ls, today, "gone")},
             "service_status": "none", "service_status_since": None, "removal": None, "offer_counts": offer_counts(ls, counts, now_dt),
             "first_daily_at": first}
+
+
+def preview_leak(ls):
+    """The most recently seen Live page Leak, else None."""
+    live = sorted((x for x in ls if x["kind"] == "page" and x["pill"] == "live"), key=lambda x: x["leak_id"])
+    if not live:
+        return None
+    x = max(live, key=lambda x: max((e["at"] for e in x["events"] if e["type"] == "seen"), default=x["first_seen_at"]))
+    return {"leak_id": x["leak_id"], "leak_site": x["leak_site"], "kind": x["kind"], "title": x["title"], "pill": x["pill"],
+            "first_seen_at": x["first_seen_at"], "preview": None}
 
 
 def lanes(c, w):
