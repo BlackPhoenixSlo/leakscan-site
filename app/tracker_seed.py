@@ -56,12 +56,12 @@ def start(watch_id):
     threading.Thread(target=run, args=(watch_id,), daemon=True, name="tracker seed").start()
 
 
-def _admit(c, watch_id, url, key, site, kind, title, source, at):
+def _admit(c, watch_id, url, key, site, kind, title, source, at, first_scan=True):
     leak_id = tdb.new_id("lk_")
     if not c.execute("INSERT OR IGNORE INTO leaks (leak_id, watch_id, url_key, url, leak_site, kind, title, created_at) "
                      "VALUES (?,?,?,?,?,?,?,?)", (leak_id, watch_id, key, url, site, kind, title, at)).rowcount:
         return 0
-    tdb.add_event(c, leak_id, "seen", {"source": source, "first_scan": True}, at)
+    tdb.add_event(c, leak_id, "seen", {"source": source, "first_scan": first_scan}, at)
     if source == "google_web":
         tdb.add_event(c, leak_id, "google_seen", None, at)
     return 1

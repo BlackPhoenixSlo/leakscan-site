@@ -7,6 +7,8 @@ import tracker_db
 
 PILLS = ("live", "cached", "gone", "listed", "not_checked")
 CAME_BACK_DAYS = 30
+LANES = (("origin_probe", "daily"), ("mega_lookup", "daily"), ("listing_recheck", "daily"), ("google_fresh", "daily"),
+         ("google_full", "weekly"), ("registry_crawl", "weekly"))
 
 
 def daily_at():
@@ -118,3 +120,19 @@ def creator(c, w, now_dt):
     return {"watch_id": w["watch_id"], "account_id": w["account_id"], "paused": bool(w["paused"]),
             "paused_since": w["paused_at"] if w["paused"] else None, "seeded": w["seeded_at"] is not None,
             "last_checked_at": last, "next_check_at": next_check_at(now_dt), "counts": counts}
+
+
+def lanes(c, w):
+    """The drill-in's `lanes`, in LANES order: a lane with no lane_state row reads `never`; every lane of a paused watch
+    reads `paused`, keeping its last success and attempt."""
+    rows = {r["lane"]: r for r in c.execute("SELECT * FROM lane_state WHERE watch_id = ?", (w["watch_id"],))}
+    out = []
+    for lane, cadence in LANES:
+        r = rows.get(lane)
+        x = {"lane": lane, "cadence": cadence, "state": r["state"] if r else "never", "reason": r["reason"] if r else None,
+             "last_success_at": r["last_success_at"] if r else None, "last_attempt_at": r["last_attempt_at"] if r else None,
+             "next_attempt_on": r["next_attempt_on"] if r else None, "trimmed": json.loads(r["trimmed_json"]) if r else []}
+        if w["paused"]:
+            x.update(state="paused", reason=None, next_attempt_on=None)
+        out.append(x)
+    return out

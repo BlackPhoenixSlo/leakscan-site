@@ -166,9 +166,9 @@ def _words(s):
     return {w for w in re.split(r"[^a-z0-9]+", _norm(s)) if len(w) >= 2}
 
 
-def packs(data, who):
+def packs(data, who, deleted=False):
     """Pure: /content response + the matched creator (match(): {title, modelId}) -> mega[] items (her live packs
-    only, deduped by pack id, capped). A pack counts as hers when its own modelId is hers; one without a modelId
+    only, or with `deleted` her deleted ones too as status "deleted", deduped by pack id, capped). A pack counts as hers when its own modelId is hers; one without a modelId
     only when the response's richProfileId is hers and its title holds every word (2+ chars) of her title.
     Nothing attributable -> []."""
     out, seen = [], set()
@@ -179,7 +179,7 @@ def packs(data, who):
     name = _words(who.get("title"))
     scoped = _model_id(data.get("richProfileId")) == model_id and bool(name)
     for p in items if isinstance(items, list) else []:
-        if not isinstance(p, dict) or p.get("deleted"):
+        if not isinstance(p, dict) or (p.get("deleted") and not deleted):
             continue
         own = _model_id(p.get("modelId"))
         if own != model_id and (own or not scoped or not name <= _words(p.get("title"))):
@@ -196,21 +196,21 @@ def packs(data, who):
             "size": _int(info.get("size")), "images": _int(info.get("images")),
             "videos": _int(info.get("videos")),
             "age": ts[:19] + "Z" if isinstance(ts, str) and _TS_RE.match(ts) else None,
-            "status": "live",
+            "status": "deleted" if p.get("deleted") else "live",
         })
         if len(out) >= MAX_PACKS:
             break
     return out
 
 
-def _lookup(term, aliases, names, deadline, source=False):
+def _lookup(term, aliases, names, deadline, source=False, deleted=False):
     try:
         who, how, needle = match_source(_get("/content/suggest", {"term": term, "take": 8}, deadline), [term, *aliases],
                                         names)
         if not who:
             return [], "nomatch"
         out = packs(_get("/content", {"search": who["title"], "count": MAX_PACKS, "sorting": "NEWEST"},
-                         deadline), who)
+                         deadline), who, deleted)
         return [dict(p, match_source=how, match_term=needle) for p in out] if source else out, "ok"
     except Skip as e:
         return [], str(e)
@@ -218,19 +218,20 @@ def _lookup(term, aliases, names, deadline, source=False):
         return [], f"err:{type(e).__name__}"
 
 
-def start(term, aliases, names=(), source=False):
+def start(term, aliases, names=(), source=False, deleted=False):
     """term + alias set -> Future of (mega items, reason): one suggest + one pack-list call in a daemon thread of its
     own that gives up at TIMEOUT s from now (it closes a response still dripping at the deadline; a daemon never holds
     up the process exit). Wait for it with result(). reason: ok | nomatch | short | timeout | busy | net | http<code>
     | badjson | err:<type>. The worker never raises. `source` (the tracker's private run only): each item also carries
-    match_source (handle | alias | name) and match_term (match_source())."""
+    match_source (handle | alias | name) and match_term (match_source()). `deleted` (the tracker's Mega lane only): the
+    index's deleted packs come back too, status "deleted"."""
     fut = _cf.Future()
     term = _norm(term)
     if len(term) <= 2:                       # the site's own autocomplete needs > 2 chars
         fut.set_result(([], "short"))
         return fut
     deadline = time.monotonic() + TIMEOUT
-    threading.Thread(target=lambda: fut.set_result(_lookup(term, aliases, names, deadline, source)),
+    threading.Thread(target=lambda: fut.set_result(_lookup(term, aliases, names, deadline, source, deleted)),
                      name="leakshaven", daemon=True).start()
     return fut
 
