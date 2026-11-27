@@ -143,11 +143,13 @@ class TestAuth(Base):
         self.assertEqual(self.req("DELETE", "/v1/watches/w_ash_00002", key=self.a)[0], 204)
         st, r, b = self.req("GET", "/v1/me", key=self.a)
         self.assertEqual(b, {"tenant_id": "tn_tenant_a", "label": "Agency A", "brand": None, "contact_url": None, "creators_max": 5,
-                             "creators_used": 1, "accepting_new": True})
+                             "creators_used": 1, "accepting_new": True, "notices_updated_at": None})
         self.assertEqual(r.getheader("Cache-Control"), "no-store")
         with mock.patch.dict(os.environ, TRACKER_BRAND="Example Removal", TRACKER_CONTACT_URL="https://removal.example/contact"):
             b = self.req("GET", "/v1/me", key=self.a)[2]
+            b2 = self.req("GET", "/v1/me", key=self.b)[2]
         self.assertEqual((b["brand"], b["contact_url"]), ("Example Removal", "https://removal.example/contact"))
+        self.assertEqual((b2["contact_url"], b2["notices_updated_at"]), (b["contact_url"], None))
 
     def test_routes(self):
         self.assertEqual(self.req("GET", "/v1/nope", key=self.a)[::2], (404, {"error": "not_found"}))
