@@ -12,7 +12,8 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   leak_events       seen{source: google_web|mega_index, first_scan: bool}; google_seen{};
                     status{from: NULL|live|gone, to: live|gone, dead_since: ts|NULL} only when origin_status changes.
   daily_scans.outcome        NULL while running | ok | failed.
-  load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired.
+  load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired;
+                    watch_id NULL = a purged watch's carried spend.
 """
 import contextlib
 import hashlib
@@ -125,7 +126,7 @@ INSERT OR IGNORE INTO tracker_limits (id, daily_loads, daily_judge) VALUES (1, 3
 CREATE TABLE IF NOT EXISTS load_reservation (
   id         TEXT PRIMARY KEY,
   tenant_id  TEXT NOT NULL,
-  watch_id   TEXT NOT NULL,
+  watch_id   TEXT,
   unit       TEXT NOT NULL CHECK (unit IN ('load', 'judge_call')),
   day        TEXT NOT NULL,
   month      TEXT NOT NULL,
@@ -133,7 +134,8 @@ CREATE TABLE IF NOT EXISTS load_reservation (
   used       INTEGER NOT NULL DEFAULT 0,
   state      TEXT NOT NULL DEFAULT 'held' CHECK (state IN ('held', 'settled', 'expired')),
   created_at TEXT NOT NULL,
-  settled_at TEXT
+  settled_at TEXT,
+  CHECK (held > 0 AND used >= 0 AND used <= held)
 );
 CREATE INDEX IF NOT EXISTS idx_resv_day ON load_reservation(day, unit);
 CREATE INDEX IF NOT EXISTS idx_resv_month ON load_reservation(tenant_id, month, unit);

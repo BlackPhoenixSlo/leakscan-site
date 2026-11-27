@@ -1,6 +1,7 @@
 """Watch purge (spec "Purge (service)"): a deleted watch whose purge_after has passed loses its row and every row keyed
 by its watch_id, one transaction per watch, and its id goes to deleted_ids (never pruned). Never touches the Quick
 scan tables or tenants."""
+import tracker_budget
 import tracker_db as tdb
 from tracker_probe import log
 
@@ -20,6 +21,7 @@ def _purge(c, watch_id, now):
     for t in _LEAK_TABLES:
         c.execute(f"DELETE FROM {t} WHERE leak_id IN (SELECT leak_id FROM leaks WHERE watch_id = ?)", (watch_id,))
     c.execute("DELETE FROM leaks WHERE watch_id = ?", (watch_id,))
+    tracker_budget.fold(c, watch_id, now)
     for t, col in WATCH_TABLES:
         c.execute(f"DELETE FROM {t} WHERE {col} = ?", (watch_id,))
     c.execute("DELETE FROM watches WHERE watch_id = ?", (watch_id,))

@@ -1,9 +1,7 @@
-"""Load reservation (spec "Interfaces" tracker_budget): every paid call holds budget before it is made.
-
-`load` counts against the global UTC day (tracker_limits.daily_loads) and the tenant's UTC month
-(tenants.month_loads); `judge_call` against the global day only (tracker_limits.daily_judge). A watch ranked past
-tenants.creators_max among its tenant's non-deleted watches (created_at, then watch_id) reserves nothing and is
-never paused. Spend = held for held/expired rows, used for settled ones. One unit is one outbound attempt."""
+"""Load reservation (spec "Interfaces" tracker_budget). Spend = `used` for settled rows, `held` for held and expired
+ones, so a crashed worker's hold keeps counting. The caps bind at reserve time only: a hold taken before midnight or
+before a cap was lowered can still be consumed in full (overshoot bounded by the open holds). Purge folds a watch's
+spend into a watch-less carry row, so deleting a watch never reopens day or month room."""
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import NamedTuple
@@ -11,7 +9,6 @@ from typing import NamedTuple
 import tracker_db as tdb
 
 UNITS = ("load", "judge_call")
-STALE = timedelta(hours=2)
 _SPENT = "COALESCE(SUM(CASE WHEN state = 'settled' THEN used ELSE held END), 0)"
 
 
@@ -27,7 +24,7 @@ class Reservation:
 
 class Refused(NamedTuple):
     reason: str
-    next_on: str
+    next_on: str | None
 
 
 def _next_day(d):
@@ -39,49 +36,45 @@ def _next_month(d):
     return f"{y + m // 12:04d}-{m % 12 + 1:02d}-01"
 
 
-def spent(c, unit, day=None, tenant_id=None, month=None):
-    q, args = f"SELECT {_SPENT} FROM load_reservation WHERE unit = ?", [unit]
-    if day:
-        q, args = q + " AND day = ?", args + [day]
-    if tenant_id:
-        q, args = q + " AND tenant_id = ? AND month = ?", args + [tenant_id, month]
-    return c.execute(q, args).fetchone()[0]
+def day_spent(c, unit, day):
+    return c.execute(f"SELECT {_SPENT} FROM load_reservation WHERE unit = ? AND day = ?", (unit, day)).fetchone()[0]
 
 
-def reserve(c, tenant_id, watch_id, unit, n, partial=False):
+def month_loads_spent(c, tenant_id, month):
+    return c.execute(f"SELECT {_SPENT} FROM load_reservation WHERE unit = 'load' AND tenant_id = ? AND month = ?",
+                     (tenant_id, month)).fetchone()[0]
+
+
+def reserve(tenant_id, watch_id, unit, n, partial=False):
     """Hold n units (partial=True: min(n, room), > 0) -> Reservation, or Refused(reason, next_on) holding nothing.
-    Commits its own BEGIN IMMEDIATE transaction on c, so c must not be inside one."""
+    reason: cap_global | cap_tenant_month | creator_cap | gone (watch deleted or missing); next_on None = no date."""
     if unit not in UNITS or n < 1:
         raise ValueError(f"bad reserve {unit} {n}")
-    c.execute("BEGIN IMMEDIATE")
-    try:
-        out = _reserve(c, tenant_id, watch_id, unit, n, partial)
-        c.commit()
-    except BaseException:
-        c.rollback()
-        raise
-    return out
+    with tdb.db() as c:
+        c.execute("BEGIN IMMEDIATE")
+        return _reserve(c, tenant_id, watch_id, unit, n, partial)
 
 
 def _reserve(c, tenant_id, watch_id, unit, n, partial):
-    d = tdb.day()
+    now = tdb.now_dt()
+    d = tdb.day(now)
     month = d[:7]
     w = c.execute("SELECT created_at FROM watches WHERE watch_id = ? AND tenant_id = ? AND deleted_at IS NULL",
                   (watch_id, tenant_id)).fetchone()
     if w is None:
-        raise ValueError(f"unknown watch {watch_id}")
+        return Refused("gone", None)
     cap, month_loads = c.execute("SELECT creators_max, month_loads FROM tenants WHERE tenant_id = ?",
                                  (tenant_id,)).fetchone()
     rank = c.execute("SELECT COUNT(*) FROM watches WHERE tenant_id = ? AND deleted_at IS NULL AND "
                      "(created_at < ? OR (created_at = ? AND watch_id <= ?))",
                      (tenant_id, w[0], w[0], watch_id)).fetchone()[0]
     if rank > cap:
-        return Refused("creator_cap", _next_day(d))
+        return Refused("creator_cap", None)
     daily_loads, daily_judge = c.execute("SELECT daily_loads, daily_judge FROM tracker_limits WHERE id = 1").fetchone()
-    room = (daily_loads if unit == "load" else daily_judge) - spent(c, unit, day=d)
+    room = (daily_loads if unit == "load" else daily_judge) - day_spent(c, unit, d)
     reason, next_on = "cap_global", _next_day(d)
     if unit == "load":
-        tenant_room = month_loads - spent(c, unit, tenant_id=tenant_id, month=month)
+        tenant_room = month_loads - month_loads_spent(c, tenant_id, month)
         if tenant_room <= room:
             room, reason, next_on = tenant_room, "cap_tenant_month", _next_month(d)
     grant = min(n, room) if partial else (n if n <= room else 0)
@@ -89,13 +82,15 @@ def _reserve(c, tenant_id, watch_id, unit, n, partial):
         return Refused(reason, next_on)
     r = Reservation(tdb.new_id("rs_"), tenant_id, watch_id, unit, grant)
     c.execute("INSERT INTO load_reservation (id, tenant_id, watch_id, unit, day, month, held, created_at) "
-              "VALUES (?,?,?,?,?,?,?,?)", (r.id, tenant_id, watch_id, unit, d, month, grant, tdb.now()))
+              "VALUES (?,?,?,?,?,?,?,?)", (r.id, tenant_id, watch_id, unit, d, month, grant, tdb.fmt(now)))
     return r
 
 
 def consume(r, k=1):
     """Mark k more units used, just before k outbound attempts -> True, or False (nothing used) when that would pass
     the hold or the hold is no longer `held`; the caller then makes no call."""
+    if k < 1:
+        raise ValueError(f"bad consume {k}")
     with tdb.db() as c:
         ok = c.execute("UPDATE load_reservation SET used = used + ? WHERE id = ? AND state = 'held' AND used + ? <= held",
                        (k, r.id, k)).rowcount == 1
@@ -112,9 +107,18 @@ def settle(r):
 
 
 def expire_stale(now=None):
-    """Holds older than 2 h nobody settled become `expired` and keep counting in full -> how many."""
-    now = now or tdb.now_dt()
-    now = tdb.parse(now) if isinstance(now, str) else now
+    """Holds older than 2 h (now: ISO ts) nobody settled become `expired` and keep counting in full -> how many."""
     with tdb.db() as c:
         return c.execute("UPDATE load_reservation SET state = 'expired' WHERE state = 'held' AND created_at < ?",
-                         (tdb.fmt(now - STALE),)).rowcount
+                         (tdb.plus(now or tdb.now(), hours=-2),)).rowcount
+
+
+def fold(c, watch_id, now):
+    """Inside the purge transaction, before the watch's rows go: add its spend to the carry row per
+    (tenant, unit, day) (watch_id NULL, settled, used = held)."""
+    c.execute(f"INSERT INTO load_reservation (id, tenant_id, watch_id, unit, day, month, held, used, state, created_at, "
+              f"settled_at) SELECT 'carry_' || tenant_id || '_' || unit || '_' || day, tenant_id, NULL, unit, day, month, "
+              f"{_SPENT}, {_SPENT}, 'settled', ?, ? FROM load_reservation WHERE watch_id = ? "
+              f"GROUP BY tenant_id, unit, day, month HAVING {_SPENT} > 0 "
+              f"ON CONFLICT(id) DO UPDATE SET held = held + excluded.held, used = used + excluded.used",
+              (now, now, watch_id))

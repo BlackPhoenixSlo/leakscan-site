@@ -1,5 +1,5 @@
 """Load reservation (Service seams, test_tracker_budget): caps hold under concurrency, partial grants, consume / settle /
-expire_stale, the Creator cap by rank, the caps CLI and the purge. All data synthetic."""
+expire_stale, the daily reset, the Creator cap by rank, the caps CLI and the purge. All data synthetic."""
 import contextlib
 import io
 import os
@@ -11,6 +11,7 @@ import unittest
 from unittest import mock
 
 from tracker_fixture import Base, tdb
+import tracker_api
 import tracker_budget as tb
 import tracker_cli
 import tracker_purge
@@ -34,13 +35,12 @@ class TestBudget(Base):
                 c.execute("UPDATE tenants SET month_loads = ? WHERE tenant_id = ?", (n, getattr(self, tid)))
 
     def reserve(self, watch, unit, n, partial=False):
-        tid = self.a if watch == self.wa else self.b
-        with tdb.db() as c:
-            return tb.reserve(c, tid, watch, unit, n, partial=partial)
+        tid = self.rows("SELECT tenant_id FROM watches WHERE watch_id = ?", watch)[0]["tenant_id"]
+        return tb.reserve(tid, watch, unit, n, partial=partial)
 
     def spent(self, unit, tenant=None):
         with tdb.db() as c:
-            return tb.spent(c, unit, day=None if tenant else tdb.day(), tenant_id=tenant, month=tdb.day()[:7])
+            return tb.month_loads_spent(c, tenant, tdb.day()[:7]) if tenant else tb.day_spent(c, unit, tdb.day())
 
     def stampede(self, watches):
         grants, errors = [], []
@@ -100,6 +100,17 @@ class TestBudget(Base):
         self.assertEqual(self.reserve(self.wa, "load", 1), tb.Refused("cap_tenant_month", "2027-01-01"))
         self.assertEqual(self.spent("load", self.a), 0)
 
+    def test_the_day_cap_resets_at_utc_midnight(self):
+        self.caps(daily_loads=3, daily_judge=1)
+        self.clock("2026-11-02T23:59:59Z")
+        self.assertEqual(self.reserve(self.wa, "load", 3).held, 3)
+        self.assertEqual(self.reserve(self.wa, "judge_call", 1).held, 1)
+        self.assertEqual(self.reserve(self.wb, "load", 1), tb.Refused("cap_global", "2026-11-03"))
+        self.clock("2026-11-03T00:00:00Z")
+        self.assertEqual(self.reserve(self.wb, "load", 3).held, 3)
+        self.assertEqual(self.reserve(self.wb, "judge_call", 1).held, 1)
+        self.assertEqual(self.reserve(self.wa, "load", 1), tb.Refused("cap_global", "2026-11-04"))
+
     def test_consume_never_passes_the_hold_and_settle_releases_the_rest(self):
         self.caps(daily_loads=5)
         r = self.reserve(self.wa, "load", 5)
@@ -109,6 +120,13 @@ class TestBudget(Base):
         self.assertFalse(tb.consume(r))
         self.assertEqual(r.used, 5)
         self.assertEqual(self.rows("SELECT used FROM load_reservation WHERE id = ?", r.id), [{"used": 5}])
+        with self.assertRaises(ValueError):
+            tb.consume(r, 0)
+        for held, used in ((0, 0), (2, 3), (2, -1)):
+            with self.assertRaises(sqlite3.IntegrityError), tdb.db() as c:
+                c.execute("INSERT INTO load_reservation (id, tenant_id, watch_id, unit, day, month, held, used, "
+                          "created_at) VALUES ('rs_bad', ?, ?, 'load', '2026-11-02', '2026-11', ?, ?, ?)",
+                          (self.a, self.wa, held, used, self.T0))
 
         self.caps(daily_loads=10)
         r = self.reserve(self.wb, "load", 5)
@@ -127,7 +145,7 @@ class TestBudget(Base):
         r = self.reserve(self.wa, "judge_call", 4)
         tb.consume(r)
         self.assertEqual(tb.expire_stale(tdb.plus(self.T0, hours=2)), 0)
-        self.assertEqual(tb.expire_stale(tdb.parse(tdb.plus(self.T0, hours=2, seconds=1))), 1)
+        self.assertEqual(tb.expire_stale(tdb.plus(self.T0, hours=2, seconds=1)), 1)
         self.assertEqual(self.rows("SELECT state FROM load_reservation WHERE id = ?", r.id), [{"state": "expired"}])
         self.assertFalse(tb.settle(r))
         self.assertFalse(tb.consume(r))
@@ -143,20 +161,20 @@ class TestBudget(Base):
             later.append(self.watch(self.a, username=name))
         tracker_cli.main(["tenant", "cap", self.a, "2"])
         self.assertIsInstance(self.reserve(self.wa, "load", 1), tb.Reservation)
-        with tdb.db() as c:
-            self.assertIsInstance(tb.reserve(c, self.a, later[0], "load", 1), tb.Reservation)
-            self.assertEqual(tb.reserve(c, self.a, later[1], "judge_call", 1), tb.Refused("creator_cap", "2026-11-03"))
+        self.assertIsInstance(tb.reserve(self.a, later[0], "load", 1), tb.Reservation)
+        self.assertEqual(tb.reserve(self.a, later[1], "judge_call", 1), tb.Refused("creator_cap", None))
         self.assertEqual(self.rows("SELECT * FROM load_reservation WHERE watch_id = ?", later[1]), [])
         self.assertEqual(self.rows("SELECT paused, paused_at FROM watches WHERE watch_id = ?", later[1]),
                          [{"paused": 0, "paused_at": None}])
         with tdb.db() as c:
             c.execute("UPDATE watches SET deleted_at = ? WHERE watch_id = ?", (tdb.now(), self.wa))
-            c.commit()
-            self.assertIsInstance(tb.reserve(c, self.a, later[1], "load", 1), tb.Reservation)
+        self.assertIsInstance(tb.reserve(self.a, later[1], "load", 1), tb.Reservation)
+        self.assertEqual(tb.reserve(self.a, self.wa, "load", 1), tb.Refused("gone", None))
+        self.assertEqual(tb.reserve(self.a, "w_missing", "load", 1), tb.Refused("gone", None))
+        self.assertEqual(tb.reserve(self.b, later[1], "load", 1), tb.Refused("gone", None))
+        for unit, n in (("minutes", 1), ("load", 0)):
             with self.assertRaises(ValueError):
-                tb.reserve(c, self.a, self.wa, "load", 1)
-            with self.assertRaises(ValueError):
-                tb.reserve(c, self.a, later[1], "minutes", 1)
+                tb.reserve(self.a, later[1], unit, n)
 
     def cli(self, *args, ok=True):
         p = subprocess.run([sys.executable, os.path.join(APP, "tracker_cli.py"), *args], capture_output=True, text=True,
@@ -164,10 +182,15 @@ class TestBudget(Base):
         self.assertEqual(p.returncode == 0, ok, p.stderr)
         return p.stdout
 
+    def main(self, *args):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            tracker_cli.main(list(args))
+        return buf.getvalue()
+
     def test_cli_caps_take_effect_on_the_next_reserve(self):
-        out = self.cli("caps", "list").splitlines()
-        self.assertIn("daily_loads=300\tdaily_judge=2000", out[0])
-        self.assertEqual(sum("month_loads=1000\t" in line for line in out[1:]), 2)
+        self.assertEqual(self.cli("caps", "global"), "global\tdaily_loads=300\tdaily_judge=2000\tloads_today=0\tjudge_today=0\n")
+        self.assertEqual(sum(line.endswith("\tmonth_loads=1000\tloads_month=0") for line in self.cli("tenant", "list").splitlines()), 2)
         self.cli("caps", "global", "--daily-loads", "2", "--daily-judge", "1")
         self.cli("caps", "tenant", self.a, "--month-loads", "1")
         self.assertEqual(self.reserve(self.wa, "load", 2), tb.Refused("cap_tenant_month", "2026-12-01"))
@@ -177,26 +200,48 @@ class TestBudget(Base):
         self.cli("caps", "global", "--daily-judge", "5")
         self.assertEqual(self.reserve(self.wb, "judge_call", 2).held, 2)
         self.assertEqual(self.reserve(self.wb, "load", 2), tb.Refused("cap_global", "2026-11-03"))
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            tracker_cli.main(["caps", "list"])
-        out = buf.getvalue().splitlines()
-        self.assertEqual(out[0], "global\tdaily_loads=2\tdaily_judge=5\tloads_today=1\tjudge_today=2")
-        self.assertIn(f"{self.a}\tAgency A\tmonth_loads=1\tloads_month=1\tcreators_max=5", out)
-        self.cli("caps", "global", ok=False)
+        self.assertEqual(self.main("caps", "global"), "global\tdaily_loads=2\tdaily_judge=5\tloads_today=1\tjudge_today=2\n")
+        self.assertIn(f"{self.a}\tAgency A\tmax=5\tused=1\tkeys=0\tmonth_loads=1\tloads_month=1\n",
+                      self.main("tenant", "list"))
         self.cli("caps", "global", "--daily-loads", "-1", ok=False)
         self.cli("caps", "tenant", "tn_missing", "--month-loads", "1", ok=False)
 
-    def test_purged_watch_leaves_no_reservation_row(self):
-        tb.settle(self.reserve(self.wa, "load", 2))
-        self.reserve(self.wa, "judge_call", 1)
+    def test_purged_watch_leaves_no_reservation_row_and_its_spend_stays(self):
+        self.clock(tdb.plus(self.T0, days=-31))
+        old = self.watch(self.a, username="noa_lind")
+        self.clock(self.T0)
+        r = self.reserve(old, "load", 5)
+        tb.consume(r, 5)
+        tb.settle(r)
+        r = self.reserve(old, "load", 4)
+        tb.settle(r)
+        self.reserve(old, "judge_call", 2)
         self.reserve(self.wb, "load", 1)
-        with tdb.db() as c:
-            c.execute("UPDATE watches SET deleted_at = ?, purge_after = ? WHERE watch_id = ?",
-                      (self.T0, self.T0, self.wa))
+        created = self.rows("SELECT created_at FROM watches WHERE watch_id = ?", old)[0]["created_at"]
+        self.assertEqual(tracker_api.delete_watch({"tenant_id": self.a}, {"requested_at": [created]}, b"", old), (204, None))
         self.assertIn(("load_reservation", "watch_id"), tracker_purge.WATCH_TABLES)
-        self.assertEqual(tracker_purge.run(self.T0)["deleted_ids"], [self.wa])
-        self.assertEqual([r["watch_id"] for r in self.rows("SELECT watch_id FROM load_reservation")], [self.wb])
+        self.assertEqual(tracker_purge.run()["deleted_ids"], [old])
+        self.assertEqual(self.rows("SELECT * FROM load_reservation WHERE watch_id = ?", old), [])
+        self.assertEqual(self.spent("load"), 6)
+        self.assertEqual(self.spent("load", self.a), 5)
+        self.assertEqual(self.spent("judge_call"), 2)
+        self.assertEqual(self.rows("SELECT tenant_id, unit, day, month, held, used, state FROM load_reservation WHERE "
+                                   "watch_id IS NULL ORDER BY unit"),
+                         [{"tenant_id": self.a, "unit": "judge_call", "day": "2026-11-02", "month": "2026-11", "held": 2,
+                           "used": 2, "state": "settled"},
+                          {"tenant_id": self.a, "unit": "load", "day": "2026-11-02", "month": "2026-11", "held": 5,
+                           "used": 5, "state": "settled"}])
+        self.clock(tdb.plus(self.T0, days=-31))
+        again = self.watch(self.a, username="ava_rowe")
+        self.clock(self.T0)
+        tb.consume(self.reserve(again, "load", 3), 1)
+        tracker_api.delete_watch({"tenant_id": self.a}, {}, b"", again)
+        with tdb.db() as c:
+            c.execute("UPDATE watches SET purge_after = ? WHERE watch_id = ?", (self.T0, again))
+        tracker_purge.run()
+        self.assertEqual(self.rows("SELECT held, used FROM load_reservation WHERE watch_id IS NULL AND unit = 'load'"),
+                         [{"held": 8, "used": 8}])
+        self.assertEqual(self.spent("load", self.a), 8)
 
     def test_init_adds_month_loads_to_a_phase_1_db(self):
         mock.patch.dict(os.environ, TRACKER_DB=os.path.join(self.tmp.name, "phase1.db")).start()
