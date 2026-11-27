@@ -14,6 +14,10 @@ import tracker_api
 import tracker_seed
 
 
+WORST = {"username": "mia_vale", "platform": "onlyfans", "instagram": "mia.vale.ig", "x": "miavale_x",
+         "aliases_json": json.dumps(["rowanash", "vale.mia", "mia-official", "miavee", "rowan_mia"])}  # 31 loads
+
+
 class AdmissionBase(Base):
     def setUp(self):
         super().setUp()
@@ -22,7 +26,7 @@ class AdmissionBase(Base):
 
     def admit(self, tenant_id=None, identity=None):
         with tdb.db() as c:
-            return adm.admit(c, tenant_id or self.t, identity or {"username": "mia_vale", "aliases_json": "[]"})
+            return adm.admit(c, tenant_id or self.t, identity or WORST)
 
     def cap(self, daily_loads):
         with tdb.db() as c:
@@ -119,8 +123,8 @@ class TestEdits(AdmissionBase):
             self.assertEqual(self.put("w_mia_00001", paused=True)[0], 200)
             self.assertEqual(self.put("w_ash_00002", username="rowan_ash")[0], 200)
             got = self.rows("SELECT watch_id, weekly_slot, plan_loads FROM watches ORDER BY watch_id")
-            self.assertEqual(got, [{"watch_id": "w_ash_00002", "weekly_slot": 1, "plan_loads": 31},
-                                   {"watch_id": "w_mia_00001", "weekly_slot": 0, "plan_loads": 31}])
+            self.assertEqual(got, [{"watch_id": "w_ash_00002", "weekly_slot": 1, "plan_loads": 9},
+                                   {"watch_id": "w_mia_00001", "weekly_slot": 0, "plan_loads": 9}])
             self.cap(2)
             self.assertEqual(self.put("w_bee_00003", username="bee_example"), (409, {"error": "waitlist"}))
             self.assertEqual(self.rows("SELECT COUNT(*) n FROM watches")[0]["n"], 2)
@@ -129,7 +133,10 @@ class TestEdits(AdmissionBase):
             self.assertEqual(self.put("w_mia_00001", paused=False)[0], 200)
             got = self.rows("SELECT watch_id, weekly_slot, plan_loads, paused FROM watches ORDER BY watch_id")
             self.assertEqual(got, [{"watch_id": "w_ash_00002", "weekly_slot": 1, "plan_loads": 50, "paused": 0},
-                                   {"watch_id": "w_mia_00001", "weekly_slot": 0, "plan_loads": 31, "paused": 0}])
+                                   {"watch_id": "w_mia_00001", "weekly_slot": 0, "plan_loads": 9, "paused": 0}])
+            self.assertEqual(self.put("w_mia_00001", aliases=["rowanash"])[0], 200)
+            self.assertEqual(self.rows("SELECT weekly_slot, plan_loads FROM watches WHERE watch_id = 'w_mia_00001'"),
+                             [{"weekly_slot": 0, "plan_loads": 13}])
 
 
 class TestBackfill(AdmissionBase):
@@ -142,7 +149,7 @@ class TestBackfill(AdmissionBase):
         with tdb.db() as c:
             c.execute("UPDATE watches SET deleted_at = ? WHERE watch_id = 'w_gone_00009'", (tdb.now(),))
         tdb.init()
-        want = {"w_pre_00000": (0, 31), "w_first_0001": (1, 31), "w_second_002": (2, 31), "w_third_0003": (3, 31),
+        want = {"w_pre_00000": (0, 31), "w_first_0001": (1, 9), "w_second_002": (2, 9), "w_third_0003": (3, 9),
                 "w_gone_00009": (None, None)}
         got = {r["watch_id"]: (r["weekly_slot"], r["plan_loads"]) for r in self.rows("SELECT * FROM watches")}
         self.assertEqual(got, want)
@@ -166,4 +173,4 @@ class TestMigration(Base):
         tdb.init()
         tdb.init()
         self.assertEqual(self.rows("SELECT watch_id, weekly_slot, plan_loads, carry_json FROM watches"),
-                         [{"watch_id": "w_old_00001", "weekly_slot": 0, "plan_loads": 31, "carry_json": None}])
+                         [{"watch_id": "w_old_00001", "weekly_slot": 0, "plan_loads": 9, "carry_json": None}])
