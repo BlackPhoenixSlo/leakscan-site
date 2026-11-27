@@ -172,7 +172,8 @@ def set_fetcher(fn):
     _override = fn
 
 
-def fetcher():
+def fetcher(**bounds):
+    """-> the fetch seam: set_fetcher()'s fn, the stub (TRACKER_FETCHER=stub) or Fetcher(**bounds)."""
     if _override:
         return _override
     if os.environ.get("TRACKER_FETCHER") == "stub":
@@ -181,7 +182,7 @@ def fetcher():
             sys.path.insert(0, tests)
         import tracker_stub_fetch
         return tracker_stub_fetch.FETCH
-    return Fetcher()
+    return Fetcher(**bounds)
 
 
 def classify(fetch, url):

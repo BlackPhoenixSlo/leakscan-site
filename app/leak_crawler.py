@@ -122,12 +122,13 @@ SIBLING_REACH_ABOVE = 8      # probe <base>-(max+1) .. <base>-(max+8) — her ne
 SIBLING_PROBE_CAP = 48       # hard cap on sibling fetches per domain (above-max + gap-fill)
 
 
-def _throttle(host):
-    if MIN_INTERVAL <= 0:
+def _throttle(host, gap=None):
+    gap = MIN_INTERVAL if gap is None else gap
+    if gap <= 0:
         return
     with _HOST_LOCK:
         start = max(time.monotonic(), _HOST_NEXT.get(host, 0.0))
-        _HOST_NEXT[host] = start + MIN_INTERVAL   # reserve the slot, then sleep unlocked
+        _HOST_NEXT[host] = start + gap   # reserve the slot, then sleep unlocked
     delay = start - time.monotonic()
     if delay > 0:
         time.sleep(delay)

@@ -9,14 +9,16 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   leak_site         registrable host of the Leak url (netloc.registrable), mega items: leakshaven.com.
   probe_state.last_status    raw last probe: live | dead | blocked | unknown.
   probe_state.origin_status  settled: NULL (no settled probe yet) | live | gone (gone = 2 dead in a row).
-  leak_events       seen{source: google_web|mega_index, first_scan: bool}; google_seen{};
+  leaks.recheck_at  the listing recheck's last attempt at this Leak (tracker_lanes), NULL = never.
+  leak_events       seen{source: google_web|mega_index|site_search, first_scan: bool}; google_seen{};
                     status{from: NULL|live|gone, to: live|gone, dead_since: ts|NULL} only when origin_status changes;
                     a mega Leak's status adds source: mega_index.
   daily_scans.outcome        NULL while running | ok | failed.
   watches.weekly_slot   0 = Monday .. 6; with plan_loads set by tracker_admission (admit on create, backfill in init).
   load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired;
                     watch_id NULL = a purged watch's carried spend.
-  lane_state        one row per (watch, lane) run so far (tracker_lanes): state ok | failed; next_attempt_on a UTC day.
+  lane_state        one row per (watch, lane) run so far (tracker_lanes): state ok | reduced | failed; next_attempt_on a
+                    UTC day.
   lane_day          one row per (watch, UTC day, lane) run: outcome ok | partial | failed, reason (scan_partial's).
 """
 import contextlib
@@ -170,7 +172,8 @@ CREATE TABLE IF NOT EXISTS lane_day (
 _COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
             ("watches", "weekly_slot", "INTEGER CHECK (weekly_slot BETWEEN 0 AND 6)"),
             ("watches", "plan_loads", "INTEGER"),
-            ("watches", "carry_json", "TEXT")]
+            ("watches", "carry_json", "TEXT"),
+            ("leaks", "recheck_at", "TEXT")]
 
 _clock = None
 
