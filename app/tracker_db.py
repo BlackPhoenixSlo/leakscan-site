@@ -12,6 +12,7 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   leak_events       seen{source: google_web|mega_index, first_scan: bool}; google_seen{};
                     status{from: NULL|live|gone, to: live|gone, dead_since: ts|NULL} only when origin_status changes.
   daily_scans.outcome        NULL while running | ok | failed.
+  load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired.
 """
 import contextlib
 import hashlib
@@ -115,7 +116,31 @@ CREATE TABLE IF NOT EXISTS daily_scans (
   outcome     TEXT,
   PRIMARY KEY (watch_id, day)
 );
+CREATE TABLE IF NOT EXISTS tracker_limits (
+  id          INTEGER PRIMARY KEY CHECK (id = 1),
+  daily_loads INTEGER NOT NULL,
+  daily_judge INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO tracker_limits (id, daily_loads, daily_judge) VALUES (1, 300, 2000);
+CREATE TABLE IF NOT EXISTS load_reservation (
+  id         TEXT PRIMARY KEY,
+  tenant_id  TEXT NOT NULL,
+  watch_id   TEXT NOT NULL,
+  unit       TEXT NOT NULL CHECK (unit IN ('load', 'judge_call')),
+  day        TEXT NOT NULL,
+  month      TEXT NOT NULL,
+  held       INTEGER NOT NULL,
+  used       INTEGER NOT NULL DEFAULT 0,
+  state      TEXT NOT NULL DEFAULT 'held' CHECK (state IN ('held', 'settled', 'expired')),
+  created_at TEXT NOT NULL,
+  settled_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_resv_day ON load_reservation(day, unit);
+CREATE INDEX IF NOT EXISTS idx_resv_month ON load_reservation(tenant_id, month, unit);
+CREATE INDEX IF NOT EXISTS idx_resv_watch ON load_reservation(watch_id);
+CREATE INDEX IF NOT EXISTS idx_resv_state ON load_reservation(state, created_at);
 """
+_COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000")]
 
 _clock = None
 
@@ -141,6 +166,10 @@ def init():
     with db() as c:
         c.execute("PRAGMA journal_mode=WAL")
         c.executescript(_SCHEMA)
+        c.execute("BEGIN IMMEDIATE")
+        for table, col, decl in _COLUMNS:
+            if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
+                c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
 
 
 def set_clock(fn):

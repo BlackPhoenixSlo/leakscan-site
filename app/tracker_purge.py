@@ -4,7 +4,7 @@ scan tables or tenants."""
 import tracker_db as tdb
 from tracker_probe import log
 
-WATCH_TABLES = [("pending_hits", "watch_id"), ("daily_scans", "watch_id")]
+WATCH_TABLES = [("pending_hits", "watch_id"), ("daily_scans", "watch_id"), ("load_reservation", "watch_id")]
 _LEAK_TABLES = ("leak_events", "probe_state")
 
 

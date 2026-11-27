@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Leak tracker owner CLI (spec "Measures"): tenants, keys, purge, report, daily pass. Uses TRACKER_DB.
+"""Leak tracker owner CLI (spec "Measures"): tenants, keys, caps, purge, report, daily pass. Uses TRACKER_DB.
 
   python3 app/tracker_cli.py tenant add <label> [--max N] | tenant cap <tenant_id> <n> | tenant list
   python3 app/tracker_cli.py key issue <tenant_id> | key revoke <tenant_id>
+  python3 app/tracker_cli.py caps global [--daily-loads N] [--daily-judge N] | caps tenant <tenant_id> --month-loads N
+  python3 app/tracker_cli.py caps list
   python3 app/tracker_cli.py purge [--dry-run] | report | daily [--at ISO]
 """
 import argparse
@@ -57,6 +59,40 @@ def key_revoke(a):
     print(f"revoked {n}")
 
 
+def caps_global(a):
+    if a.daily_loads is None and a.daily_judge is None:
+        sys.exit("give --daily-loads and/or --daily-judge")
+    with tracker_db.db() as c:
+        for col, n in (("daily_loads", a.daily_loads), ("daily_judge", a.daily_judge)):
+            if n is not None:
+                c.execute(f"UPDATE tracker_limits SET {col} = ? WHERE id = 1", (n,))
+
+
+def caps_tenant(a):
+    with tracker_db.db() as c:
+        _tenant(c, a.tenant_id)
+        c.execute("UPDATE tenants SET month_loads = ? WHERE tenant_id = ?", (a.month_loads, a.tenant_id))
+
+
+def caps_list(a):
+    import tracker_budget as tb
+    d = tracker_db.day()
+    with tracker_db.db() as c:
+        loads, judge = c.execute("SELECT daily_loads, daily_judge FROM tracker_limits WHERE id = 1").fetchone()
+        print(f"global\tdaily_loads={loads}\tdaily_judge={judge}\tloads_today={tb.spent(c, 'load', day=d)}"
+              f"\tjudge_today={tb.spent(c, 'judge_call', day=d)}")
+        for r in c.execute("SELECT tenant_id, label, month_loads, creators_max FROM tenants ORDER BY created_at, tenant_id"):
+            print(f"{r[0]}\t{r[1]}\tmonth_loads={r[2]}\tloads_month={tb.spent(c, 'load', tenant_id=r[0], month=d[:7])}"
+                  f"\tcreators_max={r[3]}")
+
+
+def _count(s):
+    n = int(s)
+    if n < 0:
+        raise argparse.ArgumentTypeError("must be >= 0")
+    return n
+
+
 def purge(a):
     import tracker_purge
     print(json.dumps(tracker_purge.run(tracker_db.now(), dry_run=a.dry_run), indent=2, sort_keys=True))
@@ -95,6 +131,16 @@ def main(argv=None):
         x = k.add_parser(name)
         x.add_argument("tenant_id")
         x.set_defaults(fn=fn)
+    k = sub.add_parser("caps").add_subparsers(dest="sub", required=True)
+    x = k.add_parser("global")
+    x.add_argument("--daily-loads", type=_count)
+    x.add_argument("--daily-judge", type=_count)
+    x.set_defaults(fn=caps_global)
+    x = k.add_parser("tenant")
+    x.add_argument("tenant_id")
+    x.add_argument("--month-loads", type=_count, required=True)
+    x.set_defaults(fn=caps_tenant)
+    k.add_parser("list").set_defaults(fn=caps_list)
     x = sub.add_parser("purge")
     x.add_argument("--dry-run", action="store_true")
     x.set_defaults(fn=purge)
