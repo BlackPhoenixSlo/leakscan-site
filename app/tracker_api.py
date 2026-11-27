@@ -22,6 +22,7 @@ INSTAGRAM = re.compile(r"^[A-Za-z0-9_.]{1,30}$")
 X_HANDLE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
 NOT_FOUND = {"error": "not_found"}
 GONE = {"error": "watch_deleted"}
+RATE_LIMITED = {"error": "rate_limited"}
 
 
 class _Err(Exception):
@@ -32,6 +33,15 @@ class _Err(Exception):
 
 def _invalid(field):
     raise _Err(422, {"error": "invalid", "field": field})
+
+
+def _new_watches_last_hour(c, ts):
+    """New watches by capped tenants (all but TRACKER_UNCAPPED_TENANTS) in the hour before ts, deleted ones included:
+    TRACKER_PUBLIC_PER_HOUR bounds paid seeds across every public tenant, so DELETE + PUT can't churn past it."""
+    free = [s.strip() for s in os.environ.get("TRACKER_UNCAPPED_TENANTS", "").split(",") if s.strip()]
+    since = tracker_db.fmt(tracker_db.parse(ts) - timedelta(hours=1))
+    return c.execute(f"SELECT COUNT(*) FROM watches WHERE created_at > ? AND tenant_id NOT IN ({','.join('?' * len(free))})",
+                     (since, *free)).fetchone()[0], free
 
 
 def _log(msg):
@@ -186,6 +196,9 @@ def put_watch(t, q, raw, watch_id):
             cap = c.execute("SELECT creators_max FROM tenants WHERE tenant_id = ?", (tid,)).fetchone()[0]
             if c.execute("SELECT COUNT(*) FROM watches WHERE tenant_id = ? AND deleted_at IS NULL", (tid,)).fetchone()[0] >= cap:
                 raise _Err(409, {"error": "creator_cap", "creators_max": cap})
+            n, free = _new_watches_last_hour(c, ts)
+            if tid not in free and n >= int(os.environ.get("TRACKER_PUBLIC_PER_HOUR") or 10):
+                raise _Err(429, RATE_LIMITED)
             v.update(watch_id=watch_id, tenant_id=tid, paused_at=ts if v["paused"] else None, created_at=ts, updated_at=ts)
             c.execute(f"INSERT INTO watches ({', '.join(v)}) VALUES ({', '.join('?' * len(v))})", list(v.values()))
         else:
