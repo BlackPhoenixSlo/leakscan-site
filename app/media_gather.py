@@ -4,8 +4,9 @@
 Sources (official only, nothing from the scan's leak results), in this order:
   (a) Instagram profile embed page (instagram.com/<handle>/embed/, anonymous, no browser):
       latest posts' image URLs from its server-rendered contextJSON;
-  (b) ONE Browserbase session per scan (only when (a) left room, keys set, a gather slot is
-      free and >= 20 s budget left), each sub-step time-boxed and failing alone:
+  (b) Browserbase (only when (a) left room, keys set, a gather slot is free and >= 20 s budget  # one-project: proxy split
+      left): 1-2 in an unproxied session, 3 in its own BROWSERBASE_PROXIES one; each sub-step  # one-project: proxy split
+      time-boxed and failing alone:  # one-project: proxy split
         1. Google Images (MEDIA_GOOGLE=browser, default): tbm=isch&safe=active for
            google_queries() (<= 2, official-account sites); tiles on official sites are
            clicked to read the full-size URL (must be an official CDN, same google_ok policy
@@ -60,10 +61,11 @@ MEDIA_MAX = max(1, min(int(os.environ.get("MEDIA_MAX", "12")), 12))
 MEDIA_GOOGLE = os.environ.get("MEDIA_GOOGLE", "browser").strip().lower()
 if MEDIA_GOOGLE not in ("browser", "cse", "off"):
     MEDIA_GOOGLE = "browser"
-# Residential proxies ON by default: without them Instagram serves the login wall to
+# Residential proxies, Instagram grid session only, ON by default: without them Instagram serves the login wall to  # one-project: proxy split
 # Browserbase's datacenter IPs (0 images after ~19s, a billed session wasted); with them 12
 # grid images in ~11s (measured 2026-11-04). Proxy bandwidth is billed extra, but the
 # session only runs as the fallback when the free embed step comes up short.
+# Google never uses them: same results unproxied (measured 2026-11-27: 248 imgs, 8.5 s vs 16.7 s, 3.7 MB saved).  # one-project: proxy split
 BB_PROXIES = _flag("BROWSERBASE_PROXIES", "1")
 # "" -> relative src ("/api/media/<slug>/<n>.jpg"); unset -> the VPS origin.
 PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "https://scan.srv1395798.hstgr.cloud").rstrip("/")
@@ -509,7 +511,7 @@ def ig_embed_grid(handle, timeout=IG_EMBED_TIMEOUT):
     return urls
 
 
-# ── Browserbase session (one per scan) ───────────────────────────────────────
+# ── Browserbase sessions (browser_split) ───────────────────────────────  # one-project: proxy split
 _GRID_JS = """async (sel) => {
   const t0 = Date.now();
   const imgs = () => Array.from(document.querySelectorAll(sel));
@@ -574,9 +576,9 @@ def _bb(method, path, key, body, timeout=15):
         return json.loads(r.read() or b"{}")
 
 
-def _bb_create(key, proj, timeout, deadline):
+def _bb_create(key, proj, timeout, deadline, proxies=False):  # one-project: proxy split
     body = {"projectId": proj, "browserSettings": {"solveCaptchas": True}, "timeout": timeout}
-    if BB_PROXIES:
+    if proxies:  # one-project: proxy split
         body["proxies"] = True
     for attempt in (0, 1):
         try:
@@ -611,14 +613,14 @@ def _bb_release(key, proj, sid):
     return False
 
 
-def _bb_create_gated(key, proj, timeout, deadline):
+def _bb_create_gated(key, proj, timeout, deadline, proxies=False):  # one-project: proxy split
     """Process-wide: one create at a time, >= BB_CREATE_GAP s apart (no 429 bursts)."""
     with _BB_GATE:
         wait = _BB_LAST[0] + BB_CREATE_GAP - time.monotonic()
         if wait > 0:
             time.sleep(wait)
         try:
-            return _bb_create(key, proj, timeout, deadline)
+            return _bb_create(key, proj, timeout, deadline, proxies=proxies)  # one-project: proxy split
         finally:
             _BB_LAST[0] = time.monotonic()
 
@@ -929,8 +931,8 @@ def google_web_step(page, handle, profile, ig, leak, box_deadline):
     return out, len(raw)  # one-project: web retry (-> kept snippets, raw result count)
 
 
-def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_grid):
-    """ONE Browserbase session for this scan: (b) Google web text, (a) Google Images,
+def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_grid, proxies=False):  # one-project: proxy split
+    """ONE Browserbase session (browser_split: one per kind): (b) Google web text, (a) Google Images,  # one-project: proxy split
     (c) IG grid fallback — each time-boxed, each failing alone. Session released in finally.
     -> {session, google, instagram, snippets, ok}"""
     st = {"session": False, "google": 0, "instagram": 0, "snippets": [], "ok": True}
@@ -943,12 +945,12 @@ def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_g
         log("media: playwright not installed, skipping browser steps")
         return st
     t0 = time.monotonic()
-    sess = _bb_create_gated(key, proj, int(max(60, min(120, deadline - t0 + 15))), deadline)
+    sess = _bb_create_gated(key, proj, int(max(60, min(120, deadline - t0 + 15))), deadline, proxies)  # one-project: proxy split
     if not sess:
         st["ok"] = False
         return st
     st["session"] = True
-    log(f"media browserbase session created secs={time.monotonic() - t0:.1f}")
+    log(f"media browserbase session created proxies={int(proxies)} secs={time.monotonic() - t0:.1f}")  # one-project: proxy split
     try:
         with _cdp_page(sess["connectUrl"], deadline) as page:
             if want_google:
@@ -970,6 +972,7 @@ def browser_steps(g, *, handle, ig, profile, leak, deadline, want_google, want_g
                 google_web_retry(st, raw, page, handle, profile, ig, leak, deadline)  # one-project: web retry
             if want_grid and not g.full and deadline - time.monotonic() > 8:
                 t1 = time.monotonic()
+                block_heavy(page)  # one-project: proxy split
                 try:
                     for data in grid_from_page(page, ig, deadline):
                         st["instagram"] += g.add(data, "instagram")
@@ -1077,7 +1080,7 @@ def gather(slug, platform, handle, profile, cse_items, *, budget=MEDIA_BUDGET, b
         k, p = bb_keys()
         bb_wanted = bool(MEDIA_BROWSERBASE and k and p and (want_grid or want_google))
         if browser and bb_wanted and deadline - time.monotonic() > 20:
-            st = browser_steps(g, handle=handle, ig=ig, profile=profile, leak=leak,
+            st = browser_split(g, handle=handle, ig=ig, profile=profile, leak=leak,  # one-project: proxy split
                                deadline=deadline - (REFINE_RESERVE if want_google else 0),
                                want_google=want_google, want_grid=want_grid)
             snippets = st["snippets"]
@@ -1218,6 +1221,28 @@ def google_web_retry(st, raw, page, handle, profile, ig, leak, deadline):
     except Exception as e:
         st["ok"] = False
         log(f"media google web retry failed: {type(e).__name__}")
+
+
+# Images are not aborted in the grid session: _GRID_JS/pick_grid read naturalWidth/Height, 0 for an aborted image.
+GRID_ABORT = ("media", "font")
+
+
+def block_heavy(page):
+    try:
+        page.route("**/*", lambda r: r.abort() if r.request.resource_type in GRID_ABORT else r.continue_())
+    except Exception as e:
+        log(f"media grid route failed: {type(e).__name__}")
+
+
+def browser_split(g, *, deadline, want_google, want_grid, **kw):
+    """Google steps then the IG grid, each in its own session (only the wanted ones). -> browser_steps' st, merged."""
+    st = {"session": False, "google": 0, "instagram": 0, "snippets": [], "ok": True}
+    if want_google:
+        st = browser_steps(g, deadline=deadline, want_google=True, want_grid=False, proxies=False, **kw)
+    if want_grid and not g.full and deadline - time.monotonic() > 8:
+        s2 = browser_steps(g, deadline=deadline, want_google=False, want_grid=True, proxies=BB_PROXIES, **kw)
+        st.update(session=st["session"] or s2["session"], instagram=s2["instagram"], ok=st["ok"] and s2["ok"])
+    return st
 
 
 # A reused quick scan (public_app.scan_reuse_serve): its photos and refined profile are the source scan's, no external call.
