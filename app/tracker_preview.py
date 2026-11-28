@@ -3,8 +3,14 @@ Google's results page served for its tile (leaks.thumb_url / thumb_query_id / th
 the thumb route fetches it at request time. This module is the only place the service requests a thumbnail URL; the
 URL, its query id and its rank never leave the service, and logs hold counts only.
 
+A tile whose src is an inline data: image is never fetched: data_thumb decodes it at capture (base64, an image/jpeg |
+png | webp | gif MIME its magic bytes match, at most MAX_BYTES decoded; bytes kept as is, no re-encode) and the bytes
+are stored in leaks.thumb_blob / thumb_mime, served by the route as stored (owner decision 2026-11-28).
+
 A query id is `<vertical>|<field key>` of the full-pass query that returned the tile (query_id()); a thumb whose query
 leaves the plan, or whose Leak's Google visibility turns false, is cleared (tracker_lanes._visibility)."""
+import base64
+import binascii
 import concurrent.futures
 import os
 import re
@@ -22,6 +28,10 @@ MAX_BYTES = 3 * 1024 * 1024
 TOTAL_S = 5.0
 PORT = 443
 URL_MAX = 2048
+DATA_MAX = len("data:image/jpeg;base64,") + 4 * -(-MAX_BYTES // 3)
+_DATA = re.compile(r"data:(image/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/]+={0,2})")
+_CLEAR = "thumb_url = NULL, thumb_blob = NULL, thumb_mime = NULL, thumb_query_id = NULL, thumb_seen_at = NULL"
+_HELD = "(thumb_url IS NOT NULL OR thumb_blob IS NOT NULL)"
 _HOST = re.compile(r"^[a-z0-9.-]+$")
 _MAGIC = ((b"\xff\xd8\xff", "image/jpeg"), (b"\x89PNG\r\n\x1a\n", "image/png"), (b"GIF87a", "image/gif"),
           (b"GIF89a", "image/gif"))
@@ -52,32 +62,52 @@ def allowed(url):
             and any(host.endswith("." + h) for h in THUMB_HOSTS))
 
 
-def store_thumb(c, leak_id, url, query_id, seen_at):
-    """The capture's write: an allowed url for a media Leak, a query_id() of an images / videos query and an ISO
-    seen_at overwrite its thumb; anything else stores nothing. -> True when stored."""
-    if (not allowed(url) or not isinstance(query_id, str) or query_id.partition("|")[0] not in VERTICALS
+def data_thumb(src):
+    """A data: tile src -> (its MIME, the decoded bytes) under the module docstring's rules, else None."""
+    if not isinstance(src, str) or len(src) > DATA_MAX or not src.startswith("data:"):
+        return None
+    m = _DATA.fullmatch(src)
+    if not m:
+        return None
+    try:
+        body = base64.b64decode(m[2], validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    return (m[1], body) if len(body) <= MAX_BYTES and sniff(body) == m[1] else None
+
+
+def storable(src):
+    return allowed(src) or data_thumb(src) is not None
+
+
+def store_thumb(c, leak_id, src, query_id, seen_at):
+    """The capture's write: an allowed https src (thumb_url) or a data_thumb data: src (thumb_blob + thumb_mime) for a
+    media Leak, a query_id() of an images / videos query and an ISO seen_at overwrite its thumb; anything else stores
+    nothing. -> True when stored."""
+    data = data_thumb(src)
+    if (not (data or allowed(src)) or not isinstance(query_id, str) or query_id.partition("|")[0] not in VERTICALS
             or tracker_db.parse(seen_at) is None):
         return False
-    return c.execute("UPDATE leaks SET thumb_url = ?, thumb_query_id = ?, thumb_seen_at = ? WHERE leak_id = ? AND kind = 'media'",
-                     (url, query_id, seen_at, leak_id)).rowcount > 0
+    url, mime, blob = (None, *data) if data else (src, None, None)
+    return c.execute("UPDATE leaks SET thumb_url = ?, thumb_mime = ?, thumb_blob = ?, thumb_query_id = ?, thumb_seen_at = ? "
+                     "WHERE leak_id = ? AND kind = 'media'", (url, mime, blob, query_id, seen_at, leak_id)).rowcount > 0
 
 
 def clear_thumb(c, leak_id):
-    c.execute("UPDATE leaks SET thumb_url = NULL, thumb_query_id = NULL, thumb_seen_at = NULL "
-              "WHERE leak_id = ? AND thumb_url IS NOT NULL", (leak_id,))
+    c.execute(f"UPDATE leaks SET {_CLEAR} WHERE leak_id = ? AND {_HELD}", (leak_id,))
 
 
 def prune(c, watch_id, query_ids):
     """Clear every thumb of watch_id whose query id is not in query_ids (the current plan's) -> rows cleared."""
     ids = sorted(query_ids)
-    return c.execute(f"UPDATE leaks SET thumb_url = NULL, thumb_query_id = NULL, thumb_seen_at = NULL WHERE watch_id = ? "
-                     f"AND thumb_url IS NOT NULL AND thumb_query_id NOT IN ({','.join('?' * len(ids))})",
-                     (watch_id, *ids)).rowcount
+    return c.execute(f"UPDATE leaks SET {_CLEAR} WHERE watch_id = ? AND {_HELD} "
+                     f"AND thumb_query_id NOT IN ({','.join('?' * len(ids))})", (watch_id, *ids)).rowcount
 
 
 def preview(row, visible):
     """The read's `preview` for a leaks row and its Google visibility: {vertical, seen_at} | None."""
-    if row["kind"] != "media" or not row["thumb_url"] or not row["thumb_query_id"] or visible is not True or not on():
+    if (row["kind"] != "media" or not (row["thumb_url"] or row["thumb_blob"]) or not row["thumb_query_id"]
+            or visible is not True or not on()):
         return None
     return {"vertical": row["thumb_query_id"].partition("|")[0], "seen_at": row["thumb_seen_at"]}
 
@@ -149,6 +179,13 @@ def _fetch(url):
     finally:
         timer.cancel()
         conn.close()
+
+
+def stored(blob):
+    """A stored data: thumb -> (its sniffed content type, bytes), no request; counted like fetch."""
+    ctype = sniff(blob or b"")
+    _count("served_stored" if ctype else "refused_type")
+    return (ctype, bytes(blob)) if ctype else None
 
 
 def fetch(url):

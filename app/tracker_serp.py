@@ -221,11 +221,11 @@ def _tile_title(tile):
 
 
 def _src(img):
-    for k in ("src", "data-src"):
-        v = (img.get(k) or "").strip()
-        if v.startswith("https://"):
-            return v
-    return None
+    """An image's https src or data-src, else its first data: one tracker_preview.data_thumb accepts."""
+    import tracker_preview  # not at module top: tracker_preview -> tracker_db -> tracker_plan imports this module
+    vals = [(img.get(k) or "").strip() for k in ("src", "data-src")]
+    return (next((v for v in vals if v.startswith("https://")), None)
+            or next((v for v in vals if tracker_preview.data_thumb(v)), None))
 
 
 def _result(el, base):
@@ -235,7 +235,7 @@ def _result(el, base):
 
 
 def _thumb(el, tile, url, base):
-    """A result's https thumbnail src: an images tile's first image; else the image of the link or of its nearest
+    """A result's thumbnail src (_src): an images tile's first image; else the image of the link or of its nearest
     ancestor (up to 3 up) holding any, None when that ancestor holds several or links another result (theirs)."""
     if tile is not None:
         img = tile.find("img")
@@ -256,7 +256,7 @@ def _thumb(el, tile, url, base):
 def serp_results(html, base=GOOGLE_SEARCH):
     """(url, title, thumb) for every result link on a SERP, first occurrence per url; /goto links still unresolved.
     Images tiles: an anchor's href or the landing page in `data-lpage`, titled from the tile (see _tile_title). thumb:
-    the result's https image src (_thumb), else None; never fetched here."""
+    the result's image src (_thumb), else None; never fetched here."""
     out, thumbs = {}, {}
     for el in _Tree(html).root.descendants():
         if not ("data-lpage" in el.attrs or (el.name == "a" and "href" in el.attrs)):

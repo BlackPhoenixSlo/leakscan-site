@@ -2,6 +2,7 @@
 cleared with their query / alias / visibility, the `preview` read, `/v1/leaks?preview_only=1` and the thumb route's
 fetch-time checks. The thumb host is a loopback stub reached through a patched resolver and connect; no real network.
 All data fictional."""
+import base64
 import http.client
 import io
 import json
@@ -32,6 +33,11 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 24
 BODIES = {"/a.png": PNG, "/a.jpg": b"\xff\xd8\xff\xe0" + b"\0" * 16, "/a.gif": b"GIF89a" + b"\0" * 16,
           "/a.webp": b"RIFF\x0c\x00\x00\x00WEBPVP8 " + b"\0" * 8,
           "/page.html": b"<!doctype html><html><body>not an image</body></html>"}
+DATA = {"image/jpeg": BODIES["/a.jpg"], "image/png": PNG, "image/webp": BODIES["/a.webp"], "image/gif": BODIES["/a.gif"]}
+
+
+def uri(mime, body):
+    return f"data:{mime};base64,{base64.b64encode(body).decode()}"
 
 
 class _Stub(BaseHTTPRequestHandler):
@@ -145,12 +151,12 @@ class TestPreview(Base):
         self.assertIn("json", r.getheader("Content-Type"), msg)
 
     def test_store_allowlist(self):
-        """[ ] An allowlisted https tile stores thumb_url; a data: tile or a foreign host stores nothing."""
+        """[ ] An allowlisted https tile stores thumb_url; a refused data: tile or a foreign host stores nothing."""
         self.leak("w_mia_00001", "lk_m2", "https://pics.example-leaks.test/m2", kind="media", key_suffix="#google_videos")
         self.leak("w_mia_00001", "lk_page", "https://example-leaks.test/page")
         seen = ts(NOW)
         with tracker_db.db() as c:
-            for url in ("data:image/jpeg;base64,/9j/4AAQ", "http://encrypted-tbn0.gstatic.com/images?q=tbn:x",
+            for url in ("data:image/png;base64,/9j/4AAQ", "http://encrypted-tbn0.gstatic.com/images?q=tbn:x",
                         "https://example-leaks.test/a.png", "https://encrypted-tbn0.gstatic.com.evil/images?q=tbn:x",
                         "https://googleusercontent.com.evil/x.png", "https://evilgstatic.com/x.png", "https://gstatic.com/x.png",
                         "https://user@encrypted-tbn0.gstatic.com/x.png", "https://encrypted-tbn0.gstatic.com:8443/x.png",
@@ -173,6 +179,90 @@ class TestPreview(Base):
         self.assertEqual((self.row("lk_m2")["thumb_url"], self.row("lk_m2")["thumb_query_id"], self.row("lk_m2")["thumb_seen_at"]),
                          ("https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9Gc", "videos|alias:miavalex", later))
         self.assertEqual(self.row("lk_m1")["thumb_url"], f"https://{HOST}/a.png")
+
+    def blob_media(self, lid, src, wid="w_mia_00001", query="handle"):
+        seen = ts(NOW - timedelta(days=1))
+        self.media(wid, lid, None, seen)
+        with tracker_db.db() as c:
+            return tracker_preview.store_thumb(c, lid, src, f"images|{query}", seen)
+
+    def raw_thumb(self, lid):
+        c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=10)
+        c.request("GET", f"/v1/creators/w_mia_00001/leaks/{lid}/thumb", headers={"Authorization": f"Bearer {self.a}"})
+        r = c.getresponse()
+        data = r.read()
+        c.close()
+        return r.status, r.getheader("Content-Type"), r.getheader("Cache-Control"), r.getheader("X-Content-Type-Options"), data
+
+    def test_data_thumbs_stored_and_served_byte_exact(self):
+        """A data: jpeg / png / webp / gif tile is decoded at capture into thumb_blob + thumb_mime and served as stored."""
+        for i, (mime, body) in enumerate(DATA.items()):
+            lid = f"lk_d{i}"
+            self.assertTrue(self.blob_media(lid, uri(mime, body)), mime)
+            r = self.row(lid)
+            self.assertEqual((r["thumb_url"], r["thumb_mime"], bytes(r["thumb_blob"])), (None, mime, body))
+            self.assertEqual(self.items()[lid]["preview"], {"vertical": "images", "seen_at": ts(NOW - timedelta(days=1))})
+            self.assertEqual(self.raw_thumb(lid), (200, mime, "no-store", "nosniff", body))
+        self.assertEqual((self.resolved, self.connects, _Stub.hits), ([], [], []))
+        self.assertEqual(tracker_preview._counts, {"served_stored": 4})
+        with tracker_db.db() as c:
+            self.assertTrue(tracker_preview.store_thumb(c, "lk_d0", f"https://{HOST}/a.png", "images|handle", ts(NOW)))
+        self.assertEqual({k: self.row("lk_d0")[k] for k in ("thumb_url", "thumb_mime", "thumb_blob")},
+                         {"thumb_url": f"https://{HOST}/a.png", "thumb_mime": None, "thumb_blob": None})
+
+    def test_bad_data_thumbs_store_nothing(self):
+        """A MIME / magic mismatch, svg+xml, text/html, non-base64, junk base64 or an oversize data: tile stores nothing;
+        the length is bounded before any decode."""
+        jpg = DATA["image/jpeg"]
+        bad = [uri("image/png", jpg), uri("image/jpeg", PNG), uri("image/svg+xml", b"<svg/>"), uri("text/html", b"<b>x</b>"),
+               "data:image/jpeg,%FF%D8%FF", "data:image/jpeg;base64,@@@@", "data:image/jpeg;base64,/9j/4A",
+               uri("image/jpeg", b"not a jpeg"), "data:;base64,/9j/4AAQ", " " + uri("image/jpeg", jpg)]
+        self.assertFalse(self.blob_media("lk_bad", bad[0]))
+        with tracker_db.db() as c:
+            for u in bad:
+                self.assertFalse(tracker_preview.store_thumb(c, "lk_bad", u, "images|handle", ts(NOW)), u)
+                self.assertFalse(tracker_preview.storable(u), u)
+        with mock.patch.object(tracker_preview, "MAX_BYTES", len(jpg) - 1):
+            self.assertIsNone(tracker_preview.data_thumb(uri("image/jpeg", jpg)))
+        with mock.patch.object(tracker_preview.base64, "b64decode", side_effect=AssertionError("decoded")):
+            self.assertIsNone(tracker_preview.data_thumb("data:image/jpeg;base64,/9j/" + "A" * tracker_preview.DATA_MAX))
+        self.assertEqual({k: self.row("lk_bad")[k] for k in ("thumb_url", "thumb_mime", "thumb_blob", "thumb_query_id")},
+                         dict.fromkeys(("thumb_url", "thumb_mime", "thumb_blob", "thumb_query_id")))
+        self.assertIsNone(self.items()["lk_bad"]["preview"])
+        self.assert_refused(*self.thumb(lid="lk_bad"))
+
+    def test_data_thumb_clear_prune_purge(self):
+        """clear_thumb and prune drop the blob with the rest of the thumb; the purge drops the row."""
+        for lid, wid, query in (("lk_c", "w_mia_00001", "handle"), ("lk_p", "w_mia_00001", "alias:gone"),
+                                ("lk_k", "w_mia_00001", "handle"), ("lk_ashd", "w_ash_00002", "handle")):
+            self.assertTrue(self.blob_media(lid, uri("image/png", PNG), wid, query))
+        with tracker_db.db() as c:
+            tracker_preview.clear_thumb(c, "lk_c")
+            self.assertEqual(tracker_preview.prune(c, "w_mia_00001", {"images|handle"}), 1)
+        empty = dict.fromkeys(("thumb_url", "thumb_mime", "thumb_blob", "thumb_query_id", "thumb_seen_at"))
+        for lid in ("lk_c", "lk_p"):
+            self.assertEqual({k: self.row(lid)[k] for k in empty}, empty, lid)
+        self.assertEqual(bytes(self.row("lk_k")["thumb_blob"]), PNG)
+        self.assertEqual(self.req("DELETE", "/v1/watches/w_ash_00002", key=self.a)[0], 204)
+        self.assertEqual(tracker_purge.run(NOW + timedelta(days=31))["deleted_ids"], ["w_ash_00002"])
+        self.assertEqual(self.row("lk_ashd"), {})
+
+    def test_data_thumb_previews_off(self):
+        self.assertTrue(self.blob_media("lk_d", uri("image/png", PNG)))
+        with mock.patch.dict(os.environ, TRACKER_PREVIEWS="0"):
+            self.assertIsNone(self.items()["lk_d"]["preview"])
+            self.assert_refused(*self.thumb(lid="lk_d"))
+        self.assertEqual(tracker_preview._counts, {})
+
+    def test_data_thumb_route_makes_no_fetch(self):
+        """A stored blob is served without a request, a resolve or the fetch rate cap."""
+        self.assertTrue(self.blob_media("lk_d", uri("image/gif", DATA["image/gif"])))
+        never, cap = mock.Mock(side_effect=AssertionError("network")), mock.Mock()
+        with mock.patch.multiple(tracker_preview, fetch=never, _fetch=never, _resolve=never, _connect=never), \
+                mock.patch.object(tracker_api, "_THUMBS", cap):
+            for _ in range(3):
+                self.assertEqual(self.raw_thumb("lk_d")[::4], (200, DATA["image/gif"]))
+        self.assertEqual((never.call_count, cap.method_calls, self.resolved, self.connects, _Stub.hits), (0, [], [], [], []))
 
     def test_clear_query_alias_visibility_and_purge(self):
         """[ ] The query removed, the alias removed or visibility false clears it; the purge drops it."""

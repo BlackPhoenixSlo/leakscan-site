@@ -2,6 +2,7 @@
 landing page's, from the pages the pass already loads (FakePW tiles, see test_tracker_google.tile), with the tile's
 thumbnail kept only through tracker_preview.store_thumb; the pill follows the landing Leak's Origin status; the stub
 fetcher records every URL the probe asks for. No real network, no paid call. Fictional creators only."""
+import base64
 import json
 import os
 from unittest import mock
@@ -154,6 +155,27 @@ class TestMediaLeaks(Media):
                            "AND page = 0")[0]["results_json"]
         self.assertEqual(json.loads(cached), [[IMG, "Mia pics"], [other, "Mia set"], [data, "Mia data"]])
         self.assertNotIn("cdn.example", cached)
+
+    def test_data_tiles_store_decoded_thumbs_and_bad_ones_none(self):
+        jpg = b"\xff\xd8\xff\xe0" + b"\0" * 16
+        good = "data:image/jpeg;base64," + base64.b64encode(jpg).decode()
+        bad = {"svg": "data:image/svg+xml;base64,PHN2Zy8+", "html": "data:text/html;base64,PGI+eDwvYj4=",
+               "mismatch": "data:image/png;base64," + base64.b64encode(jpg).decode(), "raw": "data:image/jpeg,xyz",
+               "junk": "data:image/jpeg;base64,@@@@"}
+        urls = {k: f"{SITE}/gallery/mia_vale-{k}" for k in ("good", *bad)}
+        self.pw.links[("images", '"mia_vale"')] = [(urls["good"], "Mia good", good)] + [
+            (urls[k], f"Mia {k}", v) for k, v in bad.items()]
+        self.day(2)
+        items = self.items()
+        self.assertEqual((bytes(self.media(urls["good"])["thumb_blob"]), self.media(urls["good"])["thumb_mime"]),
+                         (jpg, "image/jpeg"))
+        self.assertIsNotNone(items[(urls["good"], "media")]["preview"])
+        for k in bad:
+            m = self.media(urls[k])
+            self.assertEqual((m["thumb_blob"], m["thumb_url"], items[(urls[k], "media")]["preview"]), (None, None, None), k)
+        cached = self.rows("SELECT results_json FROM serp_cache WHERE vertical = 'images' AND text = '\"mia_vale\"' "
+                           "AND page = 0")[0]["results_json"]
+        self.assertEqual(json.loads(cached), [[urls["good"], "Mia good", good]] + [[urls[k], f"Mia {k}"] for k in bad])
 
     def test_a_new_images_landing_counts_once_as_new(self):
         base = [(f"{SITE}/gallery/mia_vale-i0", "Mia pics zero")]
