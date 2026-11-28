@@ -9,6 +9,7 @@ Needles, norm() and the Leak / Pending hit writes are tracker_judge's; this rule
 import contextlib
 import json
 import os
+import queue
 import threading
 from datetime import timedelta
 
@@ -23,6 +24,9 @@ LEASE_H = 2
 MEGA_SITE = "leakshaven.com"
 _LOCK = threading.Lock()
 _busy = set()
+_Q = queue.Queue()
+_pending = set()
+_workers = []
 
 
 def _quick_candidates():
@@ -43,10 +47,38 @@ def claim_all(watch_ids):
 
 
 def start(watch_id):
-    """Seed in a daemon thread (inline, returning run()'s result, when TRACKER_SEED_INLINE=1)."""
+    """Queue the seed on a FIFO drained by TRACKER_SEED_WORKERS (default 2) daemon threads, started on the first call,
+    so a PUT burst can't run unbounded seeds at once; an id already queued or running isn't queued again. The queue is
+    lost on restart (the daily pass seeds unseeded watches). Inline, returning run()'s result, when
+    TRACKER_SEED_INLINE=1."""
     if os.environ.get("TRACKER_SEED_INLINE") == "1":
         return run(watch_id)
-    threading.Thread(target=run, args=(watch_id,), daemon=True, name="tracker seed").start()
+    k = max(1, int(os.environ.get("TRACKER_SEED_WORKERS") or 2))
+    with _LOCK:
+        if watch_id in _pending:
+            return
+        _pending.add(watch_id)
+        if not _workers:
+            _workers.extend(threading.Thread(target=_work, args=(_Q,), daemon=True, name="tracker seed")
+                            for _ in range(k))
+            for t in _workers:
+                t.start()
+        _Q.put(watch_id)
+        depth, k = _Q.qsize(), len(_workers)
+    if depth > k:
+        tracker_probe.log(f"tracker seed queued depth={depth}")
+
+
+def _work(q):
+    while True:
+        watch_id = q.get()
+        try:
+            run(watch_id)
+        except Exception as e:
+            tracker_probe.log(f"tracker seed worker error: {type(e).__name__}")
+        finally:
+            with _LOCK:
+                _pending.discard(watch_id)
 
 
 def admit_mega(c, watch_id, it, handle, at, first_scan=True):
