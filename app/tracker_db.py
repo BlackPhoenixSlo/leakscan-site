@@ -271,7 +271,7 @@ def plus(ts, **delta):
 
 
 def env_set(name):
-    """A comma-list env var (TRACKER_UNCAPPED_TENANTS, TRACKER_PAID_TENANTS) -> the set of its non-blank items."""
+    """A comma-list env var (TRACKER_UNCAPPED_TENANTS) -> the set of its non-blank items."""
     return {t.strip() for t in os.environ.get(name, "").split(",") if t.strip()}
 
 
