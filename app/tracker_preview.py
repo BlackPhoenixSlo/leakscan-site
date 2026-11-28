@@ -5,8 +5,10 @@ URL, its query id and its rank never leave the service, and logs hold counts onl
 
 A query id is `<vertical>|<field key>` of the full-pass query that returned the tile (query_id()); a thumb whose query
 leaves the plan, or whose Leak's Google visibility turns false, is cleared (tracker_lanes._visibility)."""
+import concurrent.futures
 import os
 import re
+import socket
 import threading
 import time
 from urllib.parse import urlsplit
@@ -18,12 +20,14 @@ THUMB_HOSTS = ("gstatic.com", "googleusercontent.com", "ggpht.com")
 VERTICALS = ("images", "videos")
 MAX_BYTES = 3 * 1024 * 1024
 TOTAL_S = 5.0
+PORT = 443
 URL_MAX = 2048
 _HOST = re.compile(r"^[a-z0-9.-]+$")
 _MAGIC = ((b"\xff\xd8\xff", "image/jpeg"), (b"\x89PNG\r\n\x1a\n", "image/png"), (b"GIF87a", "image/gif"),
           (b"GIF89a", "image/gif"))
 _LOCK = threading.Lock()
 _counts = {}
+_DNS = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="thumb-dns")
 
 
 def on():
@@ -73,7 +77,7 @@ def prune(c, watch_id, query_ids):
 
 def preview(row, visible):
     """The read's `preview` for a leaks row and its Google visibility: {vertical, seen_at} | None."""
-    if row["kind"] != "media" or not row["thumb_url"] or visible is not True or not on():
+    if row["kind"] != "media" or not row["thumb_url"] or not row["thumb_query_id"] or visible is not True or not on():
         return None
     return {"vertical": row["thumb_query_id"].partition("|")[0], "seen_at": row["thumb_seen_at"]}
 
@@ -86,11 +90,12 @@ def sniff(data):
 
 
 def _resolve(host, port):
-    return tracker_probe._resolve(host, port)
+    return [ai[4][0] for ai in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)]
 
 
 def _connect(ip, host, timeout):
-    return tracker_probe._HTTPS(ip, host, 443, timeout)
+    """tracker_probe's pinned HTTPS connection: TLS verified against host (SNI + certificate), TCP to ip."""
+    return tracker_probe._HTTPS(ip, host, PORT, timeout)
 
 
 def _count(outcome):
@@ -103,16 +108,18 @@ def _count(outcome):
 def _fetch(url):
     if not allowed(url):
         return "host"
-    p = urlsplit(url)
+    p, deadline = urlsplit(url), time.monotonic() + TOTAL_S
     try:
-        ips = _resolve(p.hostname, 443)
-    except OSError:
+        ips = _DNS.submit(_resolve, p.hostname, PORT).result(timeout=TOTAL_S)
+    except (OSError, concurrent.futures.TimeoutError):
         return "dns"
     if not ips or not all(tracker_probe.ip_ok(ip) for ip in ips):
         return "address"
-    deadline = time.monotonic() + TOTAL_S
-    conn = _connect(ips[0], p.hostname, TOTAL_S)
-    timer = threading.Timer(TOTAL_S, conn.kill)
+    left = deadline - time.monotonic()
+    if left <= 0:
+        return "slow"
+    conn = _connect(ips[0], p.hostname, left)
+    timer = threading.Timer(left, conn.kill)
     timer.daemon = True
     timer.start()
     try:

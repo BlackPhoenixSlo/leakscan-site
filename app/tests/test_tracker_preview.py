@@ -6,6 +6,9 @@ import http.client
 import io
 import json
 import os
+import shutil
+import ssl
+import subprocess
 import threading
 import time
 from datetime import timedelta
@@ -23,6 +26,7 @@ import tracker_probe
 import tracker_purge
 
 HOST = "encrypted-tbn0.gstatic.com"
+REAL_CONNECT = tracker_preview._connect
 PUBLIC_IP = "142.250.64.78"
 PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 24
 BODIES = {"/a.png": PNG, "/a.jpg": b"\xff\xd8\xff\xe0" + b"\0" * 16, "/a.gif": b"GIF89a" + b"\0" * 16,
@@ -89,7 +93,7 @@ class TestPreview(Base):
         super().setUp()
         os.environ.pop("TRACKER_PREVIEWS", None)
         _Stub.hits = []
-        self.dns, self.resolved, self.connects = {}, [], []
+        self.dns, self.resolved, self.connects, self.timeouts = {}, [], [], []
         for p in (mock.patch.object(tracker_preview, "_resolve", self.resolve),
                   mock.patch.object(tracker_preview, "_connect", self.connect),
                   mock.patch.dict(tracker_preview._counts, clear=True),
@@ -109,6 +113,7 @@ class TestPreview(Base):
 
     def connect(self, ip, host, timeout):
         self.connects.append((ip, host))
+        self.timeouts.append(timeout)
         return tracker_probe._HTTP("127.0.0.1", host, self.stub.server_address[1], timeout)
 
     def media(self, wid, lid, path, seen, vertical="images", query="handle", visible=True):
@@ -204,10 +209,14 @@ class TestPreview(Base):
         self.media("w_mia_00001", "lk_vid", "/a.jpg", seen, vertical="videos")
         self.leak("w_mia_00001", "lk_page", "https://example-leaks.test/page", google=True)
         self.set_url("lk_page", f"https://{HOST}/a.png")
+        self.media("w_mia_00001", "lk_noq", None, seen)
+        self.set_url("lk_noq", f"https://{HOST}/a.png")
         got = self.items()
         self.assertEqual({k: x["preview"] for k, x in got.items()},
                          {"lk_m1": {"vertical": "images", "seen_at": ts(NOW - timedelta(days=2))}, "lk_bare": None,
-                          "lk_hidden": None, "lk_unknown": None, "lk_vid": {"vertical": "videos", "seen_at": seen}, "lk_page": None})
+                          "lk_hidden": None, "lk_unknown": None, "lk_vid": {"vertical": "videos", "seen_at": seen}, "lk_page": None,
+                          "lk_noq": None})
+        self.assert_refused(*self.thumb(lid="lk_noq"))
         all_ = self.req("GET", "/v1/leaks?watch_id=w_mia_00001", key=self.a)[2]["leaks"]
         self.assertEqual({x["leak_id"]: x["preview"] for x in all_}, {k: x["preview"] for k, x in got.items()})
         text = json.dumps([got, all_, self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2],
@@ -274,7 +283,8 @@ class TestPreview(Base):
         """[ ] The thumb route refuses a private address after DNS, a redirect, port 8443, userinfo, a lookalike host
         (googleusercontent.com.evil), an oversize or slow body and HTML bytes, each as 404 with no-store."""
         for ips in (["10.0.0.7"], ["127.0.0.1"], ["169.254.169.254"], ["::1"], ["fe80::1"], [PUBLIC_IP, "192.168.1.4"],
-                    ["::ffff:10.0.0.7"], ["64:ff9b::a00:7"], []):
+                    ["::ffff:10.0.0.7"], ["64:ff9b::a00:7"], ["0.0.0.0"], ["100.64.0.1"], ["224.0.0.1"], ["240.0.0.1"],
+                    ["2001::1"], []):
             self.dns[HOST] = ips
             self.assert_refused(*self.thumb(), ips)
         self.assertEqual((self.connects, _Stub.hits), ([], []))
@@ -295,7 +305,7 @@ class TestPreview(Base):
             t0 = time.monotonic()
             self.assert_refused(*self.thumb(), "slow")
             self.assertLess(time.monotonic() - t0, 1.5)
-        self.assertEqual(tracker_preview._counts, {"refused_address": 9, "refused_host": 7, "refused_status": 2, "refused_type": 1,
+        self.assertEqual(tracker_preview._counts, {"refused_address": 14, "refused_host": 7, "refused_status": 2, "refused_type": 1,
                                                    "refused_size": 1, "refused_slow": 1})
 
     def test_thumb_scope(self):
@@ -316,11 +326,69 @@ class TestPreview(Base):
         self.assertEqual(self.req("HEAD", "/v1/creators/w_mia_00001/leaks/lk_m1/thumb", key=self.a)[0], 405)
         self.assertEqual(_Stub.hits, [])
 
+    def test_dns_inside_total_cap(self):
+        """DNS counts against the 5 s cap: a hung resolver is cut at the cap; a slow one leaves connect only what's left."""
+        def slow(host, port):
+            time.sleep(self.delay)
+            return [PUBLIC_IP]
+
+        with mock.patch.object(tracker_preview, "_resolve", slow), mock.patch.object(tracker_preview, "TOTAL_S", 0.4):
+            self.delay = 2.0
+            t0 = time.monotonic()
+            self.assert_refused(*self.thumb(), "hung dns")
+            self.assertLess(time.monotonic() - t0, 1.2)
+            self.assertEqual((tracker_preview._counts, self.connects), ({"refused_dns": 1}, []))
+            self.delay = 0.2
+            self.assertEqual(self.thumb()[0], 200)
+        self.assertLess(self.timeouts[0], 0.25)
+
+    def test_tls_verified(self):
+        """The real connect: tracker_probe's pinned HTTPS on 443 with certificate and hostname checks; a loopback TLS stub
+        with a self-signed certificate for HOST is refused before any request reaches it."""
+        c = REAL_CONNECT(PUBLIC_IP, HOST, 1)
+        self.assertIsInstance(c, tracker_probe._HTTPS)
+        self.assertEqual((c.port, c._ip, c.host, c._context.verify_mode, c._context.check_hostname),
+                         (443, PUBLIC_IP, HOST, ssl.CERT_REQUIRED, True))
+        if not shutil.which("openssl"):
+            self.skipTest("no openssl to mint a self-signed certificate")
+        cert, key = (os.path.join(self.tmp.name, n) for n in ("cert.pem", "key.pem"))
+        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "1",
+                        "-subj", f"/CN={HOST}", "-addext", f"subjectAltName=DNS:{HOST}"], check=True, capture_output=True)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(cert, key)
+        tls = ThreadingHTTPServer(("127.0.0.1", 0), _Stub)
+        tls.socket = ctx.wrap_socket(tls.socket, server_side=True)
+        threading.Thread(target=tls.serve_forever, daemon=True).start()
+        self.addCleanup(tls.server_close)
+        self.addCleanup(tls.shutdown)
+        self.dns[HOST] = ["127.0.0.1"]
+        with mock.patch.object(tracker_preview, "_connect", REAL_CONNECT), \
+                mock.patch.object(tracker_preview, "PORT", tls.server_address[1]), \
+                mock.patch.object(tracker_probe, "ip_ok", lambda ip: True):
+            self.assert_refused(*self.thumb(), "self-signed")
+        self.assertEqual((tracker_preview._counts, _Stub.hits), ({"refused_error": 1}, []))
+        trusting = tracker_probe._HTTPS("127.0.0.1", HOST, tls.server_address[1], 5)
+        trusting._context = ssl.create_default_context(cafile=cert)
+        trusting.request("GET", "/a.png")
+        self.assertEqual(trusting.getresponse().read(), PNG)
+        trusting.close()
+
+    def test_previews_off_deleted_watch(self):
+        """ASSUMPTION: previews off answers 404 before the watch lookup, so a deleted watch reads 404, not 410."""
+        self.req("DELETE", "/v1/watches/w_ash_00002", key=self.a)
+        self.assert_refused(*self.thumb("w_ash_00002", "lk_ash"), code=410)
+        with mock.patch.dict(os.environ, TRACKER_PREVIEWS="0"):
+            self.assert_refused(*self.thumb("w_ash_00002", "lk_ash"))
+        self.assertEqual(_Stub.hits, [])
+
     def test_rate_cap(self):
-        """The per-tenant rate cap answers 429 before any fetch; another tenant keeps its own budget."""
+        """The per-tenant rate cap answers 429 before any fetch, no Retry-After (ASSUMPTION, like put_watch's cap); another
+        tenant keeps its own budget."""
         with mock.patch.object(tracker_api, "_THUMBS", ratelimit.Limiter(rate_per_min=1, burst=1, max_concurrent=1)):
             self.assertEqual(self.thumb()[0], 200)
-            self.assert_refused(*self.thumb(), code=429)
+            st, r = self.thumb()
+            self.assert_refused(st, r, code=429)
+            self.assertIsNone(r.getheader("Retry-After"))
             self.assertEqual(self.thumb("w_bee_00001", "lk_bee", key=self.b)[0], 200)
         self.assertEqual(len(_Stub.hits), 2)
 

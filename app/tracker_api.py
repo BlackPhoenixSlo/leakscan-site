@@ -352,17 +352,16 @@ def all_leaks(t, q, raw):
 
 def thumb(t, q, raw, watch_id, leak_id):
     """The media Leak's thumbnail, fetched now under tracker_preview's checks; previews off, a Leak of another watch
-    or tenant, one without a preview, or any refused fetch -> 404."""
+    or tenant, one without a preview, or any refused fetch -> 404.
+    ASSUMPTION: previews off answers 404 before the watch lookup, so a deleted watch reads 404, not 410.
+    ASSUMPTION: the per-tenant cap answers 429 rate_limited with no Retry-After, like put_watch's hourly cap."""
     if not tracker_preview.on():
         raise _Err(404, NOT_FOUND)
     with tracker_db.db() as c:
         _own(c, t, watch_id)
         row = c.execute("SELECT * FROM leaks WHERE leak_id = ? AND watch_id = ?", (leak_id, watch_id)).fetchone()
-        seen = row and c.execute("SELECT data_json FROM leak_events WHERE leak_id = ? AND type = 'google_seen' "
-                                 "ORDER BY id DESC LIMIT 1", (leak_id,)).fetchone()
-    vis = tracker_db.visible_of(json.loads(seen[0] or "{}")) if seen else None
-    if not row or not tracker_preview.preview(row, vis):
-        raise _Err(404, NOT_FOUND)
+        if not row or not tracker_view.preview_of(c, row):
+            raise _Err(404, NOT_FOUND)
     if not _THUMBS.allow(t["tenant_id"]):
         raise _Err(429, RATE_LIMITED)
     try:
