@@ -64,6 +64,15 @@ class TestBuild(unittest.TestCase):
         self.assertEqual(rows(p)[7:], [("web", '"rowanash"', 1, "alias:0"), ("web", '"rowanash" leaked', 1, "alias:0"),
                                        ("images", '"rowanash"', 1, "alias:0"), ("videos", '"rowanash"', 1, "alias:0")])
 
+    def test_handle_or_alias_reading_as_words_is_qualified_in_images_and_videos(self):
+        p = tp.build(ident(["Rowan Ash"], username="mia.vale"), "fansly")
+        self.assertEqual([r for r in rows(p) if r[0] != "web"],
+                         [("images", '"mia.vale" fansly', 1, "handle"), ("videos", '"mia.vale" fansly', 1, "handle"),
+                          ("images", '"Rowan Ash" fansly', 1, "alias:0"), ("videos", '"Rowan Ash" fansly', 1, "alias:0")])
+        self.assertEqual(rows(p)[:2], [("web", '"mia.vale"', 2, "handle"), ("web", '"mia.vale" leaked', 2, "handle")])
+        self.assertEqual(rows(tp.build(ident(username="mia-vale"), "onlyfans"))[3][1], '"mia-vale" onlyfans')
+        self.assertEqual(rows(tp.build(ident(), "onlyfans"))[3:5], HANDLE_ROWS[3:5])
+
     def test_weak_alias_only_beside_handle(self):
         for alias in ("miav", "vee.x"):
             with self.subTest(alias):
