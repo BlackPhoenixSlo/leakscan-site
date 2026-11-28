@@ -10,8 +10,8 @@ import json
 import os
 import re
 import socket
+import sys
 import threading
-import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest import mock
 from urllib.parse import parse_qs, urlsplit
@@ -1505,8 +1505,17 @@ if __name__ == "__main__":
 
 
 class TestNoNetwork(Base):
-    def test_fake_keys_in_env_make_no_outbound_call(self):
-        """Only the conftest / fixture stubs stand between a test and Browserbase now that every tenant runs."""
+    def test_dotenv_cannot_restore_paid_keys(self):
+        import conftest
+        import web_common
+        env = os.path.join(self.tmp.name, ".env")
+        with open(env, "w", encoding="utf-8") as fh:
+            fh.write("".join(f"{k}=fake-{k.lower()}\n" for k in conftest.PAID_KEYS))
+        self.assertIn("public_app", sys.modules)
+        web_common.load_env(env)
+        self.assertEqual({k: os.environ.get(k) for k in conftest.PAID_KEYS}, dict.fromkeys(conftest.PAID_KEYS, ""))
+
+    def test_fake_keys_in_env_reach_only_the_closed_loopback_port(self):
         t, t2 = self.tenant("Agency A"), self.tenant("Agency B")
         with tdb.db() as c:
             c.execute("UPDATE tenants SET bb_key = 'bb-own-key-fake', bb_project = 'prj-b' WHERE tenant_id = ?", (t2,))
@@ -1514,20 +1523,27 @@ class TestNoNetwork(Base):
                                    "onlyfans").loads
         ws = [self.watch(t, weekly_slot=0, plan_loads=loads),
               self.watch(t2, account_id="acc-b", weekly_slot=0, plan_loads=loads)]
-        calls = []
+        seen, real = [], socket.getaddrinfo
 
-        def deny(*a, **kw):
-            calls.append(a)
-            raise AssertionError(f"network call in a test: {a!r}")
+        def lookup(host, *a, **kw):
+            if host != "127.0.0.1":
+                seen.append((host, a[0] if a else None))
+                raise AssertionError(f"DNS lookup in a test: {host}")
+            return real(host, *a, **kw)
+
+        def connect(sock, addr):
+            seen.append(tuple(addr[:2]))
+            raise ConnectionRefusedError(f"network call in a test: {addr!r}")
         with mock.patch.dict(os.environ, BROWSERBASE_API_KEY="bb-host-key-fake", BROWSERBASE_PROJECT_ID="prj-host",
                              DEEPSEEK_API_KEY="fake", GOOGLE_API_KEY="fake", GOOGLE_CSE_ID="fake",
                              TRACKER_UNCAPPED_TENANTS=t), \
-                mock.patch.object(socket.socket, "connect", deny), mock.patch.object(socket.socket, "connect_ex", deny), \
-                mock.patch.object(socket, "create_connection", deny), \
-                mock.patch.object(http.client.HTTPConnection, "connect", deny), \
-                mock.patch.object(urllib.request, "urlopen", deny):
+                mock.patch.object(tracker_serp, "_playwright", lambda: mock.Mock()), \
+                mock.patch.object(socket, "getaddrinfo", lookup), \
+                mock.patch.object(socket.socket, "connect", connect), \
+                mock.patch.object(socket.socket, "connect_ex", connect):
             tracker_scheduler.daily_pass(at(2))
-        self.assertEqual(calls, [])
+        self.assertTrue(seen)
+        self.assertEqual(set(seen), {("127.0.0.1", 9)})
         self.assertEqual(self.rows("SELECT lane, state, reason FROM lane_state WHERE lane LIKE 'google_%' "
                                    "ORDER BY watch_id = ?, lane", ws[0]),
                          [{"lane": "google_fresh", "state": "reduced", "reason": "google_failed"},
