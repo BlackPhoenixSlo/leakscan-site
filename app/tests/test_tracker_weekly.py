@@ -281,6 +281,24 @@ class TestTick(Weekly):
         self.assertEqual((ran, out["weekly"], out["refreshed"]), ([self.w, w3, w2], 2, 1))
         self.assertEqual(self.scans(w3), [("2026-11-03", "refresh", "ok")])
 
+    def test_refresh_posted_during_a_reseed_runs_before_the_next_seed(self):
+        s1, s2 = (self.watch(self.t, username=u, account_id=w, watch_id=w, seeded=False)
+                  for u, w in (("rowan_ash", "w_zz_s1"), ("juniper_lee", "w_zz_s2")))
+        ran, real = [], tracker_lanes.run_scan
+
+        def seed(wid, claimed=False):
+            ran.append(wid)
+            if wid == s1:
+                self.queue(tdb.now())
+
+        def scan(wid, day, serps):
+            ran.append(wid)
+            return real(wid, day, serps)
+        with mock.patch.object(tracker_seed, "run", side_effect=seed), \
+                mock.patch.object(tracker_lanes, "run_scan", side_effect=scan):
+            out = self.tick_at(ts(2, "04:00"), pack(1))
+        self.assertEqual((ran, out["refreshed"]), ([s1, self.w, s2], 1))
+
 
 class TestThisWeekStates(Weekly):
     def week(self, when, wid=None):

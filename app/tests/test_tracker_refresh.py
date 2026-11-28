@@ -177,6 +177,26 @@ class TestScan(Refresh):
         self.assertEqual(len(self.navs()), 21)
         self.assert_charged()
 
+    def test_slot_tick_crossing_utc_midnight_pays_once_for_a_refresh_drained_mid_tick(self):
+        w2 = self.watch(self.t, username="rowan_ash", account_id="acc-r", watch_id="w_zz_second", weekly_slot=0)
+        t, real = [tdb.parse(ts(2, "23:50"))], tracker_lanes.run_scan
+
+        def scan(wid, day, serps):
+            if wid == self.w:
+                with tdb.db() as c:
+                    c.execute("UPDATE watches SET refresh_queued_at = ? WHERE watch_id = ?", (tdb.now(), w2))
+            r = real(wid, day, serps)
+            if wid == w2:
+                t[0] = tdb.parse(ts(3, "00:05"))
+            return r
+        tdb.set_clock(lambda: t[0])
+        with mock.patch.object(tracker_lanes, "run_scan", side_effect=scan):
+            out = tracker_scheduler.daily_pass()
+        self.assertEqual((out["weekly"], out["refreshed"]), (1, 1))
+        self.assertEqual(self.scans(w2), [("2026-11-02", "refresh", "ok")])
+        self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM load_reservation WHERE unit = 'load' AND watch_id = ?",
+                                   w2)[0]["n"], 1)
+
 
 if __name__ == "__main__":
     import unittest

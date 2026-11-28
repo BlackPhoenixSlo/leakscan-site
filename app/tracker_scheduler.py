@@ -4,13 +4,14 @@ every TICK_S. A scan (tracker_lanes.run_scan: every lane of one watch) owns the 
 watch's refresh queue when it finishes. Each tick, in order:
   1. Queued refreshes (watches.refresh_queued_at, POST /v1/watches/{id}/refresh), at any hour: a `refresh` scan (an
      unseeded watch is seeded instead); a paused or deleted watch's queue is dropped. A refresh absorbs a pending
-     carry (its whole plan replaces it). The queue is drained again before each step-4 claim.
+     carry (its whole plan replaces it). The queue is drained again before each step-3/4 claim.
   From TRACKER_DAILY_AT (UTC HH:MM, default 04:00) on (before it, a tick that ran no refresh returns None):
   2. Rows still open from an earlier day (a crash) finish failed.
   3. The daily re-seed of every live unseeded watch (tracker_seed.claim retry: a failed or crashed seed row of the day).
   4. A `weekly` scan of every live seeded watch whose weekly_slot is today's weekday, unless a scan of it (a row with a
      trigger) started less than tracker_view.REFRESH_COOLDOWN_H before today's TRACKER_DAILY_AT: that scan is the week's
-     (today's weekly row is left to the claim, so a crashed one is taken over after tracker_seed.LEASE_H).
+     (today's weekly row is left to the claim, so a crashed one is taken over after tracker_seed.LEASE_H); re-checked
+     right before each claim, so a refresh drained mid-tick (even past UTC midnight) is the week's scan.
   5. Pending carries due today (tracker_lanes.run_carry) and the dead-streak confirm (tracker_probe.run confirm: a
      page whose latest settled probe was its first dead one is probed once on a later day); neither owns a row.
   6. The purge, once per UTC day.
@@ -47,12 +48,13 @@ def _finish(wid, day, outcome):
 
 
 def _claimed(wid, serps, out, trigger, retry=False):
-    """Claim wid's row at the real start (not the tick's) and run its scan -> True when it ran here."""
+    """Claim wid's row at the real start (not the tick's) and run its scan -> True when it ran here. serps is keyed by
+    UTC day: a tick crossing midnight gets the new day's sessions, serp_cache and breaker."""
     now = tdb.now_dt()
     with tdb.db() as c:
         mine = tracker_seed.claim(c, wid, now, retry=retry, trigger=trigger)
     if mine:
-        _scan(wid, tdb.day(now), serps, out)
+        _scan(wid, tdb.day(now), serps.setdefault(tdb.day(now), {}), out)
     return mine
 
 
@@ -99,20 +101,24 @@ def _pass(now, due):
         order = "ORDER BY created_at, watch_id"
         unseeded = [r[0] for r in c.execute(_LIVE + "AND seeded_at IS NULL " + order)]
     for wid in unseeded:
+        _drain(serps, out)
         _claimed(wid, serps, out, "seed", retry=True)
+    fresh = ("AND NOT EXISTS (SELECT 1 FROM daily_scans d WHERE d.watch_id = watches.watch_id AND d.trigger IS NOT NULL "
+             "AND d.started_at > ? AND NOT (d.day = ? AND d.trigger = 'weekly')) ")
     with tdb.db() as c:
-        slot = [r[0] for r in c.execute(
-            _LIVE + "AND seeded_at IS NOT NULL AND weekly_slot = ? AND NOT EXISTS (SELECT 1 FROM daily_scans d WHERE "
-            "d.watch_id = watches.watch_id AND d.trigger IS NOT NULL AND d.started_at > ? AND NOT "
-            "(d.day = ? AND d.trigger = 'weekly')) " + order, (now.weekday(), floor, today))]
+        slot = [r[0] for r in c.execute(_LIVE + "AND seeded_at IS NOT NULL AND weekly_slot = ? " + fresh + order,
+                                        (now.weekday(), floor, today))]
     for wid in slot:
         _drain(serps, out)
+        with tdb.db() as c:
+            if not c.execute(_LIVE + "AND watch_id = ? " + fresh, (wid, floor, today)).fetchone():
+                continue
         out["weekly"] += _claimed(wid, serps, out, "weekly")
     with tdb.db() as c:
         carried = [r[0] for r in c.execute(_LIVE + "AND carry_json IS NOT NULL " + order)]
     for wid in carried:
         try:
-            tracker_lanes.run_carry(wid, today, serps)
+            tracker_lanes.run_carry(wid, today, serps.setdefault(today, {}))
         except Exception as e:
             log(f"tracker carry failed: {type(e).__name__}")
     try:
