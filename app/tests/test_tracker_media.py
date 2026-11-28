@@ -156,14 +156,17 @@ class TestMediaLeaks(Media):
         self.assertNotIn("cdn.example", cached)
 
     def test_a_new_images_landing_counts_once_as_new(self):
+        base = [(f"{SITE}/gallery/mia_vale-i0", "Mia pics zero")]
+        self.pw.links[("images", '"mia_vale"')] = base
         self.day(2)
         before = self.get(f"/v1/creators/{self.w}")[1]
-        self.pw.links[("images", '"mia_vale"')] = [(IMG, "Mia pics", THUMB)]
+        self.pw.links[("images", '"mia_vale"')] = base + [(IMG, "Mia pics", THUMB)]
         self.day(9)
         after = self.get(f"/v1/creators/{self.w}")[1]
-        self.assertEqual(len(self.rows("SELECT * FROM leaks WHERE kind = 'media'")), 1)
+        self.assertEqual(len(self.rows("SELECT * FROM leaks WHERE kind = 'media'")), 2)
         self.assertEqual((before["this_week"]["new"], before["offer_counts"]["new_7d"]), (0, 0))
         self.assertEqual((after["this_week"]["new"], after["offer_counts"]["new_7d"]), (1, 1))
+        self.assertEqual((before["this_week"]["first_scan"], after["counts"]["new_today"]), (1, 1))
 
     def test_removed_alias_clears_its_media_thumb(self):
         self.pw.links[("images", '"miavale_x"')] = [(IMG, "Mia pics", THUMB)]

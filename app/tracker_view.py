@@ -201,7 +201,7 @@ def offer_counts(ls, counts, now_dt):
     old, week = tracker_db.fmt(now_dt - timedelta(days=OFFER_LIVE_DAYS)), tracker_db.day(now_dt - timedelta(days=OFFER_NEW_DAYS - 1))
     return {"visible": counts["live"] + counts["cached"], "came_back_30d": counts["came_back_30d"], "cached": counts["cached"],
             "live_30d": sum(x["pill"] == "live" and x["first_seen_at"] <= old for x in ls),
-            # owner default 2026-11-28: a media Leak is its landing's twin, never a second new one
+            # owner default 2026-11-28: a media Leak is its landing's twin, never a second new one (new_today, this_week too)
             "new_7d": sum(not x["found_on_first_scan"] and x["kind"] != "media" and x["first_seen_at"][:10] >= week
                           for x in ls)}
 
@@ -211,7 +211,7 @@ def creator(c, w, now_dt, ls):
     counts = {p: 0 for p in PILLS}
     for x in ls:
         counts[x["pill"]] += 1
-    found = [x["found_on_first_scan"] for x in ls if x["first_seen_at"][:10] == today]
+    found = [x["found_on_first_scan"] for x in ls if x["first_seen_at"][:10] == today and x["kind"] != "media"]
     counts["new_today"] = found.count(False)
     counts["found_on_first_scan"] = sum(x["found_on_first_scan"] for x in ls)
     counts["came_back_30d"] = sum(x["came_back"] for x in ls)
@@ -227,7 +227,8 @@ def creator(c, w, now_dt, ls):
             "last_checked_at": last, "next_check_at": next_check_at(w, started, now_dt), "next_refresh_at": refresh_at,
             "counts": counts,
             "this_week": {"since": since, "state": week_state(c, w, now_dt, started), "new": offer["new_7d"],
-                          "first_scan": sum(x["found_on_first_scan"] and x["first_seen_at"][:10] >= since for x in ls), "came_back": _changed(ls, since, "live", "gone"),
+                          "first_scan": sum(x["found_on_first_scan"] and x["kind"] != "media" and x["first_seen_at"][:10] >= since
+                                            for x in ls), "came_back": _changed(ls, since, "live", "gone"),
                           "gone": _changed(ls, since, "gone")},
             "service_status": "none", "service_status_since": None, "removal": None, "offer_counts": offer,
             "first_daily_at": first}
