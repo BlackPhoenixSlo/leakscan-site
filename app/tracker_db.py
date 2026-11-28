@@ -9,6 +9,7 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   leaks.landing_key a media Leak's landing page url_key (its own url_key is that + #google_images / #google_videos);
                     its pill reads that landing Leak's origin_status (tracker_view.landing_probes).
   leaks.thumb_url / thumb_query_id / thumb_seen_at   a media Leak's Google thumbnail (tracker_preview); never read out.
+  leaks.thumb_blob / thumb_mime   a data: tile's decoded thumbnail instead of thumb_url (tracker_preview.data_thumb).
   leak_site         registrable host of the Leak url (netloc.registrable), mega items: leakshaven.com.
   probe_state.last_status    raw last probe: live | dead | blocked | unknown.
   probe_state.origin_status  settled: NULL (no settled probe yet) | live | gone (gone = 2 dead in a row).
@@ -210,6 +211,8 @@ _COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
             ("leaks", "thumb_url", "TEXT"),
             ("leaks", "thumb_query_id", "TEXT"),
             ("leaks", "thumb_seen_at", "TEXT"),
+            ("leaks", "thumb_blob", "BLOB"),
+            ("leaks", "thumb_mime", "TEXT"),
             ("daily_scans", "trigger", "TEXT"),
             ("watches", "refresh_queued_at", "TEXT")]
 
