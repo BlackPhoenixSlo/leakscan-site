@@ -63,6 +63,7 @@ import tracker_db as tdb
 import tracker_judge
 import tracker_pagekind
 import tracker_plan
+import tracker_preview
 import tracker_probe
 import tracker_rules as rules
 import tracker_seed
@@ -589,9 +590,11 @@ def _visibility(c, w, full, returned, complete, at, judge):
     """After a full-pass run where some page completed: each Leak's google_fields_json gains the pairs that returned it
     and loses those whose field left the identity; google_seen{visible} is written on a change: true when returned;
     only when judge (the breaker held): null when a non-empty set became empty, false when every pair of the set still
-    in the plan completed in this run (complete) without returning it; otherwise (a fresh-only Leak too) it stays."""
+    in the plan completed in this run (complete) without returning it; otherwise (a fresh-only Leak too) it stays.
+    A thumb whose query left the plan, or whose Leak turned not visible, is cleared."""
     fields = {_field_key(f, v) for f, v in full.values.items()}
     planned = {_pair(q, full.values) for q in full.queries}
+    tracker_preview.prune(c, w["watch_id"], {tracker_preview.query_id(*p) for p in planned})
     last = {}
     for lid, data in c.execute("SELECT e.leak_id, e.data_json FROM leak_events e JOIN leaks l ON l.leak_id = e.leak_id "
                                "WHERE l.watch_id = ? AND e.type = 'google_seen' ORDER BY e.id", (w["watch_id"],)):
@@ -609,3 +612,5 @@ def _visibility(c, w, full, returned, complete, at, judge):
             False if checked and checked <= complete else cur
         if vis != cur:
             tdb.add_event(c, lid, "google_seen", {"visible": vis}, at)
+            if vis is False:
+                tracker_preview.clear_thumb(c, lid)

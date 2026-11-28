@@ -5,7 +5,9 @@ Times are UTC ISO strings `YYYY-MM-DDTHH:MM:SSZ` (sortable as text). `now()` is 
 probe_state, never stored (spec "Schema (Removal service)"). Stdlib only, one connection per call.
 
 Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_probe write it):
-  kind              page | mega | filehost | telegram. Every kind but `page` is link-only; only `page` is probed in P1.
+  kind              page | mega | filehost | telegram | media. Every kind but `page` is link-only; only `page` is probed.
+  leaks.landing_key a media Leak's landing page url_key (its own url_key is that + #google_images / #google_videos).
+  leaks.thumb_url / thumb_query_id / thumb_seen_at   a media Leak's Google thumbnail (tracker_preview); never read out.
   leak_site         registrable host of the Leak url (netloc.registrable), mega items: leakshaven.com.
   probe_state.last_status    raw last probe: live | dead | blocked | unknown.
   probe_state.origin_status  settled: NULL (no settled probe yet) | live | gone (gone = 2 dead in a row).
@@ -198,7 +200,11 @@ _COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
             # every Google Leak so far is the seed's (the fresh pass shipped gated off)
             ("leaks", "google_fields_json", "TEXT", f"UPDATE leaks SET google_fields_json = '{SEED_FIELDS}' "
              "WHERE leak_id IN (SELECT leak_id FROM leak_events WHERE type = 'seen' AND "
-             "data_json LIKE '%\"source\":\"google_web\"%')")]
+             "data_json LIKE '%\"source\":\"google_web\"%')"),
+            ("leaks", "landing_key", "TEXT"),
+            ("leaks", "thumb_url", "TEXT"),
+            ("leaks", "thumb_query_id", "TEXT"),
+            ("leaks", "thumb_seen_at", "TEXT")]
 
 _clock = None
 
