@@ -6,6 +6,8 @@ WORKDIR /app
 # Pillow: build_gallery.py / media_gather.py. curl_cffi + playwright (python package only, no browsers:
 # media_gather.py drives a remote Browserbase browser over CDP). Own layer so it caches apart from the code.
 RUN pip install --no-cache-dir Pillow curl_cffi playwright
+# playwright's bundled node driver needs libatomic.so.1, which -slim lacks (without it every Browserbase lane fails).
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && rm -rf /var/lib/apt/lists/*
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PUBLIC_HOST=0.0.0.0 \
