@@ -396,6 +396,29 @@ class AdmitHit(Base):
         self.assertEqual(self.rows("SELECT url, title, source FROM pending_hits"),
                          [{"url": f"{SITE}/video/101", "title": "mia_vale beach", "source": "site_search"}])
 
+    def test_media_key_and_landing_key(self):
+        wid = self.watch(self.tenant(), aliases=("miavale_x", "miav"))
+        with tdb.db() as c:
+            w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
+            got = [tracker_judge.admit_media(c, w, u, t, v, self.T0, first_scan=True) for u, t, v in (
+                (f"{SITE}/Gallery/mia_vale-7#t", "Pics", "images"), (f"{SITE}/Gallery/mia_vale-7", "again", "images"),
+                (f"{SITE}/clip/mia_vale-8", "Clip", "videos"), ("https://mega.nz/file/X1#mia_vale", "", "images"),
+                (f"{SITE}/post/9", "mia_vale set", "images"), ("https://onlyfans.com/mia_vale", "mia_vale", "videos"))]
+        self.assertEqual(got[1], got[0])
+        self.assertEqual([g is None for g in got], [False, False, False, False, True, True])
+        rows = self.rows("SELECT url_key, landing_key, leak_site, kind, title FROM leaks ORDER BY url_key")
+        self.assertEqual(rows, [
+            {"url_key": "leaksite.example/clip/mia_vale-8#google_videos", "landing_key": "leaksite.example/clip/mia_vale-8",
+             "leak_site": "leaksite.example", "kind": "media", "title": "Clip"},
+            {"url_key": "leaksite.example/gallery/mia_vale-7#google_images",
+             "landing_key": "leaksite.example/gallery/mia_vale-7", "leak_site": "leaksite.example", "kind": "media",
+             "title": "Pics"},
+            {"url_key": "mega.nz/file/x1#mia_vale#google_images", "landing_key": "mega.nz/file/x1#mia_vale",
+             "leak_site": "mega.nz", "kind": "media", "title": ""}])
+        self.assertEqual([e["type"] for e in self.events(got[0])], ["seen", "google_seen"])
+        self.assertEqual(self.events(got[2])[0]["data"], {"source": "google_videos", "first_scan": True})
+        self.assertEqual(self.rows("SELECT * FROM pending_hits"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

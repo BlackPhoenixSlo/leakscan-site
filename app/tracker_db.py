@@ -6,7 +6,8 @@ probe_state, never stored (spec "Schema (Removal service)"). Stdlib only, one co
 
 Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_probe write it):
   kind              page | mega | filehost | telegram | media. Every kind but `page` is link-only; only `page` is probed.
-  leaks.landing_key a media Leak's landing page url_key (its own url_key is that + #google_images / #google_videos).
+  leaks.landing_key a media Leak's landing page url_key (its own url_key is that + #google_images / #google_videos);
+                    its pill reads that landing Leak's origin_status (tracker_view.landing_probes).
   leaks.thumb_url / thumb_query_id / thumb_seen_at   a media Leak's Google thumbnail (tracker_preview); never read out.
   leak_site         registrable host of the Leak url (netloc.registrable), mega items: leakshaven.com.
   probe_state.last_status    raw last probe: live | dead | blocked | unknown.
@@ -14,8 +15,9 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
   leaks.recheck_at  the listing recheck's last attempt at this Leak (tracker_lanes), NULL = never.
   leaks.google_fields_json  [[vertical, field]] whose full-pass query ever returned the Leak (tracker_lanes); an alias
                     field is `alias:<norm(alias)>`, the seed's Google Leaks are [["web","handle"]]; NULL = none.
-  leak_events       seen{source: google_web|mega_index|site_search, first_scan: bool}; google_seen{visible: true |
-                    false | null} written only when visibility changes ({} = Phase 1's, visible); no google_seen = null;
+  leak_events       seen{source: google_web|google_images|google_videos|mega_index|site_search, first_scan: bool};
+                    google_seen{visible: true | false | null} written only when visibility changes ({} = Phase 1's,
+                    visible); no google_seen = null;
                     status{from: NULL|live|gone, to: live|gone, dead_since: ts|NULL} only when origin_status changes;
                     a mega Leak's status adds source: mega_index.
   daily_scans.outcome        NULL while running | ok | partial (a lane_day row of that day is partial or failed) | failed

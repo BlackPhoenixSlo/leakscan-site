@@ -7,7 +7,11 @@ other excluded or never-a-leak host, fake_aggregators.txt), then the Mega index 
 service's own hosts (public_app.CORS_ORIGINS), subdomains included. Needles are norm()ed: the handle (>= HANDLE_MIN),
 strong aliases (>= STRONG_MIN), weak aliases (HANDLE_MIN .. STRONG_MIN - 1). A URL holding the handle or a strong alias,
 or a weak alias while the title holds the handle -> Leak; a title holding the handle or a strong alias -> Pending hit;
-anything else -> None. The display name is never a needle."""
+anything else -> None. The display name is never a needle.
+
+An images / videos result is also a `media` Leak (admit_media): judged on its landing page's url and title like any hit,
+stored only on a `leak` verdict, keyed url_key(landing) + "#google_images" | "#google_videos" with landing_key set; the
+media itself (its image or video file) is never requested."""
 import json
 import re
 import sys
@@ -18,6 +22,8 @@ import tracker_db as tdb
 import tracker_rules as rules
 
 HANDLE_MIN, STRONG_MIN = 4, 5
+MEDIA = {"images": "google_images", "videos": "google_videos"}
+GOOGLE = ("google_web", *MEDIA.values())
 
 
 def norm(s):
@@ -58,13 +64,14 @@ def admission(w, url, title):
     return _verdict(w, url, title, host, rules.host_class(host))
 
 
-def admit(c, watch_id, url, key, site, kind, title, source, at, first_scan=True):
-    """A Leak with its seen{source, first_scan} event (and google_seen for google_web) -> 1, 0 when url_key is known;
-    a known Leak a google_web hit names gets google_seen{visible: true} when its last google_seen isn't visible."""
+def admit(c, watch_id, url, key, site, kind, title, source, at, first_scan=True, landing_key=None):
+    """A Leak with its seen{source, first_scan} event (and google_seen for a GOOGLE source) -> 1, 0 when url_key is
+    known; a known Leak a GOOGLE hit names gets google_seen{visible: true} when its last google_seen isn't visible."""
     leak_id = tdb.new_id("lk_")
-    if not c.execute("INSERT OR IGNORE INTO leaks (leak_id, watch_id, url_key, url, leak_site, kind, title, created_at) "
-                     "VALUES (?,?,?,?,?,?,?,?)", (leak_id, watch_id, key, url, site, kind, title, at)).rowcount:
-        if source == "google_web":
+    if not c.execute("INSERT OR IGNORE INTO leaks (leak_id, watch_id, url_key, url, leak_site, kind, title, created_at, "
+                     "landing_key) VALUES (?,?,?,?,?,?,?,?,?)",
+                     (leak_id, watch_id, key, url, site, kind, title, at, landing_key)).rowcount:
+        if source in GOOGLE:
             known = c.execute("SELECT leak_id FROM leaks WHERE watch_id = ? AND url_key = ?", (watch_id, key)).fetchone()
             last = c.execute("SELECT data_json FROM leak_events WHERE leak_id = ? AND type = 'google_seen' "
                              "ORDER BY id DESC LIMIT 1", (known[0],)).fetchone()
@@ -72,7 +79,7 @@ def admit(c, watch_id, url, key, site, kind, title, source, at, first_scan=True)
                 tdb.add_event(c, known[0], "google_seen", {"visible": True}, at)
         return 0
     tdb.add_event(c, leak_id, "seen", {"source": source, "first_scan": first_scan}, at)
-    if source == "google_web":
+    if source in GOOGLE:
         tdb.add_event(c, leak_id, "google_seen", None, at)
     return 1
 
@@ -101,3 +108,21 @@ def admit_hit(c, w, url, title, source, at, first_scan=False):
         else:
             pend(c, w["watch_id"], url, key, title, source, at)
     return verdict
+
+
+def media_key(url, vertical):
+    """The url_key of an images / videos result's media Leak: its landing page's leak_key + #google_<vertical>."""
+    return f"{leak_key(url)}#{MEDIA[vertical]}"
+
+
+def admit_media(c, w, url, title, vertical, at, first_scan=False):
+    """An images / videos result (landing url, title) -> its media Leak's leak_id (new or known), None when the
+    landing page's verdict isn't `leak`."""
+    host = rules.host_of(url)
+    kind = rules.host_class(host)
+    if _verdict(w, url, title, host, kind) != "leak":
+        return None
+    key = media_key(url, vertical)
+    admit(c, w["watch_id"], url, key, rules.registrable_domain(host) or host, "media", title, MEDIA[vertical], at,
+          first_scan, landing_key=leak_key(url, kind))
+    return c.execute("SELECT leak_id FROM leaks WHERE watch_id = ? AND url_key = ?", (w["watch_id"], key)).fetchone()[0]

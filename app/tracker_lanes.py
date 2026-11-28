@@ -38,7 +38,9 @@ lane_state.trimmed (lane `reduced`, the cap's reason, lane_day partial); refused
 gone watch records nothing); the watch is never paused. A scan's run (the whole plan) cut by cap_global /
 cap_tenant_month writes watches.carry_json: its cut pages run once on the cap's next_on (next UTC day / the 1st), never
 carried again; a later scan absorbs a pending carry (runs the whole plan, replaces the carry). Result links go through
-tracker_judge.admit_hit with source google_web (a /goto link is dropped); no other engine is called. Each returned
+tracker_judge.admit_hit with source google_web (a /goto link is dropped); no other engine is called. An images / videos
+result is also its media Leak (tracker_judge.admit_media), from the same page, no extra load; its tile's https thumbnail
+src (cached with the link) goes only through tracker_preview.store_thumb, never fetched here. Each returned
 link's (vertical, field) pairs join leaks.google_fields_json. Only a run that searched (a page completed, breaker intact) touches visibility: one that
 completed every planned pair of a Leak and returned none marks it not visible (google_seen visible false), a set
 emptied by fields leaving the identity unknown (null); a tripped breaker only adds pairs. A run with a completed page
@@ -327,9 +329,10 @@ class _Serp:
                       "VALUES (?,?,?,?,?,?)", (self.day, q.vertical, q.text, q.start, since, json.dumps(links)))
 
     def search(self, lane, r, url, vertical="web", strict=False):
-        """-> the page's [[url, title]], or None (incomplete; counts toward the breaker, links reset it). A load is
-        consumed right before each navigation, after its page is ready. A wall retries once in a fresh session while
-        the hold has a load left. strict: an empty page is complete only with Google's no-results wording."""
+        """-> the page's [[url, title]] (+ thumb on images / videos when the tile has one), or None (incomplete;
+        counts toward the breaker, links reset it). A load is consumed right before each navigation, after its page is
+        ready. A wall retries once in a fresh session while the hold has a load left. strict: an empty page is
+        complete only with Google's no-results wording."""
         links = self._search(lane, r, url, vertical, strict)
         if links is None:
             self.failed()
@@ -373,9 +376,9 @@ class _Serp:
                 walls += 1
                 self.drop()
                 continue
-            links = serp.serp_links(html, final)
+            links = serp.serp_results(html, final)
             if links:
-                return [list(x) for x in links]
+                return [[u, t] + ([th] if th and vertical in tracker_judge.MEDIA else []) for u, t, th in links]
             return [] if kind == "no_results" and (not strict or serp.says_no_results(html or "")) else None
         return None
 
@@ -472,10 +475,18 @@ def _full(w, day, serps, whole):
         first = _first(c, wid, FULL) or bool(carry and carry.get("first"))
         returned = {}
         for q, links in results:
-            for u, title in links:
-                if not serp.is_goto(u):
-                    tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
-                    returned.setdefault(tracker_judge.leak_key(u), set()).add(_pair(q, full.values))
+            pair = _pair(q, full.values)
+            for u, title, *thumb in links:
+                if serp.is_goto(u):
+                    continue
+                tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
+                returned.setdefault(tracker_judge.leak_key(u), set()).add(pair)
+                lid = tracker_judge.admit_media(c, w, u, title, q.vertical, at, first) \
+                    if q.vertical in tracker_judge.MEDIA else None
+                if lid:
+                    returned.setdefault(tracker_judge.media_key(u, q.vertical), set()).add(pair)
+                    if thumb:
+                        tracker_preview.store_thumb(c, lid, thumb[0], tracker_preview.query_id(*pair), at)
         if done:
             _visibility(c, w, full, returned, {p for p, ks in want.items() if ks <= done}, at, not browser.broken)
     new_carry = None

@@ -11,9 +11,12 @@ def counts(tenant_id):
     with tdb.db() as c:
         live = "FROM watches w WHERE w.tenant_id = ? AND w.deleted_at IS NULL"
         watches = c.execute(f"SELECT count(*) {live}", (tenant_id,)).fetchone()[0]
-        leaks = c.execute(f"SELECT l.leak_id, l.kind, p.origin_status, p.probes, p.first_dead, p.flaps, p.consecutive_dead "
+        leaks = c.execute(f"SELECT l.leak_id, l.kind, CASE WHEN l.kind = 'media' THEN lp.origin_status "
+                          f"ELSE p.origin_status END AS origin_status, p.probes, p.first_dead, p.flaps, p.consecutive_dead "
                           f"FROM leaks l JOIN watches w ON w.watch_id = l.watch_id LEFT JOIN probe_state p ON "
-                          f"p.leak_id = l.leak_id WHERE w.tenant_id = ? AND w.deleted_at IS NULL", (tenant_id,)).fetchall()
+                          f"p.leak_id = l.leak_id LEFT JOIN leaks ll ON l.kind = 'media' AND ll.watch_id = l.watch_id "
+                          f"AND ll.url_key = l.landing_key LEFT JOIN probe_state lp ON lp.leak_id = ll.leak_id "
+                          f"WHERE w.tenant_id = ? AND w.deleted_at IS NULL", (tenant_id,)).fetchall()
         events = {}
         for e in c.execute("SELECT e.leak_id, e.type, e.data_json FROM leak_events e JOIN leaks l ON l.leak_id = e.leak_id "
                            "JOIN watches w ON w.watch_id = l.watch_id WHERE w.tenant_id = ? AND w.deleted_at IS NULL "

@@ -68,11 +68,20 @@ class BBStub(ThreadingHTTPServer):
         self.base = f"http://127.0.0.1:{self.server_address[1]}"
 
 
+def tile(vertical, href, title, thumb=None):
+    """A result's markup; with a thumb, an images tile (data-lpage) or a result with its one image."""
+    if thumb is None:
+        return f'<div><a href="{href}"><h3>{title}</h3></a></div>'
+    if vertical == "images":
+        return f'<div data-lpage="{href}" aria-label="{title}"><a href="#"><img src="{thumb}"></a></div>'
+    return f'<div><a href="{href}"><h3>{title}</h3></a><img src="{thumb}"></div>'
+
+
 class FakePW:
     """Started sync Playwright stand-in: chromium.connect_over_cdp -> a browser whose pages record every goto as
     (connectUrl, url) in navs and the page's route handler in blocks. script: per-navigation overrides ("wall",
-    "fail", "shell" = a bare #search), else a results page with links[(vertical, q)], or links[q] on web (no links: the empty-result page).
-    page_fail: new_page raises."""
+    "fail", "shell" = a bare #search), else a results page with links[(vertical, q)] ((href, title[, thumb]), see
+    tile), or links[q] on web (no links: the empty-result page). page_fail: new_page raises."""
 
     def __init__(self):
         self.navs, self.routes, self.script, self.links, self.closed, self.page_fail = [], [], [], {}, [], False
@@ -105,8 +114,7 @@ class FakePW:
                 v = {"isch": "images", "vid": "videos"}.get(qs.get("tbm", [""])[0], "web")
                 links = pw.links.get((v, qs["q"][0]), pw.links.get(qs["q"][0], []) if v == "web" else [])
                 self.url = u
-                self.html = RESULTS.format("".join(f'<div><a href="{h}"><h3>{t}</h3></a></div>' for h, t in links)) \
-                    if links else EMPTY
+                self.html = RESULTS.format("".join(tile(v, *x) for x in links)) if links else EMPTY
 
             def content(self):
                 return self.html
@@ -259,11 +267,14 @@ class TestFullPass(Google):
         self.assertEqual(self.full()["last_success_at"], at(2))
         self.assertEqual(self.full_day(), [{"day": "2026-11-02", "outcome": "ok", "reason": None}])
         b = self.get(f"/v1/creators/{self.w}/leaks")[1]
-        self.assertEqual(sorted((x["url"], x["sources"], x["found_on_first_scan"]) for x in b["leaks"]),
-                         sorted((u, ["google_web"], True) for u in (web, img, vid)))
-        self.assertEqual({r["url"]: json.loads(r["google_fields_json"]) for r in self.rows(
-            "SELECT url, google_fields_json FROM leaks")}, {web: [["web", "handle"]], img: [["images", "handle"]],
-                                                            vid: [["videos", "handle"]]})
+        self.assertEqual(sorted((x["url"], x["kind"], x["sources"], x["found_on_first_scan"]) for x in b["leaks"]),
+                         sorted([(u, "page", ["google_web"], True) for u in (web, img, vid)]
+                                + [(img, "media", ["google_images"], True), (vid, "media", ["google_videos"], True)]))
+        self.assertEqual({(r["url"], r["kind"]): json.loads(r["google_fields_json"]) for r in self.rows(
+            "SELECT url, kind, google_fields_json FROM leaks")},
+            {(web, "page"): [["web", "handle"]], (img, "page"): [["images", "handle"]],
+             (vid, "page"): [["videos", "handle"]], (img, "media"): [["images", "handle"]],
+             (vid, "media"): [["videos", "handle"]]})
         self.assertEqual(len(self.rows("SELECT * FROM serp_cache WHERE since = ''")), 14)
 
     def test_images_blocker_keeps_images(self):
@@ -575,9 +586,9 @@ class TestFullPass(Google):
             self.assertEqual((self.used(self.w), self.used(w2)), (14, 0))
             self.assertEqual(self.lanes_of(w2, key2)["google_full"]["state"], "ok")
             b = self.get(f"/v1/creators/{w2}/leaks", key2)[1]
-            self.assertEqual([x["url"] for x in b["leaks"]], [hit])
+            self.assertEqual(sorted((x["url"], x["kind"]) for x in b["leaks"]), [(hit, "media"), (hit, "page")])
         self.assertEqual(self.rows("SELECT google_fields_json FROM leaks WHERE watch_id = ?", w2),
-                         [{"google_fields_json": '[["images","alias:miavalex"]]'}])
+                         [{"google_fields_json": '[["images","alias:miavalex"]]'}] * 2)
 
 
 class TestEveryTenant(Google):

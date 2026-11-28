@@ -83,6 +83,18 @@ class Parser(unittest.TestCase):
         self.assertEqual(serp_links(html), [("https://www.youtube.com/watch?v=abc", "Mia clip"),
                                             ("https://vids.test/v/9", "Mia on vids")])
 
+    def test_thumbs_are_the_results_own_https_image(self):
+        t = "https://encrypted-tbn0.gstatic.com/images?q=tbn:"
+        html = serp(f'<div data-lpage="https://example-e.test/g/1"><img src="data:x" data-src="{t}e"></div>',
+                    f'<div class="g"><a href="https://example-f.test/v/2"><h3>Mia clip</h3></a><img src="{t}f"></div>',
+                    f'<div class="g"><a href="https://example-g.test/v/3"><h3>Mia two</h3></a><img src="{t}g1">'
+                    f'<img src="{t}g2"></div>',
+                    '<div class="g"><a href="https://example-h.test/v/4"><h3>Mia http</h3></a>'
+                    '<img src="http://example-h.test/t.jpg"></div>')
+        self.assertEqual([(u, th) for u, _, th in ts.serp_results(html)],
+                         [("https://example-e.test/g/1", f"{t}e"), ("https://example-f.test/v/2", f"{t}f"),
+                          ("https://example-g.test/v/3", None), ("https://example-h.test/v/4", None)])
+
     def test_script_style_template_text_and_comments_are_no_title(self):
         html = serp('<div class="g"><a href="https://a.example/1"><h3>Mia<!-- c --> Vale<script>x()</script>'
                     '<template><b>hidden</b></template><style>.a{}</style></h3></a></div>')
