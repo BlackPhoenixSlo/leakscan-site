@@ -4,8 +4,10 @@ read. Aliases are classed by tracker_judge.norm() length, the rule
 matching uses (decision P2-D7): >= STRONG_MIN is searched alone, HANDLE_MIN .. STRONG_MIN - 1 only beside the handle.
 An alias or social whose norm() is under HANDLE_MIN (aliases only) or equals the handle's or an earlier kept value's is
 not searched. Field `alias:<i>` is the alias's index in aliases_json (appended, so the highest index is the last
-added). Phase 1 allows at most 5 aliases, so the plan is at most 9 + 5 * 4 + 2 = PLAN_MAX loads."""
+added). Images and videos search a value that reads as words (a space, "." or "-": Google splits on those, so
+"judi.roberts" also finds every real Judi Roberts) as '"<value>" <platform>'. Phase 1 allows at most 5 aliases, so the plan is at most 9 + 5 * 4 + 2 = PLAN_MAX loads."""
 import json
+import re
 from dataclasses import dataclass, replace
 
 import tracker_serp as serp
@@ -14,6 +16,7 @@ from tracker_judge import HANDLE_MIN, STRONG_MIN, norm
 LANE = "google_full"
 PLAN_MAX = 31
 _BARE, _LEAKED = serp.TEMPLATES[:2]
+_WORDS = re.compile(r"[\s.-]")
 
 
 @dataclass(frozen=True)
@@ -100,12 +103,13 @@ def _fields(identity):
 def build(identity, platform):
     values, strong = _fields(identity)
     h = values["handle"]
+    media = lambda vertical, v, f: _q(vertical, '"{h}" {p}' if _WORDS.search(v) else _BARE, v, f, p=platform)
     qs = [_q("web", _BARE, h, "handle", 2), _q("web", _LEAKED, h, "handle", 2), _q("web", '"{h}" {p}', h, "handle", p=platform),
-          _q("images", _BARE, h, "handle"), _q("videos", _BARE, h, "handle"),
+          media("images", h, "handle"), media("videos", h, "handle"),
           *(_q("web", t, h, "handle") for t in serp.FILE_HOST_TEMPLATES)]
     for f, v in values.items():
         if f in strong and strong[f]:
-            qs += [_q("web", _BARE, v, f), _q("web", _LEAKED, v, f), _q("images", _BARE, v, f), _q("videos", _BARE, v, f)]
+            qs += [_q("web", _BARE, v, f), _q("web", _LEAKED, v, f), media("images", v, f), media("videos", v, f)]
         elif f in strong:
             qs.append(_q("web", '"{h}" "{w}"', h, f, w=v))
         elif f != "handle":
