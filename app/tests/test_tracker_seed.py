@@ -305,6 +305,7 @@ class TestPool(Stubs):
     def setUp(self):
         super().setUp()
         self.running, self.peak, self.calls, self.release = 0, 0, [], threading.Event()
+        self.entered = threading.Event()
         self.addCleanup(self.release.set)
         for p in (mock.patch.multiple(tracker_seed, _Q=queue.Queue(), _workers=[], _pending=set()),
                   mock.patch.object(tracker_seed, "_quick_candidates", return_value=self.cand)):
@@ -322,6 +323,7 @@ class TestPool(Stubs):
             self.calls.append(h)
             self.running += 1
             self.peak = max(self.peak, self.running)
+        self.entered.set()
         self.release.wait(10)
         with tracker_seed._LOCK:
             self.running -= 1
@@ -380,11 +382,15 @@ class TestPool(Stubs):
 
     def test_pool_seed_and_daily_pass_never_double_run(self):
         w = self.watch(self.t, username=H, seeded=False)
-        tracker_seed.start(w)
-        self.assertTrue(until(lambda: self.running == 1))
-        self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 0)
-        self.release.set()
-        self.assertTrue(until(lambda: self.seeded() == 1))
+        finished, real = threading.Event(), tracker_seed._finish
+        # seeded_at lands before the first probe pass and _finish write the outcome; wait for the row itself
+        with mock.patch.object(tracker_seed, "_finish", side_effect=lambda wid, *a: (real(wid, *a), wid == w and finished.set())):
+            tracker_seed.start(w)
+            self.assertTrue(self.entered.wait(10))
+            self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 0)
+            self.release.set()
+            self.assertTrue(finished.wait(10))
+        self.assertEqual(self.seeded(), 1)
         self.assertEqual(self.calls, [H])
         self.assertEqual(self.rows("SELECT outcome FROM daily_scans WHERE watch_id = ?", w), [{"outcome": "ok"}])
 

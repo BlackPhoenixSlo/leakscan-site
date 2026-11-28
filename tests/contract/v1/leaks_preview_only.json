@@ -14,7 +14,7 @@
         "leak_id": "lk_0005",
         "leak_site": "example-leaks.test",
         "origin_status": null,
-        "pill": "listed",
+        "pill": "not_checked",
         "preview": {
           "seen_at": "2026-11-27T04:03:00Z",
           "vertical": "images"

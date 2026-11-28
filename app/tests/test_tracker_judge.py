@@ -396,6 +396,35 @@ class AdmitHit(Base):
         self.assertEqual(self.rows("SELECT url, title, source FROM pending_hits"),
                          [{"url": f"{SITE}/video/101", "title": "mia_vale beach", "source": "site_search"}])
 
+    def test_media_key_and_landing_key(self):
+        wid = self.watch(self.tenant(), aliases=("miavale_x", "miav"))
+        with tdb.db() as c:
+            w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
+            got = [tracker_judge.admit_media(c, w, u, t, v, self.T0, first_scan=True) for u, t, v in (
+                (f"{SITE}/Gallery/mia_vale-7#t", "Pics", "images"), (f"{SITE}/Gallery/mia_vale-7", "again", "images"),
+                (f"{SITE}/clip/mia_vale-8", "Clip", "videos"), ("https://mega.nz/file/X1#mia_vale", "", "images"))]
+            landing = tracker_judge.admit(c, wid, f"{SITE}/Gallery/mia_vale-7", "leaksite.example/gallery/mia_vale-7",
+                                          "leaksite.example", "page", "Pics", "google_web", self.T0)
+        self.assertEqual(got[1], got[0])
+        self.assertEqual([k for _, k in got], ["leaksite.example/gallery/mia_vale-7#google_images"] * 2 + [
+            "leaksite.example/clip/mia_vale-8#google_videos", "mega.nz/file/x1#mia_vale#google_images"])
+        self.assertTrue(landing[1])
+        self.assertNotIn(landing[0], {lid for lid, _ in got})
+        got = [lid for lid, _ in got]
+        rows = self.rows("SELECT url_key, landing_key, leak_site, kind, title FROM leaks WHERE kind = 'media' "
+                         "ORDER BY url_key")
+        self.assertEqual(rows, [
+            {"url_key": "leaksite.example/clip/mia_vale-8#google_videos", "landing_key": "leaksite.example/clip/mia_vale-8",
+             "leak_site": "leaksite.example", "kind": "media", "title": "Clip"},
+            {"url_key": "leaksite.example/gallery/mia_vale-7#google_images",
+             "landing_key": "leaksite.example/gallery/mia_vale-7", "leak_site": "leaksite.example", "kind": "media",
+             "title": "Pics"},
+            {"url_key": "mega.nz/file/x1#mia_vale#google_images", "landing_key": "mega.nz/file/x1#mia_vale",
+             "leak_site": "mega.nz", "kind": "media", "title": ""}])
+        self.assertEqual([e["type"] for e in self.events(got[0])], ["seen", "google_seen"])
+        self.assertEqual(self.events(got[2])[0]["data"], {"source": "google_videos", "first_scan": True})
+        self.assertEqual(self.rows("SELECT * FROM pending_hits"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

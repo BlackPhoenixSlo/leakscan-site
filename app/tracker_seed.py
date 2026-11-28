@@ -88,7 +88,8 @@ def admit_mega(c, watch_id, it, handle, at, first_scan=True):
     key, term = rules.url_key(url), tracker_judge.norm(it.get("match_term"))
     if (how == "handle" and len(handle) >= tracker_judge.HANDLE_MIN) or (
             how == "alias" and len(term) >= tracker_judge.STRONG_MIN):
-        return tracker_judge.admit(c, watch_id, url, key, MEGA_SITE, "mega", title, "mega_index", at, first_scan), 0
+        return int(tracker_judge.admit(c, watch_id, url, key, MEGA_SITE, "mega", title, "mega_index", at,
+                                       first_scan)[1]), 0
     return 0, tracker_judge.pend(c, watch_id, url, key, title, "mega_index", at)
 
 
@@ -170,7 +171,7 @@ def _seed(w, at):
             key = tracker_judge.leak_key(url, cls)
             if any(n in tracker_judge.norm(url) for n in strong):
                 if tracker_judge.admit(c, watch_id, url, key, rules.registrable_domain(host) or host, cls, title,
-                                       "google_web", at):
+                                       "google_web", at)[1]:
                     admitted += 1
                     c.execute("UPDATE leaks SET google_fields_json = ? WHERE watch_id = ? AND url_key = ?",
                               (tdb.SEED_FIELDS, watch_id, key))
