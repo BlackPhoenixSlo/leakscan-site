@@ -1,12 +1,10 @@
-"""Query plan (spec "Interfaces" tracker_plan, "Full Google pass" table, "Google fresh pass"). Pure: a row-shaped Leak
-identity (username, aliases_json, instagram, x) -> the weekly full pass's ordered queries, their loads and trim order,
-and the daily fresh query. The display name is never read. Aliases are classed by tracker_judge.norm() length, the rule
+"""Query plan (spec "Interfaces" tracker_plan, "Full Google pass" table). Pure: a row-shaped Leak identity (username,
+aliases_json, instagram, x) -> the full pass's ordered queries, their loads and trim order. The display name is never
+read. Aliases are classed by tracker_judge.norm() length, the rule
 matching uses (decision P2-D7): >= STRONG_MIN is searched alone, HANDLE_MIN .. STRONG_MIN - 1 only beside the handle.
 An alias or social whose norm() is under HANDLE_MIN (aliases only) or equals the handle's or an earlier kept value's is
 not searched. Field `alias:<i>` is the alias's index in aliases_json (appended, so the highest index is the last
-added). Phase 1 allows at most 5 aliases, so the plan is at most 9 + 5 * 4 + 2 = PLAN_MAX loads. A handle-only fresh
-query has the same text, vertical and page as the full pass's handle web page 1, so a SERP cache key needs `since`
-(or the URL)."""
+added). Phase 1 allows at most 5 aliases, so the plan is at most 9 + 5 * 4 + 2 = PLAN_MAX loads."""
 import json
 from dataclasses import dataclass, replace
 
@@ -15,7 +13,6 @@ from tracker_judge import HANDLE_MIN, STRONG_MIN, norm
 
 LANE = "google_full"
 PLAN_MAX = 31
-WORD_LIMIT = 32
 _BARE, _LEAKED = serp.TEMPLATES[:2]
 
 
@@ -115,15 +112,3 @@ def build(identity, platform):
             qs.append(_q("web", _BARE, v, f))
     return Plan(tuple(qs), values)
 
-
-def fresh(identity):
-    """The daily past-day web query, page 1: handle, strong aliases and socials OR-joined, weak aliases left out,
-    trimmed in the full pass's drop order to WORD_LIMIT whitespace words ("OR" counted); the handle is always kept."""
-    values, strong = _fields(identity)
-    terms = {f: v for f, v in values.items() if strong.get(f, True)}
-    text = lambda: " OR ".join(_BARE.format(h=v) for v in terms.values())
-    for f in _drop_order(terms):
-        if len(text().split()) <= WORD_LIMIT:
-            break
-        del terms[f]
-    return QuerySpec("google_fresh", "web", text(), 1, "fresh", since="d")

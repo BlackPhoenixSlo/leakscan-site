@@ -246,7 +246,7 @@ class TestSeed(Stubs):
             self.assertEqual(tracker_seed.run(w)["outcome"], "failed")
         self.assertEqual(self.up.calls, [])
 
-    def test_post_daily_at_enrolment_probed_once_that_day(self):
+    def test_post_daily_at_enrolment_probed_once_until_its_next_slot(self):
         self.clock("2026-11-02T10:00:00Z")
         w = self.watch(self.tenant(), username=H, seeded=False)
         tracker_seed.run(w)
@@ -258,6 +258,9 @@ class TestSeed(Stubs):
         tracker_scheduler.daily_pass()
         self.assertEqual(len(tracker_stub_fetch.CALLS), first)
         self.clock("2026-11-03T04:00:00Z")
+        tracker_scheduler.daily_pass()
+        self.assertEqual(len(tracker_stub_fetch.CALLS), first)
+        self.clock("2026-11-09T04:00:00Z")
         tracker_scheduler.daily_pass()
         self.assertEqual(len(tracker_stub_fetch.CALLS), 2 * first)
 

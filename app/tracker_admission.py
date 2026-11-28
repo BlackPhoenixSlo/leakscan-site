@@ -1,7 +1,7 @@
 """Weekly slot admission (spec "Interfaces" tracker_admission). Weekday 0 = Monday (date.weekday()). Every
-non-deleted watch, paused or not, costs 1 fresh load each day plus its plan_loads on its weekly_slot day, so resuming
-never needs admission. Admission binds on create only: an identity edit recomputes plan_loads and is never refused,
-runtime trimming and tracker_budget.reserve hold the cap after that."""
+non-deleted watch, paused or not, costs its plan_loads on its weekly_slot day, so resuming never needs admission;
+refresh and carry loads are not planned (reservations trim them). Admission binds on create only: an identity edit
+recomputes plan_loads and is never refused, runtime trimming and tracker_budget.reserve hold the cap after that."""
 from dataclasses import dataclass
 
 import tracker_plan
@@ -30,7 +30,7 @@ def plan_loads(identity):
 
 
 def projected(c):
-    p = [c.execute("SELECT COUNT(*) FROM watches WHERE deleted_at IS NULL").fetchone()[0]] * 7
+    p = [0] * 7
     for d, n in c.execute("SELECT weekly_slot, SUM(plan_loads) FROM watches WHERE deleted_at IS NULL "
                           "AND weekly_slot IS NOT NULL GROUP BY weekly_slot"):
         p[d] += n
@@ -46,7 +46,7 @@ def _fits(c, plan):
     p = projected(c)
     cap = c.execute("SELECT daily_loads FROM tracker_limits WHERE id = 1").fetchone()[0]
     d = _least(p)
-    return d if p[d] + plan + 1 <= cap and max(p) + 1 <= cap else None
+    return d if p[d] + plan <= cap else None
 
 
 def accepting_new(c):

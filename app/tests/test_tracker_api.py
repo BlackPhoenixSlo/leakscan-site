@@ -217,7 +217,7 @@ class TestWatches(Base):
         self.put("w_bee_00001", self.b, account_id="1")
         self.assertEqual([self.req("GET", "/v1/me", key=k)[2]["accepting_new"] for k in (self.a, self.b)], [True, True])
         with tracker_db.db() as c:
-            c.execute("UPDATE tracker_limits SET daily_loads = 15")
+            c.execute("UPDATE tracker_limits SET daily_loads = 12")
         self.assertEqual([self.req("GET", "/v1/me", key=k)[2]["accepting_new"] for k in (self.a, self.b)], [False, False])
         self.assertEqual(self.put("w_two_00002", account_id="2")[::2], (409, {"error": "waitlist"}))
         self.assertIsNone(self.watch("w_two_00002"))
@@ -488,17 +488,19 @@ class TestPill(Base):
             row = self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]
         self.assertEqual(row["counts"], {"live": 3, "cached": 1, "gone": 3, "listed": 2, "not_checked": 3, "new_today": 1,
                                          "found_on_first_scan": 8, "came_back_30d": 1})
-        self.assertEqual((row["last_checked_at"], row["next_check_at"], row["seeded"]), (d(1), "2026-11-27T13:30:00Z", False))
-        self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["next_check_at"], "2026-11-28T04:00:00Z")
-        self.clock = NOW.replace(hour=3, minute=59)
-        self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["next_check_at"], "2026-11-27T04:00:00Z")
-        self.clock = NOW.replace(hour=4, minute=0)
-        self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["next_check_at"], "2026-11-28T04:00:00Z")
+        self.assertEqual((row["last_checked_at"], row["next_check_at"], row["seeded"]), (d(1), "2026-11-30T13:30:00Z", False))
+        nxt = lambda: self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["next_check_at"]
+        self.assertEqual(nxt(), "2026-11-30T04:00:00Z")
+        with tracker_db.db() as c:
+            c.execute("UPDATE watches SET weekly_slot = ?", (NOW.weekday(),))
+        self.assertEqual(nxt(), "2026-11-27T04:00:00Z")
+        with tracker_db.db() as c:
+            c.execute("UPDATE daily_scans SET trigger = 'refresh' WHERE day = '2026-11-26'")
+        self.assertEqual(nxt(), "2026-12-04T04:00:00Z")
 
 
 class TestLanes(Base):
-    LANES = [("origin_probe", "daily"), ("mega_lookup", "daily"), ("listing_recheck", "daily"), ("google_fresh", "daily"),
-             ("google_full", "weekly"), ("registry_crawl", "weekly")]
+    LANES = [(n, "weekly") for n in ("origin_probe", "mega_lookup", "listing_recheck", "google_full", "registry_crawl")]
 
     def lane_row(self, wid, lane, state="ok", reason=None):
         with tracker_db.db() as c:
@@ -518,7 +520,7 @@ class TestLanes(Base):
         self.lane_row("w_mia_00001", "origin_probe")
         self.lane_row("w_mia_00001", "mega_lookup", "failed", "lane_failed")
         got = {x["lane"]: x for x in self.lanes("w_mia_00001")}
-        self.assertEqual(got["mega_lookup"], {"lane": "mega_lookup", "cadence": "daily", "state": "failed", "reason": "lane_failed",
+        self.assertEqual(got["mega_lookup"], {"lane": "mega_lookup", "cadence": "weekly", "state": "failed", "reason": "lane_failed",
                                               "last_success_at": ts(NOW - timedelta(days=1)), "last_attempt_at": ts(NOW),
                                               "next_attempt_on": "2026-11-28", "trimmed": []})
         self.assertEqual(got["origin_probe"]["state"], "ok")
@@ -543,7 +545,7 @@ class TestLanes(Base):
         self.put("w_mia_00001", paused=True)
         got = self.lanes("w_mia_00001")
         self.assertEqual({x["state"] for x in got}, {"paused"})
-        self.assertEqual([x["last_success_at"] for x in got], [None, ts(NOW - timedelta(days=1)), None, None, None, None])
+        self.assertEqual([x["last_success_at"] for x in got], [None, ts(NOW - timedelta(days=1)), None, None, None])
         self.assertEqual({x["next_attempt_on"] for x in got}, {None})
 
     def test_tenant_isolation(self):
@@ -555,57 +557,60 @@ class TestLanes(Base):
         self.assertEqual(next(x for x in self.lanes("w_mia_00001") if x["lane"] == "mega_lookup")["state"], "ok")
 
 
-class TestToday(Base):
-    DAY = "2026-11-27"
+class TestThisWeek(Base):
+    DAY, SINCE = "2026-11-27", "2026-11-21"
 
     def scan(self, wid, finished=True, outcome="ok", day=DAY):
         with tracker_db.db() as c:
-            c.execute("INSERT OR REPLACE INTO daily_scans (watch_id, day, started_at, finished_at, outcome) VALUES (?,?,?,?,?)",
-                      (wid, day, f"{day}T04:00:00Z", f"{day}T04:05:00Z" if finished else None, outcome if finished else None))
+            c.execute("INSERT OR REPLACE INTO daily_scans (watch_id, day, started_at, finished_at, outcome, trigger) "
+                      "VALUES (?,?,?,?,?, 'refresh')", (wid, day, f"{day}T04:00:00Z", f"{day}T04:05:00Z" if finished else None,
+                                                        outcome if finished else None))
 
     def lane_day(self, wid, lane, outcome, reason=None, day=DAY):
         with tracker_db.db() as c:
             c.execute("INSERT OR REPLACE INTO lane_day (watch_id, day, lane, outcome, reason) VALUES (?,?,?,?,?)",
                       (wid, day, lane, outcome, reason))
 
-    def today(self, wid="w_mia_00001", key=None):
+    def week(self, wid="w_mia_00001", key=None):
         one = self.req("GET", f"/v1/creators/{wid}", key=key or self.a)[2]
         row = next(x for x in self.req("GET", "/v1/creators", key=key or self.a)[2]["creators"] if x["watch_id"] == wid)
-        self.assertEqual(one["today"], row["today"])
-        return row["today"]
+        self.assertEqual(one["this_week"], row["this_week"])
+        self.assertNotIn("today", one)
+        return row["this_week"]
 
     def state(self, wid="w_mia_00001"):
-        return self.today(wid)["state"]
+        return self.week(wid)["state"]
 
     def test_shape_and_counts(self):
         self.put("w_mia_00001")
-        self.assertEqual(self.today(), {"day": self.DAY, "state": "pending", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
+        zero = {"since": self.SINCE, "state": "pending", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0}
+        self.assertEqual(self.week(), zero)
         h = lambda hour, days=0: ts(NOW.replace(hour=hour) - timedelta(days=days))
         self.leak("w_mia_00001", "lk_new", "https://example-leaks.test/new", seen=h(4), first_scan=False)
         self.leak("w_mia_00001", "lk_new2", "https://example-leaks.test/new2", seen=h(0), first_scan=False)
+        self.leak("w_mia_00001", "lk_edge", "https://example-leaks.test/edge", seen=h(0, 6), first_scan=False)
         self.leak("w_mia_00001", "lk_first", "https://example-leaks.test/first", seen=h(4))
-        self.leak("w_mia_00001", "lk_old_new", "https://example-leaks.test/oldnew", seen=h(23, 1), first_scan=False)
-        self.leak("w_mia_00001", "lk_old_first", "https://example-leaks.test/oldfirst", seen=h(23, 1))
+        self.leak("w_mia_00001", "lk_old_new", "https://example-leaks.test/oldnew", seen=h(23, 7), first_scan=False)
+        self.leak("w_mia_00001", "lk_old_first", "https://example-leaks.test/oldfirst", seen=h(23, 7))
         self.leak("w_mia_00001", "lk_back", "https://example-leaks.test/back", seen=h(4, 9),
-                  statuses=[(h(4, 9), None, "live", None), (h(4, 3), "live", "gone", h(4, 4)), (h(4), "gone", "live", None)])
+                  statuses=[(h(4, 9), None, "live", None), (h(4, 8), "live", "gone", h(4, 9)), (h(4), "gone", "live", None)])
         self.leak("w_mia_00001", "lk_back_old", "https://example-leaks.test/backold", seen=h(4, 9),
-                  statuses=[(h(4, 5), "live", "gone", None), (h(4, 1), "gone", "live", None)])
+                  statuses=[(h(4, 9), "live", "gone", None), (h(4, 7), "gone", "live", None)])
         self.leak("w_mia_00001", "lk_gone", "https://example-leaks.test/gone", seen=h(4, 9),
-                  statuses=[(h(4, 8), None, "live", None), (h(4), "live", "gone", h(4, 1))])
+                  statuses=[(h(4, 8), None, "live", None), (h(4, 6), "live", "gone", h(4, 7))])
         self.leak("w_mia_00001", "lk_mega_gone", "https://mega.example-index.test/f/1", kind="mega", site="example-index.test",
                   seen=h(4, 9), source="mega_index", statuses=[(h(5), "live", "gone", None)])
         self.leak("w_mia_00001", "lk_gone_unseen", "https://example-leaks.test/goneunseen", seen=h(4, 2),
                   statuses=[(h(4), None, "gone", h(4, 1))])
         self.leak("w_mia_00001", "lk_gone_old", "https://example-leaks.test/goneold", seen=h(4, 9),
-                  statuses=[(h(4, 1), "live", "gone", h(4, 2))])
+                  statuses=[(h(4, 7), "live", "gone", h(4, 8))])
         self.scan("w_mia_00001")
-        t = self.today()
-        self.assertEqual(t, {"day": self.DAY, "state": "complete", "new": 2, "first_scan": 1, "came_back": 1, "gone": 3})
-        counts = self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["counts"]
-        self.assertEqual(t["new"], counts["new_today"])
-        self.clock = NOW + timedelta(days=1)
-        self.assertEqual(self.today(), {"day": "2026-11-28", "state": "pending", "new": 0, "first_scan": 0, "came_back": 0,
-                                        "gone": 0})
+        t = self.week()
+        self.assertEqual(t, {"since": self.SINCE, "state": "complete", "new": 3, "first_scan": 2, "came_back": 1, "gone": 3})
+        one = self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]
+        self.assertEqual((one["counts"]["new_today"], one["offer_counts"]["new_7d"]), (2, t["new"]))
+        self.clock = NOW + timedelta(days=7)
+        self.assertEqual(self.week(), {**zero, "since": "2026-11-28", "state": "complete"})
 
     def test_states(self):
         self.put("w_mia_00001")
@@ -617,8 +622,6 @@ class TestToday(Base):
         self.assertEqual(self.state(), "partial")
         self.lane_day("w_mia_00001", "mega_lookup", "ok")
         self.assertEqual(self.state(), "complete")
-        self.lane_day("w_mia_00001", "google_fresh", "partial", "google_failed")
-        self.assertEqual(self.state(), "coverage_reduced")
         self.lane_day("w_mia_00001", "google_full", "partial", "google_failed")
         self.assertEqual(self.state(), "coverage_reduced")
         self.lane_day("w_mia_00001", "google_full", "partial", "cap_global")
@@ -627,7 +630,6 @@ class TestToday(Base):
         self.lane_day("w_mia_00001", "listing_recheck", "partial", "listing_rotated")
         self.assertEqual(self.state(), "partial")
         self.lane_day("w_mia_00001", "listing_recheck", "ok")
-        self.lane_day("w_mia_00001", "google_fresh", "ok")
         self.lane_day("w_mia_00001", "mega_lookup", "failed", "lane_failed", day="2026-11-26")
         self.assertEqual(self.state(), "complete")
         self.scan("w_mia_00001", outcome="failed")
@@ -643,7 +645,8 @@ class TestToday(Base):
         self.put("w_mia_00001")
         self.scan("w_mia_00001", outcome="partial")
         self.lane_day("w_mia_00001", "mega_lookup", "failed", "lane_failed")
-        self.assertEqual(self.today(), {"day": self.DAY, "state": "partial", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
+        self.assertEqual(self.week(), {"since": self.SINCE, "state": "partial", "new": 0, "first_scan": 0, "came_back": 0,
+                                       "gone": 0})
 
     def test_tenant_isolation(self):
         self.put("w_mia_00001")
@@ -654,9 +657,9 @@ class TestToday(Base):
         self.scan("w_rowan_0001")
         self.assertEqual(self.req("GET", "/v1/creators/w_mia_00001", key=self.b)[:3:2], (404, {"error": "not_found"}))
         self.assertEqual([x["watch_id"] for x in self.req("GET", "/v1/creators", key=self.b)[2]["creators"]], ["w_rowan_0001"])
-        self.assertEqual(self.today("w_rowan_0001", key=self.b),
-                         {"day": self.DAY, "state": "complete", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
-        t = self.today()
+        self.assertEqual(self.week("w_rowan_0001", key=self.b),
+                         {"since": self.SINCE, "state": "complete", "new": 0, "first_scan": 0, "came_back": 0, "gone": 0})
+        t = self.week()
         self.assertEqual((t["state"], t["new"]), ("partial", 1))
 
 
@@ -748,8 +751,8 @@ class TestContract(Base):
             self.leak("w_miavale_0001", "lk_0004", "https://pics.example-leaks.test/miavale/set-2", seen=d(27, 4, 2), first_scan=False,
                       google=True, title="miavale set 2")
             with tracker_db.db() as c:
-                c.execute("INSERT INTO daily_scans (watch_id, day, started_at, finished_at, outcome) VALUES (?,?,?,?, 'ok')",
-                          ("w_miavale_0001", "2026-11-27", d(27, 4, 0), d(27, 4, 5)))
+                c.execute("INSERT INTO daily_scans (watch_id, day, started_at, finished_at, outcome, trigger) "
+                          "VALUES (?,?,?,?, 'ok', 'refresh')", ("w_miavale_0001", "2026-11-27", d(27, 4, 0), d(27, 4, 5)))
                 c.execute("UPDATE watches SET seeded_at = ? WHERE watch_id = 'w_miavale_0001'", (d(20, 9, 6),))
             call("me", "GET", "/v1/me")
             vdir = os.path.join(self.tmp.name, "offer-video")
@@ -781,6 +784,10 @@ class TestContract(Base):
                                                             "images|handle", d(27, 4, 3)))
             call("creator_leaks", "GET", "/v1/creators/w_miavale_0001/leaks")
             call("leaks_preview_only", "GET", "/v1/leaks?watch_id=w_miavale_0001&preview_only=1&limit=12")
+            call("err_429_refresh_cooldown", "POST", "/v1/watches/w_miavale_0001/refresh")
+            self.assertEqual(self.req("POST", "/v1/watches/w_miavale_0001/refresh", None, key)[1].getheader("Retry-After"),
+                             str(out["err_429_refresh_cooldown"]["response"]["retry_after_s"]))
+            call("err_409_watch_paused", "POST", "/v1/watches/w_rowanash_0002/refresh")
             call("err_401", "GET", "/v1/me", k="ltk_" + "0" * 40)
             call("err_404", "GET", "/v1/creators/w_unknown_0009")
             call("err_405", "POST", "/v1/me", {})
@@ -790,7 +797,7 @@ class TestContract(Base):
             call("err_409_creator_cap", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="example_three"))
             call("delete", "DELETE", "/v1/watches/w_rowanash_0002?requested_at=2026-11-27T11:00:00Z")
             with tracker_db.db() as c:
-                c.execute("UPDATE tracker_limits SET daily_loads = 14")
+                c.execute("UPDATE tracker_limits SET daily_loads = 12")
             call("err_409_waitlist", "PUT", "/v1/watches/w_other_0003", body(account_id="acc-1003", username="example_three"))
             with tracker_db.db() as c:
                 c.execute("UPDATE tracker_limits SET daily_loads = 300")
@@ -807,21 +814,22 @@ class TestContract(Base):
         writers leave them, full passes on slot days only."""
         key = self.tenant("tn_example0002", "Example Agency Two")
 
-        def call(name, path):
-            st, _, b = self.req("GET", path, None, key)
-            out[name] = {"method": "GET", "path": path, "request": None, "status": st, "response": b}
+        def call(name, path, method="GET"):
+            st, _, b = self.req(method, path, None, key)
+            out[name] = {"method": method, "path": path, "request": None, "status": st, "response": b}
 
-        def put(wid, at, **over):
+        def put(wid, at, slot=None, **over):
             self.clock = at
             self.assertEqual(self.req("PUT", f"/v1/watches/{wid}", body(**over), key)[0], 200)
             with tracker_db.db() as c:
-                c.execute("UPDATE watches SET seeded_at = COALESCE(seeded_at, ?) WHERE watch_id = ?", (iso(at.date(), 9, 5), wid))
+                c.execute("UPDATE watches SET seeded_at = COALESCE(seeded_at, ?), weekly_slot = COALESCE(?, weekly_slot) "
+                          "WHERE watch_id = ?", (iso(at.date(), 9, 5), slot, wid))
                 return c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
 
         iso = lambda day, h=4, m=0: f"{day.isoformat()}T{h:02d}:{m:02d}:00Z"
         last_slot = lambda w: NOW.date() - timedelta(days=(NOW.weekday() - w["weekly_slot"]) % 7 or 7)
         at9 = lambda day: datetime(2026, 11, day, 9, 0, tzinfo=timezone.utc)
-        rec, fresh, full = tracker_lanes._record, tracker_lanes.FRESH, tracker_lanes.FULL
+        rec, full = tracker_lanes._record, tracker_lanes.FULL
         nov = lambda day: NOW.date().replace(day=day)
 
         w = put("w_miavale_0101", at9(20), account_id="acc-2001", instagram="mia.vale.official", x="itsmiavale")
@@ -830,31 +838,31 @@ class TestContract(Base):
         plan = tracker_plan.build(w, w["platform"])
         tr = plan.trim(plan.loads - 6)
         self.assertEqual([x["field"] for x in tr.dropped], ["alias:0", "x", "instagram"])
-        before = slot - timedelta(days=1)
-        rec("w_miavale_0101", before.isoformat(), fresh, iso(before, 4, 3))
-        rec("w_miavale_0101", slot.isoformat(), full, iso(slot, 4, 10), "reduced", "cap_tenant_month", next_on="2026-12-01",
+        nxt, s = slot.isoformat(), slot.isoformat()
+        for lane, m in (("origin_probe", 1), ("mega_lookup", 2), ("listing_recheck", 2), (full, 10)):
+            rec("w_miavale_0101", "2026-11-21", lane, iso(nov(21), 3, m), ledger=lane != "origin_probe", next_on=nxt)
+        nxt = (slot + timedelta(days=7)).isoformat()
+        rec("w_miavale_0101", s, "origin_probe", iso(slot, 4, 1), ledger=False, next_on=nxt)
+        rec("w_miavale_0101", s, "mega_lookup", iso(slot, 4, 2), "failed", next_on=nxt)
+        rec("w_miavale_0101", s, "listing_recheck", iso(slot, 4, 2), next_on=nxt)
+        rec("w_miavale_0101", s, full, iso(slot, 4, 10), "reduced", "cap_tenant_month", next_on="2026-12-01",
             trimmed=tr.dropped, carry=json.dumps({"on": "2026-12-01", "reason": "cap_tenant_month", "first": True, "pages": [
                 list(tracker_lanes._page_key(q)) for q in tracker_lanes._pages(tr.cut)]}))
-        rec("w_miavale_0101", "2026-11-26", "mega_lookup", iso(nov(26), 4, 2))
-        rec("w_miavale_0101", "2026-11-26", fresh, iso(nov(26), 4, 3), "waiting", "cap_tenant_month", next_on="2026-12-01")
-        rec("w_miavale_0101", "2026-11-27", "origin_probe", iso(nov(27), 4, 1), ledger=False)
-        rec("w_miavale_0101", "2026-11-27", "mega_lookup", iso(nov(27), 4, 2), "failed")
-        rec("w_miavale_0101", "2026-11-27", "listing_recheck", iso(nov(27), 4, 2))
-        rec("w_miavale_0101", "2026-11-27", fresh, iso(nov(27), 4, 3), "waiting", "cap_tenant_month", next_on="2026-12-01")
 
         rowan = dict(account_id="acc-2002", username="rowanash", display_name="Rowan Ash", aliases=[], instagram=None, x=None)
-        put("w_rowanash_0102", at9(10), **rowan)
-        for lane, m in (("origin_probe", 1), ("mega_lookup", 2), ("listing_recheck", 2)):
-            rec("w_rowanash_0102", "2026-11-26", lane, iso(nov(26), 4, m), ledger=lane != "origin_probe")
+        r = put("w_rowanash_0102", at9(10), **rowan)
+        for lane, m in (("origin_probe", 1), ("mega_lookup", 2), ("listing_recheck", 2), (full, 10)):
+            rec("w_rowanash_0102", "2026-11-26", lane, iso(nov(26), 4, m), ledger=lane != "origin_probe",
+                next_on=(last_slot(r) + timedelta(days=7)).isoformat())
         with tracker_db.db() as c:
-            c.executemany("INSERT INTO daily_scans (watch_id, day, started_at, finished_at, outcome) VALUES (?,?,?,?,?)",
-                          [("w_miavale_0101", "2026-11-26", iso(nov(26)), iso(nov(26), 4, 5), "partial"),
-                           ("w_miavale_0101", "2026-11-27", iso(nov(27)), iso(nov(27), 4, 5), "partial"),
-                           ("w_rowanash_0102", "2026-11-26", iso(nov(26)), iso(nov(26), 4, 5), "ok")])
+            c.executemany("INSERT INTO daily_scans (watch_id, day, started_at, finished_at, outcome, trigger) VALUES (?,?,?,?,?,?)",
+                          [("w_miavale_0101", "2026-11-21", iso(nov(21), 3), iso(nov(21), 3, 15), "ok", "refresh"),
+                           ("w_miavale_0101", s, iso(slot), iso(slot, 4, 15), "partial", "weekly"),
+                           ("w_rowanash_0102", "2026-11-26", iso(nov(26)), iso(nov(26), 4, 15), "ok", "refresh")])
         put("w_rowanash_0102", at9(26), paused=True, **rowan)
 
         vis = dict(account_id="acc-2003", platform="fansly", instagram=None, x=None)
-        w = put("w_miavale_0103", at9(11), **vis)
+        w = put("w_miavale_0103", at9(11), 3, **vis)
         s = last_slot(w)
         passes = [s - timedelta(days=14), s - timedelta(days=7), s]
         self.assertTrue(nov(11) < passes[0] <= nov(18), passes)
@@ -898,6 +906,12 @@ class TestContract(Base):
         call("creator_one_coverage", "/v1/creators/w_miavale_0101")
         call("creator_one_coverage_paused", "/v1/creators/w_rowanash_0102")
         call("creator_leaks_visibility", "/v1/creators/w_miavale_0103/leaks")
+        call("refresh_queued", "/v1/watches/w_miavale_0103/refresh", "POST")
+        self.clock = NOW + timedelta(minutes=1)
+        with tracker_db.db() as c:
+            c.execute("INSERT INTO daily_scans (watch_id, day, started_at, trigger) VALUES ('w_miavale_0103', ?, ?, 'refresh')",
+                      (NOW.date().isoformat(), ts(self.clock)))
+        call("refresh_running", "/v1/watches/w_miavale_0103/refresh", "POST")
 
     def test_goldens(self):
         out = self.scenario()

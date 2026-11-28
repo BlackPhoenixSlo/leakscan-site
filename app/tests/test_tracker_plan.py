@@ -1,10 +1,9 @@
-"""tracker_plan: identity -> weekly full-pass plan, loads, trim order, fresh OR query (spec Service seams, ticket 21).
+"""tracker_plan: identity -> full-pass plan, loads, trim order (spec Service seams, ticket 21).
 Pure, fictional Creators only."""
 import json
 import os
 import sys
 import unittest
-from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -85,7 +84,6 @@ class TestBuild(unittest.TestCase):
                          ident(["miav"], "mia.vale.ig", "miavale_x", display_name="Juniper Sol")):
             p = tp.build(identity, "onlyfans")
             self.assertFalse([q.text for q in p.queries if "Juniper" in q.text or "Sol" in q.text])
-            self.assertNotIn("Juniper", tp.fresh(identity).text)
             self.assertNotIn("display_name", {q.field for q in p.queries})
 
     def test_urls(self):
@@ -149,35 +147,6 @@ class TestTrim(unittest.TestCase):
         t = tp.build(FULL, "onlyfans").trim(19)
         self.assertEqual(rows(t.plan)[:7], HANDLE_ROWS)
         self.assertEqual([q.field for q in t.plan.queries[7:]], ["alias:0"] * 4 + ["alias:1"] * 4 + ["instagram", "x"])
-
-
-class TestFresh(unittest.TestCase):
-    def test_or_query_excludes_weak_aliases(self):
-        for identity, want in (
-                (ident(), H),
-                (ident(["miav"]), H),
-                (ident(["rowanash", "miav", "vale.mia"], "mia.vale.ig", "miavale_x"),
-                 f'{H} OR "rowanash" OR "vale.mia" OR "mia.vale.ig" OR "miavale_x"')):
-            with self.subTest(want):
-                self.assertEqual(tp.fresh(identity), QuerySpec("google_fresh", "web", want, 1, "fresh", since="d"))
-
-    def test_trimmed_in_the_same_order_to_the_word_limit(self):
-        long = [" ".join("abcdefghij"[i:] + "klmno"[:i]) for i in range(5)]
-        q = tp.fresh(ident(long, "mia.vale.ig", "miavale_x")).text
-        self.assertLessEqual(len(q.split()), tp.WORD_LIMIT)
-        self.assertEqual(q, " OR ".join([H] + [f'"{a}"' for a in long[:2]] + ['"mia.vale.ig"', '"miavale_x"']))
-        identity = ident(["rowanash"], "mia.vale.ig", "miavale_x")
-        for limit, want in ((7, f'{H} OR "rowanash" OR "mia.vale.ig" OR "miavale_x"'),
-                            (6, f'{H} OR "mia.vale.ig" OR "miavale_x"'), (4, f'{H} OR "mia.vale.ig"'),
-                            (2, H), (0, H)):
-            with self.subTest(limit=limit), mock.patch.object(tp, "WORD_LIMIT", limit):
-                self.assertEqual(tp.fresh(identity).text, want)
-
-    def test_fresh_url_is_past_day_web_page_1(self):
-        [url] = tp.fresh(ident(["rowanash"])).urls()
-        qs = parse_qs(urlsplit(url).query)
-        self.assertEqual((qs["q"], qs["tbs"], qs["start"]), ([f'{H} OR "rowanash"'], ["qdr:d"], ["0"]))
-        self.assertNotIn("tbm", qs)
 
 
 if __name__ == "__main__":

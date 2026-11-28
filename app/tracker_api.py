@@ -2,6 +2,7 @@
 Ids of another tenant answer 404 like unknown ones, so a key never learns another tenant's ids exist."""
 import base64
 import json
+import math
 import os
 import re
 import sys
@@ -30,13 +31,14 @@ NOT_FOUND = {"error": "not_found"}
 GONE = {"error": "watch_deleted"}
 RATE_LIMITED = {"error": "rate_limited"}
 WAITLIST = {"error": "waitlist"}
+PAUSED = {"error": "watch_paused"}
 _THUMBS = ratelimit.Limiter(rate_per_min=600, burst=120, max_concurrent=16)
 
 
 class _Err(Exception):
-    def __init__(self, code, body):
+    def __init__(self, code, body, headers=()):
         super().__init__(code)
-        self.code, self.body = code, body
+        self.code, self.body, self.headers = code, body, headers
 
 
 class _Take:
@@ -373,6 +375,31 @@ def thumb(t, q, raw, watch_id, leak_id):
     return _Blob(got[1], got[0])
 
 
+def refresh_watch(t, q, raw, watch_id):
+    """Queue one scan of every lane (tracker_scheduler runs it on its next tick); at most one per REFRESH_COOLDOWN_H
+    from the start of the watch's last scan."""
+    cool = timedelta(hours=tracker_view.REFRESH_COOLDOWN_H)
+    with tracker_db.db() as c:
+        c.execute("BEGIN IMMEDIATE")
+        w = _own(c, t, watch_id)
+        if w["paused"]:
+            raise _Err(409, PAUSED)
+        busy = tracker_view.in_flight(c, w)
+        if busy:
+            queued, run = busy
+            return 202, {"watch_id": watch_id, "queued_at": queued,
+                         "next_refresh_at": tracker_db.fmt(tracker_db.parse(run or queued) + cool)}
+        now, last = tracker_db.now_dt(), tracker_view.last_scan_at(c, watch_id)
+        if last and now < last + cool:
+            wait = math.ceil((last + cool - now).total_seconds())
+            raise _Err(429, {"error": "refresh_cooldown", "retry_after_s": wait,
+                             "next_refresh_at": tracker_db.fmt(last + cool)}, [("Retry-After", str(wait))])
+        at = tracker_db.fmt(now)
+        c.execute("UPDATE watches SET refresh_queued_at = ? WHERE watch_id = ?", (at, watch_id))
+    _log(f"refresh queued {watch_id}")
+    return 202, {"watch_id": watch_id, "queued_at": at, "next_refresh_at": tracker_db.fmt(now + cool)}
+
+
 def offer_video(t, q, raw, part):
     name, ctype, ranged = tracker_video.PARTS.get(part, (None, None, False))
     p = tracker_video.path(name) if name else None
@@ -387,6 +414,7 @@ def offer_video(t, q, raw, part):
 ROUTES = (
     (re.compile(r"^/v1/me$"), {"GET": me}),
     (re.compile(r"^/v1/watches/([^/]+)$"), {"PUT": put_watch, "DELETE": delete_watch}),
+    (re.compile(r"^/v1/watches/([^/]+)/refresh$"), {"POST": refresh_watch}),
     (re.compile(r"^/v1/creators$"), {"GET": creators}),
     (re.compile(r"^/v1/creators/([^/]+)$"), {"GET": creator_one}),
     (re.compile(r"^/v1/creators/([^/]+)/leaks$"), {"GET": creator_leaks}),
@@ -432,7 +460,7 @@ def handle(h, method):
     try:
         res = _dispatch(h, method, u)
     except _Err as e:
-        res = e.code, e.body
+        res = e.code, e.body, e.headers
     except Exception as e:
         _log(f"{method} failed: {type(e).__name__}")
         res = 500, {"error": "internal"}
@@ -440,5 +468,4 @@ def handle(h, method):
         return _stream(h, res)
     if isinstance(res, _Blob):
         return _send(h, 200, res.data, ctype=res.ctype)
-    code, obj = res
-    _send(h, code, obj)
+    _send(h, *res)

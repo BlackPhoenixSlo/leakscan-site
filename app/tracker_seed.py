@@ -96,21 +96,31 @@ def _finish(watch_id, today, outcome):
     with tdb.db() as c:
         c.execute("UPDATE daily_scans SET finished_at = ?, outcome = ? WHERE watch_id = ? AND day = ?",
                   (tdb.now(), outcome, watch_id, today))
+        c.execute("UPDATE watches SET refresh_queued_at = NULL WHERE watch_id = ?", (watch_id,))
 
 
-def claim(c, watch_id, now_dt, retry=False):
-    """Open watch_id's daily_scans row for now_dt's UTC day: the claim on its seed / daily work across threads and
-    processes -> True when the caller now holds it. retry (the daily pass) also takes over a row left open over LEASE_H
-    hours (a crash), and once a row that failed before the day's TRACKER_DAILY_AT (Seed 5)."""
+def claim(c, watch_id, now_dt, retry=False, trigger="seed"):
+    """Open watch_id's daily_scans row for now_dt's UTC day with `trigger` (seed | weekly | refresh): the claim on its
+    scan across threads and processes -> True when the caller now holds it. A weekly or refresh claim takes over its
+    own trigger's row, or a trigger-less one (from before triggers), left open over LEASE_H hours (a crash), and a
+    trigger-less row that finished. retry (the daily re-seed) takes over a seed row left open over LEASE_H hours, and
+    once one that failed before the day's TRACKER_DAILY_AT (Seed 5); never a weekly or refresh row."""
     at, today = tdb.fmt(now_dt), tdb.day(now_dt)
-    if c.execute("INSERT OR IGNORE INTO daily_scans (watch_id, day, started_at) VALUES (?,?,?)",
-                 (watch_id, today, at)).rowcount:
+    if c.execute("INSERT OR IGNORE INTO daily_scans (watch_id, day, started_at, trigger) VALUES (?,?,?,?)",
+                 (watch_id, today, at, trigger)).rowcount:
         return True
     stale, due = tdb.fmt(now_dt - timedelta(hours=LEASE_H)), tdb.fmt(tracker_view.due_at(now_dt))
+    take = "UPDATE daily_scans SET started_at = ?, finished_at = NULL, outcome = NULL, trigger = ? WHERE watch_id = ? " \
+           "AND day = ? AND "
+    if trigger != "seed" and c.execute(
+            take + "((trigger IS NULL AND finished_at IS NOT NULL) OR "
+            "(COALESCE(trigger, ?) = ? AND finished_at IS NULL AND started_at < ?))",
+            (at, trigger, watch_id, today, trigger, trigger, stale)).rowcount:
+        return True
     return retry and c.execute(
-        "UPDATE daily_scans SET started_at = ?, finished_at = NULL, outcome = NULL WHERE watch_id = ? AND day = ? AND "
+        take + "COALESCE(trigger, 'seed') = 'seed' AND "
         "((finished_at IS NULL AND started_at < ?) OR (outcome = 'failed' AND started_at < ?))",
-        (at, watch_id, today, stale, due)).rowcount == 1
+        (at, trigger, watch_id, today, stale, due)).rowcount == 1
 
 
 def run(watch_id, claimed=False):
@@ -170,6 +180,6 @@ def _seed(w, at):
             a, p = admit_mega(c, watch_id, it, handle, at)
             admitted, pending = admitted + a, pending + p
         c.execute("UPDATE watches SET seeded_at = ? WHERE watch_id = ?", (at, watch_id))
-    outcome = "ok" if tracker_lanes.origin_probe(watch_id, at[:10]) is not None else "failed"
+    outcome = "ok" if tracker_lanes.origin_probe(w, at[:10]) is not None else "failed"
     tracker_probe.log(f"tracker seed {outcome} admitted={admitted} pending={pending}")
     return {"admitted": admitted, "pending": pending, "outcome": outcome}

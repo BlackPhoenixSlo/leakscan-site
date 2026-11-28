@@ -65,6 +65,9 @@ class Base(unittest.TestCase):
         return tid
 
     def watch(self, tenant_id, username="mia_vale", aliases=(), seeded=True, paused=False, **kw):
+        """Slotted on T0's weekday (Monday) unless weekly_slot is given, so a tick on T0's day scans it."""
+        if "weekly_slot" not in kw:
+            kw.update(weekly_slot=0, plan_loads=kw.get("plan_loads", 9))
         wid = kw.pop("watch_id", None) or tdb.new_id("w_")
         row = dict(watch_id=wid, tenant_id=tenant_id, account_id=kw.pop("account_id", wid), platform="onlyfans",
                    username=username, aliases_json=json.dumps(list(aliases)), paused=int(paused),
