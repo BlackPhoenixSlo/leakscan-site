@@ -22,6 +22,7 @@ import tracker_db
 import tracker_judge
 import tracker_lanes
 import tracker_plan
+import tracker_preview
 import tracker_seed
 import tracker_view
 
@@ -101,11 +102,12 @@ class Base(unittest.TestCase):
         return self.req("PUT", f"/v1/watches/{wid}", body(**over), key or self.a)
 
     def leak(self, wid, lid, url, kind="page", site="example-leaks.test", seen=None, source="google_web", first_scan=True,
-             google=False, statuses=(), probe=None, title=None):
+             google=False, statuses=(), probe=None, title=None, key_suffix=""):
         seen = seen or ts(NOW - timedelta(days=7))
         with tracker_db.db() as c:
-            c.execute("INSERT INTO leaks (leak_id, watch_id, url_key, url, leak_site, kind, title, created_at) VALUES (?,?,?,?,?,?,?,?)",
-                      (lid, wid, url.lower(), url, site, kind, title, seen))
+            c.execute("INSERT INTO leaks (leak_id, watch_id, url_key, url, leak_site, kind, title, created_at, landing_key) "
+                      "VALUES (?,?,?,?,?,?,?,?,?)", (lid, wid, url.lower() + key_suffix, url, site, kind, title, seen,
+                                                      url.lower() if key_suffix else None))
             tracker_db.add_event(c, lid, "seen", {"source": source, "first_scan": first_scan}, at=seen)
             if google:
                 tracker_db.add_event(c, lid, "google_seen", {}, at=seen)
@@ -386,7 +388,8 @@ class TestLeaks(Base):
         self.assertEqual([x["leak_id"] for x in b["leaks"]], self.order)
         self.assertIsNone(b["next_cursor"])
         self.assertEqual(set(b["leaks"][0]), {"watch_id", "leak_id", "url", "leak_site", "kind", "sources", "title", "pill", "came_back",
-                                              "found_on_first_scan", "first_seen_at", "last_up_at", "last_probe_at", "origin_status"})
+                                              "found_on_first_scan", "first_seen_at", "last_up_at", "last_probe_at", "origin_status",
+                                              "preview"})
         self.assertEqual(b["leaks"][0]["watch_id"], "w_ash_00002")
         st, _, b = self.req("GET", "/v1/leaks?watch_id=w_old_00003&watch_id=w_bee_00001", key=self.a)
         self.assertEqual((st, b), (200, {"leaks": [], "next_cursor": None}))
@@ -768,10 +771,16 @@ class TestContract(Base):
                           "('w_miavale_0001', '2026-11-27', 'mega_lookup', 'failed', 'lane_failed')")
                 c.execute("UPDATE daily_scans SET outcome = 'partial' WHERE watch_id = 'w_miavale_0001'")
             call("creator_one", "GET", "/v1/creators/w_miavale_0001")
-            call("creator_leaks", "GET", "/v1/creators/w_miavale_0001/leaks")
             call("leaks", "GET", "/v1/leaks?watch_id=w_miavale_0001&watch_id=w_rowanash_0002&limit=2")
             call("leaks_page2", "GET", "/v1/leaks?watch_id=w_miavale_0001&watch_id=w_rowanash_0002&limit=2&cursor="
                  + out["leaks"]["response"]["next_cursor"])
+            self.leak("w_miavale_0001", "lk_0005", "https://pics.example-leaks.test/miavale/set-2", kind="media", seen=d(27, 4, 3),
+                      source="google_images", first_scan=False, google=True, title="miavale set 2", key_suffix="#google_images")
+            with tracker_db.db() as c:
+                self.assertTrue(tracker_preview.store_thumb(c, "lk_0005", "https://encrypted-tbn0.gstatic.com/images?q=tbn:miavale-set-2",
+                                                            "images|handle", d(27, 4, 3)))
+            call("creator_leaks", "GET", "/v1/creators/w_miavale_0001/leaks")
+            call("leaks_preview_only", "GET", "/v1/leaks?watch_id=w_miavale_0001&preview_only=1&limit=12")
             call("err_401", "GET", "/v1/me", k="ltk_" + "0" * 40)
             call("err_404", "GET", "/v1/creators/w_unknown_0009")
             call("err_405", "POST", "/v1/me", {})

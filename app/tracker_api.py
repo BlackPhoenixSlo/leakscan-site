@@ -8,9 +8,11 @@ import sys
 import urllib.parse
 from datetime import timedelta
 
+import ratelimit
 import tracker_admission
 import tracker_db
 import tracker_judge
+import tracker_preview
 import tracker_seed
 import tracker_video
 import tracker_view
@@ -28,6 +30,7 @@ NOT_FOUND = {"error": "not_found"}
 GONE = {"error": "watch_deleted"}
 RATE_LIMITED = {"error": "rate_limited"}
 WAITLIST = {"error": "waitlist"}
+_THUMBS = ratelimit.Limiter(rate_per_min=600, burst=120, max_concurrent=16)
 
 
 class _Err(Exception):
@@ -39,6 +42,11 @@ class _Err(Exception):
 class _Take:
     def __init__(self, f, ctype, ranged):
         self.f, self.ctype, self.ranged = f, ctype, ranged
+
+
+class _Blob:
+    def __init__(self, data, ctype):
+        self.data, self.ctype = data, ctype
 
 
 def _invalid(field):
@@ -68,11 +76,11 @@ def _no_store(h):
     h.send_header("X-Content-Type-Options", "nosniff")
 
 
-def _send(h, code, obj, headers=()):
-    body = b"" if obj is None else json.dumps(obj, ensure_ascii=False).encode("utf-8")
+def _send(h, code, obj, headers=(), ctype="application/json; charset=utf-8"):
+    body = b"" if obj is None else obj if isinstance(obj, bytes) else json.dumps(obj, ensure_ascii=False).encode("utf-8")
     h.send_response(code)
     if obj is not None:
-        h.send_header("Content-Type", "application/json; charset=utf-8")
+        h.send_header("Content-Type", ctype)
     if code == 401:
         h.send_header("WWW-Authenticate", "Bearer")
     for k, v in headers:
@@ -213,12 +221,21 @@ def _cursor(q):
     return first_seen, leak_id
 
 
-def _page(items, q, events):
+def _first_seen(x):
+    return x["first_seen_at"]
+
+
+def _preview_seen(x):
+    return x["preview"]["seen_at"]
+
+
+def _page(items, q, events, at=_first_seen):
+    """items newest at() first, then leak_id; the cursor is the last item's at() and leak_id."""
     limit, cur = _limit(q), _cursor(q)
     if cur:
-        items = [x for x in items if x["first_seen_at"] < cur[0] or (x["first_seen_at"] == cur[0] and x["leak_id"] > cur[1])]
+        items = [x for x in items if at(x) < cur[0] or (at(x) == cur[0] and x["leak_id"] > cur[1])]
     page, more = items[:limit], len(items) > limit
-    nxt = base64.urlsafe_b64encode(f"{page[-1]['first_seen_at']}|{page[-1]['leak_id']}".encode()).decode().rstrip("=") if more else None
+    nxt = base64.urlsafe_b64encode(f"{at(page[-1])}|{page[-1]['leak_id']}".encode()).decode().rstrip("=") if more else None
     drop = ("events",) if not events else ("watch_id",)
     return {"leaks": [{k: v for k, v in x.items() if k not in drop} for x in page], "next_cursor": nxt}
 
@@ -316,14 +333,44 @@ def creator_leaks(t, q, raw, watch_id):
 
 
 def all_leaks(t, q, raw):
-    ids = q.get("watch_id") or []
+    ids, only = q.get("watch_id") or [], q.get("preview_only") or ["0"]
     if not 1 <= len(ids) <= IDS_MAX:
         _invalid("watch_id")
+    if only not in (["0"], ["1"]):
+        _invalid("preview_only")
     ids, now = sorted({i for i in ids if WATCH_ID.match(i)}), tracker_db.now_dt()
     with tracker_db.db() as c:
         live = [r[0] for r in c.execute(f"SELECT watch_id FROM watches WHERE tenant_id = ? AND deleted_at IS NULL "
                                         f"AND watch_id IN ({','.join('?' * len(ids))})", [t["tenant_id"], *ids])] if ids else []
-        return 200, _page(tracker_view.leaks(c, live, now), q, events=False)
+        ls = tracker_view.leaks(c, live, now)
+    if only == ["1"]:
+        ls = sorted((x for x in ls if x["preview"]), key=lambda x: x["leak_id"])
+        ls.sort(key=_preview_seen, reverse=True)
+        return 200, _page(ls, q, events=False, at=_preview_seen)
+    return 200, _page(ls, q, events=False)
+
+
+def thumb(t, q, raw, watch_id, leak_id):
+    """The media Leak's thumbnail, fetched now under tracker_preview's checks; previews off, a Leak of another watch
+    or tenant, one without a preview, or any refused fetch -> 404.
+    ASSUMPTION: previews off answers 404 before the watch lookup, so a deleted watch reads 404, not 410.
+    ASSUMPTION: the per-tenant cap answers 429 rate_limited with no Retry-After, like put_watch's hourly cap."""
+    if not tracker_preview.on():
+        raise _Err(404, NOT_FOUND)
+    with tracker_db.db() as c:
+        _own(c, t, watch_id)
+        row = c.execute("SELECT * FROM leaks WHERE leak_id = ? AND watch_id = ?", (leak_id, watch_id)).fetchone()
+        if not row or not tracker_view.preview_of(c, row):
+            raise _Err(404, NOT_FOUND)
+    if not _THUMBS.allow(t["tenant_id"]):
+        raise _Err(429, RATE_LIMITED)
+    try:
+        got = tracker_preview.fetch(row["thumb_url"])
+    finally:
+        _THUMBS.release(t["tenant_id"])
+    if not got:
+        raise _Err(404, NOT_FOUND)
+    return _Blob(got[1], got[0])
 
 
 def offer_video(t, q, raw, part):
@@ -343,6 +390,7 @@ ROUTES = (
     (re.compile(r"^/v1/creators$"), {"GET": creators}),
     (re.compile(r"^/v1/creators/([^/]+)$"), {"GET": creator_one}),
     (re.compile(r"^/v1/creators/([^/]+)/leaks$"), {"GET": creator_leaks}),
+    (re.compile(r"^/v1/creators/([^/]+)/leaks/([^/]+)/thumb$"), {"GET": thumb}),
     (re.compile(r"^/v1/leaks$"), {"GET": all_leaks}),
     (re.compile(r"^/v1/offer-video/([^/]+)$"), {"GET": offer_video}),
 )
@@ -390,5 +438,7 @@ def handle(h, method):
         res = 500, {"error": "internal"}
     if isinstance(res, _Take):
         return _stream(h, res)
+    if isinstance(res, _Blob):
+        return _send(h, 200, res.data, ctype=res.ctype)
     code, obj = res
     _send(h, code, obj)

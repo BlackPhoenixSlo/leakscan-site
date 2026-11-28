@@ -4,6 +4,7 @@ import os
 from datetime import timedelta
 
 import tracker_db
+import tracker_preview
 
 PILLS = ("live", "cached", "gone", "listed", "not_checked")
 CAME_BACK_DAYS = 30
@@ -95,7 +96,14 @@ def leak(row, events, probe, now_dt):
             "first_seen_at": seen[0]["at"] if seen else row["created_at"],
             "last_up_at": probe["last_live_at"] if probe else None,
             "last_probe_at": probe["last_probe_at"] if probe else None,
-            "origin_status": origin, "events": events}
+            "origin_status": origin, "preview": preview_of(None, row, events), "events": events}
+
+
+def preview_of(c, row, events=None):
+    """A leaks row's `preview` from its events (read through c when not given)."""
+    if events is None:
+        events = _events(c, [row["leak_id"]])[row["leak_id"]]
+    return tracker_preview.preview(row, visible(events))
 
 
 def leaks(c, watch_ids, now_dt):
