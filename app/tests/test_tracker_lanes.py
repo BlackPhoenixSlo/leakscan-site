@@ -9,7 +9,9 @@ import io
 import json
 import os
 import re
+import socket
 import threading
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest import mock
 from urllib.parse import parse_qs, urlsplit
@@ -161,7 +163,8 @@ class TestMegaLookup(Lanes):
                           "last_attempt_at": at(2), "next_attempt_on": "2026-11-03", "trimmed": []})
         self.assertEqual((lanes["origin_probe"]["state"], lanes["origin_probe"]["last_success_at"]), ("ok", at(2)))
         self.assertEqual(lanes["listing_recheck"]["state"], "ok")
-        self.assertEqual({k: lanes[k]["state"] for k in LANES[3:]}, dict.fromkeys(LANES[3:], "never"))
+        self.assertEqual((lanes["google_fresh"]["state"], lanes["google_fresh"]["reason"]), ("waiting", "no_browserbase_key"))
+        self.assertEqual({k: lanes[k]["state"] for k in LANES[4:]}, dict.fromkeys(LANES[4:], "never"))
 
         self.day(3, pack(1, deleted=True), pack(2, deleted=True))
         self.assertEqual(self.pills(), {url(1): "listed", url(2): "listed"})
@@ -560,8 +563,8 @@ class Fresh(Lanes):
         self.bb.fail = False
         for p in (mock.patch.object(bb_client, "BB_API", self.bb.base),
                   mock.patch.object(tracker_serp, "_playwright", lambda: self.pw),
-                  mock.patch.dict(os.environ, TRACKER_PAID_TENANTS=self.t, TRACKER_UNCAPPED_TENANTS=self.t,
-                                  BROWSERBASE_API_KEY=HOST_KEY, BROWSERBASE_PROJECT_ID=HOST_PROJECT)):
+                  mock.patch.dict(os.environ, TRACKER_UNCAPPED_TENANTS=self.t, BROWSERBASE_API_KEY=HOST_KEY,
+                                  BROWSERBASE_PROJECT_ID=HOST_PROJECT)):
             p.start()
             self.addCleanup(p.stop)
 
@@ -726,26 +729,25 @@ class TestFreshPass(Fresh):
         self.assertEqual(self.q(w2), self.q())
         hit = f"{SITE}/video/mia_vale-g3"
         self.pw.links[self.q().text] = [(hit, "Mia")]
-        with mock.patch.dict(os.environ, TRACKER_PAID_TENANTS=f"{self.t},{t2}"):
-            self.day(2)
-            self.assertEqual(self.pw.navs, [("wss://bb.stub/1", self.q().urls()[0])])
-            self.assertEqual([k for k, _ in self.bb.creates], [HOST_KEY])
-            self.assert_charged()
-            self.assertEqual((self.used(self.w), self.used(w2)), (1, 0))
-            self.assertEqual(self.rows("SELECT watch_id FROM load_reservation"), [{"watch_id": self.w}])
-            self.assertEqual(len(self.rows("SELECT * FROM serp_cache")), 1)
-            for wid, key in ((self.w, self.key), (w2, key2)):
-                b = self.get(f"/v1/creators/{wid}/leaks", key)[1]
-                self.assertEqual([(x["url"], x["sources"]) for x in b["leaks"]], [(hit, ["google_web"])])
-                st, one = self.get(f"/v1/creators/{wid}", key)
-                self.assertEqual({x["lane"]: x["state"] for x in one["lanes"]}["google_fresh"], "ok")
-            self.assertEqual(len(self.rows("SELECT leak_id FROM leaks WHERE url = ?", hit)), 2)
+        self.day(2)
+        self.assertEqual(self.pw.navs, [("wss://bb.stub/1", self.q().urls()[0])])
+        self.assertEqual([k for k, _ in self.bb.creates], [HOST_KEY])
+        self.assert_charged()
+        self.assertEqual((self.used(self.w), self.used(w2)), (1, 0))
+        self.assertEqual(self.rows("SELECT watch_id FROM load_reservation"), [{"watch_id": self.w}])
+        self.assertEqual(len(self.rows("SELECT * FROM serp_cache")), 1)
+        for wid, key in ((self.w, self.key), (w2, key2)):
+            b = self.get(f"/v1/creators/{wid}/leaks", key)[1]
+            self.assertEqual([(x["url"], x["sources"]) for x in b["leaks"]], [(hit, ["google_web"])])
+            st, one = self.get(f"/v1/creators/{wid}", key)
+            self.assertEqual({x["lane"]: x["state"] for x in one["lanes"]}["google_fresh"], "ok")
+        self.assertEqual(len(self.rows("SELECT leak_id FROM leaks WHERE url = ?", hit)), 2)
 
-            self.day(3)
-            self.assertEqual(len(self.pw.navs), 2)
-            self.assertEqual(self.rows("SELECT DISTINCT day FROM serp_cache"), [{"day": "2026-11-03"}])
-            self.assert_charged()
-            self.assertEqual((self.used(self.w), self.used(w2)), (2, 0))
+        self.day(3)
+        self.assertEqual(len(self.pw.navs), 2)
+        self.assertEqual(self.rows("SELECT DISTINCT day FROM serp_cache"), [{"day": "2026-11-03"}])
+        self.assert_charged()
+        self.assertEqual((self.used(self.w), self.used(w2)), (2, 0))
 
     def test_12_packed_into_one_session_13_into_two(self):
         with tdb.db() as c:
@@ -795,17 +797,18 @@ class TestFreshPass(Fresh):
         self.assertEqual((f["state"], f["reason"], f["next_attempt_on"]), ("waiting", "cap_tenant_month", "2026-12-01"))
         self.assertEqual(self.pw.navs, [])
 
-    def test_gate_no_allowlist_zero_navigations(self):
-        for env in ({"TRACKER_PAID_TENANTS": ""}, {"TRACKER_PAID_TENANTS": "tn_someone_else"}):
-            with mock.patch.dict(os.environ, env):
-                self.day(2)
-        os.environ.pop("TRACKER_PAID_TENANTS")
-        self.day(3)
-        self.assertEqual((self.pw.navs, self.bb.creates), ([], []))
-        self.assertEqual(self.rows("SELECT * FROM load_reservation"), [])
-        self.assertEqual(self.rows("SELECT * FROM lane_state WHERE lane = 'google_fresh'"), [])
-        self.assertEqual(self.fresh()["state"], "never")
-        self.assertEqual(self.scan(d=3), "ok")
+    def test_every_tenant_runs_no_allowlist_capped_never_gets_the_host_key(self):
+        self.clock(tdb.plus(Base.T0, seconds=1))
+        t2 = self.tenant("Agency B")
+        w2 = self.watch(t2, username="rowan_ash", account_id="acc-b")
+        self.day(2)
+        self.assertEqual([q for _, q in self.pw.navs], [self.q().urls()[0]])
+        self.assertEqual([k for k, _ in self.bb.creates], [HOST_KEY])
+        self.assertEqual(self.fresh()["state"], "ok")
+        self.assertEqual(self.rows("SELECT state, reason FROM lane_state WHERE lane = 'google_fresh' AND watch_id = ?", w2),
+                         [{"state": "waiting", "reason": "no_browserbase_key"}])
+        self.assertEqual(self.used(w2), 0)
+        self.assert_charged()
 
     def test_missing_browserbase_creds_waits(self):
         with mock.patch.dict(os.environ, TRACKER_UNCAPPED_TENANTS=""):
@@ -837,8 +840,7 @@ class TestFreshPass(Fresh):
         with self.assertRaises(SystemExit):
             tracker_cli.main(["tenant", "bb", "tn_nope", "--key-file", kf, "--project", "p"])
         log = io.StringIO()
-        with mock.patch.dict(os.environ, TRACKER_PAID_TENANTS=f"{self.t},{t2}"), \
-                mock.patch.object(tracker_probe, "log", side_effect=lambda m: log.write(m + "\n")):
+        with mock.patch.object(tracker_probe, "log", side_effect=lambda m: log.write(m + "\n")):
             self.pw.script = ["fail", "fail"]
             self.day(2)
         self.assertEqual([(k, b["projectId"]) for k, b in self.bb.creates], [(HOST_KEY, HOST_PROJECT), (OWN_KEY, "prj-b")])
@@ -946,8 +948,7 @@ class TestFreshPass(Fresh):
         w2 = self.watch(t2, username="rowan_ash", account_id="acc-b")
         with tdb.db() as c:
             c.execute("DELETE FROM tenants WHERE tenant_id = ?", (t2,))
-        with mock.patch.dict(os.environ, TRACKER_PAID_TENANTS=f"{self.t},{t2}"):
-            tracker_lanes.run_fresh_batch([w2, self.w], "2026-11-02")
+        tracker_lanes.run_fresh_batch([w2, self.w], "2026-11-02")
         self.assertEqual([q for _, q in self.pw.navs], [self.q().urls()[0]])
         self.assertEqual(self.rows("SELECT watch_id, state FROM lane_state WHERE lane = 'google_fresh'"),
                          [{"watch_id": self.w, "state": "ok"}])
@@ -1089,18 +1090,13 @@ class TestFullPass(Full):
         self.assertEqual(self.full_day(), [{"day": "2026-11-03", "outcome": "ok", "reason": None}])
         self.assert_charged()
 
-    def test_paused_gate_and_missing_creds(self):
+    def test_paused_and_missing_creds(self):
         with tdb.db() as c:
             c.execute("UPDATE watches SET paused = 1, paused_at = ? WHERE watch_id = ?", (at(2), self.w))
         self.day(2)
         self.assertEqual((self.pw.navs, self.full()["state"]), ([], "paused"))
         with tdb.db() as c:
             c.execute("UPDATE watches SET paused = 0, paused_at = NULL WHERE watch_id = ?", (self.w,))
-        self.slot(3)
-        with mock.patch.dict(os.environ, TRACKER_PAID_TENANTS=""):
-            self.day(3)
-        self.assertEqual(self.pw.navs, [])
-        self.assertEqual(self.full()["state"], "never")
         self.slot(4)
         with mock.patch.dict(os.environ, TRACKER_UNCAPPED_TENANTS=""):
             self.day(4)
@@ -1351,7 +1347,7 @@ class TestFullPass(Full):
         w2 = self.watch(t2, username="mia_vale", aliases=("miavale_x", "miav"), account_id="acc-b", weekly_slot=wd(2))
         hit = f"{SITE}/gallery/mia_vale-i9"
         self.pw.links[("images", '"miavale_x"')] = [(hit, "Mia")]
-        with mock.patch.dict(os.environ, TRACKER_PAID_TENANTS=f"{self.t},{t2}", TRACKER_UNCAPPED_TENANTS=f"{self.t},{t2}"):
+        with mock.patch.dict(os.environ, TRACKER_UNCAPPED_TENANTS=f"{self.t},{t2}"):
             self.day(2)
             self.assertEqual(len(self.full_navs()), 14)
             self.assert_charged()
@@ -1506,3 +1502,33 @@ class TestVisibility(Full):
 if __name__ == "__main__":
     import unittest
     unittest.main()
+
+
+class TestNoNetwork(Base):
+    def test_fake_keys_in_env_make_no_outbound_call(self):
+        """Only the conftest / fixture stubs stand between a test and Browserbase now that every tenant runs."""
+        t, t2 = self.tenant("Agency A"), self.tenant("Agency B")
+        with tdb.db() as c:
+            c.execute("UPDATE tenants SET bb_key = 'bb-own-key-fake', bb_project = 'prj-b' WHERE tenant_id = ?", (t2,))
+        loads = tracker_plan.build({"username": "mia_vale", "aliases_json": "[]", "instagram": None, "x": None},
+                                   "onlyfans").loads
+        ws = [self.watch(t, weekly_slot=0, plan_loads=loads),
+              self.watch(t2, account_id="acc-b", weekly_slot=0, plan_loads=loads)]
+        calls = []
+
+        def deny(*a, **kw):
+            calls.append(a)
+            raise AssertionError(f"network call in a test: {a!r}")
+        with mock.patch.dict(os.environ, BROWSERBASE_API_KEY="bb-host-key-fake", BROWSERBASE_PROJECT_ID="prj-host",
+                             DEEPSEEK_API_KEY="fake", GOOGLE_API_KEY="fake", GOOGLE_CSE_ID="fake",
+                             TRACKER_UNCAPPED_TENANTS=t), \
+                mock.patch.object(socket.socket, "connect", deny), mock.patch.object(socket.socket, "connect_ex", deny), \
+                mock.patch.object(socket, "create_connection", deny), \
+                mock.patch.object(http.client.HTTPConnection, "connect", deny), \
+                mock.patch.object(urllib.request, "urlopen", deny):
+            tracker_scheduler.daily_pass(at(2))
+        self.assertEqual(calls, [])
+        self.assertEqual(self.rows("SELECT lane, state, reason FROM lane_state WHERE lane LIKE 'google_%' "
+                                   "ORDER BY watch_id = ?, lane", ws[0]),
+                         [{"lane": "google_fresh", "state": "reduced", "reason": "google_failed"},
+                          {"lane": "google_full", "state": "reduced", "reason": "google_failed"}] * 2)

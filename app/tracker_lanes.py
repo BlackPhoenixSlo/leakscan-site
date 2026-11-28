@@ -21,8 +21,8 @@ listing_rotated (lane_day `partial`); no listing answering at all -> `failed`.
 A Leak a lane admits on its first-ever successful run for the watch is a first-scan find (seen.first_scan); for the
 listing recheck, so is one found on a listing never rechecked before (leaks.recheck_at NULL).
 
-Google fresh pass (paid, run_fresh_batch after every watch's $0 lanes): runs only for tenants on TRACKER_PAID_TENANTS
-(comma list, default empty: nothing paid runs, the lane stays `never`). Browserbase creds: the host's BROWSERBASE_API_KEY
+Google fresh pass (paid, run_fresh_batch after every watch's $0 lanes): runs for every tenant (owner 2026-11-28;
+`tracker_cli caps global --daily-loads 0` stops it). Browserbase creds: the host's BROWSERBASE_API_KEY
 / BROWSERBASE_PROJECT_ID for TRACKER_UNCAPPED_TENANTS, the tenant's own (tracker_cli tenant bb) for every other; none ->
 `waiting` / no_browserbase_key, no lane_day row. Watches are grouped by creds, so a session never serves two keys, and
 each group's misses are packed LOADS_PER_SESSION to a Browserbase session (tracker_serp.Session). Each watch's query is
@@ -37,7 +37,7 @@ watch whose tenant row is missing is skipped. Result links go through tracker_ju
 /goto link is dropped), which only ever marks a Leak visible in Google. No other engine is called.
 
 Google full pass (paid, run_weekly_batch(watch_ids, day, serps) after the fresh batch, on a watch's weekly_slot weekday
-or its carry day): the same gate, creds, Session and cache (since '') as fresh, and each creds group's breaker goes on
+or its carry day): the same creds, Session and cache (since '') as fresh, and each creds group's breaker goes on
 from the fresh batch across the tick's watches; each vertical blocks its own assets (tracker_serp.BLOCKED); an empty
 page counts only with Google's no-results wording. tracker_plan.build()'s misses + FULL_RETRIES (wall retries) are reserved with a partial grant; a
 short grant trims the plan (Plan.trim) to what fits, the dropped fields go to lane_state.trimmed (lane `reduced`, the
@@ -283,15 +283,13 @@ def _creds(c, w, uncapped, lane):
 def run_fresh_batch(watch_ids, day):
     """The Google fresh pass over watch_ids (the daily pass's, in its order) for UTC day (module docstring) -> its
     {creds: _Serp}, so the weekly lanes go on with each group's breaker."""
-    paid, uncapped, groups = tdb.env_set("TRACKER_PAID_TENANTS"), tdb.env_set("TRACKER_UNCAPPED_TENANTS"), {}
-    if not paid:
-        return {}
+    uncapped, groups = tdb.env_set("TRACKER_UNCAPPED_TENANTS"), {}
     with tdb.db() as c:
         c.execute("DELETE FROM serp_cache WHERE day < ?", (day,))
     with tdb.db() as c:
         for wid in watch_ids:
             w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
-            if not w or w["paused"] or w["deleted_at"] or w["tenant_id"] not in paid:
+            if not w or w["paused"] or w["deleted_at"]:
                 continue
             creds = _creds(c, w, uncapped, FRESH)
             if creds is None:
@@ -498,16 +496,14 @@ def _carried(full, pages):
 
 
 def _full(w, day, serps):
-    """The full Google pass (spec "Full Google pass"): the slot's whole plan, or a carry's pages on its day. Gate,
-    creds and serp_cache (since '') are the fresh pass's; searches go through serps' _Serp for the creds (its session
+    """The full Google pass (spec "Full Google pass"): the slot's whole plan, or a carry's pages on its day. Creds
+    and serp_cache (since '') are the fresh pass's; searches go through serps' _Serp for the creds (its session
     loop and breaker; strict: an empty page needs Google's no-results wording). Holds the misses + FULL_RETRIES wall
     retries (partial grant); a grant under the misses trims the plan until its misses fit the grant - FULL_RETRIES (at
     least 1). The slot run carries cap_global / cap_tenant_month cuts to the cap's next_on, once; a carry run never
     carries again, and keeps the slot's first-scan baseline in carry_json.first. A run with a completed page is a success
 (it ends the baseline, _first). carry_json changes only with the run's lane_state (a crash keeps a pending carry)."""
-    paid, uncapped, wid = tdb.env_set("TRACKER_PAID_TENANTS"), tdb.env_set("TRACKER_UNCAPPED_TENANTS"), w["watch_id"]
-    if w["tenant_id"] not in paid:
-        return
+    uncapped, wid = tdb.env_set("TRACKER_UNCAPPED_TENANTS"), w["watch_id"]
     slot, carry = w["weekly_slot"] == date.fromisoformat(day).weekday(), json.loads(w["carry_json"] or "null")
     with tdb.db() as c:
         c.execute("DELETE FROM serp_cache WHERE day < ?", (day,))

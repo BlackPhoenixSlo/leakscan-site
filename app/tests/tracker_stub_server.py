@@ -1,5 +1,6 @@
 """Seam 6: the Removal service's public server on loopback with every upstream stubbed (Google CSE ->
-upstream_stub, the Mega aggregator -> leakshaven_stub, Origin probes -> tracker_stub_fetch), a temp TRACKER_DB and
+upstream_stub, the Mega aggregator -> leakshaven_stub, Origin probes -> tracker_stub_fetch, Browserbase -> a closed
+loopback port with the host's BROWSERBASE_* unset), a temp TRACKER_DB and
 the Quick scan DB, the seed inline and the scheduler thread off. Prints the base URL, then TRACKER_DB=<path> and
 TRACKER_STUB_FETCH=<path> for other processes (tracker_cli with TRACKER_FETCHER=stub). Test-only routes:
   POST /__tracker/daily?at=<ISO>    one daily pass at that moment -> its counts (JSON)
@@ -30,6 +31,9 @@ def main():
     os.environ.update(TRACKER_DB=a.db or os.path.join(tmp, "tracker.db"), TRACKER_SEED_INLINE="1",
                       TRACKER_FETCHER="stub", TRACKER_SCHEDULER="0", TRACKER_STUB_FETCH=os.path.join(tmp, "fetch.json"),
                       GOOGLE_API_KEY="fake", GOOGLE_CSE_ID="fake", SCAN_REUSE_TTL="0")
+    for k in ("BROWSERBASE_API_KEY", "BROWSERBASE_PROJECT_ID"):
+        os.environ.pop(k, None)
+    import bb_client
     import cse_scanner
     import db
     import leakshaven
@@ -42,6 +46,7 @@ def main():
 
     cse, agg = upstream_stub.Stub().start(), leakshaven_stub.Stub().start()
     cse_scanner.CSE_ENDPOINT = cse.base + "/customsearch/v1"
+    bb_client.BB_API = "http://127.0.0.1:9"
     db.DB_PATH = os.path.join(tmp, "public.db")
     public_app.PROFILE_ENABLED = public_app.ALIAS_ENRICH = media_gather.MEDIA_ENABLED = False
     leakshaven.BASE, leakshaven.ENABLED, leakshaven.MIN_GAP = agg.base, True, 0.0
