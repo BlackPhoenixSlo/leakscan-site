@@ -3,7 +3,7 @@ seeded watch (tracker_scheduler: a weekly slot scan or a refresh): every lane in
 (next_attempt_on: the watch's next weekly scan day, tracker_view.next_scan_at) plus a lane_day row for the lanes Phase 2
 adds. Lanes so far: origin_probe (Phase 1's probe; only its lane_state row is new; the seed records it too), then
 mega_lookup, listing_recheck and google_full; registry_crawl is listed (tracker_view.LANES) but not built yet.
-run_carry runs only a pending carry's pages on its day. A paused or deleted watch runs no lane (tracker_view reads its
+run_carry runs only a pending carry's pages on its day, never while a scan of the watch is in flight. A paused or deleted watch runs no lane (tracker_view reads its
 lanes `paused`). One lane failing never stops the next.
 
 Mega lookup ($0, no reservation): the Mega index client (leakshaven) with the handle and the strong aliases (tracker_judge
@@ -121,6 +121,13 @@ def _ran(watch_id, day, lane):
                          (watch_id, day, lane)).fetchone() is not None
 
 
+def _scanning(watch_id):
+    """A scan in flight (tracker_cli scan in another process) absorbs the carry."""
+    with tdb.db() as c:
+        return c.execute("SELECT 1 FROM daily_scans WHERE watch_id = ? AND finished_at IS NULL",
+                         (watch_id,)).fetchone() is not None
+
+
 def _first(c, watch_id, lane):
     return c.execute("SELECT 1 FROM lane_state WHERE watch_id = ? AND lane = ? AND last_success_at IS NOT NULL",
                      (watch_id, lane)).fetchone() is None
@@ -173,7 +180,8 @@ def run_carry(watch_id, day, serps):
     with tdb.db() as c:
         w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
     carry = json.loads(w["carry_json"] or "null") if w else None
-    if not carry or carry["on"] > day or w["paused"] or w["deleted_at"] or not w["seeded_at"] or _ran(watch_id, day, FULL):
+    if not carry or carry["on"] > day or w["paused"] or w["deleted_at"] or not w["seeded_at"] or _ran(watch_id, day, FULL) \
+            or _scanning(watch_id):
         return False
     _full_lane(w, day, serps, False)
     return True
