@@ -1,9 +1,14 @@
 """Seed + the Quick scan's private candidate step (ticket 03) (Seam 5). Google CSE -> upstream_stub, the Mega
 aggregator -> leakshaven_stub, probes -> tracker_stub_fetch; no real network. All data synthetic."""
 import contextlib
+import http.client
+import json
 import os
+import queue
 import threading
+import time
 import unittest
+from http.server import ThreadingHTTPServer
 from unittest import mock
 
 from tracker_fixture import Base, tdb, tracker_scheduler, tracker_seed, tracker_stub_fetch
@@ -270,6 +275,123 @@ class TestSeed(Stubs):
         w = self.watch(self.tenant(), username=H, seeded=False)
         with mock.patch.dict(os.environ, TRACKER_SEED_INLINE="1"):
             self.assertEqual(tracker_seed.start(w)["outcome"], "ok")
+
+
+def until(cond, timeout=10):
+    end = time.monotonic() + timeout
+    while not cond():
+        if time.monotonic() > end:
+            return False
+        time.sleep(0.01)
+    return True
+
+
+class TestPool(Stubs):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.api = ThreadingHTTPServer(("127.0.0.1", 0), public_app.Handler)
+        threading.Thread(target=cls.api.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.api.shutdown()
+        cls.api.server_close()
+
+    def setUp(self):
+        super().setUp()
+        self.running, self.peak, self.calls, self.release = 0, 0, [], threading.Event()
+        self.addCleanup(self.release.set)
+        for p in (mock.patch.multiple(tracker_seed, _Q=queue.Queue(), _workers=[], _pending=set()),
+                  mock.patch.object(tracker_seed, "_quick_candidates", return_value=self.cand)):
+            p.start()
+            self.addCleanup(p.stop)
+        self.t = self.tenant()
+        self.key = tdb.new_key()
+        with tdb.db() as c:
+            c.execute("UPDATE tenants SET creators_max = 50 WHERE tenant_id = ?", (self.t,))
+            c.execute("INSERT INTO tenant_keys (key_hash, tenant_id, issued_at) VALUES (?,?,?)",
+                      (tdb.key_hash(self.key), self.t, tdb.now()))
+
+    def cand(self, h, a):
+        with tracker_seed._LOCK:
+            self.calls.append(h)
+            self.running += 1
+            self.peak = max(self.peak, self.running)
+        self.release.wait(10)
+        with tracker_seed._LOCK:
+            self.running -= 1
+        return {"errors": [], "google": GOOGLE, "mega": []}
+
+    def put(self, i):
+        c = http.client.HTTPConnection("127.0.0.1", self.api.server_address[1], timeout=10)
+        body = {"account_id": f"acc-{i}", "platform": "onlyfans", "username": f"rowan_ash{i}", "verified": True,
+                "paused": False}
+        c.request("PUT", f"/v1/watches/w_rowan_{i:05d}", body=json.dumps(body),
+                  headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"})
+        r = c.getresponse()
+        out = r.status, json.loads(r.read())
+        c.close()
+        return out
+
+    def seeded(self):
+        return self.rows("SELECT COUNT(*) AS n FROM watches WHERE seeded_at IS NOT NULL")[0]["n"]
+
+    def test_put_burst_runs_at_most_k_seeds_at_once_and_all_seed(self):
+        with mock.patch.dict(os.environ, TRACKER_SEED_WORKERS="3", TRACKER_UNCAPPED_TENANTS=self.t):
+            for i in range(10):
+                self.assertEqual(self.put(i), (200, {"watch_id": f"w_rowan_{i:05d}", "created": True,
+                                                     "seeded": False}))
+            self.assertTrue(until(lambda: self.running == 3))
+            time.sleep(0.2)
+            self.assertEqual((self.running, self.peak, tracker_seed._Q.qsize()), (3, 3, 7))
+            tracker_seed.start("w_rowan_00009")
+            self.assertEqual(tracker_seed._Q.qsize(), 7)
+            self.release.set()
+            self.assertTrue(until(lambda: self.seeded() == 10))
+        self.assertEqual(self.peak, 3)
+        self.assertEqual(sorted(self.calls), sorted(f"rowan_ash{i}" for i in range(10)))
+        self.assertEqual(len(tracker_seed._workers), 3)
+        self.assertTrue(until(lambda: not tracker_seed._pending))
+
+    def test_worker_survives_a_raising_seed(self):
+        self.release.set()
+        bad, good = (self.watch(self.t, username=f"rowan_ash{i}", seeded=False) for i in (1, 2))
+        real = tracker_seed._run
+        with mock.patch.object(tracker_seed, "_run",
+                               side_effect=lambda w, c: (_ for _ in ()).throw(RuntimeError) if w == bad else real(w, c)):
+            tracker_seed.start(bad)
+            tracker_seed.start(good)
+            self.assertTrue(until(lambda: self.seeded() == 1))
+        self.assertEqual(len(tracker_seed._workers), 2)
+        self.assertTrue(all(t.is_alive() for t in tracker_seed._workers))
+        self.assertEqual(self.rows("SELECT watch_id FROM watches WHERE seeded_at IS NOT NULL"), [{"watch_id": good}])
+
+    def test_inline_runs_in_the_caller_and_starts_no_worker(self):
+        self.release.set()
+        w = self.watch(self.t, username=H, seeded=False)
+        with mock.patch.dict(os.environ, TRACKER_SEED_INLINE="1"):
+            self.assertEqual(tracker_seed.start(w)["outcome"], "ok")
+        self.assertEqual(tracker_seed._workers, [])
+
+    def test_pool_seed_and_daily_pass_never_double_run(self):
+        w = self.watch(self.t, username=H, seeded=False)
+        tracker_seed.start(w)
+        self.assertTrue(until(lambda: self.running == 1))
+        self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 0)
+        self.release.set()
+        self.assertTrue(until(lambda: self.seeded() == 1))
+        self.assertEqual(self.calls, [H])
+        self.assertEqual(self.rows("SELECT outcome FROM daily_scans WHERE watch_id = ?", w), [{"outcome": "ok"}])
+
+    def test_daily_pass_seeds_what_the_pool_lost(self):
+        self.release.set()
+        w = self.watch(self.t, username=H, seeded=False)
+        self.assertEqual(tracker_scheduler.daily_pass()["seeded"], 1)
+        tracker_seed.start(w)
+        self.assertTrue(until(lambda: not tracker_seed._pending))
+        self.assertEqual(self.calls, [H])
 
 
 if __name__ == "__main__":
