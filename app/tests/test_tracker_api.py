@@ -607,8 +607,8 @@ class TestThisWeek(Base):
         self.scan("w_mia_00001")
         t = self.week()
         self.assertEqual(t, {"since": self.SINCE, "state": "complete", "new": 3, "first_scan": 2, "came_back": 1, "gone": 3})
-        counts = self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]["counts"]
-        self.assertEqual(counts["new_today"], 2)
+        one = self.req("GET", "/v1/creators/w_mia_00001", key=self.a)[2]
+        self.assertEqual((one["counts"]["new_today"], one["offer_counts"]["new_7d"]), (2, t["new"]))
         self.clock = NOW + timedelta(days=7)
         self.assertEqual(self.week(), {**zero, "since": "2026-11-28", "state": "complete"})
 

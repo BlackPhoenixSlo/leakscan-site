@@ -179,6 +179,6 @@ def _seed(w, at):
             a, p = admit_mega(c, watch_id, it, handle, at)
             admitted, pending = admitted + a, pending + p
         c.execute("UPDATE watches SET seeded_at = ? WHERE watch_id = ?", (at, watch_id))
-    outcome = "ok" if tracker_lanes.origin_probe(watch_id, at[:10]) is not None else "failed"
+    outcome = "ok" if tracker_lanes.origin_probe(w, at[:10]) is not None else "failed"
     tracker_probe.log(f"tracker seed {outcome} admitted={admitted} pending={pending}")
     return {"admitted": admitted, "pending": pending, "outcome": outcome}

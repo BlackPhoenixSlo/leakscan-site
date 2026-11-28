@@ -3,10 +3,12 @@ dead-streak confirms between slots, the scan claim's triggers, and `this_week` /
 2026-11-02 is a Monday; Lanes' Mega index and listing stubs, no Browserbase creds. Fictional creators only."""
 import http.client
 import json
+from datetime import timedelta
 from unittest import mock
 
 from tracker_fixture import tdb, tracker_scheduler, tracker_stub_fetch
 from test_tracker_lanes import SITE, Lanes, at, pack
+import tracker_lanes
 import tracker_seed
 
 MON, TUE = 0, 1
@@ -208,6 +210,64 @@ class TestF7(Weekly):
         self.tick_at(ts(4, "11:30"), pack(1))
         self.assertEqual(len(self.mega.calls), 2)
         self.assertEqual(self.scans(), [("2026-11-04", "refresh", "ok")])
+
+
+class TestTick(Weekly):
+    """Review fixes: the queue a slot scan serves, the claim's real start, the queue re-checked mid-tick."""
+
+    def second(self, wid="w_zz_second", slot=TUE):
+        return self.watch(self.t, username="rowan_ash", account_id=wid, watch_id=wid, weekly_slot=slot)
+
+    def test_refresh_posted_just_before_the_weekly_claim_is_served_by_it(self):
+        real, posted = tracker_seed.claim, []
+
+        def claim(c, wid, now, retry=False, trigger="seed"):
+            if trigger == "weekly" and not posted:
+                posted.append(self.post())
+            return real(c, wid, now, retry=retry, trigger=trigger)
+        with mock.patch.object(tracker_seed, "claim", side_effect=claim):
+            out = self.tick_at(ts(3, "04:00"), pack(1))
+        self.assertEqual((posted[0][0], out["weekly"], out["refreshed"]), (202, 1, 0))
+        self.assertEqual(self.rows("SELECT refresh_queued_at FROM watches"), [{"refresh_queued_at": None}])
+        for when in (ts(3, "05:00"), ts(4, "03:59")):
+            self.assertEqual((self.tick_at(when, pack(1)) or {}).get("refreshed", 0), 0, when)
+        self.assertEqual(self.post()[0], 429)
+        self.tick_at(ts(4, "13:00"), pack(1))
+        self.assertEqual(self.scans(), [("2026-11-03", "weekly", "ok")])
+
+    def test_long_tick_claims_at_the_real_start_and_a_second_process_never_takes_over(self):
+        w2, t, ran, nested = self.second(), [tdb.parse(ts(3, "04:00"))], [], []
+        real = tracker_lanes.run_scan
+
+        def scan(wid, day, serps):
+            ran.append(wid)
+            if wid == self.w:
+                t[0] += timedelta(hours=3)
+            elif not nested:
+                nested.append(tracker_scheduler.daily_pass())
+            return real(wid, day, serps)
+        self.index(pack(1), pack(1))
+        tdb.set_clock(lambda: t[0])
+        with mock.patch.object(tracker_lanes, "run_scan", side_effect=scan):
+            out = tracker_scheduler.daily_pass()
+        self.assertEqual((out["weekly"], nested[0]["weekly"], ran), (2, 0, [self.w, w2]))
+        self.assertEqual([r["started_at"] for r in self.rows("SELECT started_at FROM daily_scans ORDER BY watch_id")],
+                         [ts(3, "04:00"), ts(3, "07:00")])
+        self.assertEqual(self.one(w2)["next_refresh_at"], ts(4, "07:00"))
+
+    def test_refresh_posted_mid_tick_runs_before_the_next_slot_claim(self):
+        w2, w3, ran = self.second(), self.second("w_zz_third", MON), []
+        real = tracker_lanes.run_scan
+
+        def scan(wid, day, serps):
+            ran.append(wid)
+            if wid == self.w:
+                self.assertEqual(self.post(w3)[0], 202)
+            return real(wid, day, serps)
+        with mock.patch.object(tracker_lanes, "run_scan", side_effect=scan):
+            out = self.tick_at(ts(3, "04:00"), pack(1), pack(1), pack(1))
+        self.assertEqual((ran, out["weekly"], out["refreshed"]), ([self.w, w3, w2], 2, 1))
+        self.assertEqual(self.scans(w3), [("2026-11-03", "refresh", "ok")])
 
 
 class TestThisWeekStates(Weekly):

@@ -201,7 +201,7 @@ def creator(c, w, now_dt, ls):
     first, last = c.execute("SELECT MIN(finished_at), MAX(finished_at) FROM daily_scans WHERE watch_id=? "
                             "AND outcome IN ('ok', 'partial')", (w["watch_id"],)).fetchone()
     started, since = last_scan_at(c, w["watch_id"]), tracker_db.day(now_dt - timedelta(days=OFFER_NEW_DAYS - 1))
-    week = [x["found_on_first_scan"] for x in ls if x["first_seen_at"][:10] >= since]
+    offer = offer_counts(ls, counts, now_dt)
     # a watch with no scan yet (created paused, then resumed) can be refreshed right away
     refresh_at = None if w["paused"] else tracker_db.fmt(started + timedelta(hours=REFRESH_COOLDOWN_H)) if started \
         else w["created_at"]
@@ -209,10 +209,10 @@ def creator(c, w, now_dt, ls):
             "paused_since": w["paused_at"] if w["paused"] else None, "seeded": w["seeded_at"] is not None,
             "last_checked_at": last, "next_check_at": next_check_at(w, started, now_dt), "next_refresh_at": refresh_at,
             "counts": counts,
-            "this_week": {"since": since, "state": week_state(c, w, now_dt, started), "new": week.count(False),
-                          "first_scan": week.count(True), "came_back": _changed(ls, since, "live", "gone"),
+            "this_week": {"since": since, "state": week_state(c, w, now_dt, started), "new": offer["new_7d"],
+                          "first_scan": sum(x["found_on_first_scan"] and x["first_seen_at"][:10] >= since for x in ls), "came_back": _changed(ls, since, "live", "gone"),
                           "gone": _changed(ls, since, "gone")},
-            "service_status": "none", "service_status_since": None, "removal": None, "offer_counts": offer_counts(ls, counts, now_dt),
+            "service_status": "none", "service_status_since": None, "removal": None, "offer_counts": offer,
             "first_daily_at": first}
 
 

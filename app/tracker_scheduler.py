@@ -1,9 +1,10 @@
 """Scheduler tick (spec "Daily pass (service)", cadence spec slice A): a daemon thread like the retention loop wakes
 every TICK_S. A scan (tracker_lanes.run_scan: every lane of one watch) owns the watch's daily_scans row for its UTC day
-(tracker_seed.claim) with its trigger. Each tick, in order:
+(tracker_seed.claim, stamped with the scan's real start) with its trigger; any scan the tick claims clears the
+watch's refresh queue when it finishes. Each tick, in order:
   1. Queued refreshes (watches.refresh_queued_at, POST /v1/watches/{id}/refresh), at any hour: a `refresh` scan (an
-     unseeded watch is seeded instead); the row's finish clears the queue; a paused or deleted watch's queue is
-     dropped. A refresh absorbs a pending carry (its whole plan replaces it).
+     unseeded watch is seeded instead); a paused or deleted watch's queue is dropped. A refresh absorbs a pending
+     carry (its whole plan replaces it). The queue is drained again before each step-4 claim.
   From TRACKER_DAILY_AT (UTC HH:MM, default 04:00) on (before it, a tick that ran no refresh returns None):
   2. Rows still open from an earlier day (a crash) finish failed.
   3. The daily re-seed of every live unseeded watch (tracker_seed.claim retry: a failed or crashed seed row of the day).
@@ -35,17 +36,37 @@ _purged_day = None
 _LIVE = "SELECT watch_id FROM watches WHERE paused = 0 AND deleted_at IS NULL "
 
 
-def _finish(wid, day, outcome, refresh=False):
+def _finish(wid, day, outcome):
+    """A refresh queued before the scan's claim (once claimed, POST answers with the running scan) is served by it."""
     with tdb.db() as c:
         c.execute("UPDATE daily_scans SET finished_at = ?, outcome = CASE WHEN ? = 'ok' AND EXISTS (SELECT 1 FROM "
                   "lane_day WHERE watch_id = daily_scans.watch_id AND day = daily_scans.day AND outcome != 'ok') "
                   "THEN 'partial' ELSE ? END WHERE watch_id = ? AND day = ? AND finished_at IS NULL",
                   (tdb.now(), outcome, outcome, wid, day))
-        if refresh:
-            c.execute("UPDATE watches SET refresh_queued_at = NULL WHERE watch_id = ?", (wid,))
+        c.execute("UPDATE watches SET refresh_queued_at = NULL WHERE watch_id = ?", (wid,))
 
 
-def _scan(wid, today, serps, out, refresh=False):
+def _claimed(wid, serps, out, trigger, retry=False):
+    """Claim wid's row at the real start (not the tick's) and run its scan -> True when it ran here."""
+    now = tdb.now_dt()
+    with tdb.db() as c:
+        mine = tracker_seed.claim(c, wid, now, retry=retry, trigger=trigger)
+    if mine:
+        _scan(wid, tdb.day(now), serps, out)
+    return mine
+
+
+def _drain(serps, out):
+    with tdb.db() as c:
+        c.execute("UPDATE watches SET refresh_queued_at = NULL WHERE refresh_queued_at IS NOT NULL AND "
+                  "(paused = 1 OR deleted_at IS NOT NULL)")
+        queued = [r[0] for r in c.execute(_LIVE + "AND refresh_queued_at IS NOT NULL ORDER BY refresh_queued_at, "
+                                          "watch_id")]
+    for wid in queued:
+        out["refreshed"] += _claimed(wid, serps, out, "refresh")
+
+
+def _scan(wid, today, serps, out):
     """The claimed row's work: the seed for an unseeded watch (it finishes its own row), else run_scan."""
     outcome = "failed"
     try:
@@ -61,24 +82,14 @@ def _scan(wid, today, serps, out, refresh=False):
             outcome = r["outcome"]
     except Exception as e:
         log(f"tracker scan failed: {type(e).__name__}")
-    _finish(wid, today, outcome, refresh)
+    _finish(wid, today, outcome)
 
 
 def _pass(now, due):
     global _purged_day
     today, serps = tdb.day(now), {}
     out = {"seeded": 0, "probed": 0, "keys": 0, "fetched": 0, "refreshed": 0, "weekly": 0, "purged": None}
-    with tdb.db() as c:
-        c.execute("UPDATE watches SET refresh_queued_at = NULL WHERE refresh_queued_at IS NOT NULL AND "
-                  "(paused = 1 OR deleted_at IS NOT NULL)")
-        queued = [r[0] for r in c.execute(_LIVE + "AND refresh_queued_at IS NOT NULL ORDER BY refresh_queued_at, "
-                                          "watch_id")]
-    for wid in queued:
-        with tdb.db() as c:
-            mine = tracker_seed.claim(c, wid, now, trigger="refresh")
-        if mine:
-            _scan(wid, today, serps, out, refresh=True)
-            out["refreshed"] += 1
+    _drain(serps, out)
     if not due:
         return out if out["refreshed"] else None
     floor = tdb.fmt(tracker_view.due_at(now) - timedelta(hours=tracker_view.REFRESH_COOLDOWN_H))
@@ -87,22 +98,17 @@ def _pass(now, due):
                   (tdb.now(), today))
         order = "ORDER BY created_at, watch_id"
         unseeded = [r[0] for r in c.execute(_LIVE + "AND seeded_at IS NULL " + order)]
-        reseed = [w for w in unseeded if tracker_seed.claim(c, w, now, retry=True)]
-    for wid in reseed:
-        _scan(wid, today, serps, out)
+    for wid in unseeded:
+        _claimed(wid, serps, out, "seed", retry=True)
     with tdb.db() as c:
         slot = [r[0] for r in c.execute(
             _LIVE + "AND seeded_at IS NOT NULL AND weekly_slot = ? AND NOT EXISTS (SELECT 1 FROM daily_scans d WHERE "
             "d.watch_id = watches.watch_id AND d.trigger IS NOT NULL AND d.started_at > ? AND NOT "
             "(d.day = ? AND d.trigger = 'weekly')) " + order, (now.weekday(), floor, today))]
     for wid in slot:
-        with tdb.db() as c:
-            mine = tracker_seed.claim(c, wid, now, trigger="weekly")
-        if mine:
-            _scan(wid, today, serps, out)
-            out["weekly"] += 1
+        _drain(serps, out)
+        out["weekly"] += _claimed(wid, serps, out, "weekly")
     with tdb.db() as c:
-        live = [r[0] for r in c.execute(_LIVE + order)]
         carried = [r[0] for r in c.execute(_LIVE + "AND carry_json IS NOT NULL " + order)]
     for wid in carried:
         try:
@@ -110,7 +116,7 @@ def _pass(now, due):
         except Exception as e:
             log(f"tracker carry failed: {type(e).__name__}")
     try:
-        tracker_probe.run(live, confirm=True)
+        tracker_probe.run(confirm=True)
     except Exception as e:
         log(f"tracker dead-streak confirm failed: {type(e).__name__}")
     if _purged_day != today:

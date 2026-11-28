@@ -135,19 +135,17 @@ def _lane(w, day, lane, fn):
     _record(w["watch_id"], day, lane, at, state, reason, next_on=_next_scan(w, at))
 
 
-def origin_probe(watch_id, day):
-    """Phase 1's probe for one watch as the origin_probe lane (a scan and the seed) -> tracker_probe.run()'s counts,
+def origin_probe(w, day):
+    """Phase 1's probe for watch row w as the origin_probe lane (a scan and the seed) -> tracker_probe.run()'s counts,
     None when it raised; writes the lane's lane_state row either way."""
     at = tdb.now()
     try:
-        probe = tracker_probe.run([watch_id])
+        probe = tracker_probe.run([w["watch_id"]])
     except Exception as e:
         probe = None
         tracker_probe.log(f"tracker origin probe failed: {type(e).__name__}")
-    with tdb.db() as c:
-        w = c.execute("SELECT weekly_slot FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
-    _record(watch_id, day, "origin_probe", at, "ok" if probe is not None else "failed", ledger=False,
-            next_on=_next_scan(w, at) if w and w["weekly_slot"] is not None else None)
+    _record(w["watch_id"], day, "origin_probe", at, "ok" if probe is not None else "failed", ledger=False,
+            next_on=_next_scan(w, at))
     return probe
 
 
@@ -158,7 +156,7 @@ def run_scan(watch_id, day, serps):
         w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
     if not w or w["paused"] or w["deleted_at"]:
         return {"outcome": "skipped", "probe": None}
-    probe = origin_probe(watch_id, day)
+    probe = origin_probe(w, day)
     if leakshaven.ENABLED:
         _lane(w, day, "mega_lookup", _mega)
     _lane(w, day, "listing_recheck", _recheck)
