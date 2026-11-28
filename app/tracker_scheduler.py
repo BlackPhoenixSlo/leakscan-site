@@ -17,7 +17,8 @@ watch's refresh queue when it finishes. Each tick, in order:
   6. The purge, once per UTC day.
 A scan's row finishes failed when the Origin probe failed, partial when it was ok but a lane_day row of its day isn't;
 one watch's error fails only its own row. A row still open after tracker_seed.LEASE_H (a crash) is taken over by the
-next claim of its trigger; a failed weekly or refresh row is never rerun. TRACKER_SCHEDULER=0 keeps the thread off."""
+next claim of its trigger; a failed weekly or refresh row is never rerun. TRACKER_SCHEDULER=0 keeps the thread off.
+scan_now (tracker_cli scan) is an operator's refresh outside the tick."""
 import ipaddress
 import os
 import threading
@@ -85,6 +86,26 @@ def _scan(wid, today, serps, out):
     except Exception as e:
         log(f"tracker scan failed: {type(e).__name__}")
     _finish(wid, today, outcome)
+
+
+def scan_now(wid, serps):
+    """Operator scan (tracker_cli scan): a `refresh` scan now, past the weekly slot and the refresh cooldown, under the
+    same caps. Today's row is the only cross-process claim, so it is taken over in place once finished (or open past
+    tracker_seed.LEASE_H, a crash); the scan then counts as the watch's last for the cooldown and the slot guard, like
+    a refresh -> its start, None when the watch isn't live and seeded or today's row is in flight."""
+    now = tdb.now_dt()
+    at, today = tdb.fmt(now), tdb.day(now)
+    with tdb.db() as c:
+        mine = c.execute(_LIVE + "AND seeded_at IS NOT NULL AND watch_id = ?", (wid,)).fetchone() and (
+            c.execute("INSERT OR IGNORE INTO daily_scans (watch_id, day, started_at, trigger) VALUES (?,?,?,'refresh')",
+                      (wid, today, at)).rowcount or
+            c.execute("UPDATE daily_scans SET started_at = ?, finished_at = NULL, outcome = NULL, trigger = 'refresh' "
+                      "WHERE watch_id = ? AND day = ? AND (finished_at IS NOT NULL OR started_at < ?)",
+                      (at, wid, today, tdb.fmt(now - timedelta(hours=tracker_seed.LEASE_H)))).rowcount)
+    if not mine:
+        return None
+    _scan(wid, today, serps.setdefault(today, {}), dict.fromkeys(("seeded", "probed", "keys", "fetched"), 0))
+    return at
 
 
 def _pass(now, due):

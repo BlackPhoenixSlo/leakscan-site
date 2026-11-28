@@ -6,6 +6,7 @@
   python3 app/tracker_cli.py key issue <tenant_id> | key revoke <tenant_id>
   python3 app/tracker_cli.py caps global [--daily-loads N] [--daily-judge N] (no flag: caps + today's spend) | caps tenant <tenant_id> --month-loads N
   python3 app/tracker_cli.py purge [--dry-run] | report | daily [--at ISO]
+  python3 app/tracker_cli.py scan --tenant T [--watch W ...]   (a full scan now, past the slot and the cooldown, caps kept)
 """
 import argparse
 import json
@@ -118,6 +119,39 @@ def daily(a):
         print(json.dumps(out, indent=2, sort_keys=True, default=str))
 
 
+def scan(a):
+    """One watch at a time (tracker_scheduler.scan_now); one line each: ids and counts, never a handle."""
+    import tracker_scheduler
+    import tracker_view
+    with tracker_db.db() as c:
+        _tenant(c, a.tenant)
+        ws = {r[0]: r for r in c.execute("SELECT watch_id, paused, deleted_at, seeded_at FROM watches WHERE tenant_id = ? "
+                                         "ORDER BY created_at, watch_id", (a.tenant,))}
+    serps, total = {}, {}
+    for wid in a.watch or ws:
+        w = ws.get(wid)
+        why = "unknown" if not w else "deleted" if w[2] else "paused" if w[1] else "unseeded" if not w[3] else None
+        at = None if why else tracker_scheduler.scan_now(wid, serps)
+        if not at:
+            print(f"{wid}\tskipped={why or 'in_flight'}", flush=True)
+            continue
+        with tracker_db.db() as c:
+            outcome = c.execute("SELECT outcome FROM daily_scans WHERE watch_id = ? AND started_at = ?",
+                                (wid, at)).fetchone()
+            lanes = dict(c.execute("SELECT lane, state FROM lane_state WHERE watch_id = ? AND last_attempt_at >= ?",
+                                   (wid, at)).fetchall())
+            loads = c.execute("SELECT COALESCE(SUM(used), 0) FROM load_reservation WHERE watch_id = ? AND unit = 'load' "
+                              "AND created_at >= ?", (wid, at)).fetchone()[0]
+            media, thumbs = c.execute("SELECT COALESCE(SUM(created_at >= ?), 0), COALESCE(SUM(thumb_seen_at >= ?), 0) "
+                                      "FROM leaks WHERE watch_id = ? AND kind = 'media'", (at, at, wid)).fetchone()
+        lane = {k: lanes.get(k, "not_run") for k, _ in tracker_view.LANES if k != "registry_crawl"}
+        for k, v in lane.items():
+            total[f"{k}={v}"] = total.get(f"{k}={v}", 0) + 1
+        print("\t".join([wid, f"scan={outcome[0] if outcome else None}", *(f"{k}={v}" for k, v in lane.items()),
+                         f"loads={loads}", f"media_new={media}", f"thumbs={thumbs}"]), flush=True)
+    print("total\t" + "\t".join(f"{k}:{n}" for k, n in sorted(total.items())))
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="tracker_cli")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -157,6 +191,10 @@ def main(argv=None):
     x = sub.add_parser("daily")
     x.add_argument("--at")
     x.set_defaults(fn=daily)
+    x = sub.add_parser("scan")
+    x.add_argument("--tenant", required=True)
+    x.add_argument("--watch", action="append")
+    x.set_defaults(fn=scan)
     a = p.parse_args(argv)
     tracker_db.init()
     a.fn(a)
