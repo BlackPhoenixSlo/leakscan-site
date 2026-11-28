@@ -249,16 +249,18 @@ def _today_status(c, key, today):
     return r and r[0]
 
 
-def run(watch_ids):
+def run(watch_ids, confirm=False):
     """Probe every page Leak of these (unpaused, undeleted) watches not probed today -> {keys, fetched, reused}.
-    A key in flight in another thread of this process is left to it (it applies to every Leak with the key)."""
+    A key in flight in another thread of this process is left to it (it applies to every Leak with the key).
+    confirm: only Leaks whose latest settled probe was their first dead one (the dead-streak confirm)."""
     if not watch_ids:
         return {"keys": 0, "fetched": 0, "reused": 0}
     today = tdb.day()
     with tdb.db() as c:
         due = {}
         for r in c.execute(f"SELECT l.url_key, l.url {_LIVE_PAGES} AND l.watch_id IN ({','.join('?' * len(watch_ids))}) "
-                           "AND (p.last_probe_at IS NULL OR substr(p.last_probe_at, 1, 10) < ?) ORDER BY l.created_at",
+                           "AND (p.last_probe_at IS NULL OR substr(p.last_probe_at, 1, 10) < ?) "
+                           + ("AND p.consecutive_dead = 1 " if confirm else "") + "ORDER BY l.created_at",
                            (*watch_ids, today)):
             due.setdefault(r["url_key"], r["url"])
     reused, todo = 0, {}

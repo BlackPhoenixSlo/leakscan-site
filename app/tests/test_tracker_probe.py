@@ -111,7 +111,8 @@ class TestDaily(Base):
         for u in (A, B, C):
             self.leak(w, u)
         with tdb.db() as c:
-            c.execute("INSERT INTO daily_scans (watch_id, day, started_at) VALUES (?,?,?)", (w, "2026-11-02", "2026-11-02T04:00:00Z"))
+            c.execute("INSERT INTO daily_scans (watch_id, day, started_at, trigger) VALUES (?,?,?,?)",
+                      (w, "2026-11-02", "2026-11-02T04:00:00Z", "weekly"))
         tracker_probe.apply(tracker_probe.rules.url_key(A), "live")
         tracker_probe._inflight.clear()
         tracker_scheduler.daily_pass()
@@ -122,6 +123,9 @@ class TestDaily(Base):
         self.assertEqual(sorted(tracker_stub_fetch.CALLS), sorted([B, C]))
         self.assertEqual(self.rows("SELECT outcome FROM daily_scans")[0]["outcome"], "ok")
         self.clock("2026-11-03T04:00:00Z")
+        tracker_scheduler.daily_pass()
+        self.assertEqual(len(tracker_stub_fetch.CALLS), 2)
+        self.clock("2026-11-09T04:00:00Z")
         tracker_scheduler.daily_pass()
         self.assertEqual(len(tracker_stub_fetch.CALLS), 5)
 
@@ -156,18 +160,24 @@ class TestDaily(Base):
         tracker_scheduler.daily_pass("2026-11-09T06:00:00Z")
         self.assertEqual(self.rows("SELECT day FROM daily_scans")[0]["day"], "2026-11-09")
         self.assertEqual(tdb.now(), self.T0)
-        self.assertEqual(tracker_view.next_check_at(tdb.parse("2026-11-09T06:00:00Z")), "2026-11-10T04:00:00Z")
+        with tdb.db() as c:
+            row = c.execute("SELECT * FROM watches").fetchone()
+            last = tracker_view.last_scan_at(c, w)
+        self.assertEqual(tdb.fmt(last), "2026-11-09T06:00:00Z")
+        self.assertEqual(tracker_view.next_check_at(row, last, last), "2026-11-16T04:00:00Z")
 
     def test_daily_at_env_and_its_fallback(self):
         with mock.patch.dict("os.environ", TRACKER_DAILY_AT="06:00"):
             self.assertIsNone(tracker_scheduler.daily_pass("2026-11-09T05:59:00Z"))
             self.assertIsNotNone(tracker_scheduler.daily_pass("2026-11-09T06:00:00Z"))
-            self.assertEqual(tracker_view.next_check_at(tdb.parse("2026-11-09T05:00:00Z")), "2026-11-09T06:00:00Z")
+            self.assertEqual(tdb.fmt(tracker_view.next_scan_at(0, None, tdb.parse("2026-11-09T05:00:00Z"))),
+                             "2026-11-09T06:00:00Z")
         for bad in ("4am", "25:00", "04:60", ""):
             with mock.patch.dict("os.environ", TRACKER_DAILY_AT=bad):
                 self.assertIsNone(tracker_scheduler.daily_pass("2026-11-10T03:59:00Z"), bad)
                 self.assertIsNotNone(tracker_scheduler.daily_pass("2026-11-10T04:00:00Z"), bad)
-                self.assertEqual(tracker_view.next_check_at(tdb.parse("2026-11-10T03:00:00Z")), "2026-11-10T04:00:00Z")
+                self.assertEqual(tdb.fmt(tracker_view.next_scan_at(1, None, tdb.parse("2026-11-10T03:00:00Z"))),
+                                 "2026-11-10T04:00:00Z")
 
 
 class TestReport(Base):

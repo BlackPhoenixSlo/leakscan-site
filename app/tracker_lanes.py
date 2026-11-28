@@ -1,9 +1,10 @@
-"""Leak lanes (Phase 2 spec "Lanes in detail"): run_daily(watch_id, day) runs a seeded watch's daily lanes in order inside
-Phase 1's daily pass (tracker_scheduler) and writes each lane's lane_state row, plus a lane_day row for the lanes Phase 2
+"""Leak lanes (Phase 2 spec "Lanes in detail", cadence spec slice A): run_scan(watch_id, day, serps) is one scan of a
+seeded watch (tracker_scheduler: a weekly slot scan or a refresh): every lane in order, each writing its lane_state row
+(next_attempt_on: the watch's next weekly scan day, tracker_view.next_scan_at) plus a lane_day row for the lanes Phase 2
 adds. Lanes so far: origin_probe (Phase 1's probe; only its lane_state row is new; the seed records it too), then
-mega_lookup, then listing_recheck; after every watch's run_daily, run_fresh_batch(watch_ids, day) runs google_fresh.
-A paused or deleted watch runs no lane (tracker_view reads its lanes `paused`). One lane failing never stops the next.
-Each added lane runs at most once per watch per UTC day (a non-failed lane_day row).
+mega_lookup, listing_recheck and google_full; registry_crawl is listed (tracker_view.LANES) but not built yet.
+run_carry runs only a pending carry's pages on its day. A paused or deleted watch runs no lane (tracker_view reads its
+lanes `paused`). One lane failing never stops the next.
 
 Mega lookup ($0, no reservation): the Mega index client (leakshaven) with the handle and the strong aliases (tracker_judge
 norm() length >= STRONG_MIN) and names=(), so a display-name title match can never pick the Creator; the index's
@@ -21,39 +22,33 @@ listing_rotated (lane_day `partial`); no listing answering at all -> `failed`.
 A Leak a lane admits on its first-ever successful run for the watch is a first-scan find (seen.first_scan); for the
 listing recheck, so is one found on a listing never rechecked before (leaks.recheck_at NULL).
 
-Google fresh pass (paid, run_fresh_batch after every watch's $0 lanes): runs for every tenant (owner 2026-11-28;
+Google full pass (paid, in every scan, and run_carry on a carry's day): runs for every tenant (owner 2026-11-28;
 `tracker_cli caps global --daily-loads 0` stops it). Browserbase creds: the host's BROWSERBASE_API_KEY
 / BROWSERBASE_PROJECT_ID for TRACKER_UNCAPPED_TENANTS, the tenant's own (tracker_cli tenant bb) for every other; none ->
-`waiting` / no_browserbase_key, no lane_day row. Watches are grouped by creds, so a session never serves two keys, and
-each group's misses are packed LOADS_PER_SESSION to a Browserbase session (tracker_serp.Session). Each watch's query is
-tracker_plan.fresh(); serp_cache by (UTC day, vertical, text, page, since) first: a hit reuses the links and reserves
-nothing, a miss reserves FRESH_HOLD loads (partial grant), consumes one before every navigation and caches the links of
-a page that loaded. A wall (tracker_serp.WALLS) ends the session and retries once in a fresh one, if the hold has a
-load left; a second wall, a failed load, a results page without links or a spent hold -> no result: `reduced` /
-google_failed (lane_day partial). A session also rotates at serp.ROTATE_S old. Breaker: a failed create, or BREAKER
-incomplete queries in a row, and the group's remaining misses are google_failed with no reservation and no session.
-Refused -> `waiting` with the cap's reason and next_on (a gone watch records nothing); the watch is never paused. A
-watch whose tenant row is missing is skipped. Result links go through tracker_judge.admit_hit with source google_web (a
-/goto link is dropped), which only ever marks a Leak visible in Google. No other engine is called.
-
-Google full pass (paid, run_weekly_batch(watch_ids, day, serps) after the fresh batch, on a watch's weekly_slot weekday
-or its carry day): the same creds, Session and cache (since '') as fresh, and each creds group's breaker goes on
-from the fresh batch across the tick's watches; each vertical blocks its own assets (tracker_serp.BLOCKED); an empty
-page counts only with Google's no-results wording. tracker_plan.build()'s misses + FULL_RETRIES (wall retries) are reserved with a partial grant; a
-short grant trims the plan (Plan.trim) to what fits, the dropped fields go to lane_state.trimmed (lane `reduced`, the
-cap's reason, lane_day partial). A slot run cut by cap_global / cap_tenant_month writes watches.carry_json: its cut pages
-run once on the cap's next_on (next UTC day / the 1st), never carried again. Each returned link's (vertical, field) pairs
-join leaks.google_fields_json. Only a run that searched (a page completed, breaker intact) touches visibility: one that
+`waiting` / no_browserbase_key, no lane_day row; a watch whose tenant row is missing is skipped. One _Serp per creds
+across a tick's watches (tracker_serp.Session, so a session never serves two keys; it rotates at serp.ROTATE_S old),
+serp_cache by (UTC day, vertical, text, page, since '') first: a hit reuses the links and reserves nothing. Each vertical
+blocks its own assets (tracker_serp.BLOCKED); an empty page counts only with Google's no-results wording. A load is
+consumed before every navigation; a wall (tracker_serp.WALLS) ends the session and retries once in a fresh one while
+the hold has a load left; a second wall, a failed load or a results page without links is an incomplete page (`reduced`
+/ google_failed, lane_day partial). Breaker: a failed create, or BREAKER incomplete pages in a row, and the creds'
+remaining misses get no reservation and no session. tracker_plan.build()'s misses + FULL_RETRIES (wall retries) are
+reserved with a partial grant; a short grant trims the plan (Plan.trim) to what fits, the dropped fields go to
+lane_state.trimmed (lane `reduced`, the cap's reason, lane_day partial); refused -> `waiting` with the cap's reason (a
+gone watch records nothing); the watch is never paused. A scan's run (the whole plan) cut by cap_global /
+cap_tenant_month writes watches.carry_json: its cut pages run once on the cap's next_on (next UTC day / the 1st), never
+carried again; a later scan absorbs a pending carry (runs the whole plan, replaces the carry). Result links go through
+tracker_judge.admit_hit with source google_web (a /goto link is dropped); no other engine is called. Each returned
+link's (vertical, field) pairs join leaks.google_fields_json. Only a run that searched (a page completed, breaker intact) touches visibility: one that
 completed every planned pair of a Leak and returned none marks it not visible (google_seen visible false), a set
 emptied by fields leaving the identity unknown (null); a tripped breaker only adds pairs. A run with a completed page
-ends the first-scan baseline, which a trimmed slot hands to its carry run."""
+ends the first-scan baseline, which a trimmed scan hands to its carry run."""
 import functools
 import html as _html
 import json
 import os
 import re
 from dataclasses import replace
-from datetime import date, timedelta
 from urllib.parse import parse_qsl, urljoin, urlsplit
 
 import leak_crawler
@@ -68,6 +63,7 @@ import tracker_probe
 import tracker_rules as rules
 import tracker_seed
 import tracker_serp as serp
+import tracker_view
 
 _MEGA_OK = ("ok", "nomatch", "short")
 MAP_FILE = os.path.join(tdb.HERE, "bruqi_detection_map.json")
@@ -77,9 +73,7 @@ LISTING_GAP = 0.4
 _ANCHOR = re.compile(r"""<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>(.*?)</a>""", re.I | re.S)
 _TAG = re.compile(r"<[^>]+>")
 _OUTCOME = {"ok": "ok", "reduced": "partial", "failed": "failed", "waiting": "partial"}
-FRESH = "google_fresh"
 BREAKER = 3
-FRESH_HOLD = 2  # the load and its one wall retry; settle releases what a query didn't use
 FULL = tracker_plan.LANE
 FULL_RETRIES = 2
 
@@ -113,6 +107,11 @@ def _record(watch_id, day, lane, at, state="ok", reason=None, ledger=True, next_
                       (watch_id, day, lane, _OUTCOME[state], reason))
 
 
+def _next_scan(w, at):
+    """next_attempt_on of a lane run at `at`: the watch's next weekly scan day after a scan starting then."""
+    return tracker_view.next_scan_at(w["weekly_slot"], tdb.parse(at), tdb.parse(at)).date().isoformat()
+
+
 def _ran(watch_id, day, lane):
     with tdb.db() as c:
         return c.execute("SELECT 1 FROM lane_day WHERE watch_id = ? AND day = ? AND lane = ? AND outcome != 'failed'",
@@ -133,34 +132,59 @@ def _lane(w, day, lane, fn):
     except Exception as e:
         state, reason = "failed", None
         tracker_probe.log(f"tracker {lane} failed: {e if isinstance(e, LaneFailed) else type(e).__name__}")
-    _record(w["watch_id"], day, lane, at, state, reason)
+    _record(w["watch_id"], day, lane, at, state, reason, next_on=_next_scan(w, at))
 
 
 def origin_probe(watch_id, day):
-    """Phase 1's probe for one watch as the origin_probe lane (the daily pass and the seed) -> tracker_probe.run()'s
-    counts, None when it raised; writes the lane's lane_state row either way."""
+    """Phase 1's probe for one watch as the origin_probe lane (a scan and the seed) -> tracker_probe.run()'s counts,
+    None when it raised; writes the lane's lane_state row either way."""
     at = tdb.now()
     try:
         probe = tracker_probe.run([watch_id])
     except Exception as e:
         probe = None
         tracker_probe.log(f"tracker origin probe failed: {type(e).__name__}")
-    _record(watch_id, day, "origin_probe", at, "ok" if probe is not None else "failed", ledger=False)
+    with tdb.db() as c:
+        w = c.execute("SELECT weekly_slot FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
+    _record(watch_id, day, "origin_probe", at, "ok" if probe is not None else "failed", ledger=False,
+            next_on=_next_scan(w, at) if w and w["weekly_slot"] is not None else None)
     return probe
 
 
-def run_daily(watch_id, day):
-    """-> {outcome: ok | failed (the Origin probe failed) | skipped (paused, deleted or missing), probe: counts | None}."""
+def run_scan(watch_id, day, serps):
+    """One scan of a watch, every lane in order; serps {creds: _Serp} is shared across a tick's watches -> {outcome: ok
+    | failed (the Origin probe failed) | skipped (paused, deleted or missing), probe: counts | None}."""
     with tdb.db() as c:
         w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
     if not w or w["paused"] or w["deleted_at"]:
         return {"outcome": "skipped", "probe": None}
     probe = origin_probe(watch_id, day)
-    if leakshaven.ENABLED and not _ran(watch_id, day, "mega_lookup"):
+    if leakshaven.ENABLED:
         _lane(w, day, "mega_lookup", _mega)
-    if not _ran(watch_id, day, "listing_recheck"):
-        _lane(w, day, "listing_recheck", _recheck)
+    _lane(w, day, "listing_recheck", _recheck)
+    _full_lane(w, day, serps, True)
     return {"outcome": "ok" if probe is not None else "failed", "probe": probe}
+
+
+def run_carry(watch_id, day, serps):
+    """A pending carry's pages on (or after) its day, once a day (a failed run retries on the next tick) -> True when
+    it ran."""
+    with tdb.db() as c:
+        w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
+    carry = json.loads(w["carry_json"] or "null") if w else None
+    if not carry or carry["on"] > day or w["paused"] or w["deleted_at"] or not w["seeded_at"] or _ran(watch_id, day, FULL):
+        return False
+    _full_lane(w, day, serps, False)
+    return True
+
+
+def _full_lane(w, day, serps, whole):
+    try:
+        _full(w, day, serps, whole)
+    except Exception as e:
+        tracker_probe.log(f"tracker {FULL} failed: {type(e).__name__}")
+        at = tdb.now()
+        _record(w["watch_id"], day, FULL, at, "failed", next_on=_next_scan(w, at))
 
 
 def _mega(w, at):
@@ -281,33 +305,6 @@ def _creds(c, w, uncapped, lane):
     return creds if all(creds) else ()
 
 
-def run_fresh_batch(watch_ids, day):
-    """The Google fresh pass over watch_ids (the daily pass's, in its order) for UTC day (module docstring) -> its
-    {creds: _Serp}, so the weekly lanes go on with each group's breaker."""
-    uncapped, groups = tdb.env_set("TRACKER_UNCAPPED_TENANTS"), {}
-    with tdb.db() as c:
-        c.execute("DELETE FROM serp_cache WHERE day < ?", (day,))
-    with tdb.db() as c:
-        for wid in watch_ids:
-            w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
-            if not w or w["paused"] or w["deleted_at"]:
-                continue
-            creds = _creds(c, w, uncapped, FRESH)
-            if creds is None:
-                continue
-            if not creds:
-                groups.setdefault(None, []).append(w)
-            elif not _ran(wid, day, FRESH):
-                groups.setdefault(creds, []).append(w)
-    for w in groups.pop(None, []):
-        _record(w["watch_id"], day, FRESH, tdb.now(), "waiting", "no_browserbase_key", ledger=False)
-    serps = {}
-    for creds, ws in groups.items():
-        serps[creds] = _Batch(creds, day)
-        serps[creds].run(ws)
-    return serps
-
-
 class _Serp:
     """Browserbase sessions on one creds for a UTC day, the day's serp_cache, and the breaker: a failed create, or
     BREAKER incomplete searches in a row, and every later miss gets no reservation and no session (broken)."""
@@ -385,92 +382,6 @@ class _Serp:
         return None
 
 
-class _Batch(_Serp):
-    """One creds group's fresh misses, packed into sessions."""
-
-    def run(self, ws):
-        try:
-            for w in ws:
-                try:
-                    self._watch(w)
-                except Exception as e:
-                    tracker_probe.log(f"tracker {FRESH} failed: {type(e).__name__}")
-                    self.failed()
-                    self._failed(w, tdb.now())
-        finally:
-            self.drop()
-
-    def _failed(self, w, at):
-        _record(w["watch_id"], self.day, FRESH, at, "reduced", "google_failed", success=False)
-
-    def _watch(self, w):
-        at, q = tdb.now(), tracker_plan.fresh(w)
-        since = q.since or ""
-        links = self.cached(q, since)
-        if links is None:
-            if self.broken:
-                self._failed(w, at)
-                return
-            r = tracker_budget.reserve(w["tenant_id"], w["watch_id"], "load", FRESH_HOLD, partial=True)
-            if isinstance(r, tracker_budget.Refused):
-                if r.reason != "gone":
-                    _record(w["watch_id"], self.day, FRESH, at, "waiting", r.reason, next_on=r.next_on)
-                return
-            try:
-                links = self.search(FRESH, r, q.urls()[0])
-            finally:
-                tracker_budget.settle(r)
-            if links is None:
-                self._failed(w, at)
-                return
-            self.cache(q, since, links)
-        with tdb.db() as c:
-            first = _first(c, w["watch_id"], FRESH)
-            for u, title in links:
-                if not serp.is_goto(u):
-                    tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
-        _record(w["watch_id"], self.day, FRESH, at)
-
-
-def weekly_due(w, day):
-    """The watch's weekly lanes run on its slot weekday and on the day its carried pages are due."""
-    carry = json.loads(w["carry_json"] or "null")
-    return w["weekly_slot"] == date.fromisoformat(day).weekday() or bool(carry and carry["on"] <= day)
-
-
-def run_weekly_batch(watch_ids, day, serps=None):
-    """run_weekly over watch_ids, one _Serp per creds across them all; serps = run_fresh_batch's, so a creds group
-    the fresh pass broke stays broken."""
-    serps = {} if serps is None else serps
-    for wid in watch_ids:
-        try:
-            run_weekly(wid, day, serps)
-        except Exception as e:
-            tracker_probe.log(f"tracker weekly lanes failed: {type(e).__name__}")
-
-
-def run_weekly(watch_id, day, serps):
-    """The weekly lanes of one unpaused, undeleted, seeded watch that is weekly_due on UTC day -> True when due; serps
-    {creds: _Serp} is shared across a tick's watches. Lanes so far: google_full; the registry crawl (ticket 30) is
-    added here as its own lane."""
-    with tdb.db() as c:
-        w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (watch_id,)).fetchone()
-    if not w or w["paused"] or w["deleted_at"] or not w["seeded_at"] or not weekly_due(w, day):
-        return False
-    if not _ran(watch_id, day, FULL):
-        try:
-            _full(w, day, serps)
-        except Exception as e:
-            tracker_probe.log(f"tracker {FULL} failed: {type(e).__name__}")
-            _record(watch_id, day, FULL, tdb.now(), "failed", next_on=_next_slot(w, day))
-    return True
-
-
-def _next_slot(w, day):
-    d = date.fromisoformat(day)
-    return (d + timedelta(days=(w["weekly_slot"] - d.weekday()) % 7 or 7)).isoformat()
-
-
 def _pages(queries):
     return [replace(q, start=p, pages=1) for q in queries for p in range(q.start, q.start + q.pages)]
 
@@ -496,20 +407,21 @@ def _carried(full, pages):
     return tracker_plan.Plan(qs, {f: v for f, v in full.values.items() if any(q.field == f for q in qs)})
 
 
-def _full(w, day, serps):
-    """The full Google pass (spec "Full Google pass"): the slot's whole plan, or a carry's pages on its day. Creds
-    and serp_cache (since '') are the fresh pass's; searches go through serps' _Serp for the creds (its session
-    loop and breaker; strict: an empty page needs Google's no-results wording). Holds the misses + FULL_RETRIES wall
-    retries (partial grant); a grant under the misses trims the plan until its misses fit the grant - FULL_RETRIES (at
-    least 1). The slot run carries cap_global / cap_tenant_month cuts to the cap's next_on, once; a carry run never
-    carries again, and keeps the slot's first-scan baseline in carry_json.first. A run with a completed page is a success
-(it ends the baseline, _first). carry_json changes only with the run's lane_state (a crash keeps a pending carry)."""
+def _full(w, day, serps, whole):
+    """The full Google pass (spec "Full Google pass"): a scan's whole plan, or a carry's pages on its day. Searches go
+    through serps' _Serp for the creds (its session loop and breaker; strict: an empty page needs Google's no-results
+    wording). Holds the misses + FULL_RETRIES wall retries (partial grant); a grant under the misses trims the plan until
+    its misses fit the grant - FULL_RETRIES (at least 1). A whole run carries cap_global / cap_tenant_month cuts to the
+    cap's next_on, once; a carry run never carries again. A pending carry's first-scan baseline (carry_json.first) goes
+    on into whichever run takes it. A run with a completed page is a success (it ends the baseline, _first). carry_json
+    changes only with the run's lane_state (a crash keeps a pending carry)."""
     uncapped, wid = tdb.env_set("TRACKER_UNCAPPED_TENANTS"), w["watch_id"]
-    slot, carry = w["weekly_slot"] == date.fromisoformat(day).weekday(), json.loads(w["carry_json"] or "null")
+    carry = json.loads(w["carry_json"] or "null")
     with tdb.db() as c:
         c.execute("DELETE FROM serp_cache WHERE day < ?", (day,))
         creds = _creds(c, w, uncapped, FULL)
-    at, next_on = tdb.now(), _next_slot(w, day)
+    at = tdb.now()
+    next_on = _next_scan(w, at)
     if creds is None:
         return
     if not creds:
@@ -517,7 +429,7 @@ def _full(w, day, serps):
         return
     browser = serps.setdefault(creds, _Serp(creds, day))
     full = tracker_plan.build(w, w["platform"])
-    plan = full if slot or not carry else _carried(full, carry["pages"])
+    plan = full if whole or not carry else _carried(full, carry["pages"])
     cache = {}
     for q in _pages(plan.queries):
         links = browser.cached(q, "")
@@ -559,7 +471,7 @@ def _full(w, day, serps):
     for q in _pages(full.queries):
         want.setdefault(_pair(q, full.values), set()).add(_page_key(q))
     with tdb.db() as c:
-        first = _first(c, wid, FULL) or bool(not slot and carry.get("first"))
+        first = _first(c, wid, FULL) or bool(carry and carry.get("first"))
         returned = {}
         for q, links in results:
             for u, title in links:
@@ -569,7 +481,7 @@ def _full(w, day, serps):
         if done:
             _visibility(c, w, full, returned, {p for p, ks in want.items() if ks <= done}, at, not browser.broken)
     new_carry = None
-    if slot and cut and short.reason in ("cap_global", "cap_tenant_month"):
+    if whole and cut and short.reason in ("cap_global", "cap_tenant_month"):
         next_on = short.next_on
         new_carry = json.dumps({"on": next_on, "reason": short.reason, "first": first,
                                 "pages": [list(_page_key(q)) for q in _pages(cut)]})

@@ -20,10 +20,13 @@ Shared vocabulary (tracker_api / tracker_view read it, tracker_seed / tracker_pr
                     a mega Leak's status adds source: mega_index.
   daily_scans.outcome        NULL while running | ok | partial (a lane_day row of that day is partial or failed) | failed
                              (the Origin probe failed) | skipped.
+  daily_scans.trigger        seed | weekly | refresh (tracker_scheduler); NULL = a row from before scans had one, never
+                             counted by the 24 h slot guard or the refresh cooldown.
   tenants.bb_key / bb_project   the tenant's own Browserbase creds (tracker_cli tenant bb); never printed or logged.
   watches.weekly_slot   0 = Monday .. 6; with plan_loads set by tracker_admission (admit on create, backfill in init).
   watches.carry_json    the full pass's cap-cut pages {on: UTC day, reason, first: the slot run's first-scan baseline,
                         pages: [[vertical, text, page]]}, run once on `on` (tracker_lanes); NULL = none.
+  watches.refresh_queued_at   when POST /v1/watches/{id}/refresh queued a scan; set until that scan finishes.
   load_reservation  a budget hold (tracker_budget): unit load | judge_call; state held | settled | expired;
                     watch_id NULL = a purged watch's carried spend.
   lane_state        one row per (watch, lane) run so far (tracker_lanes): state ok | reduced | failed; next_attempt_on a
@@ -204,7 +207,9 @@ _COLUMNS = [("tenants", "month_loads", "INTEGER NOT NULL DEFAULT 1000"),
             ("leaks", "landing_key", "TEXT"),
             ("leaks", "thumb_url", "TEXT"),
             ("leaks", "thumb_query_id", "TEXT"),
-            ("leaks", "thumb_seen_at", "TEXT")]
+            ("leaks", "thumb_seen_at", "TEXT"),
+            ("daily_scans", "trigger", "TEXT"),
+            ("watches", "refresh_queued_at", "TEXT")]
 
 _clock = None
 

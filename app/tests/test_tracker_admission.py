@@ -54,26 +54,29 @@ class TestWaitlist(AdmissionBase):
     def test_slot_day_past_cap(self):
         for d in range(7):
             self.slotted(d)
-        # 7 watches: every day = 7 fresh + 31 = 38; new watch needs 38 + 31 + 1 = 70
-        self.cap(69)
+        # 7 watches: every day = 31; new watch needs 31 + 31 = 62
+        self.cap(61)
         self.assertEqual(self.admit(), adm.Waitlist())
-        self.cap(70)
+        self.cap(62)
         self.assertEqual(self.admit(), adm.Slot(0, 31))
 
-    def test_any_day_past_cap(self):
+    def test_projected_has_no_fresh_loads(self):
         self.slotted(0, plan=100)
-        # p = [101, 1, 1, 1, 1, 1, 1]: slot day 1 fits easily, day 0 has no room for the new fresh load
-        self.cap(101)
-        self.assertEqual(self.admit(), adm.Waitlist())
-        self.cap(102)
+        self.slotted(3, plan=9, paused=True)
+        with tdb.db() as c:
+            self.assertEqual(adm.projected(c), [100, 0, 0, 9, 0, 0, 0])
+        # a day over the cap no longer blocks the others (no daily per-watch load on it)
+        self.cap(31)
         self.assertEqual(self.admit(), adm.Slot(1, 31))
+        self.cap(30)
+        self.assertEqual(self.admit(), adm.Waitlist())
 
     def test_accepting_new(self):
         self.slotted(0, plan=100)
-        self.cap(101)
+        self.cap(30)
         with tdb.db() as c:
             self.assertFalse(adm.accepting_new(c))
-        self.cap(102)
+        self.cap(31)
         with tdb.db() as c:
             self.assertTrue(adm.accepting_new(c))
 
@@ -103,9 +106,11 @@ class TestCreatorCap(AdmissionBase):
 
 class TestPaused(AdmissionBase):
     def test_paused_watches_count(self):
-        self.slotted(0, plan=100, paused=True)
-        self.assertEqual(self.admit(), adm.Slot(1, 31))
-        self.cap(101)
+        for d in range(7):
+            self.slotted(d, plan=100, paused=d == 0)
+        self.slotted(1, plan=1)
+        self.assertEqual(self.admit(), adm.Slot(0, 31))
+        self.cap(130)
         self.assertEqual(self.admit(), adm.Waitlist())
 
 
@@ -145,7 +150,7 @@ class TestBackfill(AdmissionBase):
         self.watch(self.t, watch_id="w_pre_00000", weekly_slot=0, plan_loads=31)
         for wid, h in (("w_third_0003", 3), ("w_first_0001", 1), ("w_gone_00009", 0), ("w_second_002", 2)):
             self.clock(tdb.fmt(t0 + timedelta(hours=h)))
-            self.watch(self.t, watch_id=wid)
+            self.watch(self.t, watch_id=wid, weekly_slot=None)
         with tdb.db() as c:
             c.execute("UPDATE watches SET deleted_at = ? WHERE watch_id = 'w_gone_00009'", (tdb.now(),))
         tdb.init()
