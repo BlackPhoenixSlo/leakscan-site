@@ -346,6 +346,10 @@ class Admission(unittest.TestCase):
     def test_needles(self):
         self.assertEqual(tracker_judge.needles(WATCH), ("miavale", ["miavale", "miavalex"], ["miav"]))
         self.assertEqual(tracker_judge.needles({**WATCH, "username": "m.v_a"})[:2], ("", ["miavalex"]))
+        self.assertEqual(tracker_judge.needles({**WATCH, "instagram": "Rowan.Ash", "x": "mia_v"}),
+                         ("miavale", ["miavale", "miavalex", "rowanash"], ["miav"]))
+        self.assertEqual(tracker_judge.admission({**WATCH, "instagram": "rowan_ash"}, "https://fapello.com/rowan-ash/3/", ""), "leak")
+        self.assertIsNone(tracker_judge.admission(WATCH, "https://fapello.com/rowan-ash/3/", ""))
 
     def test_url_title_and_weak_alias_table(self):
         table = [

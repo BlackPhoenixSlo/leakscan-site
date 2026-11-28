@@ -393,7 +393,7 @@ class TestFullPass(Google):
             c.execute("UPDATE watches SET plan_loads = 9, instagram = 'mia.vale.ig', x = 'miavale_xx' WHERE watch_id = ?",
                       (self.w,))
             c.execute("UPDATE tracker_limits SET daily_loads = 11")
-        self.assertEqual(self.plan().loads, 16)
+        self.assertEqual(self.plan().loads, 19)
         self.day(2)
         self.assert_charged()
         self.assert_day_within_cap(2, 11)
