@@ -121,4 +121,8 @@ If the take ends before a say / end-card cue, they come on `ended`. No spoken na
    motion, sfx, no overvoice (0 `speechSynthesis.speak` calls, `--break-voice`), scan-stub texts + photos, captions at every word, webm + mp4 sources; `--only captions` = the
    captions + sources part, `--break-captions` = the transcript 2 s late: only the caption word checks go red).
 
+4. The Tracker's offer video (the CRM's Start removal popup): `python3 tools/video/offer_take.py OUT` (offer.mp4, poster.webp,
+   captions.vtt from `transcript.json`, cues.json from the `data-cue-*`), then copy OUT's files into the VPS's
+   `TRACKER_OFFER_VIDEO_DIR` (`/data/offer-video`, read per request, no restart).
+
 Test any moment: `?t=12.5`.
