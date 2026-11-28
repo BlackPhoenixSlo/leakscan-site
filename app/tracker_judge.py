@@ -5,7 +5,7 @@ the lanes share.
 Dropped first: hosts the host rules skip (tracker_rules.host_class: the Creator's own OnlyFans / Instagram / X, every
 other excluded or never-a-leak host, fake_aggregators.txt), then the Mega index aggregator (leakshaven.VIA) and the
 service's own hosts (public_app.CORS_ORIGINS), subdomains included. Needles are norm()ed: the handle (>= HANDLE_MIN),
-strong aliases (>= STRONG_MIN), weak aliases (HANDLE_MIN .. STRONG_MIN - 1). A URL holding the handle or a strong alias,
+strong aliases, Instagram and X (>= STRONG_MIN), weak ones (HANDLE_MIN .. STRONG_MIN - 1). A URL holding the handle or a strong alias,
 or a weak alias while the title holds the handle -> Leak; a title holding the handle or a strong alias -> Pending hit;
 anything else -> None. The display name is never a needle.
 
@@ -40,10 +40,11 @@ def _blocked():
 
 
 def needles(w):
-    """-> (handle, [handle + strong aliases], [weak aliases]), all norm()ed; a handle under HANDLE_MIN is ''."""
+    """-> (handle, [handle + strong aliases / socials], [weak ones]), all norm()ed; a handle under HANDLE_MIN is ''."""
     handle = norm(w["username"])
     handle = handle if len(handle) >= HANDLE_MIN else ""
-    aliases = dict.fromkeys(norm(a) for a in json.loads(w["aliases_json"] or "[]") if isinstance(a, str))
+    socials = [w[f] for f in ("instagram", "x") if f in w.keys() and isinstance(w[f], str)]
+    aliases = dict.fromkeys(norm(a) for a in json.loads(w["aliases_json"] or "[]") + socials if isinstance(a, str))
     strong = [handle] * bool(handle) + [a for a in aliases if len(a) >= STRONG_MIN and a != handle]
     return handle, strong, [a for a in aliases if HANDLE_MIN <= len(a) < STRONG_MIN]
 

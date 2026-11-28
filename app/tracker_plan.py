@@ -1,11 +1,13 @@
 """Query plan (spec "Interfaces" tracker_plan, "Full Google pass" table). Pure: a row-shaped Leak identity (username,
 aliases_json, instagram, x) -> the full pass's ordered queries, their loads and trim order. The display name is never
-read. Aliases are classed by tracker_judge.norm() length, the rule
-matching uses (decision P2-D7): >= STRONG_MIN is searched alone, HANDLE_MIN .. STRONG_MIN - 1 only beside the handle.
-An alias or social whose norm() is under HANDLE_MIN (aliases only) or equals the handle's or an earlier kept value's is
-not searched. Field `alias:<i>` is the alias's index in aliases_json (appended, so the highest index is the last
+read. Instagram is the second source of Leaks after the handle (owner 2026-11-28): searched like a strong alias, right
+after the handle. Aliases are classed by tracker_judge.norm() length, the rule matching uses (decision P2-D7):
+>= STRONG_MIN is searched alone, HANDLE_MIN .. STRONG_MIN - 1 only beside the handle. X is one web query. A value whose
+norm() is under HANDLE_MIN (aliases only) or equals the handle's or an earlier kept value's (handle, instagram, aliases,
+x) is not searched. Field `alias:<i>` is the alias's index in aliases_json (appended, so the highest index is the last
 added). Images and videos search a value that reads as words (a space, "." or "-": Google splits on those, so
-"judi.roberts" also finds every real Judi Roberts) as '"<value>" <platform>'. Phase 1 allows at most 5 aliases, so the plan is at most 9 + 5 * 4 + 2 = PLAN_MAX loads."""
+"judi.roberts" also finds every real Judi Roberts) as '"<value>" <platform>'. Phase 1 allows at most 5 aliases, so the
+plan is at most 9 + 4 + 5 * 4 + 1 = PLAN_MAX loads."""
 import json
 import re
 from dataclasses import dataclass, replace
@@ -14,7 +16,7 @@ import tracker_serp as serp
 from tracker_judge import HANDLE_MIN, STRONG_MIN, norm
 
 LANE = "google_full"
-PLAN_MAX = 31
+PLAN_MAX = 34
 _BARE, _LEAKED = serp.TEMPLATES[:2]
 _WORDS = re.compile(r"[\s.-]")
 
@@ -88,15 +90,19 @@ def _fields(identity):
     """-> ({field: value} in plan order, {alias field: strong?})."""
     h = identity["username"]
     values, strong, seen = {"handle": h}, {}, {norm(h)}
+
+    def social(f):
+        if identity[f] and norm(identity[f]) not in seen:
+            values[f] = identity[f]
+            seen.add(norm(identity[f]))
+
+    social("instagram")
     for i, a in enumerate(json.loads(identity["aliases_json"] or "[]")):
         n = norm(a)
         if n not in seen and len(n) >= HANDLE_MIN:
             values[f"alias:{i}"], strong[f"alias:{i}"] = a, len(n) >= STRONG_MIN
             seen.add(n)
-    for f in ("instagram", "x"):
-        if identity[f] and norm(identity[f]) not in seen:
-            values[f] = identity[f]
-            seen.add(norm(identity[f]))
+    social("x")
     return values, strong
 
 
@@ -108,11 +114,11 @@ def build(identity, platform):
           media("images", h, "handle"), media("videos", h, "handle"),
           *(_q("web", t, h, "handle") for t in serp.FILE_HOST_TEMPLATES)]
     for f, v in values.items():
-        if f in strong and strong[f]:
+        if f == "instagram" or strong.get(f):
             qs += [_q("web", _BARE, v, f), _q("web", _LEAKED, v, f), media("images", v, f), media("videos", v, f)]
         elif f in strong:
             qs.append(_q("web", '"{h}" "{w}"', h, f, w=v))
-        elif f != "handle":
+        elif f == "x":
             qs.append(_q("web", _BARE, v, f))
     return Plan(tuple(qs), values)
 

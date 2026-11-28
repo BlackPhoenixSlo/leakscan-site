@@ -15,7 +15,7 @@ import tracker_seed
 
 
 WORST = {"username": "mia_vale", "platform": "onlyfans", "instagram": "mia.vale.ig", "x": "miavale_x",
-         "aliases_json": json.dumps(["rowanash", "vale.mia", "mia-official", "miavee", "rowan_mia"])}  # 31 loads
+         "aliases_json": json.dumps(["rowanash", "vale.mia", "mia-official", "miavee", "rowan_mia"])}  # 34 loads
 
 
 class AdmissionBase(Base):
@@ -32,18 +32,18 @@ class AdmissionBase(Base):
         with tdb.db() as c:
             c.execute("UPDATE tracker_limits SET daily_loads = ? WHERE id = 1", (daily_loads,))
 
-    def slotted(self, slot, plan=31, **kw):
+    def slotted(self, slot, plan=34, **kw):
         return self.watch(self.x, weekly_slot=slot, plan_loads=plan, **kw)
 
 
 class TestSlot(AdmissionBase):
     def test_least_loaded_tie_lowest_weekday(self):
-        self.assertEqual(self.admit(), adm.Slot(0, 31))
+        self.assertEqual(self.admit(), adm.Slot(0, 34))
         self.slotted(0)
-        self.assertEqual(self.admit(), adm.Slot(1, 31))
+        self.assertEqual(self.admit(), adm.Slot(1, 34))
         for d, plan in ((1, 9), (2, 4), (3, 7), (4, 4), (5, 8), (6, 5)):
             self.slotted(d, plan)
-        self.assertEqual(self.admit(), adm.Slot(2, 31))
+        self.assertEqual(self.admit(), adm.Slot(2, 34))
 
     def test_slot_column_range(self):
         with self.assertRaises(sqlite3.IntegrityError):
@@ -54,11 +54,11 @@ class TestWaitlist(AdmissionBase):
     def test_slot_day_past_cap(self):
         for d in range(7):
             self.slotted(d)
-        # 7 watches: every day = 31; new watch needs 31 + 31 = 62
-        self.cap(61)
+        # 7 watches: every day = 34; new watch needs 34 + 34 = 68
+        self.cap(67)
         self.assertEqual(self.admit(), adm.Waitlist())
-        self.cap(62)
-        self.assertEqual(self.admit(), adm.Slot(0, 31))
+        self.cap(68)
+        self.assertEqual(self.admit(), adm.Slot(0, 34))
 
     def test_projected_has_no_fresh_loads(self):
         self.slotted(0, plan=100)
@@ -66,17 +66,17 @@ class TestWaitlist(AdmissionBase):
         with tdb.db() as c:
             self.assertEqual(adm.projected(c), [100, 0, 0, 9, 0, 0, 0])
         # a day over the cap no longer blocks the others (no daily per-watch load on it)
-        self.cap(31)
-        self.assertEqual(self.admit(), adm.Slot(1, 31))
-        self.cap(30)
+        self.cap(34)
+        self.assertEqual(self.admit(), adm.Slot(1, 34))
+        self.cap(33)
         self.assertEqual(self.admit(), adm.Waitlist())
 
     def test_accepting_new(self):
         self.slotted(0, plan=100)
-        self.cap(30)
+        self.cap(33)
         with tdb.db() as c:
             self.assertFalse(adm.accepting_new(c))
-        self.cap(31)
+        self.cap(34)
         with tdb.db() as c:
             self.assertTrue(adm.accepting_new(c))
 
@@ -85,23 +85,23 @@ class TestWaitlist(AdmissionBase):
         self.cap(101)
         with tdb.db() as c:
             c.execute("UPDATE watches SET deleted_at = ? WHERE watch_id = ?", (tdb.now(), w))
-        self.assertEqual(self.admit(), adm.Slot(0, 31))
+        self.assertEqual(self.admit(), adm.Slot(0, 34))
 
 
 class TestCreatorCap(AdmissionBase):
     def test_creator_cap(self):
         with tdb.db() as c:
             c.execute("UPDATE tenants SET creators_max = 1 WHERE tenant_id = ?", (self.t,))
-        w = self.watch(self.t, weekly_slot=0, plan_loads=31)
+        w = self.watch(self.t, weekly_slot=0, plan_loads=34)
         self.assertEqual(self.admit(), adm.CreatorCap(1))
-        self.assertNotEqual(adm.CreatorCap(1), adm.Slot(1, 31))
-        self.assertEqual(self.admit(self.tenant("Agency B")), adm.Slot(1, 31))
+        self.assertNotEqual(adm.CreatorCap(1), adm.Slot(1, 34))
+        self.assertEqual(self.admit(self.tenant("Agency B")), adm.Slot(1, 34))
         self.cap(1)
         self.assertEqual(self.admit(), adm.CreatorCap(1), "creator cap answers before the waitlist")
         self.cap(300)
         with tdb.db() as c:
             c.execute("UPDATE watches SET deleted_at = ? WHERE watch_id = ?", (tdb.now(), w))
-        self.assertEqual(self.admit(), adm.Slot(0, 31))
+        self.assertEqual(self.admit(), adm.Slot(0, 34))
 
 
 class TestPaused(AdmissionBase):
@@ -109,7 +109,7 @@ class TestPaused(AdmissionBase):
         for d in range(7):
             self.slotted(d, plan=100, paused=d == 0)
         self.slotted(1, plan=1)
-        self.assertEqual(self.admit(), adm.Slot(0, 31))
+        self.assertEqual(self.admit(), adm.Slot(0, 34))
         self.cap(130)
         self.assertEqual(self.admit(), adm.Waitlist())
 
