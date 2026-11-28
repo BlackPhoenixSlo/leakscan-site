@@ -157,11 +157,11 @@ class TestMediaLeaks(Media):
         self.assertNotIn("cdn.example", cached)
 
     def test_data_tiles_store_decoded_thumbs_and_bad_ones_none(self):
-        jpg = b"\xff\xd8\xff\xe0" + b"\0" * 16
+        jpg = b"\xff\xd8\xff\xe0" + b"\0" * 128
         good = "data:image/jpeg;base64," + base64.b64encode(jpg).decode()
         bad = {"svg": "data:image/svg+xml;base64,PHN2Zy8+", "html": "data:text/html;base64,PGI+eDwvYj4=",
                "mismatch": "data:image/png;base64," + base64.b64encode(jpg).decode(), "raw": "data:image/jpeg,xyz",
-               "junk": "data:image/jpeg;base64,@@@@"}
+               "junk": "data:image/jpeg;base64,@@@@", "placeholder": "data:image/gif;base64,R0lGODlhAQABAIAAAP///////yH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="}
         urls = {k: f"{SITE}/gallery/mia_vale-{k}" for k in ("good", *bad)}
         self.pw.links[("images", '"mia_vale"')] = [(urls["good"], "Mia good", good)] + [
             (urls[k], f"Mia {k}", v) for k, v in bad.items()]

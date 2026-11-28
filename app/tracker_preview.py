@@ -4,7 +4,7 @@ the thumb route fetches it at request time. This module is the only place the se
 URL, its query id and its rank never leave the service, and logs hold counts only.
 
 A tile whose src is an inline data: image is never fetched: data_thumb decodes it at capture (base64, an image/jpeg |
-png | webp | gif MIME its magic bytes match, at most MAX_BYTES decoded; bytes kept as is, no re-encode) and the bytes
+png | webp | gif MIME its magic bytes match, DATA_MIN..MAX_BYTES decoded (below DATA_MIN is Google's 1x1 lazy placeholder); bytes kept as is, no re-encode) and the bytes
 are stored in leaks.thumb_blob / thumb_mime, served by the route as stored (owner decision 2026-11-28).
 
 A query id is `<vertical>|<field key>` of the full-pass query that returned the tile (query_id()); a thumb whose query
@@ -28,6 +28,7 @@ MAX_BYTES = 3 * 1024 * 1024
 TOTAL_S = 5.0
 PORT = 443
 URL_MAX = 2048
+DATA_MIN = 100
 DATA_MAX = len("data:image/jpeg;base64,") + 4 * -(-MAX_BYTES // 3)
 _DATA = re.compile(r"data:(image/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/]+={0,2})")
 _CLEAR = "thumb_url = NULL, thumb_blob = NULL, thumb_mime = NULL, thumb_query_id = NULL, thumb_seen_at = NULL"
@@ -73,7 +74,7 @@ def data_thumb(src):
         body = base64.b64decode(m[2], validate=True)
     except (binascii.Error, ValueError):
         return None
-    return (m[1], body) if len(body) <= MAX_BYTES and sniff(body) == m[1] else None
+    return (m[1], body) if DATA_MIN <= len(body) <= MAX_BYTES and sniff(body) == m[1] else None
 
 
 def storable(src):

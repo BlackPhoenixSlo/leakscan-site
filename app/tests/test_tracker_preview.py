@@ -33,7 +33,8 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 24
 BODIES = {"/a.png": PNG, "/a.jpg": b"\xff\xd8\xff\xe0" + b"\0" * 16, "/a.gif": b"GIF89a" + b"\0" * 16,
           "/a.webp": b"RIFF\x0c\x00\x00\x00WEBPVP8 " + b"\0" * 8,
           "/page.html": b"<!doctype html><html><body>not an image</body></html>"}
-DATA = {"image/jpeg": BODIES["/a.jpg"], "image/png": PNG, "image/webp": BODIES["/a.webp"], "image/gif": BODIES["/a.gif"]}
+DATA = {m: b + b"\0" * 128 for m, b in (("image/jpeg", BODIES["/a.jpg"]), ("image/png", PNG),
+                                        ("image/webp", BODIES["/a.webp"]), ("image/gif", BODIES["/a.gif"]))}
 
 
 def uri(mime, body):
@@ -216,7 +217,7 @@ class TestPreview(Base):
         jpg = DATA["image/jpeg"]
         bad = [uri("image/png", jpg), uri("image/jpeg", PNG), uri("image/svg+xml", b"<svg/>"), uri("text/html", b"<b>x</b>"),
                "data:image/jpeg,%FF%D8%FF", "data:image/jpeg;base64,@@@@", "data:image/jpeg;base64,/9j/4A",
-               uri("image/jpeg", b"not a jpeg"), "data:;base64,/9j/4AAQ", " " + uri("image/jpeg", jpg)]
+               uri("image/jpeg", b"not a jpeg"), "data:image/gif;base64,R0lGODlhAQABAIAAAP///////yH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==", "data:;base64,/9j/4AAQ", " " + uri("image/jpeg", jpg)]
         self.assertFalse(self.blob_media("lk_bad", bad[0]))
         with tracker_db.db() as c:
             for u in bad:
@@ -235,20 +236,20 @@ class TestPreview(Base):
         """clear_thumb and prune drop the blob with the rest of the thumb; the purge drops the row."""
         for lid, wid, query in (("lk_c", "w_mia_00001", "handle"), ("lk_p", "w_mia_00001", "alias:gone"),
                                 ("lk_k", "w_mia_00001", "handle"), ("lk_ashd", "w_ash_00002", "handle")):
-            self.assertTrue(self.blob_media(lid, uri("image/png", PNG), wid, query))
+            self.assertTrue(self.blob_media(lid, uri("image/png", DATA["image/png"]), wid, query))
         with tracker_db.db() as c:
             tracker_preview.clear_thumb(c, "lk_c")
             self.assertEqual(tracker_preview.prune(c, "w_mia_00001", {"images|handle"}), 1)
         empty = dict.fromkeys(("thumb_url", "thumb_mime", "thumb_blob", "thumb_query_id", "thumb_seen_at"))
         for lid in ("lk_c", "lk_p"):
             self.assertEqual({k: self.row(lid)[k] for k in empty}, empty, lid)
-        self.assertEqual(bytes(self.row("lk_k")["thumb_blob"]), PNG)
+        self.assertEqual(bytes(self.row("lk_k")["thumb_blob"]), DATA["image/png"])
         self.assertEqual(self.req("DELETE", "/v1/watches/w_ash_00002", key=self.a)[0], 204)
         self.assertEqual(tracker_purge.run(NOW + timedelta(days=31))["deleted_ids"], ["w_ash_00002"])
         self.assertEqual(self.row("lk_ashd"), {})
 
     def test_data_thumb_previews_off(self):
-        self.assertTrue(self.blob_media("lk_d", uri("image/png", PNG)))
+        self.assertTrue(self.blob_media("lk_d", uri("image/png", DATA["image/png"])))
         with mock.patch.dict(os.environ, TRACKER_PREVIEWS="0"):
             self.assertIsNone(self.items()["lk_d"]["preview"])
             self.assert_refused(*self.thumb(lid="lk_d"))
