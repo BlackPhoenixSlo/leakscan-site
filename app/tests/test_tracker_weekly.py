@@ -235,6 +235,18 @@ class TestTick(Weekly):
         self.tick_at(ts(4, "13:00"), pack(1))
         self.assertEqual(self.scans(), [("2026-11-03", "weekly", "ok")])
 
+    def test_refresh_posted_before_the_pool_seed_claims_is_served_by_the_seed(self):
+        w2 = self.watch(self.t, username="rowan_ash", account_id="acc-r", seeded=False, weekly_slot=MON)
+        self.clock(ts(3, "10:00"))
+        self.assertEqual(self.post(w2)[0], 202)
+        cand = {"google": [], "mega": [], "errors": []}
+        with mock.patch.object(tracker_seed, "_quick_candidates", return_value=lambda *a: cand):
+            self.assertEqual(tracker_seed.run(w2)["outcome"], "ok")
+        self.assertEqual(self.rows("SELECT refresh_queued_at FROM watches WHERE watch_id = ?", w2),
+                         [{"refresh_queued_at": None}])
+        out = self.tick_at(ts(4, "09:00"))
+        self.assertEqual((out["refreshed"], self.scans(w2)), (0, [("2026-11-03", "seed", "ok")]))
+
     def test_long_tick_claims_at_the_real_start_and_a_second_process_never_takes_over(self):
         w2, t, ran, nested = self.second(), [tdb.parse(ts(3, "04:00"))], [], []
         real = tracker_lanes.run_scan

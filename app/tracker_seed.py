@@ -96,6 +96,7 @@ def _finish(watch_id, today, outcome):
     with tdb.db() as c:
         c.execute("UPDATE daily_scans SET finished_at = ?, outcome = ? WHERE watch_id = ? AND day = ?",
                   (tdb.now(), outcome, watch_id, today))
+        c.execute("UPDATE watches SET refresh_queued_at = NULL WHERE watch_id = ?", (watch_id,))
 
 
 def claim(c, watch_id, now_dt, retry=False, trigger="seed"):
