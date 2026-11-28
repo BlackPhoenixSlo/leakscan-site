@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlsplit
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 import tracker_serp as ts
-from tracker_serp import classify_serp, serp_links, serp_url
+from tracker_serp import classify_serp, serp_results, serp_url
 
 G = "https://www.google.com"
 FIXTURES = os.path.join(HERE, "fixtures")
@@ -17,6 +17,10 @@ FIXTURES = os.path.join(HERE, "fixtures")
 def fixture(name, sub="tracker_serp"):
     with open(os.path.join(FIXTURES, sub, name), encoding="utf-8") as f:
         return f.read()
+
+
+def links(html):
+    return [(u, t) for u, t, _ in serp_results(html)]
 
 
 def result(href, title=""):
@@ -50,7 +54,7 @@ class Parser(unittest.TestCase):
                     result("https://example-g.test/clip.mp4", "media"),
                     '<div><h3>Mia D</h3><span><a href="https://example-h.test/d">more</a></span></div>',
                     result("https://example-i.test/i"))
-        self.assertEqual(serp_links(html), [
+        self.assertEqual(links(html), [
             ("https://example-e.test/a?x=1", "Mia A"), (f"{G}/goto?url=CAESEnc", "Mia B"),
             ("https://example-f.test/b", "Mia C"), ("https://example-h.test/d", "Mia D"),
             ("https://example-i.test/i", "")])
@@ -59,7 +63,7 @@ class Parser(unittest.TestCase):
         html = serp('<div data-lpage="https://example-e.test/gallery/1"><img src="data:x"></div>',
                     result(f"{G}/imgres?imgurl=https://cdn.test/p.jpg&imgrefurl=https://example-f.test/post/2"),
                     result("https://cdn.test/full.jpg"))
-        self.assertEqual([u for u, _ in serp_links(html)],
+        self.assertEqual([u for u, _ in links(html)],
                          ["https://example-e.test/gallery/1", "https://example-f.test/post/2"])
 
     def test_images_tiles_carry_their_caption_aria_label_or_alt_as_title(self):
@@ -71,7 +75,7 @@ class Parser(unittest.TestCase):
                     f'<a href="{G}/imgres?imgurl=https://cdn.test/p.jpg&imgrefurl=https://example-h.test/s/4" '
                     'title="Mia set four"><img src="data:x"></a>',
                     '<div data-lpage="https://example-i.test/q/5"><img src="data:x"></div>')
-        self.assertEqual(serp_links(html), [
+        self.assertEqual(links(html), [
             ("https://example-e.test/gallery/1", "Mia Vale gallery example-e.test"),
             ("https://example-f.test/post/2", "Mia post two"), ("https://example-g.test/p/3", "Mia alt text"),
             ("https://example-h.test/s/4", "Mia set four"), ("https://example-i.test/q/5", "")])
@@ -80,7 +84,7 @@ class Parser(unittest.TestCase):
         html = serp(result("https://www.youtube.com/watch?v=abc", "Mia clip"),
                     result("https://accounts.youtube.com/accounts/SetSID"), result("https://www.youtube.com/account"),
                     result("https://vids.test/v/9", "Mia on vids"))
-        self.assertEqual(serp_links(html), [("https://www.youtube.com/watch?v=abc", "Mia clip"),
+        self.assertEqual(links(html), [("https://www.youtube.com/watch?v=abc", "Mia clip"),
                                             ("https://vids.test/v/9", "Mia on vids")])
 
     def test_thumbs_are_the_results_own_https_image(self):
@@ -91,25 +95,33 @@ class Parser(unittest.TestCase):
                     f'<img src="{t}g2"></div>',
                     '<div class="g"><a href="https://example-h.test/v/4"><h3>Mia http</h3></a>'
                     '<img src="http://example-h.test/t.jpg"></div>')
-        self.assertEqual([(u, th) for u, _, th in ts.serp_results(html)],
+        self.assertEqual([(u, th) for u, _, th in serp_results(html)],
                          [("https://example-e.test/g/1", f"{t}e"), ("https://example-f.test/v/2", f"{t}f"),
                           ("https://example-g.test/v/3", None), ("https://example-h.test/v/4", None)])
+
+    def test_a_result_never_takes_its_neighbours_thumb(self):
+        t = "https://encrypted-tbn0.gstatic.com/images?q=tbn:"
+        html = serp('<div><div class="g"><a href="https://example-a.test/v/1"><h3>Mia one</h3></a></div>'
+                    f'<div class="g"><a href="https://example-b.test/v/2"><h3>Mia two</h3></a><img src="{t}b"></div>'
+                    '</div>')
+        self.assertEqual([(u, th) for u, _, th in serp_results(html)],
+                         [("https://example-a.test/v/1", None), ("https://example-b.test/v/2", f"{t}b")])
 
     def test_script_style_template_text_and_comments_are_no_title(self):
         html = serp('<div class="g"><a href="https://a.example/1"><h3>Mia<!-- c --> Vale<script>x()</script>'
                     '<template><b>hidden</b></template><style>.a{}</style></h3></a></div>')
-        self.assertEqual(serp_links(html), [("https://a.example/1", "Mia Vale")])
+        self.assertEqual(links(html), [("https://a.example/1", "Mia Vale")])
 
     def test_deep_markup_does_not_hit_the_recursion_limit(self):
         html = serp("<div>" * 3000 + result("https://deep.example/v/1", "Mia deep") + "</div>" * 3000)
-        self.assertEqual(serp_links(html), [("https://deep.example/v/1", "Mia deep")])
+        self.assertEqual(links(html), [("https://deep.example/v/1", "Mia deep")])
 
 
 class SavedPages(unittest.TestCase):
     def test_web(self):
         html = fixture("google_web_mia.html")
         self.assertEqual(classify_serp(f"{G}/search?q=x", html), "results")
-        self.assertEqual(serp_links(html), [
+        self.assertEqual(links(html), [
             ("https://leaksite.example/mia_vale/12?ref=g", "Mia\xa0Vale  leaked set 12"),
             ("https://tube.example/v/mia-vale-solo", "Mia Vale solo clip"),
             ("https://forum.example/threads/mia-vale.123/", "Rowan Ash forum thread"),
@@ -121,7 +133,7 @@ class SavedPages(unittest.TestCase):
     def test_images(self):
         html = fixture("google_images_mia.html")
         self.assertEqual(classify_serp(f"{G}/search?q=x&tbm=isch", html), "results")
-        self.assertEqual(serp_links(html), [
+        self.assertEqual(links(html), [
             ("https://leaksite.example/mia_vale/gallery/3", "Mia Vale gallery leaksite.example"),
             ("https://pics.example/p/mia-vale-2", "Mia Vale post two"),
             ("https://img.example/s/3", "Rowan Ash alt text"),
@@ -131,7 +143,7 @@ class SavedPages(unittest.TestCase):
     def test_videos(self):
         html = fixture("google_videos_mia.html")
         self.assertEqual(classify_serp(f"{G}/search?q=x&tbm=vid", html), "results")
-        self.assertEqual(serp_links(html), [
+        self.assertEqual(links(html), [
             ("https://www.youtube.com/watch?v=mia42", "Mia Vale backstage"),
             ("https://vids.example/v/9/mia-vale", "Mia Vale on vids"),
             ("https://clips.example/watch/rowan-ash-77", "Rowan Ash clip 77"),
@@ -139,13 +151,13 @@ class SavedPages(unittest.TestCase):
 
     def test_the_sources_redacted_pages(self):
         web = fixture("google_web_results.html")
-        self.assertEqual(serp_links(web), [("https://www.google.com/goto?url=RESULT-A", "PLACEHOLDER A"),
+        self.assertEqual(links(web), [("https://www.google.com/goto?url=RESULT-A", "PLACEHOLDER A"),
                                            ("https://www.google.com/goto?url=TRANSLATE-A", "PLACEHOLDER A"),
                                            ("https://www.google.com/goto?url=RESULT-B", "PLACEHOLDER B")])
-        self.assertEqual(serp_links(fixture("google_images_empty.html")), [])
+        self.assertEqual(links(fixture("google_images_empty.html")), [])
 
     def test_the_quick_scans_saved_pages_parse_the_same(self):
-        web, images = serp_links(fixture("google_web.html", "")), serp_links(fixture("google_images.html", ""))
+        web, images = links(fixture("google_web.html", "")), links(fixture("google_images.html", ""))
         self.assertEqual((len(web), web[0]), (8, ("https://www.google.com/goto?url=CAESVwHEIkXX",
                                                   "Mira Example (@mira.example) • Instagram photos and videos")))
         self.assertEqual((len(images), images[0]),
@@ -182,7 +194,7 @@ class NoResultsWording(unittest.TestCase):
             ("videos", f"{G}/search?q=x&tbm=vid", vid_empty, fixture("google_videos_mia.html")),
         ]:
             with self.subTest(vertical=vertical):
-                self.assertEqual((classify_serp(url, empty), ts.says_no_results(empty), serp_links(empty)),
+                self.assertEqual((classify_serp(url, empty), ts.says_no_results(empty), links(empty)),
                                  ("no_results", True, []))
                 self.assertEqual((classify_serp(url, SHELL_ONLY), ts.says_no_results(SHELL_ONLY)), ("no_results", False))
                 self.assertEqual((classify_serp(url, full), ts.says_no_results(full)), ("results", False))

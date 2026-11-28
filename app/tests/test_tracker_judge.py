@@ -402,11 +402,17 @@ class AdmitHit(Base):
             w = c.execute("SELECT * FROM watches WHERE watch_id = ?", (wid,)).fetchone()
             got = [tracker_judge.admit_media(c, w, u, t, v, self.T0, first_scan=True) for u, t, v in (
                 (f"{SITE}/Gallery/mia_vale-7#t", "Pics", "images"), (f"{SITE}/Gallery/mia_vale-7", "again", "images"),
-                (f"{SITE}/clip/mia_vale-8", "Clip", "videos"), ("https://mega.nz/file/X1#mia_vale", "", "images"),
-                (f"{SITE}/post/9", "mia_vale set", "images"), ("https://onlyfans.com/mia_vale", "mia_vale", "videos"))]
+                (f"{SITE}/clip/mia_vale-8", "Clip", "videos"), ("https://mega.nz/file/X1#mia_vale", "", "images"))]
+            landing = tracker_judge.admit(c, wid, f"{SITE}/Gallery/mia_vale-7", "leaksite.example/gallery/mia_vale-7",
+                                          "leaksite.example", "page", "Pics", "google_web", self.T0)
         self.assertEqual(got[1], got[0])
-        self.assertEqual([g is None for g in got], [False, False, False, False, True, True])
-        rows = self.rows("SELECT url_key, landing_key, leak_site, kind, title FROM leaks ORDER BY url_key")
+        self.assertEqual([k for _, k in got], ["leaksite.example/gallery/mia_vale-7#google_images"] * 2 + [
+            "leaksite.example/clip/mia_vale-8#google_videos", "mega.nz/file/x1#mia_vale#google_images"])
+        self.assertTrue(landing[1])
+        self.assertNotIn(landing[0], {lid for lid, _ in got})
+        got = [lid for lid, _ in got]
+        rows = self.rows("SELECT url_key, landing_key, leak_site, kind, title FROM leaks WHERE kind = 'media' "
+                         "ORDER BY url_key")
         self.assertEqual(rows, [
             {"url_key": "leaksite.example/clip/mia_vale-8#google_videos", "landing_key": "leaksite.example/clip/mia_vale-8",
              "leak_site": "leaksite.example", "kind": "media", "title": "Clip"},

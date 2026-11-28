@@ -39,8 +39,9 @@ gone watch records nothing); the watch is never paused. A scan's run (the whole 
 cap_tenant_month writes watches.carry_json: its cut pages run once on the cap's next_on (next UTC day / the 1st), never
 carried again; a later scan absorbs a pending carry (runs the whole plan, replaces the carry). Result links go through
 tracker_judge.admit_hit with source google_web (a /goto link is dropped); no other engine is called. An images / videos
-result is also its media Leak (tracker_judge.admit_media), from the same page, no extra load; its tile's https thumbnail
-src (cached with the link) goes only through tracker_preview.store_thumb, never fetched here. Each returned
+result judged `leak` is also its media Leak (tracker_judge.admit_media), from the same page, no extra load; its tile's
+thumbnail src, cached with the link only when tracker_preview.allowed, goes only through tracker_preview.store_thumb,
+never fetched here. Each returned
 link's (vertical, field) pairs join leaks.google_fields_json. Only a run that searched (a page completed, breaker intact) touches visibility: one that
 completed every planned pair of a Leak and returned none marks it not visible (google_seen visible false), a set
 emptied by fields leaving the identity unknown (null); a tripped breaker only adds pairs. A run with a completed page
@@ -329,7 +330,7 @@ class _Serp:
                       "VALUES (?,?,?,?,?,?)", (self.day, q.vertical, q.text, q.start, since, json.dumps(links)))
 
     def search(self, lane, r, url, vertical="web", strict=False):
-        """-> the page's [[url, title]] (+ thumb on images / videos when the tile has one), or None (incomplete;
+        """-> the page's [[url, title]] (+ thumb on images / videos: an allowed tile src), or None (incomplete;
         counts toward the breaker, links reset it). A load is consumed right before each navigation, after its page is
         ready. A wall retries once in a fresh session while the hold has a load left. strict: an empty page is
         complete only with Google's no-results wording."""
@@ -378,7 +379,8 @@ class _Serp:
                 continue
             links = serp.serp_results(html, final)
             if links:
-                return [[u, t] + ([th] if th and vertical in tracker_judge.MEDIA else []) for u, t, th in links]
+                keep = vertical in tracker_judge.MEDIA
+                return [[u, t] + ([th] if keep and th and tracker_preview.allowed(th) else []) for u, t, th in links]
             return [] if kind == "no_results" and (not strict or serp.says_no_results(html or "")) else None
         return None
 
@@ -479,14 +481,14 @@ def _full(w, day, serps, whole):
             for u, title, *thumb in links:
                 if serp.is_goto(u):
                     continue
-                tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
                 returned.setdefault(tracker_judge.leak_key(u), set()).add(pair)
-                lid = tracker_judge.admit_media(c, w, u, title, q.vertical, at, first) \
-                    if q.vertical in tracker_judge.MEDIA else None
-                if lid:
-                    returned.setdefault(tracker_judge.media_key(u, q.vertical), set()).add(pair)
-                    if thumb:
-                        tracker_preview.store_thumb(c, lid, thumb[0], tracker_preview.query_id(*pair), at)
+                verdict = tracker_judge.admit_hit(c, w, u, title, "google_web", at, first_scan=first)
+                if verdict != "leak" or q.vertical not in tracker_judge.MEDIA:
+                    continue
+                lid, key = tracker_judge.admit_media(c, w, u, title, q.vertical, at, first)
+                returned.setdefault(key, set()).add(pair)
+                if thumb:
+                    tracker_preview.store_thumb(c, lid, thumb[0], tracker_preview.query_id(*pair), at)
         if done:
             _visibility(c, w, full, returned, {p for p, ks in want.items() if ks <= done}, at, not browser.broken)
     new_carry = None

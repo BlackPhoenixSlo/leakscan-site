@@ -201,7 +201,9 @@ def offer_counts(ls, counts, now_dt):
     old, week = tracker_db.fmt(now_dt - timedelta(days=OFFER_LIVE_DAYS)), tracker_db.day(now_dt - timedelta(days=OFFER_NEW_DAYS - 1))
     return {"visible": counts["live"] + counts["cached"], "came_back_30d": counts["came_back_30d"], "cached": counts["cached"],
             "live_30d": sum(x["pill"] == "live" and x["first_seen_at"] <= old for x in ls),
-            "new_7d": sum(not x["found_on_first_scan"] and x["first_seen_at"][:10] >= week for x in ls)}
+            # owner default 2026-11-28: a media Leak is its landing's twin, never a second new one
+            "new_7d": sum(not x["found_on_first_scan"] and x["kind"] != "media" and x["first_seen_at"][:10] >= week
+                          for x in ls)}
 
 
 def creator(c, w, now_dt, ls):

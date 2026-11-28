@@ -150,9 +150,20 @@ class TestMediaLeaks(Media):
         self.day(2)
         for u in (IMG, other, data):
             self.assertEqual((self.media(u)["thumb_url"], self.items()[(u, "media")]["preview"]), (None, None), u)
-        self.assertEqual(json.loads(self.rows("SELECT results_json FROM serp_cache WHERE vertical = 'images' AND "
-                                              "text = '\"mia_vale\"' AND page = 0")[0]["results_json"]),
-                         [[IMG, "Mia pics", "https://cdn.example/mia-i1.jpg"], [other, "Mia set"], [data, "Mia data"]])
+        cached = self.rows("SELECT results_json FROM serp_cache WHERE vertical = 'images' AND text = '\"mia_vale\"' "
+                           "AND page = 0")[0]["results_json"]
+        self.assertEqual(json.loads(cached), [[IMG, "Mia pics"], [other, "Mia set"], [data, "Mia data"]])
+        self.assertNotIn("cdn.example", cached)
+
+    def test_a_new_images_landing_counts_once_as_new(self):
+        self.day(2)
+        before = self.get(f"/v1/creators/{self.w}")[1]
+        self.pw.links[("images", '"mia_vale"')] = [(IMG, "Mia pics", THUMB)]
+        self.day(9)
+        after = self.get(f"/v1/creators/{self.w}")[1]
+        self.assertEqual(len(self.rows("SELECT * FROM leaks WHERE kind = 'media'")), 1)
+        self.assertEqual((before["this_week"]["new"], before["offer_counts"]["new_7d"]), (0, 0))
+        self.assertEqual((after["this_week"]["new"], after["offer_counts"]["new_7d"]), (1, 1))
 
     def test_removed_alias_clears_its_media_thumb(self):
         self.pw.links[("images", '"miavale_x"')] = [(IMG, "Mia pics", THUMB)]

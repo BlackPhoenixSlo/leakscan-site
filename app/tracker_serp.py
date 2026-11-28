@@ -1,8 +1,8 @@
 """Google web / images / videos SERPs: URL builder (`since` d|w|m is the `tbs=qdr:` past-day / week / month filter),
 page classification, result unwrapping and the link parser, plus the query templates. Copied from leakhunt 7ccbdd3
 (the laptop leak tools; read-only source) google (serp_url, classify_serp, is_goto, unwrap, serp_links) and search
-(VERTICALS, TEMPLATES, FILE_HOST_TEMPLATES); serp_links rewritten from bs4 onto html.parser with bs4's html.parser
-tree rules (void and self-closed tags hold nothing, an end tag closes the nearest open tag of its name, script /
+(VERTICALS, TEMPLATES, FILE_HOST_TEMPLATES); serp_links (here serp_results, which adds each result's thumb) rewritten
+from bs4 onto html.parser with bs4's html.parser tree rules (void and self-closed tags hold nothing, an end tag closes the nearest open tag of its name, script /
 style / template / rt / rp text and comments are no text). Not copied: the backend's paging, counters and stats, /goto
 resolution (a /goto link is dropped). Local: is_media_url is tracker_rules'. Stdlib only.
 
@@ -228,9 +228,15 @@ def _src(img):
     return None
 
 
-def _thumb(el, tile):
+def _result(el, base):
+    """The result url an element links (data-lpage, else an anchor's href, unwrapped) or None."""
+    raw = el.get("data-lpage") or (el.get("href") if el.name == "a" else None)
+    return unwrap(urljoin(base, raw)) if raw is not None else None
+
+
+def _thumb(el, tile, url, base):
     """A result's https thumbnail src: an images tile's first image; else the image of the link or of its nearest
-    ancestor (up to 3 up) holding any, None when that ancestor holds several (another result's)."""
+    ancestor (up to 3 up) holding any, None when that ancestor holds several or links another result (theirs)."""
     if tile is not None:
         img = tile.find("img")
         return _src(img) if img else None
@@ -238,6 +244,8 @@ def _thumb(el, tile):
     for _ in range(4):
         if node is None:
             break
+        if any(_result(d, base) not in (None, url) for d in node.descendants()):
+            return None
         imgs = list(islice((d for d in node.descendants() if d.name == "img"), 2))
         if imgs:
             return _src(imgs[0]) if len(imgs) == 1 else None
@@ -254,20 +262,15 @@ def serp_results(html, base=GOOGLE_SEARCH):
         if not ("data-lpage" in el.attrs or (el.name == "a" and "href" in el.attrs)):
             continue
         raw = el.get("data-lpage") or el.get("href") or ""
-        url = unwrap(urljoin(base, raw))
+        url = _result(el, base)
         if url and not (out.get(url) and thumbs.get(url)):
             tile = el if "data-lpage" in el.attrs else next((p for p in el.parents() if "data-lpage" in p.attrs), None)
             if tile is None and urlsplit(urljoin(base, raw)).path == "/imgres":
                 tile = el
             if not out.get(url):
                 out[url] = (_tile_title(tile) if tile is not None else "") or _title(el)
-            thumbs[url] = thumbs.get(url) or _thumb(el, tile)
+            thumbs[url] = thumbs.get(url) or _thumb(el, tile, url, base)
     return [(u, t, thumbs.get(u)) for u, t in out.items()]
-
-
-def serp_links(html, base=GOOGLE_SEARCH):
-    """serp_results' (url, title) pairs."""
-    return [(u, t) for u, t, _ in serp_results(html, base)]
 
 
 LOADS_PER_SESSION = 12  # then a fresh session (a new IP)
